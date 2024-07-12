@@ -17,9 +17,9 @@ def unlock_and_unzip_file(data2unzip, key_dir='key.key',multifile=False):
     
     if not multifile:
         # make sure its a ezip file
-        assert data2unzip.split(".")[1] == "ezip", "data2unzip is not a ezip file under RDP standards"
+        assert data2unzip.split(".")[-1] == "ezip", "data2unzip is not a ezip file under RDP standards"
         # make sure its not multifile
-        assert len(data2unzip.split(".")) == 2, "data2unzip is a multifile ezip file, please set multifile=True"
+        assert len(data2unzip.split('/')[-1].split(".")) == 2, "data2unzip is a multifile ezip file, please set multifile=True"
         
         # decrypt file
         with open(data2unzip, "rb") as file:
@@ -30,18 +30,18 @@ def unlock_and_unzip_file(data2unzip, key_dir='key.key',multifile=False):
         
         # unzip all files and folders
         with zipfile.ZipFile(data2unzip.replace("ezip","zip"), 'r') as zip_ref:
-            zip_ref.extractall(data2unzip.split(".")[0])
+            zip_ref.extractall(data2unzip[:-5])
         
         # delete zip file
         os.remove(data2unzip.replace("ezip","zip"))
     else:
         # make sure its not singlefile
-        assert len(data2unzip.split(".")) == 3, "data2unzip is a singlefile ezip file, please set multifile=False"
+        assert len(data2unzip.split('/')[-1].split(".")) == 3, "data2unzip is a singlefile ezip file, please set multifile=False"
         # make sure its the first ezip file
-        assert data2unzip.split(".")[1] == "ezip" and data2unzip.split(".")[2] == "000", "data2unzip is not a multisplit ezip file under RDP standards"
+        assert data2unzip.split('/')[-1].split(".")[1] == "ezip" and data2unzip.split('/')[-1].split(".")[2] == "000", "data2unzip is not a multisplit ezip file under RDP standards"
         
         # get each split file
-        split_files = list(filter(lambda x: x.startswith(data2unzip.split(".")[0]+"."+data2unzip.split(".")[1]), os.listdir()))
+        split_files = list(filter(lambda x: x.startswith(data2unzip[:-4]), os.listdir()))
         
         # decrypt each split file
         for split_file in split_files:
@@ -54,7 +54,7 @@ def unlock_and_unzip_file(data2unzip, key_dir='key.key',multifile=False):
         # unzip all files and folders
         with SplitFileReader([files.replace('ezip','zip') for files in split_files]) as sub_zip:
             with zipfile.ZipFile(sub_zip, 'r') as zip_ref:
-                zip_ref.extractall(data2unzip.split(".")[0])
+                zip_ref.extractall(data2unzip[:-9])
         
         # delete zip files
         for split_file in split_files:
@@ -119,11 +119,11 @@ def zip_and_lock_folder(data2zip,key_dir='key.key',multifile=False,split_size_by
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Lock and unlock files.')
-    parser.add_argument('--encrypt', default='', dtype=str, help='Folder to encrypt.')
-    parser.add_argument('--decrypt', default='', dtype=str, help='File to decrypt.')
-    parser.add_argument('--key_dir', default='key.key', dtype=str, help='Directory of key.')
-    parser.add_argument('--multifile', default=False, dtype=bool, help='Whether to split zip files into multiple files.')
-    parser.add_argument('--split_size_bytes', default=50_000_000, dtype=int, help='Size of each split file in bytes. Default is 50MB.')
+    parser.add_argument('--encrypt', default='', type=str, help='Folder to encrypt.')
+    parser.add_argument('--decrypt', default='', type=str, help='File to decrypt.')
+    parser.add_argument('--key_dir', default='key.key', type=str, help='Directory of key.')
+    parser.add_argument('--multifile', default=False, type=bool, help='Whether to split zip files into multiple files.')
+    parser.add_argument('--split_size_bytes', default=50_000_000, type=int, help='Size of each split file in bytes. Default is 50MB.')
     args = parser.parse_args()
 
     assert args.encrypt != '' or args.decrypt != '', "Insufficient arguments provided. Please provide a file or folder to encrypt or decrypt."
