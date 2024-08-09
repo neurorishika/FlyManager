@@ -1,9 +1,10 @@
 import pandas as pd
-from flymanager.labels import AveryLabel
+from flymanager.utils.labels import AveryLabel
 from datetime import datetime
 import os
 import segno
 import numpy as np
+import hashlib
 
 def validated_input(prompt, valid_options, default=None, show_options=True):
     """
@@ -69,6 +70,23 @@ elif response == "4":
     # keep only the ones with X in the stock name
     df = df[df["Stock"].str.contains("X")]
 
+# ask if only a subset of the labels should be printed
+response = validated_input("Print all labels or a subset?", ["all", "subset"], default="all")
+if response == "subset":
+    # provide a gui to select the labels
+    print("Select the labels to print:")
+    for i in range(len(df)):
+        print(f"{i}: {df['Stock'].iloc[i]} | {df['Genotype'].iloc[i]} | {df['Common Name'].iloc[i]}")
+    print("Enter the numbers separated by commas.")
+    response = input("Enter your choice: ")
+    response = [int(i) for i in response.split(",")]
+    # check if all the indices are valid
+    if not all([i in range(len(df)) for i in response]):
+        print("Indices: ", response)
+        print("Invalid indices. Please try again.")
+        exit()
+    df = df.iloc[response]
+
 # ask how many blank spaces to leave
 num_blank = validated_input("How many blank spaces to leave?", [str(i) for i in range(30)], default="0", show_options=False)
 num_blank = int(num_blank)
@@ -93,10 +111,10 @@ label.debug = False
 # create a callable function to render the labels
 # LABEL TEMPLATE
 # Stock | Replicate | Date
-# Genotype (colored by Status: Healthy = Green, Showing Issues = Orange, Needs refresh = Red)
+# Genotype + Alt name (colored by Status: Healthy = Green, Showing Issues = Orange, Needs refresh = Red)
 # watermark: common name
 
-def render_label(canvas, width, height, stock, replicate, genotype, status, common_name):
+def render_label(canvas, width, height, stock, replicate, genotype, status, common_name, alt_name):
     if stock != "" and replicate != "":
         
         # write the common name as a watermark
@@ -117,32 +135,41 @@ def render_label(canvas, width, height, stock, replicate, genotype, status, comm
         elif status == "Needs refresh":
             canvas.setFillColorRGB(*hex_to_rgb("#8B0000"))
         # if the genotype is too long, split it into multiple lines
+        genotype = genotype + "(" + alt_name + ")" if alt_name != "" else genotype
         split_genotype = [genotype[i:i+25] for i in range(0, len(genotype), 25)]
         for i, genotype in enumerate(split_genotype):
             canvas.drawString(10, height - 30 - i*10, f"{genotype}")
         
         # add a qr code on the bottom right corner
-        
-        text = f"{stock[3:]}_{replicate}_{datetime.now().strftime('%Y-%m-%d')}"
-        qr = segno.make(f"{stock[3:]}_{replicate}_{datetime.now().strftime('%Y-%m-%d')}", micro=False)
+        text = f"{stock[3:]}_{replicate}_{genotype}"
+        # hash the text to make it shorter
+        text = hashlib.md5(text.encode()).hexdigest()
+        # generate the qr code
+        qr = segno.make(f"{text}")
         qr.save("data/generated_qr/{0}_{1}.png".format(stock, replicate), scale=5)
         canvas.drawImage("data/generated_qr/{0}_{1}.png".format(stock, replicate),
                         width - 50, 5, width=45, height=45)
 
 # render the blank spaces
 for i in range(num_blank):
-    label.render(render_label, 1, "", "", "", "")
+    label.render(render_label, 1, "", "", "", "", "", "")
 
 # render the labels
 for i in range(num_labels):
-    label.render(render_label, 1, df["Stock"].iloc[i], df["Replicate"].iloc[i], df["Genotype"].iloc[i], df["Status"].iloc[i], df["Common Name"].iloc[i])
+    label.render(render_label, 1, df["Stock"].iloc[i], df["Replicate"].iloc[i], df["Genotype"].iloc[i], df["Status"].iloc[i], df["Common Name"].iloc[i], df["Alt Names"].iloc[i] if not pd.isna(df["Alt Names"].iloc[i]) else "")
 
 # close the pdf file
 label.close()
 
+# ask user if the printer is ready
+response = validated_input("Is the printer ready?", ["y", "n"], default="y")
+if response == "n":
+    print("Please make sure the printer is ready and try again.")
+    exit()
+
 # start the printing process
 print("Printing labels...")
-# os.system(f"lpr data/generated_labels/{datetime.now().strftime('%Y-%m-%d')}.pdf")
+os.system(f"lpr data/generated_labels/{datetime.now().strftime('%Y-%m-%d')}.pdf")
 
 
 

@@ -5,18 +5,11 @@ from reportlab.lib.pagesizes import LETTER, landscape
 from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from flymanager.utils.utils import hex_to_rgb
+from datetime import datetime
+import segno
 
-# Usage:
-#   label = AveryLabels.AveryLabel(5160)
-#   label.open( "labels5160.pdf" )
-#   label.render( RenderAddress, 30 )
-#   label.close()
-#
-# 'render' can either pass a callable, which receives the canvas object
-# (with X,Y=0,0 at the lower right) or a string "form" name of a form
-# previously created with canv.beginForm().
-
-
+# Label Info:
 # labels across
 # labels down
 # label size w/h
@@ -50,6 +43,13 @@ class AveryLabel:
     'render' can either pass a callable, which receives the canvas object
     (with X,Y=0,0 at the lower right) or a string "form" name of a form
     previously created with canv.beginForm().
+
+    To render, you can either create a template and tell me
+    "go draw N of these templates" or provide a callback.
+    Callback receives canvas, width, height.
+    
+    Or, pass a callable and an iterator.  We'll do one label
+    per iteration of the iterator.
     """
 
     def __init__(self, label, **kwargs):
@@ -98,12 +98,7 @@ class AveryLabel:
         self.canvas.save()
         self.canvas = None
 
-    # To render, you can either create a template and tell me
-    # "go draw N of these templates" or provide a callback.
-    # Callback receives canvas, width, height.
-    #
-    # Or, pass a callable and an iterator.  We'll do one label
-    # per iteration of the iterator.
+
 
     def render( self, thing, count, *args ):
         assert callable(thing) or isinstance(thing, str)
@@ -135,3 +130,84 @@ class AveryLabel:
             func( canv, self.size[0], self.size[1], chunk )
             canv.restoreState()
             self.advance()
+
+
+
+
+def render_label(canvas, width, height, stock, uid, genotype, status, common_name, alt_name):
+    '''
+    LABEL TEMPLATE
+    Stock | Replicate | Date
+    Genotype + Alt name (colored by Status: Healthy = Green, Showing Issues = Orange, Needs refresh = Red)
+    watermark: common name
+    '''
+    if stock != "":
+        
+        # write the common name as a watermark
+        canvas.setFont("Courier-Bold", 10)
+        canvas.setFillColorRGB(0.8, 0.8, 0.8)
+        canvas.drawString(5, 5, common_name)
+
+        # draw the stock
+        canvas.setFont("Courier-Bold", 10)
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.drawString(10, height - 15, f"{stock} | {datetime.now().strftime('%Y-%m-%d')}")
+        # draw the genotype
+        canvas.setFont("Courier", 8)
+        if status == "Healthy":
+            canvas.setFillColorRGB(*hex_to_rgb("#006400"))
+        elif status == "Showing Issues":
+            canvas.setFillColorRGB(*hex_to_rgb("#964B00"))
+        elif status == "Needs refresh":
+            canvas.setFillColorRGB(*hex_to_rgb("#8B0000"))
+        # if the genotype is too long, split it into multiple lines
+        genotype = genotype + "(" + alt_name + ")" if alt_name != "" else genotype
+        split_genotype = [genotype[i:i+25] for i in range(0, len(genotype), 25)]
+        for i, genotype in enumerate(split_genotype):
+            canvas.drawString(10, height - 30 - i*10, f"{genotype}")
+        
+        # add a qr code on the bottom right corner
+        text = str(uid)
+        # generate the qr code
+        qr = segno.make(f"{text}")
+        qr.save("temp/{0}.png".format(uid), scale=5)
+        canvas.drawImage("temp/{}.png".format(uid),
+                        width - 50, 5, width=45, height=45)
+
+def generate_label_pdf(filename, user_initial, selected_stocks, num_blank, num_labels, path="flymanager/static/generated_labels/", debug=False):
+
+    if os.path.exists("temp/"):
+        os.system("rm -r temp/")
+    os.mkdir("temp/")
+
+    # generate a reportlab using AveryLabel
+    label = AveryLabel(5160)
+    # open the pdf files
+    if not os.path.exists(path):
+        os.mkdir(path)
+    # make sure the file path ends with a /
+    if path[-1] != "/":
+        path += "/"
+        
+    # open the pdf files
+    label.open("{0}{1}.pdf".format(path, filename))
+
+    # set debug to True to see the labels
+    label.debug = debug
+    
+    # render the blank spaces
+    for i in range(num_blank):
+        label.render(render_label, 1, "", "", "", "", "", "")
+
+    # render the labels
+    for i in range(num_labels):
+        label.render(render_label, 1, 
+                    user_initial + "-" + str(selected_stocks[i]['SeriesID']) + str(selected_stocks[i]['ReplicateID']) + "(" + str(selected_stocks[i]['TrayID']) + "-" + str(selected_stocks[i]['TrayPosition']) + ")",
+                    selected_stocks[i]['UniqueID'],
+                    selected_stocks[i]['Genotype'],
+                    selected_stocks[i]['Status'],
+                    selected_stocks[i]['Name'],
+                    selected_stocks[i]['AltReference'] if selected_stocks[i]['AltReference']!= "" else "")
+
+    # close the pdf file
+    label.close()

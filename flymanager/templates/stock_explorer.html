@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Explorer</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.ico') }}">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0f0f0;
+            margin-bottom: 100px;
+        }
+
+        .header {
+            background-color: #007BFF;
+            color: #fff;
+            padding: 10px 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header a {
+            color: #fff;
+            margin: 0 10px;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .main-content {
+            padding: 80px 20px 20px;
+        }
+
+        .stock-item {
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            font-size: 14px;
+            border: 2px solid transparent;
+        }
+
+        .stock-item[data-status="Healthy"] {
+            border-color: green;
+        }
+
+        .stock-item[data-status="Showing Issues"] {
+            border-color: rgb(96, 32, 32);
+        }
+
+        .stock-item[data-status="Needs refresh"] {
+            border-color: red;
+        }
+
+        .stock-item[data-status="Ordered"] {
+            border-color: blue;
+        }
+
+        .stock-item[data-status="No longer maintained"] {
+            border-color: pink;
+        }
+
+        .stock-item.selected {
+            background-color: #c4ecff;
+        }
+
+        .stock-item h5 {
+            margin: 0 0 5px;
+            font-weight: 700;
+            font-size: 16px;
+        }
+
+        .stock-item p {
+            margin: 0;
+            font-size: 12px;
+        }
+
+        .stock-item .checkbox {
+            margin-right: 10px;
+        }
+
+        .details {
+            padding-top: 10px;
+            width: 100%;
+        }
+
+        .btn-link.btn-sm {
+            font-size: 12px;
+            padding: 2px 5px;
+            margin-left: 10px;
+            color: #007bff;
+        }
+
+        .btn-link.btn-sm i {
+            font-size: 14px;
+        }
+
+        .clearfix::after {
+            content: "";
+            display: table;
+            clear: both;
+        }
+
+        .badges {
+            margin-top: 5px;
+            margin-bottom: 10px;
+        }
+
+        .badge-info {
+            background-color: #17a2b8;
+            color: white;
+            margin-right: 5px;
+        }
+
+        .badge-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .filters {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 10px;
+        }
+
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .filter-col {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .footer {
+            background-color: #007BFF;
+            color: #fff;
+            padding: 10px 0;
+            text-align: center;
+            position: fixed;
+            width: 100%;
+            bottom: 0;
+            z-index: 1000;
+        }
+
+        .footer a {
+            color: #fff;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div>Welcome, <strong>{{ username }}</strong></div>
+            <nav>
+                <a href="/">Home</a>
+                <a href="/cross_explorer">Cross Explorer</a>
+                <a href="/tray_explorer">Tray Explorer</a>
+                <a href="/cross_generator">Cross Generator</a>
+                <a href="/tray_generator">Tray Generator</a>
+                <a href="/stock_explorer">Stock Explorer</a>
+                <a style="font-weight: 700;" href="/logout">Logout</a>
+            </nav>
+        </div>
+    </header>
+    <div class="container main-content">
+        <div class="filters">
+            <h3>Filters</h3>
+            <form method="post" action="/stock_explorer">
+                <div class="filter-row">
+                    <div class="filter-col">
+                        <label for="filterType">Type:</label>
+                        <select id="filterType" name="filterType" class="form-control">
+                            <option value="">All</option>
+                            {% for value in unique_values.Type %}
+                                <option value="{{ value }}" {% if filter_state.filterType == value %}selected{% endif %}>{{ value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-col">
+                        <label for="filterSeriesID">Series ID:</label>
+                        <select id="filterSeriesID" name="filterSeriesID" class="form-control">
+                            <option value="">All</option>
+                            {% for value in unique_values.SeriesID %}
+                                <option value="{{ value }}" {% if filter_state.filterSeriesID == value %}selected{% endif %}>{{ value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-col">
+                        <label for="filterTrayID">Tray ID:</label>
+                        <select id="filterTrayID" name="filterTrayID" class="form-control">
+                            <option value="">All</option>
+                            {% for value in unique_values.TrayID %}
+                                <option value="{{ value }}" {% if filter_state.filterTrayID == value %}selected{% endif %}>{{ value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-col">
+                        <label for="filterStatus">Status:</label>
+                        <select id="filterStatus" name="filterStatus" class="form-control">
+                            <option value="">All</option>
+                            {% for value in unique_values.Status %}
+                                <option value="{{ value }}" {% if filter_state.filterStatus == value %}selected{% endif %}>{{ value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-col">
+                        <label for="filterFoodType">Food Type:</label>
+                        <select id="filterFoodType" name="filterFoodType" class="form-control">
+                            <option value="">All</option>
+                            {% for value in unique_values.FoodType %}
+                                <option value="{{ value }}" {% if filter_state.filterFoodType == value %}selected{% endif %}>{{ value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-col">
+                        <label for="filterProvenance">Provenance:</label>
+                        <select id="filterProvenance" name="filterProvenance" class="form-control">
+                            <option value="">All</option>
+                            {% for value in unique_values.Provenance %}
+                                <option value="{{ value }}" {% if filter_state.filterProvenance == value %}selected{% endif %}>{{ value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-col">
+                        <label for="searchQuery">Search:</label>
+                        <input type="text" id="searchQuery" name="searchQuery" class="form-control" value="{{ filter_state.searchQuery }}">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">Apply Filters</button>
+                <button type="submit" name="clear_filters" class="btn btn-secondary mt-3">Clear Filters</button>
+            </form>                          
+        </div>
+        <div class="mb-3">
+            <a href="/add_stock" class="btn btn-success">Add New Stock</a>
+        </div>
+        <div id="stockItems">
+            {% for stock in stocks %}
+            <div class="stock-item" data-status="{{ stock.Status }}" id="item-{{ loop.index }}">
+                <div class="checkbox">
+                    <input type="checkbox" id="stock{{ loop.index }}">
+                </div>
+                <div style="flex-grow: 1;">
+                    <h5>
+                        {{ stock.SeriesID }}{{ stock.ReplicateID }}
+                        {% if stock.TrayID and stock.TrayPosition %}
+                            <small class="text-muted">({{ stock.TrayID }}-{{ stock.TrayPosition }})</small>
+                        {% endif %}
+                        | {{ stock.Name }}
+                        {% if stock.AltReference %}
+                            <span class="text-muted">({{ stock.AltReference }})</span>
+                        {% endif %}
+                    </h5>
+                    <p>
+                        <strong>Genotype:</strong> {{ stock.Genotype }}<br>
+                        <strong>Provenance:</strong> {{ stock.Provenance }}<br>
+                        <strong>Unique Identifier:</strong> <i>{{ stock.UniqueID }}</i>
+                    </p>
+                    <div class="badges">
+                        <span class="badge badge-info">{{ stock.FoodType }}</span>
+                        <span class="badge badge-secondary">{{ stock.Type }}</span>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <button class="btn btn-link btn-sm expand-btn" onclick="toggleDetails({{ loop.index }})">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <button class="btn btn-link btn-sm view-details-btn" onclick="viewDetails('{{ stock.UniqueID }}')">
+                        <i class="fas fa-external-link-alt"></i>
+                    </button>
+                </div>
+                <div class="clearfix"></div>
+                <div class="details" id="details-{{ loop.index }}" style="display: none; width: 100%;">
+                    <div style="display: flex; flex-wrap: wrap;">
+                        <div style="flex: 1;">
+                            <p><strong>Source ID:</strong> {{ stock.SourceID }}</p>
+                            <p><strong>Comments:</strong> {{ stock.Comments }}</p>
+                            <p><strong>Creation Date:</strong> {{ stock.CreationDate }}</p>
+                        </div>
+                        <div style="flex: 1;">
+                            <p><strong>Last Flip Date:</strong> {{ stock.LastFlipDate }}</p>
+                            <p><strong>Flip Log:</strong> {{ stock.FlipLog[-5:]|join(', ') }}</p>
+                            <p><strong>Data Modified Date:</strong> {{ stock.DataModifiedDate }}</p>
+                            <p><strong>Modification Log:</strong> {{ stock.ModificationLog[-5:]|join(', ') }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>                                                       
+            {% endfor %}
+        </div>   
+        <button type="button" id="addToCartBtn" class="btn btn-warning mt-3">Add to Cart</button>
+        <button type="button" id="selectAllBtn" class="btn btn-info mt-3">Select All</button>
+        <button type="button" id="deselectAllBtn" class="btn btn-info mt-3">Deselect All</button>
+        <div id="cart" class="mt-5">
+            <h3>Cart</h3>
+            <div id="cartItems"></div>
+            <button type="button" id="emptyCartBtn" class="btn btn-danger mt-3">Empty Cart</button>
+        </div>
+        <form id="generateLabelsForm" method="post" action="/generate_labels" target="_blank">
+            <input type="hidden" name="selected_uids" id="selectedUids">
+            <input type="hidden" name="blank_spaces" id="blankSpaces">
+            <input type="hidden" name="quantities" id="quantities">
+            <button type="button" id="generateLabelsBtn" class="btn btn-primary btn-block mt-3">Generate Labels</button>
+        </form>
+    </div>
+    <footer class="footer">
+        <div>For support, contact admin: Rishika Mohanta <a href="mailto:rmohanta@rockefeller.edu">rmohanta@rockefeller.edu</a></div>
+        <div>
+            <a href="/privacy_policy">Privacy Policy</a> |
+            <a href="/terms_of_service">Terms of Service</a>
+        </div>
+    </footer>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        let cart = JSON.parse(localStorage.getItem('cart')) || [];
+    
+        function saveCart() {
+            localStorage.setItem('cart', JSON.stringify(cart));
+        }
+    
+        function updateCart() {
+            let cartItems = document.getElementById('cartItems');
+            cartItems.innerHTML = '';
+            if (cart.length === 0) {
+                cartItems.innerHTML = '<p>Your cart is empty.</p>';
+            } else {
+                cart.forEach(function(item, index) {
+                    cartItems.innerHTML += `<div class="cart-item">
+                        <span>${item.identifier} - ${item.name}</span>
+                        <input type="number" class="form-control quantity-input" value="${item.quantity}" min="1" style="width: 60px; display: inline-block; margin: 0 10px;" onchange="updateQuantity(${index}, this.value)">
+                        <button class="btn btn-danger btn-sm" onclick="removeFromCart(${index})">Remove</button>
+                    </div>`;
+                });
+            }
+            saveCart();
+        }
+    
+        function updateQuantity(index, quantity) {
+            cart[index].quantity = quantity;
+            saveCart();
+        }
+    
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            updateCart();
+        }
+    
+        function emptyCart() {
+            cart = [];
+            updateCart();
+        }
+    
+        document.getElementById('selectAllBtn').addEventListener('click', function() {
+            document.querySelectorAll('.stock-item input[type="checkbox"]').forEach(function(checkbox) {
+                checkbox.checked = true;
+                document.getElementById('item-' + checkbox.id.replace('stock', '')).classList.add('selected');
+            });
+        });
+    
+        document.getElementById('deselectAllBtn').addEventListener('click', function() {
+            document.querySelectorAll('.stock-item input[type="checkbox"]').forEach(function(checkbox) {
+                checkbox.checked = false;
+                document.getElementById('item-' + checkbox.id.replace('stock', '')).classList.remove('selected');
+            });
+        });
+    
+        document.querySelectorAll('.stock-item input[type="checkbox"]').forEach(function(checkbox) {
+            checkbox.addEventListener('change', function() {
+                if (checkbox.checked) {
+                    document.getElementById('item-' + checkbox.id.replace('stock', '')).classList.add('selected');
+                } else {
+                    document.getElementById('item-' + checkbox.id.replace('stock', '')).classList.remove('selected');
+                }
+            });
+        });
+    
+        document.querySelector('button[name="clear_filters"]').addEventListener('click', function(event) {
+            if (!confirm('Are you sure you want to clear all filters?')) {
+                event.preventDefault();
+            }
+        });
+    
+        document.getElementById('addToCartBtn').addEventListener('click', function() {
+            document.querySelectorAll('.stock-item input[type="checkbox"]:checked').forEach(function(checkbox) {
+                let index = checkbox.id.replace('stock', '');
+                let stockItem = document.getElementById('item-' + index);
+                let identifier = stockItem.querySelector('h5').textContent.split('|')[0].trim();
+                let name = stockItem.querySelector('h5').textContent.split('|')[1].trim();
+                let uid = stockItem.querySelector('p i').textContent.trim();
+                let item = {
+                    id: index,
+                    quantity: 1,
+                    identifier: identifier,
+                    name: name,
+                    uid: uid
+                };
+    
+                let existingItem = cart.find(cartItem => cartItem.uid === item.uid);
+                if (existingItem) {
+                    existingItem.quantity++;
+                } else {
+                    cart.push(item);
+                }
+            });
+    
+            updateCart();
+            clearSelection();
+        });
+    
+        function clearSelection() {
+            document.querySelectorAll('.stock-item input[type="checkbox"]').forEach(function(checkbox) {
+                checkbox.checked = false;
+                document.getElementById('item-' + checkbox.id.replace('stock', '')).classList.remove('selected');
+            });
+        }
+    
+        document.getElementById('generateLabelsBtn').addEventListener('click', function() {
+            if (cart.length > 0) {
+                let selectedUids = cart.map(item => item.uid).join(',');
+                let quantities = cart.map(item => item.quantity).join(',');
+                let blankSpaces = prompt('How many blank spaces should be left?');
+                if (blankSpaces !== null) {
+                    let form = document.getElementById('generateLabelsForm');
+                    document.getElementById('selectedUids').value = selectedUids;
+                    document.getElementById('blankSpaces').value = blankSpaces;
+                    document.getElementById('quantities').value = quantities;
+                    form.submit();
+                }
+            } else {
+                alert('Your cart is empty.');
+            }
+            emptyCart();
+        });
+    
+        function toggleDetails(index) {
+            var details = document.getElementById('details-' + index);
+            var icon = document.querySelector('#item-' + index + ' .expand-btn i');
+            if (details.style.display === 'none') {
+                details.style.display = 'block';
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            } else {
+                details.style.display = 'none';
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        }
+    
+        function viewDetails(uniqueId) {
+            window.open('/view_stock/' + uniqueId, '_blank');
+        }
+    
+        document.addEventListener('DOMContentLoaded', function() {
+            updateCart();
+        });
+
+        document.getElementById('emptyCartBtn').addEventListener('click', function() {
+        if (confirm('Are you sure you want to empty the cart?')) {
+            emptyCart();
+        }
+    });
+    </script>
+    
+</body>
+</html>

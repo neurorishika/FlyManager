@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homepage</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.ico') }}">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0f0f0;
+            margin-bottom: 50px;
+        }
+        .header {
+            background-color: #007BFF;
+            color: #fff;
+            padding: 10px 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+        }
+        .header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header a {
+            color: #fff;
+            margin: 0 10px;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .main-content {
+            padding: 80px 20px 20px;
+        }
+        .introduction {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .quick-access {
+            margin-bottom: 20px;
+        }
+        .quick-access button {
+            margin: 5px;
+        }
+        .recent-activity,
+        .statistics {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .activity-item {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .footer {
+            background-color: #007BFF;
+            color: #fff;
+            padding: 10px 0;
+            text-align: center;
+            position: fixed;
+            width: 100%;
+            bottom: 0;
+            z-index: 1000;
+        }
+        .footer a {
+            color: #fff;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div>Welcome, <strong>{{ username }}</strong></div>
+            <nav>
+                <a href="/">Home</a>
+                <a href="/cross_explorer">Cross Explorer</a>
+                <a href="/tray_explorer">Tray Explorer</a>
+                <a href="/cross_generator">Cross Generator</a>
+                <a href="/tray_generator">Tray Generator</a>
+                <a href="/stock_explorer">Stock Explorer</a>
+                <a style="font-weight: 700;" href="/logout">Logout</a>
+            </nav>
+        </div>
+    </header>
+    <div class="container main-content">
+        
+    </div>
+    <footer class="footer">
+        <div>For support, contact admin: Rishika Mohanta <a href="mailto:rmohanta@rockefeller.edu">rmohanta@rockefeller.edu</a></div>
+        <div>
+            <a href="/privacy_policy">Privacy Policy</a> |
+            <a href="/terms_of_service">Terms of Service</a>
+        </div>
+    </footer>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
