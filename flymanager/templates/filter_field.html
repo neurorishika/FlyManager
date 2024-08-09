@@ -1,0 +1,9 @@
+<div class="filter-col">
+    <label for="filter{{ filter_name }}">{{ filter_name }}:</label>
+    <select id="filter{{ filter_name }}" name="filter{{ filter_name | replace(' ', '') }}" class="form-control">
+        <option value="">All</option>
+        {% for value in options %}
+            <option value="{{ value }}" {% if selected == value %}selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+    </select>
+</div>

@@ -211,6 +211,70 @@ def change_password(user, master_password, new_password, client):
 
 ### METHODS FOR STOCKS
 
+def flip_stock(user, uid, client, timestamp, new_status=None, added_comment=None):
+    """
+    Flip the status of the stock
+    Parameters:
+    user: str
+        the username of the user
+    uid: str
+        the unique identifier of the stock
+    client: gspread.Client
+        the client for the google sheet
+    timestamp: str
+        the special timestamp to use
+    new_status: str
+        the new status of the stock
+    added_comment: str
+        the comment to add to the stock
+    """
+    # get the user's stock sheet
+    stock = get_user_stocks(user, client)
+    # find the row of the stock
+    stock_row = stock.find(uid).row
+    # find the relevant columns
+    last_flipped_col = stock.find("LastFlipDate").col
+    flip_log_col = stock.find("FlipLog").col
+
+    # update the last flipped date and append to the flip log
+    ts = timestamp.replace('T', ' ')
+    stock.update_cell(stock_row, last_flipped_col, ts)
+    flip_log = stock.cell(stock_row, flip_log_col).value
+    stock.update_cell(stock_row, flip_log_col, ts + "\n" + flip_log if flip_log else ts)
+
+    if new_status is not None or added_comment is not None:
+        data_modified_col = stock.find("DataModifiedDate").col
+        data_modified_log_col = stock.find("ModificationLog").col
+        data_modified_log = stock.cell(stock_row, data_modified_log_col).value
+
+    if new_status is not None:
+        # update the status
+        status_col = stock.find("Status").col
+        # get the current status
+        current_status = stock.cell(stock_row, status_col).value
+        # check if the status is different
+        if current_status != new_status:
+            stock.update_cell(stock_row, status_col, new_status)
+            # update the data modified date
+            stock.update_cell(stock_row, data_modified_col, ts)
+            # append to the data modified log
+            text = "{} : Status changed from {} to {}".format(ts, current_status, new_status)
+            stock.update_cell(stock_row, data_modified_log_col, text + "\n" + data_modified_log if data_modified_log else text)
+    
+    if added_comment is not None:
+        # update the comments
+        comments_col = stock.find("Comments").col
+        # get the current comments
+        current_comments = stock.cell(stock_row, comments_col).value
+        new_comments = added_comment + "\n" + current_comments if current_comments else added_comment
+        stock.update_cell(stock_row, comments_col, new_comments)
+        # update the data modified date
+        stock.update_cell(stock_row, data_modified_col, ts)
+        # append to the data modified log
+        text = "{} : Comments added: {}".format(ts, added_comment)
+        stock.update_cell(stock_row, data_modified_log_col, text + "\n" + data_modified_log if data_modified_log else text)
+
+
 def add_to_stock(user, properties, client):
     """
     Add a stock to the user's stock sheet

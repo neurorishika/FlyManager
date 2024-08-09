@@ -13,22 +13,30 @@ import os
 import hashlib
 from fuzzywuzzy import fuzz
 
-from flymanager.utils.gsheet import get_all_users, get_user_initials, add_user, change_password, create_client, write_activity, get_user_activities, get_user_stocks
+from flymanager.utils.gsheet import get_all_users, get_user_initials, add_user, change_password, create_client, write_activity, get_user_activities, get_user_stocks, flip_stock
 from flymanager.utils.labels import generate_label_pdf
+from flymanager.utils.scanner import get_available_ports, get_next_scan
 
 from datetime import datetime
 
 
 # initialize our Flask application
 app = Flask(__name__, template_folder="../templates", static_folder="../static")
-# configure the session
+
+# configure the session (local filesystem, timeout of 10 minutes)
 app.secret_key = os.urandom(24)
-app.config["SESSION_PERMANENT"] = False
-app.config["SESSION_COOKIE_NAME"] = "flymanager"
-app.config["SESSION_TIMEOUT"] = 3600
-app.config["SESSION_USE_SIGNER"] = True
-app.config["SESSION_KEY_PREFIX"] = "flymanager"
+
+# set the session type to filesystem
 app.config["SESSION_TYPE"] = "filesystem"
+app.config["SESSION_PERMANENT"] = False
+app.config["PERMANENT_SESSION_LIFETIME"] = 600
+
+# clear the session on restart
+app.config["SESSION_FILE_DIR"] = "/tmp"
+app.config["SESSION_FILE_THRESHOLD"] = 500
+app.config["SESSION_FILE_MODE"] = 384
+
+# initialize the session
 Session(app)
 
 # connect to google sheets
@@ -282,6 +290,9 @@ def generate_labels():
     )
     
     pdf_file_path = '/static/generated_labels/{}.pdf'.format(filename)
+
+    # write the activity to the user's activity sheet
+    write_activity(username, 'Generated labels for {} stocks'.format(len(selected_stocks)), client)
     
     return redirect(pdf_file_path)
 
@@ -295,6 +306,64 @@ def view_stock(unique_id):
     username = session.get("username")
     stock = None #get_stock_by_unique_id(unique_id, client)
     return render_template('view_stock.html', username=username, stock=stock)
+
+# define a route for the flip page
+@app.route('/flip', methods=['GET'])
+def flip():
+    if not session.get("username"):
+        return redirect("/login")
+    
+    username = session.get("username")
+    ports = get_available_ports()
+    return render_template('flip.html', username=username, ports=ports)
+
+@app.route('/start_scan', methods=['POST'])
+def start_scan():
+    data = request.json
+    port_index = int(data['port_index'])
+    ports = get_available_ports()
+
+    try:
+        # Start listening for QR code scan
+        qr_code = get_next_scan(port_index, ports)
+        uid = qr_code.strip()
+        
+        # Check if the UID exists in the stocks
+        username = session.get("username")
+        stocks = get_user_stocks(username, client).get_all_records()
+        matching_stock = next((stock for stock in stocks if stock['UniqueID'] == uid), None)
+        
+        if matching_stock:
+            # Store the UID in session
+            session["last_scanned_uid"] = uid
+            return jsonify({
+                'success': True,
+                'stock': {
+                    'seriesID': matching_stock['SeriesID'],
+                    'replicateID': matching_stock['ReplicateID'],
+                    'name': matching_stock['Name'],
+                    'genotype': matching_stock['Genotype'],
+                    'status': matching_stock['Status']  # Send the current status
+                }
+            })
+        else:
+            return jsonify({'success': False, 'message': 'QR code not recognized'})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/flip_stock', methods=['POST'])
+def flip_stock_route():
+    data = request.json
+    status = data.get('status')
+    flip_time = data.get('flipTime')
+    comment = data.get('comment') if data.get('comment') else None
+    uid = session.get("last_scanned_uid")  # Assumes the UID was stored after the last scan
+    
+    username = session.get("username")
+    flip_stock(username, uid, client, flip_time, new_status=status, added_comment=comment)
+    
+    return jsonify({'message': 'Stock flipped successfully!'})
 
 
 # run the app

@@ -1,0 +1,34 @@
+<form method="post" action="/stock_explorer">
+    <div class="filter-row">
+        {% with filter_name="Type", options=unique_values.Type, selected=filter_state.filterType %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
+        {% with filter_name="Series ID", options=unique_values.SeriesID, selected=filter_state.filterSeriesID %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
+        {% with filter_name="Tray ID", options=unique_values.TrayID, selected=filter_state.filterTrayID %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
+        {% with filter_name="Status", options=unique_values.Status, selected=filter_state.filterStatus %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
+        {% with filter_name="Food Type", options=unique_values.FoodType, selected=filter_state.filterFoodType %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
+        {% with filter_name="Provenance", options=unique_values.Provenance, selected=filter_state.filterProvenance %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
+        <div class="filter-col">
+            <label for="searchQuery">Search:</label>
+            <input type="text" id="searchQuery" name="searchQuery" class="form-control" value="{{ filter_state.searchQuery }}">
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary mt-3">Apply Filters</button>
+    <button type="submit" name="clear_filters" class="btn btn-secondary mt-3">Clear Filters</button>
+</form>
