@@ -144,7 +144,7 @@ def render_label(canvas, width, height, stock, uid, genotype, status, common_nam
     if stock != "":
         
         # write the common name as a watermark
-        canvas.setFont("Courier-Bold", 10)
+        canvas.setFont("Courier-Bold", 8)
         canvas.setFillColorRGB(0.8, 0.8, 0.8)
         canvas.drawString(5, 5, common_name)
 

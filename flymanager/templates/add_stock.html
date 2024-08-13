@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center">Add New Stock</h1>
+
+    {% if error %}
+    <div class="alert alert-danger" role="alert">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/add_stock">
+        <div class="form-group">
+            <label for="sourceID"><strong>Source ID | </strong> Format: [JRF/BDSC/INTERNAL/OTHER]_[StockID/UNK]:</label>
+            <input type="text" class="form-control" id="sourceID" name="sourceID" required>
+        </div>
+        <div class="form-group">
+            <label for="genotype">Genotype:</label>
+            <input type="text" class="form-control" id="genotype" name="genotype" required>
+        </div>
+        <div class="form-group">
+            <label for="name">Name:</label>
+            <input type="text" class="form-control" id="name" name="name" required>
+        </div>
+        <div class="form-group">
+            <label for="altReference">Alt Reference (optional):</label>
+            <input type="text" class="form-control" id="altReference" name="altReference">
+        </div>
+        <div class="form-group">
+            <label for="type">Type:</label>
+            <input type="text" class="form-control" id="type" name="type" required>
+        </div>
+        <div class="form-group">
+            <label for="seriesID">Series ID:</label>
+            <input type="text" class="form-control" id="seriesID" name="seriesID" required>
+        </div>
+        <div class="form-group">
+            <label for="replicateID">Replicate ID:</label>
+            <input type="text" class="form-control" id="replicateID" name="replicateID" required>
+        </div>
+        <div class="form-group">
+            <label for="trayID">Tray ID (optional):</label>
+            <input type="text" class="form-control" id="trayID" name="trayID">
+        </div>
+        <div class="form-group">
+            <label for="trayPosition">Tray Position (optional):</label>
+            <input type="text" class="form-control" id="trayPosition" name="trayPosition">
+        </div>
+        <div class="form-group">
+            <label for="status">Status:</label>
+            <select class="form-control" id="status" name="status" required>
+                <option value="Healthy">Healthy</option>
+                <option value="Showing Issues">Showing Issues</option>
+                <option value="Needs refresh">Needs refresh</option>
+                <option value="Ordered">Ordered</option>
+                <option value="No longer maintained">No longer maintained</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="foodType">Food Type (optional):</label>
+            <input type="text" class="form-control" id="foodType" name="foodType">
+        </div>
+        <div class="form-group">
+            <label for="provenance">Provenance (optional):</label>
+            <input type="text" class="form-control" id="provenance" name="provenance">
+        </div>
+        <div class="form-group">
+            <label for="comments">Comments (optional):</label>
+            <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>
+        </div>
+        <button type="submit" class="btn btn-success btn-block">Add Stock</button>
+    </form>
+</div>
+{% endblock %}

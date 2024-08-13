@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center">FlyFlipper</h1>
+    <div id="port-selection" class="mb-3">
+        <label for="serialPort" class="form-label">Select Serial Port:</label>
+        <select class="form-select" id="serialPort">
+            {% for port in ports %}
+                <option value="{{ loop.index0 }}">{{ port.device }} - {{ port.description }}</option>
+            {% endfor %}
+        </select>
+        <button id="startScanBtn" class="btn btn-primary mt-3">Start</button>
+    </div>
+
+    <div id="scan-waiting" class="text-center" style="display: none;">
+        <h2>Waiting for QR code to be scanned...</h2>
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden"></span>
+        </div>
+    </div>
+
+    <div id="stock-details" style="display: none;">
+        <h2>Stock Details</h2>
+        <p><strong>Series ID:</strong> <span id="seriesID"></span></p>
+        <p><strong>Replicate ID:</strong> <span id="replicateID"></span></p>
+        <p><strong>Name:</strong> <span id="name"></span></p>
+        <p><strong>Genotype:</strong> <span id="genotype"></span></p>
+
+        <h3>Status</h3>
+        <div id="status-options">
+            <label>
+                <input type="radio" name="status" value="Healthy"> Healthy
+            </label>
+            <label>
+                <input type="radio" name="status" value="Showing Issues"> Showing Issues
+            </label>
+            <label>
+                <input type="radio" name="status" value="Needs refresh"> Needs refresh
+            </label>
+            <label>
+                <input type="radio" name="status" value="Ordered"> Ordered
+            </label>
+            <label>
+                <input type="radio" name="status" value="No longer maintained"> No longer maintained
+            </label>
+        </div>
+
+        <h3>Flip Time</h3>
+        <input type="datetime-local" id="flipTime" class="form-control" value="{{ now }}">
+
+        <h3>Add Comment</h3>
+        <textarea id="comment" class="form-control" rows="3"></textarea>
+
+        <button id="flipBtn" class="btn btn-success mt-3">Flip Stock</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const startScanBtn = document.getElementById('startScanBtn');
+    const portSelection = document.getElementById('serialPort');
+    const scanWaiting = document.getElementById('scan-waiting');
+    const stockDetails = document.getElementById('stock-details');
+    const flipTimeInput = document.getElementById('flipTime');
+
+    // Function to get the current datetime in the local time zone
+    function getLocalDateTime() {
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000; // getTimezoneOffset returns minutes, so convert to milliseconds
+        const localTime = new Date(now - offset);
+        return localTime.toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM
+    }
+
+    startScanBtn.addEventListener('click', function() {
+        const selectedPort = portSelection.value;
+        portSelection.parentElement.style.display = 'none';
+        scanWaiting.style.display = 'block';
+
+        fetch('/start_scan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ port_index: selectedPort })
+        })
+        .then(response => response.json())
+        .then(data => {
+            scanWaiting.style.display = 'none';
+            if (data.success) {
+                // Fill in stock details
+                document.getElementById('seriesID').textContent = data.stock.seriesID;
+                document.getElementById('replicateID').textContent = data.stock.replicateID;
+                document.getElementById('name').textContent = data.stock.name;
+                document.getElementById('genotype').textContent = data.stock.genotype;
+                
+                // Set the radio button for the current status
+                const currentStatus = data.stock.status;
+                document.querySelector(`input[name="status"][value="${currentStatus}"]`).checked = true;
+                
+                // Set the current date and time in local time
+                flipTimeInput.value = getLocalDateTime();
+
+                stockDetails.style.display = 'block';
+            } else {
+                alert('QR code not recognized. Please try again.');
+                portSelection.parentElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            alert('Failed to connect to the serial port. Please try again.');
+            portSelection.parentElement.style.display = 'block';
+            scanWaiting.style.display = 'none';
+        });
+    });
+
+    const flipBtn = document.getElementById('flipBtn');
+    flipBtn.addEventListener('click', function() {
+        const status = document.querySelector('input[name="status"]:checked').value;
+        const flipTime = flipTimeInput.value;
+        const comment = document.getElementById('comment').value;
+
+        fetch('/flip_stock', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: status, flipTime: flipTime, comment: comment })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            stockDetails.style.display = 'none';
+            portSelection.parentElement.style.display = 'block';
+        })
+        .catch(error => {
+            alert('Failed to flip stock. Please try again.');
+        });
+    });
+});
+</script>
+{% endblock %}

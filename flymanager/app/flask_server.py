@@ -7,24 +7,31 @@
 # register page to create a new user, create a new worksheet in the master google sheet
 
 # import the necessary packages
-from flask import Flask, jsonify, render_template, request, redirect, Response, session
+from flask import Flask, jsonify, render_template, request, redirect, Response, session, jsonify
 from flask_session import Session
+from flask_socketio import SocketIO, emit
+from flask_cors import CORS
+import threading
 import os
 import hashlib
 from fuzzywuzzy import fuzz
+import serial
 
-from flymanager.utils.gsheet import get_all_users, get_user_initials, add_user, change_password, create_client, write_activity, get_user_activities, get_user_stocks, flip_stock
-from flymanager.utils.labels import generate_label_pdf
-from flymanager.utils.scanner import get_available_ports, get_next_scan
+# setup dotenv
+from dotenv import load_dotenv
+load_dotenv()
+
+from flymanager.utils.gsheet import *
+from flymanager.utils.labels import *
+from flymanager.utils.scanner import *
 
 from datetime import datetime
-
 
 # initialize our Flask application
 app = Flask(__name__, template_folder="../templates", static_folder="../static")
 
 # configure the session (local filesystem, timeout of 10 minutes)
-app.secret_key = os.urandom(24)
+app.secret_key = os.getenv("SECRET_KEY")
 
 # set the session type to filesystem
 app.config["SESSION_TYPE"] = "filesystem"
@@ -38,6 +45,12 @@ app.config["SESSION_FILE_MODE"] = 384
 
 # initialize the session
 Session(app)
+
+# initialize the socketio
+socketio = SocketIO(app)
+
+# enable CORS
+CORS(app)
 
 # connect to google sheets
 client = create_client()
@@ -248,14 +261,40 @@ def stock():
 def add_stock():
     if not session.get("username"):
         return redirect("/login")
-    
+
     if request.method == 'POST':
-        # Process the form data to add a new stock
-        # Example: new_stock_data = request.form
-        # Add the stock to the database or data source
-        return redirect('/stock_explorer')
+        # Collect form data
+        new_stock_data = {
+            'SourceID': request.form.get('sourceID'),
+            'Genotype': request.form.get('genotype'),
+            'Name': request.form.get('name'),
+            'AltReference': request.form.get('altReference'),
+            'Type': request.form.get('type'),
+            'SeriesID': request.form.get('seriesID'),
+            'ReplicateID': request.form.get('replicateID'),
+            'TrayID': request.form.get('trayID'),
+            'TrayPosition': request.form.get('trayPosition'),
+            'Status': request.form.get('status'),
+            'FoodType': request.form.get('foodType'),
+            'Provenance': request.form.get('provenance'),
+            'Comments': request.form.get('comments')
+        }
+
+        # remove empty fields
+        new_stock_data = {k: v for k, v in new_stock_data.items() if v}
+
+        # Add stock to the user's sheet
+        username = session.get("username")
+        success, uid_or_message = add_to_stock(username, new_stock_data, client)
+
+        if success:
+            return redirect('/stock_explorer')
+        else:
+            # Handle error (e.g., QC failure)
+            return render_template('add_stock.html', error=uid_or_message)
 
     return render_template('add_stock.html')
+
 
 # define a route for the generate labels page
 @app.route('/generate_labels', methods=['POST'])
@@ -304,10 +343,10 @@ def view_stock(unique_id):
     
     # get user name
     username = session.get("username")
-    stock = None #get_stock_by_unique_id(unique_id, client)
+    stock = get_stock(username, unique_id, client)
     return render_template('view_stock.html', username=username, stock=stock)
 
-# define a route for the flip page
+# define a route for the flip stock page
 @app.route('/flip', methods=['GET'])
 def flip():
     if not session.get("username"):
@@ -317,50 +356,106 @@ def flip():
     ports = get_available_ports()
     return render_template('flip.html', username=username, ports=ports)
 
+# Dictionary to store active threads
+active_threads = {}
+
+def scan_qr_code(port_index, ports, username, thread_id, baudrate=9600, size=11):
+    # Start listening for QR code scan
+    port_device = ports[port_index].device
+    port = serial.Serial(port_device, baudrate)
+    
+    emergency_stop = False
+
+    while True:
+
+        # loop to passively listen to the port (until a carriage return is received)
+        keystrokes = []
+        while True:
+            
+            if active_threads[thread_id][1] == False:
+                print('Stopping thread:', thread_id)
+                emergency_stop = True
+                break
+
+            data = port.read().decode("utf-8")
+            if data:
+                keystrokes.append(data)
+            if data == "\r":
+                qr_code = "".join(keystrokes)
+                if len(qr_code) == size:
+                    break
+                else:
+                    keystrokes = []
+
+        if emergency_stop:
+            break
+
+        # Check if the UID exists in the stocks
+        print('Scanned QR code:', qr_code)
+        uid = qr_code.strip()
+
+        # Check if the UID exists in the stocks
+        stocks = get_user_stocks(username, client).get_all_records()
+        matching_stock = next((stock for stock in stocks if stock['UniqueID'] == uid), None)
+
+        if matching_stock:
+            socketio.emit('qr_scanned', {
+                'uniqueID': uid,
+                'seriesID': matching_stock['SeriesID'],
+                'replicateID': matching_stock['ReplicateID'],
+                'name': matching_stock['Name'],
+                'genotype': matching_stock['Genotype'],
+                'status': matching_stock['Status']
+            })
+        else:
+            socketio.emit('qr_not_recognized')
+
 @app.route('/start_scan', methods=['POST'])
 def start_scan():
     data = request.json
     port_index = int(data['port_index'])
     ports = get_available_ports()
+    username = session.get("username")
 
-    try:
-        # Start listening for QR code scan
-        qr_code = get_next_scan(port_index, ports)
-        uid = qr_code.strip()
-        
-        # Check if the UID exists in the stocks
-        username = session.get("username")
-        stocks = get_user_stocks(username, client).get_all_records()
-        matching_stock = next((stock for stock in stocks if stock['UniqueID'] == uid), None)
-        
-        if matching_stock:
-            # Store the UID in session
-            session["last_scanned_uid"] = uid
-            return jsonify({
-                'success': True,
-                'stock': {
-                    'seriesID': matching_stock['SeriesID'],
-                    'replicateID': matching_stock['ReplicateID'],
-                    'name': matching_stock['Name'],
-                    'genotype': matching_stock['Genotype'],
-                    'status': matching_stock['Status']  # Send the current status
-                }
-            })
-        else:
-            return jsonify({'success': False, 'message': 'QR code not recognized'})
-    
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
+    # Create a unique thread ID
+    thread_id = threading.get_ident()
+
+    # Start a thread to handle the QR code scanning
+    scan_thread = threading.Thread(target=scan_qr_code, args=(port_index, ports, username, thread_id))
+    active_threads[thread_id] = (scan_thread,True)
+    scan_thread.start()
+    print('Started scanning thread:', thread_id)
+
+    return jsonify({'success': True, 'message': 'Started scanning', 'thread_id': thread_id})
+
+@app.route('/stop_scan', methods=['POST'])
+def stop_scan():
+    data = request.json
+    thread_id = data.get('thread_id')
+
+    if thread_id in active_threads:
+        # set the thread to stop
+        active_threads[thread_id] = (active_threads[thread_id][0], False)
+        # join the thread
+        active_threads[thread_id][0].join()
+        # remove the thread from the active threads
+        active_threads.pop(thread_id)
+
+    return jsonify({'success': True, 'message': 'Stopped scanning'})
 
 @app.route('/flip_stock', methods=['POST'])
-def flip_stock_route():
+def handle_flip_stock():
+    if not session.get("username"):
+        return redirect("/login")
+    username = session.get("username")
+    
     data = request.json
     status = data.get('status')
     flip_time = data.get('flipTime')
     comment = data.get('comment') if data.get('comment') else None
-    uid = session.get("last_scanned_uid")  # Assumes the UID was stored after the last scan
+    uid = data.get('uniqueID')
     
-    username = session.get("username")
+    print('Flipping stock:', uid)
     flip_stock(username, uid, client, flip_time, new_status=status, added_comment=comment)
     
     return jsonify({'message': 'Stock flipped successfully!'})
@@ -368,6 +463,6 @@ def flip_stock_route():
 
 # run the app
 if __name__ == '__main__':
-    app.run(debug=True)
+    socketio.run(app, debug=True)
 
 

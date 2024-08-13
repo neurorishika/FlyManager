@@ -17,5 +17,5 @@ python_sheet = sheet.get_all_records()
 
 # for record get the Genotype + SeriesID + ReplicateID
 for record in python_sheet:
-    value = str(record['Genotype']) + str(record['SeriesID']) + str(record['ReplicateID'])
+    value = "rmohanta" + str(record['Genotype']) + str(record['SeriesID']) + str(record['ReplicateID'])
     print(hashlib.shake_256(value.encode()).hexdigest(5))

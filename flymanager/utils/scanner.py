@@ -12,7 +12,7 @@ def get_available_ports():
     ports = serial.tools.list_ports.comports()
     return ports
 
-def get_next_scan(port_index, ports, baudrate=9600):
+def get_next_scan(port_index, ports, baudrate=9600, size=11):
     """
     Get the next scan from the serial port.
     """
@@ -28,8 +28,12 @@ def get_next_scan(port_index, ports, baudrate=9600):
                 keystrokes.append(data)
                 if data == "\r":
                     output = "".join(keystrokes)
-                    break
-        except KeyboardInterrupt:
+                    if len(output) == size:
+                        break
+                    else:
+                        keystrokes = []
+        except:
+            output = "" 
             break
     # close the port
     port.close()

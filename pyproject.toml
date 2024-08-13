@@ -34,6 +34,10 @@ flask-session = "^0.8.0"
 redis = "^5.0.7"
 fuzzywuzzy = "^0.18.0"
 python-levenshtein = "^0.25.1"
+flask-socketio = "^5.3.6"
+flask-cors = "^4.0.1"
+python-dotenv = "^1.0.1"
+pymongo = "^4.8.0"
 
 [build-system]
 requires = ["poetry-core"]
