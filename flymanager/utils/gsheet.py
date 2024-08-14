@@ -298,6 +298,15 @@ def add_to_stock(user, properties, client):
             FoodType (optional)
             Provenance (required)
             Comments (optional)
+    client: gspread.Client
+        the client for the google sheet
+    Returns:
+    bool
+        True if the stock was added, False otherwise
+    uid: str
+        the unique identifier of the stock
+    Note the Stock sheet has the following columns:
+    UID, SourceID, Genotype, Name, AltReference, Type, SeriesID, ReplicateID, TrayID, TrayPosition, Status, FoodType, Provenance, Comments, CreationDate, LastFlipDate, FlipLog, DataModifiedDate, ModificationLog
     """
     assert "SourceID" in properties, "SourceID is required"
     assert "Genotype" in properties, "Genotype is required"

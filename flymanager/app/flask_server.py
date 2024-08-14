@@ -7,25 +7,31 @@
 # register page to create a new user, create a new worksheet in the master google sheet
 
 # import the necessary packages
+
+# external imports
+from datetime import datetime
 from flask import Flask, jsonify, render_template, request, redirect, Response, session, jsonify
+from flask_cors import CORS
 from flask_session import Session
 from flask_socketio import SocketIO, emit
-from flask_cors import CORS
-import threading
-import os
-import hashlib
 from fuzzywuzzy import fuzz
+import hashlib
+import os
 import serial
+import threading
+
+# internal imports
+from flymanager.utils.mongo import *
+from flymanager.utils.labels import *
+from flymanager.utils.scanner import *
 
 # setup dotenv
 from dotenv import load_dotenv
 load_dotenv()
 
-from flymanager.utils.gsheet import *
-from flymanager.utils.labels import *
-from flymanager.utils.scanner import *
-
-from datetime import datetime
+# setup the mongo db
+client = create_mongo_client()
+db = get_database(client)
 
 # initialize our Flask application
 app = Flask(__name__, template_folder="../templates", static_folder="../static")
@@ -52,9 +58,6 @@ socketio = SocketIO(app)
 # enable CORS
 CORS(app)
 
-# connect to google sheets
-client = create_client()
-
 # define a route for the default URL
 @app.route('/')
 def index():
@@ -75,7 +78,7 @@ def login():
         print(session["username"], "is already logged in")
         return redirect("/home")
     # get all the users
-    users = list(get_all_users(client=client).keys())
+    users = list(get_all_users(db=db).keys())
     # if the request method is POST
     if request.method == "POST":
         # get the username and password
@@ -84,7 +87,7 @@ def login():
         # check if the user exists
         if username in users:
             # check if the password is correct
-            if get_all_users(client=client)[username] == hashlib.shake_256((username+password).encode()).hexdigest(5):
+            if get_all_users(db=db)[username] == hashlib.shake_256((username+password).encode()).hexdigest(5):
                 # store the username in the session
                 session["username"] = username
                 return redirect("/home")
@@ -106,7 +109,7 @@ def register():
         password = request.form["password"]
         initials = request.form["initials"]
         # add the user
-        if add_user(username, password, initials, client=client):
+        if add_user(username, password, initials, db=db):
             return redirect("/login")
         else:
             return render_template("auth/register.html", message="User/Initials already exists")
@@ -118,7 +121,7 @@ def forgot_password():
     # check if the user is logged in
     if not session.get("name"):
         return redirect("/login")
-    users = list(get_all_users(client=client).keys())
+    users = list(get_all_users(db=db).keys())
     if request.method == "POST":
         # get the username, master password and new password
         username = request.form["username"]
@@ -128,7 +131,7 @@ def forgot_password():
         if username == "Master":
             return render_template("auth/forgot_password.html", users=users, message="Master password cannot be changed here. Run 'python -c 'import hashlib; print(hashlib.shake_256(('admin'+input()).encode()).hexdigest(5))' in the terminal to get the new master hash and update on the users sheet on the google sheet manually")
         # change the password
-        if change_password(username, master_password, new_password, client=client):
+        if change_password(username, master_password, new_password, db=db):
             return redirect("/login")
         else:
             return render_template("auth/forgot_password.html", users=users, message="Invalid username or master password")
@@ -154,7 +157,7 @@ def home():
         return redirect("/login")
     # get the user's activity
     username = session.get("username")
-    activities = get_user_activities(username, client)
+    activities = get_user_activities(username, db)
     return render_template("home.html", username=username, activities=activities)
 
 # define a route for the stock explorer page
@@ -165,8 +168,10 @@ def stock():
         return redirect("/login")
     
     username = session.get("username")
-    stocks = get_user_stocks(username, client)
-    stocks = stocks.get_all_records()
+    stocks = get_user_stocks(username, db)
+
+    print('Number of stocks:', len(stocks))
+    print('First stock:', stocks[0])
 
     # Extract unique values for filtering
     unique_values = {
@@ -285,7 +290,7 @@ def add_stock():
 
         # Add stock to the user's sheet
         username = session.get("username")
-        success, uid_or_message = add_to_stock(username, new_stock_data, client)
+        success, uid_or_message = add_to_stock(username, new_stock_data, db)
 
         if success:
             return redirect('/stock_explorer')
@@ -308,11 +313,10 @@ def generate_labels():
 
     # get the user's initials
     username = session.get("username")
-    user_initials = get_user_initials(username, client)
+    user_initials = get_user_initials(username, db)
 
     # get the selected stocks
-    stocks = get_user_stocks(username, client)
-    stocks = stocks.get_all_records()
+    stocks = get_user_stocks(username, db)
     selected_stocks = [stock for stock in stocks if str(stock['UniqueID']) in selected_uids]
 
     # duplicate the selected stocks based on the quantities
@@ -331,7 +335,7 @@ def generate_labels():
     pdf_file_path = '/static/generated_labels/{}.pdf'.format(filename)
 
     # write the activity to the user's activity sheet
-    write_activity(username, 'Generated labels for {} stocks'.format(len(selected_stocks)), client)
+    write_activity(username, 'Generated labels for {} stocks'.format(len(selected_stocks)), db)
     
     return redirect(pdf_file_path)
 
@@ -343,7 +347,7 @@ def view_stock(unique_id):
     
     # get user name
     username = session.get("username")
-    stock = get_stock(username, unique_id, client)
+    stock = get_stock(username, unique_id, db)
     return render_template('view_stock.html', username=username, stock=stock)
 
 # define a route for the flip stock page
@@ -395,7 +399,7 @@ def scan_qr_code(port_index, ports, username, thread_id, baudrate=9600, size=11)
         uid = qr_code.strip()
 
         # Check if the UID exists in the stocks
-        stocks = get_user_stocks(username, client).get_all_records()
+        stocks = get_user_stocks(username, db)
         matching_stock = next((stock for stock in stocks if stock['UniqueID'] == uid), None)
 
         if matching_stock:
@@ -456,7 +460,7 @@ def handle_flip_stock():
     uid = data.get('uniqueID')
     
     print('Flipping stock:', uid)
-    flip_stock(username, uid, client, flip_time, new_status=status, added_comment=comment)
+    flip_stock(username, uid, db, flip_time, new_status=status, added_comment=comment)
     
     return jsonify({'message': 'Stock flipped successfully!'})
 
