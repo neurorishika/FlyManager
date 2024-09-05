@@ -3,158 +3,73 @@
 {% block title %}Stock Explorer{% endblock %}
 
 {% block head %}
-<style>
-    .stock-item {
-        background-color: #fff;
-        padding: 10px;
-        border-radius: 10px;
-        margin-bottom: 10px;
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        font-size: 14px;
-        border: 2px solid transparent;
-    }
-    .stock-item[data-status="Healthy"] {
-        border-color: green;
-    }
-    .stock-item[data-status="Showing Issues"] {
-        border-color: rgb(96, 32, 32);
-    }
-    .stock-item[data-status="Needs refresh"] {
-        border-color: red;
-    }
-    .stock-item[data-status="Ordered"] {
-        border-color: blue;
-    }
-    .stock-item[data-status="No longer maintained"] {
-        border-color: pink;
-    }
-    .stock-item.selected {
-        background-color: #c4ecff;
-    }
-    .stock-item h5 {
-        margin: 0 0 5px;
-        font-weight: 700;
-        font-size: 16px;
-    }
-    .stock-item p {
-        margin: 0;
-        font-size: 12px;
-    }
-    .stock-item .checkbox {
-        margin-right: 10px;
-    }
-    .details {
-        padding-top: 10px;
-        width: 100%;
-    }
-    .btn-link.btn-sm {
-        font-size: 12px;
-        padding: 2px 5px;
-        margin-left: 10px;
-        color: #007bff;
-    }
-    .btn-link.btn-sm i {
-        font-size: 14px;
-    }
-    .clearfix::after {
-        content: "";
-        display: table;
-        clear: both;
-    }
-    .badges {
-        margin-top: 5px;
-        margin-bottom: 10px;
-    }
-    .badge-info {
-        background-color: #17a2b8;
-        color: white;
-        margin-right: 5px;
-    }
-    .badge-secondary {
-        background-color: #6c757d;
-        color: white;
-    }
-    .filters {
-        background-color: #fff;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        margin-bottom: 10px;
-    }
-    .filter-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    .filter-col {
-        flex: 1;
-        min-width: 150px;
-    }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stock_explorer.css') }}">
 {% endblock %}
 
 {% block content %}
 <div class="filters">
     <h3>Filters</h3>
-    {% include 'filter_form.html' %}
+    {% include 'filter_stock.html' %}
 </div>
 <div class="mb-3">
     <a href="/add_stock" class="btn btn-success">Add New Stock</a>
 </div>
-<div id="stockItems">
-    {% for stock in stocks %}
-    <div class="stock-item" data-status="{{ stock.Status }}" id="item-{{ loop.index }}">
-        <div class="checkbox">
-            <input type="checkbox" id="stock{{ loop.index }}">
-        </div>
-        <div style="flex-grow: 1;">
-            <h5>
-                {{ stock.SeriesID }}{{ stock.ReplicateID }}
-                {% if stock.TrayID and stock.TrayPosition %}
-                    <small class="text-muted">({{ stock.TrayID }}-{{ stock.TrayPosition }})</small>
-                {% endif %}
-                | {{ stock.Name }}
-                {% if stock.AltReference %}
-                    <span class="text-muted">({{ stock.AltReference }})</span>
-                {% endif %}
-            </h5>
-            <p>
-                <strong>Genotype:</strong> {{ stock.Genotype }}<br>
-                <strong>Provenance:</strong> {{ stock.Provenance }}<br>
-                <strong>Unique Identifier:</strong> <i>{{ stock.UniqueID }}</i>
-            </p>
-            <div class="badges">
-                <span class="badge badge-info">{{ stock.FoodType }}</span>
-                <span class="badge badge-secondary">{{ stock.Type }}</span>
-            </div>
-        </div>
-        <div style="display: flex; align-items: center;">
-            <button class="btn btn-link btn-sm expand-btn" onclick="toggleDetails({{ loop.index }})">
-                <i class="fas fa-chevron-down"></i>
-            </button>
-            <button class="btn btn-link btn-sm view-details-btn" onclick="viewDetails('{{ stock.UniqueID }}')">
-                <i class="fas fa-external-link-alt"></i>
-            </button>
-        </div>
-        <div class="clearfix"></div>
-        <div class="details" id="details-{{ loop.index }}" style="display: none; width: 100%;">
-            <div style="display: flex; flex-wrap: wrap;">
-                <div style="flex: 1;">
-                    <p><strong>Source ID:</strong> {{ stock.SourceID }}</p>
-                    <p><strong>Comments:</strong> {{ stock.Comments }}</p>
-                    <p><strong>Creation Date:</strong> {{ stock.CreationDate }}</p>
+<div class="stock-container">
+    <div class="stock-items-grid">
+        {% for stock in stocks %}
+        <div class="stock-item" data-status="{{ stock.Status }}" id="item-{{ loop.index }}">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="checkbox-and-badges">
+                    <input type="checkbox" id="stock{{ loop.index }}">
+                    <div class="badges">
+                        <span class="badge badge-info">{{ stock.FoodType }}</span>
+                        <span class="badge badge-secondary">{{ stock.Type }}</span>
+                    </div>
                 </div>
-                <div style="flex: 1;">
-                    <p><strong>Last Flip Date:</strong> {{ stock.LastFlipDate }}</p>
-                    <p><strong>Data Modified Date:</strong> {{ stock.DataModifiedDate }}</p>
+                <div style="display: flex; align-items: center;">
+                    <button class="btn btn-link btn-sm expand-btn" onclick="toggleDetails({{ loop.index }})">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <button class="btn btn-link btn-sm view-details-btn" onclick="viewDetails('{{ stock.UniqueID }}')">
+                        <i class="fas fa-external-link-alt"></i>
+                    </button>
                 </div>
             </div>
+            <div style="flex-grow: 1; padding-top: 10px;">
+                <h5>
+                    {% if stock.TrayID and stock.TrayPosition %}
+                        {{ stock.TrayID }}-{{ stock.TrayPosition }}
+                    {% endif %}
+                    <small class="text-muted">{{ stock.SeriesID }}{{ stock.ReplicateID }}</small>
+                    | {{ stock.Name }}
+                    {% if stock.AltReference %}
+                        <span class="text-muted">({{ stock.AltReference }})</span>
+                    {% endif %}
+                </h5>
+                <p>
+                    <strong>Genotype:</strong> {{ stock.Genotype }}<br>
+                    <strong>Provenance:</strong> {{ stock.Provenance }}<br>
+                    <strong>Unique Identifier:</strong> <i>{{ stock.UniqueID }}</i>
+                </p>
+            </div>
+            <div class="details" id="details-{{ loop.index }}" style="display: none; width: 100%;">
+                <div style="display: flex; flex-wrap: wrap;">
+                    <div style="flex: 1;">
+                        <p><strong>Source ID:</strong> {{ stock.SourceID }}</p>
+                        <p><strong>Comments:</strong> {{ stock.Comments }}</p>
+                        <p><strong>Creation Date:</strong> {{ stock.CreationDate }}</p>
+                    </div>
+                    <div style="flex: 1;">
+                        <p><strong>Last Flip Date:</strong> {{ stock.LastFlipDate }}</p>
+                        <p><strong>Data Modified Date:</strong> {{ stock.DataModifiedDate }}</p>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>                                                       
-    {% endfor %}
-</div>   
+        {% endfor %}
+    </div>
+</div>
+
 <button type="button" id="addToCartBtn" class="btn btn-warning mt-3">Add to Cart</button>
 <button type="button" id="selectAllBtn" class="btn btn-info mt-3">Select All</button>
 <button type="button" id="deselectAllBtn" class="btn btn-info mt-3">Deselect All</button>
