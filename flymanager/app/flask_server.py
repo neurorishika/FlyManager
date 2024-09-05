@@ -10,7 +10,9 @@
 
 # external imports
 from datetime import datetime
-from flask import Flask, jsonify, render_template, request, redirect, Response, session, jsonify
+from flask import Flask, jsonify, render_template, request, redirect, Response, session, jsonify, send_file, flash, url_for
+from werkzeug.utils import secure_filename
+import io
 from flask_cors import CORS
 from flask_session import Session
 from flask_socketio import SocketIO, emit
@@ -24,10 +26,18 @@ import threading
 from flymanager.utils.mongo import *
 from flymanager.utils.labels import *
 from flymanager.utils.scanner import *
+from flymanager.utils.utils import *
+from flymanager.utils.converter import *
 
 # setup dotenv
 from dotenv import load_dotenv
 load_dotenv()
+
+# define the allowed file extensions
+ALLOWED_EXTENSIONS = {'xlsx'}
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # setup the mongo db
 client = create_mongo_client()
@@ -48,6 +58,9 @@ app.config["PERMANENT_SESSION_LIFETIME"] = 600
 app.config["SESSION_FILE_DIR"] = "/tmp"
 app.config["SESSION_FILE_THRESHOLD"] = 500
 app.config["SESSION_FILE_MODE"] = 384
+
+# set the upload folder
+app.config['UPLOAD_FOLDER'] = os.getenv("UPLOAD_FOLDER")
 
 # initialize the session
 Session(app)
@@ -158,7 +171,13 @@ def home():
     # get the user's activity
     username = session.get("username")
     activities = get_user_activities(username, db)
+    # keep last 5 activities
+    activities = activities[-5:][::-1]
     return render_template("home.html", username=username, activities=activities)
+
+
+### STOCK MANAGEMENT ROUTES ###
+
 
 # define a route for the stock explorer page
 @app.route('/stock_explorer', methods=['GET', 'POST'])
@@ -170,13 +189,15 @@ def stock():
     username = session.get("username")
     stocks = get_user_stocks(username, db)
 
+    # sort by TrayID and TrayPosition
+    stocks = sorted(stocks, key=lambda x: (x['TrayID'], int(x['TrayPosition'])))
+
     print('Number of stocks:', len(stocks))
     print('First stock:', stocks[0])
 
     # Extract unique values for filtering
     unique_values = {
         'Type': sorted(set(str(stock['Type']) for stock in stocks)),
-        'SeriesID': sorted(set(str(stock['SeriesID']) for stock in stocks)),
         'TrayID': sorted(set(str(stock['TrayID']) for stock in stocks)),
         'Status': sorted(set(str(stock['Status']) for stock in stocks)),
         'FoodType': sorted(set(str(stock['FoodType']) for stock in stocks)),
@@ -194,7 +215,6 @@ def stock():
 
         # Get filter values from request
         filter_type = str(request.form.get('filterType'))
-        filter_series_id = str(request.form.get('filterSeriesID'))
         filter_tray_id = str(request.form.get('filterTrayID'))
         filter_status = str(request.form.get('filterStatus'))
         filter_food_type = str(request.form.get('filterFoodType'))
@@ -204,7 +224,6 @@ def stock():
         # Store filter state in session
         filter_state = {
             'filterType': filter_type,
-            'filterSeriesID': filter_series_id,
             'filterTrayID': filter_tray_id,
             'filterStatus': filter_status,
             'filterFoodType': filter_food_type,
@@ -217,8 +236,6 @@ def stock():
         filtered_stocks = stocks
         if filter_type:
             filtered_stocks = [stock for stock in filtered_stocks if str(stock['Type']) == filter_type]
-        if filter_series_id:
-            filtered_stocks = [stock for stock in filtered_stocks if str(stock['SeriesID']) == filter_series_id]
         if filter_tray_id:
             filtered_stocks = [stock for stock in filtered_stocks if str(stock['TrayID']) == filter_tray_id]
         if filter_status:
@@ -244,14 +261,13 @@ def stock():
                 # combine all fields into a single string
                 search_string = ' '.join(str(field) for field in search_fields)
                 # find if the search query is a substring of the search string
-                return fuzz.partial_ratio(search_string, search_query) > 80
+                return fuzz.partial_ratio(search_string.lower(), search_query.lower()) > 80
             
             filtered_stocks = [stock for stock in filtered_stocks if match(stock)]
 
         # Recalculate unique values
         unique_values = {
             'Type': sorted(set(str(stock['Type']) for stock in filtered_stocks)),
-            'SeriesID': sorted(set(str(stock['SeriesID']) for stock in filtered_stocks)),
             'TrayID': sorted(set(str(stock['TrayID']) for stock in filtered_stocks)),
             'Status': sorted(set(str(stock['Status']) for stock in filtered_stocks)),
             'FoodType': sorted(set(str(stock['FoodType']) for stock in filtered_stocks)),
@@ -266,6 +282,18 @@ def stock():
 def add_stock():
     if not session.get("username"):
         return redirect("/login")
+    
+    username = session.get("username")
+    
+    # get metadata lists
+    types = get_metadata('types', db)
+    food_types = get_metadata('food_types', db)
+    provenances = get_metadata('provenances', db)
+    genesX = get_metadata('genesX', db)
+    genes2 = get_metadata('genes2nd', db)
+    genes3 = get_metadata('genes3rd', db)
+    genes4 = get_metadata('genes4th', db)
+
 
     if request.method == 'POST':
         # Collect form data
@@ -289,16 +317,20 @@ def add_stock():
         new_stock_data = {k: v for k, v in new_stock_data.items() if v}
 
         # Add stock to the user's sheet
-        username = session.get("username")
         success, uid_or_message = add_to_stock(username, new_stock_data, db)
 
         if success:
             return redirect('/stock_explorer')
         else:
             # Handle error (e.g., QC failure)
-            return render_template('add_stock.html', error=uid_or_message)
+            return render_template('add_stock.html', error=uid_or_message, username=username, 
+                                   types=types, food_types=food_types, provenances=provenances, 
+                                   genesX=genesX, genes2=genes2, genes3=genes3, 
+                                   genes4=genes4)
 
-    return render_template('add_stock.html')
+    return render_template('add_stock.html', username=username, types=types, food_types=food_types, 
+                           provenances=provenances, genesX=genesX, genes2=genes2, 
+                           genes3=genes3, genes4=genes4)
 
 
 # define a route for the generate labels page
@@ -349,6 +381,175 @@ def view_stock(unique_id):
     username = session.get("username")
     stock = get_stock(username, unique_id, db)
     return render_template('view_stock.html', username=username, stock=stock)
+
+
+### CROSS MANAGEMENT ROUTES ###
+
+# define a route for the cross explorer page
+@app.route('/cross_explorer', methods=['GET', 'POST'])
+def cross():
+    # check if the user is logged in
+    if not session.get("username"):
+        return redirect("/login")
+    
+    username = session.get("username")
+    crosses = get_user_crosses(username, db)
+
+    print('Number of crosses:', len(crosses))
+
+    # nested sort by TrayID and TrayPosition
+    crosses = sorted(crosses, key=lambda x: (str(x['TrayID']), int(x['TrayPosition'])))
+
+    # Extract unique values for filtering
+    unique_values = {
+        'MaleGenotype': sorted(set(str(cross['MaleGenotype']) for cross in crosses)),
+        'FemaleGenotype': sorted(set(str(cross['FemaleGenotype']) for cross in crosses)),
+        'TrayID': sorted(set(str(cross['TrayID']) for cross in crosses)),
+        'Status': sorted(set(str(cross['Status']) for cross in crosses)),
+        'FoodType': sorted(set(str(cross['FoodType']) for cross in crosses)),
+    }
+
+    if request.method == 'GET':
+        # Check if there are filters stored in session
+        filter_state = session.get('filter_state', {})
+        return render_template("cross_explorer.html", username=username, crosses=crosses, unique_values=unique_values, filter_state=filter_state)
+    elif request.method == 'POST':
+        if 'clear_filters' in request.form:
+            session.pop('filter_state', None)
+            return redirect('/cross_explorer')
+
+        # Get filter values from request
+        filter_MaleGenotype = str(request.form.get('filterMaleGenotype'))
+        filter_FemaleGenotype = str(request.form.get('filterFemaleGenotype'))
+        filter_tray_id = str(request.form.get('filterTrayID'))
+        filter_status = str(request.form.get('filterStatus'))
+        filter_food_type = str(request.form.get('filterFoodType'))
+        search_query = request.form.get('searchQuery')
+
+        # Store filter state in session
+        filter_state = {
+            'filterMaleGenotype': filter_MaleGenotype,
+            'filterFemaleGenotype': filter_FemaleGenotype,
+            'filterTrayID': filter_tray_id,
+            'filterStatus': filter_status,
+            'filterFoodType': filter_food_type,
+            'searchQuery': search_query
+        }
+        session['filter_state'] = filter_state
+
+        # Apply filters
+        filtered_crosses = crosses
+        if filter_MaleGenotype:
+            filtered_crosses = [cross for cross in filtered_crosses if str(cross['MaleGenotype']) == filter_MaleGenotype]
+        if filter_FemaleGenotype:
+            filtered_crosses = [cross for cross in filtered_crosses if str(cross['FemaleGenotype']) == filter_FemaleGenotype]
+        if filter_tray_id:
+            filtered_crosses = [cross for cross in filtered_crosses if str(cross['TrayID']) == filter_tray_id]
+        if filter_status:
+            filtered_crosses = [cross for cross in filtered_crosses if str(cross['Status']) == filter_status]
+        if filter_food_type:
+            filtered_crosses = [cross for cross in filtered_crosses if str(cross['FoodType']) == filter_food_type]
+        
+        # Apply search
+        if search_query:
+            def match(cross):
+                search_fields = [
+                    cross['Name'],
+                    cross['MaleGenotype'],
+                    cross['FemaleGenotype'],
+                    cross['TrayID'],
+                    cross['TrayPosition'],
+                    cross['Comments']
+                ]
+                # combine all fields into a single string
+                search_string = ' '.join(str(field) for field in search_fields)
+                # find if the search query is a substring of the search string
+                return fuzz.partial_ratio(search_string, search_query) > 80
+            
+            filtered_crosses = [cross for cross in filtered_crosses if match(stock)]
+
+        # Recalculate unique values
+        unique_values = {
+            'MaleGenotype': sorted(set(str(cross['MaleGenotype']) for cross in filtered_crosses)),
+            'FemaleGenotype': sorted(set(str(cross['FemaleGenotype']) for cross in filtered_crosses)),
+            'TrayID': sorted(set(str(cross['TrayID']) for cross in filtered_crosses)),
+            'Status': sorted(set(str(cross['Status']) for cross in filtered_crosses)),
+            'FoodType': sorted(set(str(cross['FoodType']) for cross in filtered_crosses))
+        }
+
+        return render_template("cross_explorer.html", username=username, crosses=filtered_crosses, unique_values=unique_values, filter_state=filter_state)
+    
+# define a route for the add cross page
+@app.route('/add_cross', methods=['GET', 'POST'])
+def add_cross():
+    if not session.get("username"):
+        return redirect("/login")
+
+    username = session.get("username")
+    ports = get_available_ports()
+
+    # get metadata lists
+    food_types = get_metadata('food_types', db)
+    genotypes = get_all_genotypes(username, db)
+
+    if request.method == 'POST':
+        # Collect form data
+        new_cross_data = {
+            'MaleUniqueID': request.form.get('maleUniqueID'),
+            'FemaleUniqueID': request.form.get('femaleUniqueID'),
+            'MaleGenotype': request.form.get('maleGenotype').split('"')[-2],
+            'FemaleGenotype': request.form.get('femaleGenotype').split('"')[-2],
+            'TrayID': request.form.get('trayID'),
+            'TrayPosition': request.form.get('trayPosition'),
+            'Status': request.form.get('status'),
+            'FoodType': request.form.get('foodType'),
+            'Name': request.form.get('name'),
+            'Comments': request.form.get('comments')
+        }
+
+        # remove empty fields
+        new_cross_data = {k: v for k, v in new_cross_data.items() if v}
+
+        # Add cross to the user's sheet
+        success, uid_or_message = add_to_cross(username, new_cross_data, db)
+
+        if success:
+            return redirect('/cross_explorer')
+        else:
+            # Handle error (e.g., QC failure)
+            return render_template('add_cross.html', error=uid_or_message, username=username,
+                                   food_types=food_types, genotypes=genotypes, ports=ports)
+
+    return render_template('add_cross.html', username=username,
+                           food_types=food_types, genotypes=genotypes, ports=ports)
+
+# Route to fetch genotype based on Unique ID
+@app.route('/get_genotype/<unique_id>')
+def get_genotype(unique_id):
+    username = session.get("username")
+    stock = db['stocks'].find_one({"UniqueID": unique_id, "User": username})
+    if stock:
+        return jsonify({'genotype': stock['Genotype']})
+    else:
+        return jsonify({'genotype': ''}), 404
+    
+from urllib.parse import unquote
+
+@app.route('/get_uids/<genotype>', methods=['GET'])
+def get_uids(genotype):
+    # Debugging information
+    print(f"Received genotype: {genotype}")
+    
+    decoded_genotype = unquote(unquote(genotype))
+    print(f"Decoded genotype: {decoded_genotype}")
+    
+    uids = db['stocks'].find({"Genotype": decoded_genotype}, {"UniqueID": 1})
+    uid_list = [doc['UniqueID'] for doc in uids]
+    
+    return jsonify({'uids': uid_list})
+
+
+### FLY FLIPPING ROUTES ###
 
 # define a route for the flip stock page
 @app.route('/flip', methods=['GET'])
@@ -407,7 +608,12 @@ def scan_qr_code(port_index, ports, username, thread_id, baudrate=9600, size=11)
                 'uniqueID': uid,
                 'seriesID': matching_stock['SeriesID'],
                 'replicateID': matching_stock['ReplicateID'],
+                'trayID': matching_stock['TrayID'],
+                'trayPosition': matching_stock['TrayPosition'],
+                'foodType': matching_stock['FoodType'],
+                'provenance': matching_stock['Provenance'],
                 'name': matching_stock['Name'],
+                'altReference': matching_stock['AltReference'],
                 'genotype': matching_stock['Genotype'],
                 'status': matching_stock['Status']
             })
@@ -464,6 +670,79 @@ def handle_flip_stock():
     
     return jsonify({'message': 'Stock flipped successfully!'})
 
+@app.route('/download_data', methods=['GET'])
+def download_data():
+    if not session.get("username"):
+        return redirect("/login")
+
+    # Create an in-memory bytes buffer
+    output = io.BytesIO()
+    
+    try:
+        # Generate Excel file from MongoDB data
+        mongo_to_xls(db, output)
+        
+        # Set the buffer's position to the beginning
+        output.seek(0)
+        
+        # Prepare the response with appropriate headers
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='fly_manager_data.xlsx'
+        )
+    except Exception as e:
+        print(f"Error generating Excel file: {e}")
+        return Response(
+            f"An error occurred while generating the Excel file: {e}",
+            status=500
+        )
+
+@app.route('/upload_data', methods=['GET', 'POST'])
+def upload_data():
+    if not session.get("username"):
+        return redirect("/login")
+
+    if request.method == 'POST':
+        # Check if the post request has the file part
+        if 'file' not in request.files:
+            flash('No file part')
+            return redirect(request.url)
+        
+        file = request.files['file']
+        
+        # If no file is selected
+        if file.filename == '':
+            flash('No selected file')
+            return redirect(request.url)
+        
+        # Validate file
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
+            try:
+                # Save the uploaded file temporarily
+                file.save(file_path)
+                
+                # Process the Excel file and update MongoDB
+                xls_to_mongo(file_path, db)
+                
+                # Remove the file after processing
+                os.remove(file_path)
+                
+                flash('Data successfully uploaded and updated.')
+                return redirect("/home")
+            except Exception as e:
+                print(f"Error processing Excel file: {e}")
+                flash(f'An error occurred while processing the file: {e}')
+                return redirect(request.url)
+        else:
+            flash('Allowed file type is .xlsx')
+            return redirect(request.url)
+    
+    return render_template('upload_data.html')
 
 # run the app
 if __name__ == '__main__':

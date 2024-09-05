@@ -1,0 +1,30 @@
+<form method="post" action="/cross_explorer">
+    <div class="filter-row">
+        {% with filter_name="Male Genotype", options=unique_values.MaleGenotype, selected=filter_state.filterMaleGenotype %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
+        {% with filter_name="Female Genotype", options=unique_values.FemaleGenotype, selected=filter_state.filterFemaleGenotype %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
+        {% with filter_name="Status", options=unique_values.Status, selected=filter_state.filterStatus %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
+        {% with filter_name="Food Type", options=unique_values.FoodType, selected=filter_state.filterFoodType %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
+        {% with filter_name="Tray ID", options=unique_values.TrayID, selected=filter_state.filterTrayID %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
+        <div class="filter-col">
+            <label for="searchQuery">Search:</label>
+            <input type="text" id="searchQuery" name="searchQuery" class="form-control" value="{{ filter_state.searchQuery }}">
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary mt-3">Apply Filters</button>
+    <button type="submit" name="clear_filters" class="btn btn-secondary mt-3">Clear Filters</button>
+</form>

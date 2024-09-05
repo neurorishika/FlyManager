@@ -32,6 +32,8 @@ document.addEventListener("DOMContentLoaded", function() {
             })
             .then(response => response.json())
             .then(info => {
+                document.getElementById('trayID').textContent = '';
+                document.getElementById('trayPosition').textContent = '';
                 document.getElementById('uniqueID').textContent = '';
                 document.getElementById('seriesID').textContent = '';
                 document.getElementById('replicateID').textContent = '';
@@ -53,6 +55,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const selectedPort = portSelection.value;
         scanWaiting.style.display = 'block';
         startScanBtn.style.display = 'none';
+        portSelection.disabled = true;
 
         fetch('/start_scan', {
             method: 'POST',
@@ -73,6 +76,7 @@ document.addEventListener("DOMContentLoaded", function() {
             flipFliesFromView().then(() => {
                 scanWaiting.style.display = 'none';
                 startScanBtn.style.display = 'block';
+                portSelection.disabled = false;
                 fetch('/stop_scan', {
                     method: 'POST',
                     headers: {
@@ -89,6 +93,7 @@ document.addEventListener("DOMContentLoaded", function() {
             flipFliesFromView().then(() => {
                 scanWaiting.style.display = 'none';
                 startScanBtn.style.display = 'block';
+                portSelection.disabled = false;
                 fetch('/stop_scan', {
                     method: 'POST',
                     headers: {
@@ -119,6 +124,9 @@ document.addEventListener("DOMContentLoaded", function() {
             })
             .then(response => response.json())
             .then(info => {
+                // display the stock details
+                document.getElementById('trayID').textContent = data.trayID;
+                document.getElementById('trayPosition').textContent = data.trayPosition;
                 document.getElementById('uniqueID').textContent = data.uniqueID;
                 document.getElementById('seriesID').textContent = data.seriesID;
                 document.getElementById('replicateID').textContent = data.replicateID;
@@ -130,6 +138,8 @@ document.addEventListener("DOMContentLoaded", function() {
         }
         else {
             // display the stock details
+            document.getElementById('trayID').textContent = data.trayID;
+            document.getElementById('trayPosition').textContent = data.trayPosition;
             document.getElementById('uniqueID').textContent = data.uniqueID;
             document.getElementById('seriesID').textContent = data.seriesID;
             document.getElementById('replicateID').textContent = data.replicateID;
@@ -168,4 +178,21 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     });
 
+    // Cancel the flip when the cancel button is clicked
+    const cancelFlipBtn = document.getElementById('cancelFlipBtn');
+    cancelFlipBtn.addEventListener('click', function() {
+        // Clear all the fields and hide the stock details section
+        stockDetails.style.display = 'none';
+        document.getElementById('trayID').textContent = '';
+        document.getElementById('trayPosition').textContent = '';
+        document.getElementById('name').textContent = '';
+        document.getElementById('altReference').textContent = '';
+        document.getElementById('genotype').textContent = '';
+        document.getElementById('uniqueID').textContent = '';
+        document.getElementById('seriesID').textContent = '';
+        document.getElementById('replicateID').textContent = '';
+        document.getElementById('flipTime').value = '{{ now }}';
+        document.getElementById('comment').value = '';
+        document.querySelectorAll('input[name="status"]').forEach(input => input.checked = false);
+    });
 });

@@ -1,0 +1,285 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center">Add New Cross</h1>
+
+    {% if error %}
+    <div class="alert alert-danger" role="alert">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <!-- Port Selection for Scanning -->
+    <div id="port-selection" class="row mb-3 align-items-center justify-content-center">
+        <div class="col-auto">
+            <select class="form-select" id="serialPort">
+                {% for port in ports %}
+                    <option value="{{ loop.index0 }}">{{ port.device }} - {{ port.description }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <form method="POST" action="/add_cross">
+        <!-- Male Section -->
+        <div class="form-group">
+            <label for="maleUniqueID">Male Unique ID:</label>
+            <div class="input-group">
+                <input type="text" class="form-control" id="maleUniqueID" name="maleUniqueID">
+                <button id="scanMaleUIDBtn" class="btn btn-secondary" type="button">Scan UID</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="maleGenotype">Male Genotype:</label>
+            <input type="text" id="maleGenotype" name="maleGenotype" class="form-control tag-input">
+        </div>
+        <div id="maleUIDOptions" class="mt-2"></div> <!-- Placeholder for UID buttons -->
+
+        <!-- Female Section -->
+        <div class="form-group">
+            <label for="femaleUniqueID">Female Unique ID:</label>
+            <div class="input-group">
+                <input type="text" class="form-control" id="femaleUniqueID" name="femaleUniqueID">
+                <button id="scanFemaleUIDBtn" class="btn btn-secondary" type="button">Scan UID</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="femaleGenotype">Female Genotype:</label>
+            <input type="text" id="femaleGenotype" name="femaleGenotype" class="form-control tag-input">
+        </div>
+        <div id="femaleUIDOptions" class="mt-2"></div> <!-- Placeholder for UID buttons -->
+
+        <!-- Tray and Other Details -->
+        <div class="form-group">
+            <label for="trayID">Tray ID:</label>
+            <input type="text" class="form-control" id="trayID" name="trayID">
+        </div>
+        <div class="form-group">
+            <label for="trayPosition">Tray Position:</label>
+            <input type="text" class="form-control" id="trayPosition" name="trayPosition">
+        </div>
+        <div class="form-group">
+            <label for="status">Status:</label>
+            <select class="form-control" id="status" name="status">
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="foodType">Food Type:</label>
+            <select class="form-control" id="foodType" name="foodType">
+                {% for foodtype in food_types %}
+                <option value="{{ foodtype }}">{{ foodtype }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="name">Cross Name:</label>
+            <input type="text" class="form-control" id="name" name="name">
+        </div>
+        <div class="form-group">
+            <label for="comments">Comments:</label>
+            <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-success btn-block">Add Cross</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.polyfills.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
+<script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const socket = io.connect('http://127.0.0.1:5000');
+        let currentThreadId = null;
+
+        // Function to start scanning
+        function startScanning(gender) {
+            const selectedPort = document.getElementById('serialPort').value;
+
+            fetch('/start_scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ port_index: selectedPort })
+            })
+            .then(response => response.json())
+            .then(data => {
+                currentThreadId = data.thread_id;
+                if (gender === 'male') {
+                    document.getElementById('scanMaleUIDBtn').textContent = "Stop Scan";
+                } else {
+                    document.getElementById('scanFemaleUIDBtn').textContent = "Stop Scan";
+                }
+            });
+        }
+
+        // Function to stop scanning
+        function stopScanning(gender) {
+            fetch('/stop_scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ thread_id: currentThreadId })
+            })
+            .then(() => {
+                currentThreadId = null;
+                if (gender === 'male') {
+                    document.getElementById('scanMaleUIDBtn').textContent = "Scan UID";
+                } else {
+                    document.getElementById('scanFemaleUIDBtn').textContent = "Scan UID";
+                }
+            });
+        }
+
+        // Handle scan button for Male UID
+        document.getElementById('scanMaleUIDBtn').addEventListener('click', function() {
+            if (currentThreadId) {
+                stopScanning('male');
+            } else {
+                startScanning('male');
+            }
+        });
+
+        // Handle scan button for Female UID
+        document.getElementById('scanFemaleUIDBtn').addEventListener('click', function() {
+            if (currentThreadId) {
+                stopScanning('female');
+            } else {
+                startScanning('female');
+            }
+        });
+
+        socket.on('qr_scanned', function(data) {
+            if (currentThreadId) {
+                if (document.getElementById('scanMaleUIDBtn').textContent === "Stop Scan") {
+                    document.getElementById('maleUniqueID').value = data.uniqueID;
+                    // Trigger the input event to fetch the genotype
+                    document.getElementById('maleUniqueID').dispatchEvent(new Event('input'));
+                    stopScanning('male');
+                } else if (document.getElementById('scanFemaleUIDBtn').textContent === "Stop Scan") {
+                    document.getElementById('femaleUniqueID').value = data.uniqueID;
+                    // Trigger the input event to fetch the genotype
+                    document.getElementById('femaleUniqueID').dispatchEvent(new Event('input'));
+                    stopScanning('female');
+                }
+            }
+        });
+
+        socket.on('qr_not_recognized', function() {
+            alert('QR code not recognized. Please try again.');
+        });
+
+        // Initialize Tagify for Male and Female Genotypes
+        let tagifyMaleGenotype = new Tagify(document.querySelector('#maleGenotype'), {
+            whitelist: {{ genotypes | tojson }},
+            maxTags: 1,
+            enforceWhitelist: true,
+            dropdown: {
+                enabled: 1
+            }
+        });
+
+        let tagifyFemaleGenotype = new Tagify(document.querySelector('#femaleGenotype'), {
+            whitelist: {{ genotypes | tojson }},
+            maxTags: 1,
+            enforceWhitelist: true,
+            dropdown: {
+                enabled: 1
+            }
+        });
+
+        // Fetch UIDs when Male Genotype is selected
+        tagifyMaleGenotype.on('add', function(e) {
+            const selectedGenotype = e.detail.data.value;
+            if (selectedGenotype) {
+                fetch(`/get_uids/${encodeURIComponent(encodeURIComponent(selectedGenotype))}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const maleUIDOptions = document.getElementById('maleUIDOptions');
+                        maleUIDOptions.innerHTML = '';
+                        data.uids.forEach(uid => {
+                            let button = document.createElement('button');
+                            button.className = 'btn btn-outline-primary btn-sm m-1 m-uid-button';
+                            button.textContent = uid;
+                            button.type = 'button';
+                            button.style.display = 'block';
+                            button.onclick = function() {
+                                document.getElementById('maleUniqueID').value = uid;
+                                document.querySelectorAll('.m-uid-button').forEach(button => {
+                                    button.style.display = 'none';
+                                });
+                            };
+                            maleUIDOptions.appendChild(button);
+                        });
+                    });
+            }
+        });
+
+        // Fetch UIDs when Female Genotype is selected
+        tagifyFemaleGenotype.on('add', function(e) {
+            const selectedGenotype = e.detail.data.value;
+            if (selectedGenotype) {
+                fetch(`/get_uids/${encodeURIComponent(encodeURIComponent(selectedGenotype))}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const femaleUIDOptions = document.getElementById('femaleUIDOptions');
+                        femaleUIDOptions.innerHTML = '';
+                        data.uids.forEach(uid => {
+                            let button = document.createElement('button');
+                            button.className = 'btn btn-outline-primary btn-sm m-1 f-uid-button';
+                            button.textContent = uid;
+                            button.type = 'button';
+                            button.style.display = 'block';
+                            button.onclick = function() {
+                                document.getElementById('femaleUniqueID').value = uid;
+                                document.querySelectorAll('.f-uid-button').forEach(button => {
+                                    button.style.display = 'none';
+                                });
+                            };
+                            femaleUIDOptions.appendChild(button);
+                        });
+                    });
+            }
+        });
+
+        // Fetch genotype when Male Unique ID is entered or scanned
+        document.getElementById('maleUniqueID').addEventListener('input', function() {
+            const maleUID = this.value;
+            if (maleUID) {
+                fetch(`/get_genotype/${maleUID}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.genotype) {
+                            // Remove any existing tags
+                            tagifyMaleGenotype.removeAllTags();
+                            tagifyMaleGenotype.addTags([data.genotype]);
+                        }
+                    });
+            }
+        });
+
+        document.getElementById('femaleUniqueID').addEventListener('input', function() {
+            const femaleUID = this.value;
+            if (femaleUID) {
+                fetch(`/get_genotype/${femaleUID}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.genotype) {
+                            // Remove any existing tags
+                            tagifyFemaleGenotype.removeAllTags();
+                            tagifyFemaleGenotype.addTags([data.genotype]);
+                        }
+                    });
+            }
+        });
+    });
+</script>
+{% endblock %}

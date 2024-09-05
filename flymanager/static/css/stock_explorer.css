@@ -1,0 +1,118 @@
+/* Container for the stock items */
+.stock-container {
+    width: 100%; /* Make sure the container spans the full width */
+    overflow-y: auto; /* Allow vertical scrolling if needed */
+}
+
+/* Two-column layout with multiple rows */
+.stock-items-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Two equal-width columns */
+    gap: 15px; /* Space between items */
+    padding: 10px;
+}
+
+.stock-item {
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+    border: 2px solid transparent;
+    position: relative;
+}
+
+.stock-item .checkbox-and-badges {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.badges {
+    display: flex;
+    gap: 5px;
+}
+
+.badge-info {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.badge-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.stock-item[data-status="Healthy"] {
+    border-color: green;
+}
+
+.stock-item[data-status="Showing Issues"] {
+    border-color: rgb(96, 32, 32);
+}
+
+.stock-item[data-status="Needs refresh"] {
+    border-color: red;
+}
+
+.stock-item[data-status="Ordered"] {
+    border-color: blue;
+}
+
+.stock-item[data-status="No longer maintained"] {
+    border-color: pink;
+}
+
+.stock-item h5 {
+    margin: 0 0 5px;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.stock-item p {
+    margin: 0;
+    font-size: 12px;
+}
+
+.details {
+    padding-top: 10px;
+    width: 100%;
+}
+
+.btn-link.btn-sm {
+    font-size: 12px;
+    padding: 2px 5px;
+    margin-left: 10px;
+    color: #007bff;
+}
+
+.btn-link.btn-sm i {
+    font-size: 14px;
+}
+
+.clearfix::after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+.filters {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 10px;
+}
+
+.filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.filter-col {
+    flex: 1;
+    min-width: 150px;
+}

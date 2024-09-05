@@ -72,6 +72,11 @@ def xls_to_mongo(file_path, db):
     stocks = []
     crosses = []
 
+    # clear the database
+    for collection_name in get_collection_names(db):
+        db[collection_name].delete_many({})
+
+
     for sheet_name in xls.sheet_names:
         # Skip sheets that contain stock or cross data for now
         if "Stock" in sheet_name:

@@ -137,9 +137,6 @@ class AveryLabel:
 def render_label(canvas, width, height, stock, uid, genotype, status, common_name, alt_name):
     '''
     LABEL TEMPLATE
-    Stock | Replicate | Date
-    Genotype + Alt name (colored by Status: Healthy = Green, Showing Issues = Orange, Needs refresh = Red)
-    watermark: common name
     '''
     if stock != "":
         
@@ -202,7 +199,7 @@ def generate_label_pdf(filename, user_initial, selected_stocks, num_blank, num_l
     # render the labels
     for i in range(num_labels):
         label.render(render_label, 1, 
-                    user_initial + "-" + str(selected_stocks[i]['SeriesID']) + str(selected_stocks[i]['ReplicateID']) + "(" + str(selected_stocks[i]['TrayID']) + "-" + str(selected_stocks[i]['TrayPosition']) + ")",
+                    str(selected_stocks[i]['TrayID']) + "-" + str(selected_stocks[i]['TrayPosition']) + "(" + user_initial + "-" + str(selected_stocks[i]['SeriesID']) + str(selected_stocks[i]['ReplicateID']) + ")",
                     selected_stocks[i]['UniqueID'],
                     selected_stocks[i]['Genotype'],
                     selected_stocks[i]['Status'],

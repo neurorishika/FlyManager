@@ -31,10 +31,10 @@ def reset_database(db):
     db.create_collection("types")
     db.create_collection("food_types")
     db.create_collection("provenances")
-    db.create_collection("transgenesX")
-    db.create_collection("transgenes2nd")
-    db.create_collection("transgenes3rd")
-    db.create_collection("transgenes4th")
+    db.create_collection("genesX")
+    db.create_collection("genes2nd")
+    db.create_collection("genes3rd")
+    db.create_collection("genes4th")
 
 
 # Authentication and User Management
@@ -208,9 +208,9 @@ def get_user_crosses(user, db):
     collection: pymongo.collection.Collection
         The collection representing the user's crosses.
     """
-    collection_name = f"{user}_Cross"
-    collection = db[collection_name]
-    return collection
+    crosses_collection = db["crosses"]
+    filtered_crosses = crosses_collection.find({"User": user})
+    return list(filtered_crosses)
 
 def get_user_activities(user, db):
     """
@@ -233,11 +233,38 @@ def get_user_activities(user, db):
     
     return user_activities
 
+def get_all_genotypes(user, db):
+    """
+    Get all the genotypes of the user's stocks.
+    
+    Parameters:
+    user: str
+        The username of the user.
+    db: pymongo.database.Database
+        The MongoDB database instance.
+
+    Returns:
+    genotypes: list
+        A list of all the unique genotypes.
+    """
+    stocks_collection = db["stocks"]
+    
+    # Find all the stocks and crosses of the user
+    user_stocks = stocks_collection.find({"User": user})
+    
+    # Extract the genotypes from the stocks and crosses
+    stock_genotypes = [stock["Genotype"] for stock in user_stocks]
+    
+    # Remove duplicates and sort the genotypes
+    genotypes = list(set(stock_genotypes))
+    
+    return genotypes
+
 # Stock and Cross Management
 
 def uid_exists(uid, db):
     """
-    Check if a stock or cross with the given UID exists in the MongoDB database.
+    Check if a stock or cross with the given UniqueID exists in the MongoDB database.
     
     Parameters:
     uid: str
@@ -247,14 +274,14 @@ def uid_exists(uid, db):
     
     Returns:
     bool
-        True if the UID exists, False otherwise.
+        True if the UniqueID exists, False otherwise.
     """
-    # Check if the UID exists in the stocks collection or the crosses collection
+    # Check if the UniqueID exists in the stocks collection or the crosses collection
     stocks_collection = db["stocks"]
     crosses_collection = db["crosses"]
 
-    stock = stocks_collection.find_one({"UID": uid})
-    cross = crosses_collection.find_one({"UID": uid})
+    stock = stocks_collection.find_one({"UniqueID": uid})
+    cross = crosses_collection.find_one({"UniqueID": uid})
 
     return stock is not None or cross is not None
 
@@ -305,13 +332,13 @@ def add_to_stock(user, properties, db):
     if not qc:
         return False, genotype
 
-    # create UID as a hash of the (User + Genotype + SeriesID + ReplicateID)
+    # create UniqueID as a hash of the (User + Genotype + SeriesID + ReplicateID)
     uid = str(user) + str(properties["Genotype"]) + str(properties["SeriesID"]) + str(properties["ReplicateID"])
     uid = shake_256(uid.encode()).hexdigest(5)
 
-    # make sure the UID is unique across all users
+    # make sure the UniqueID is unique across all users
     while uid_exists(uid, db):
-        print("UID already exists, generating a new one")
+        print("UniqueID already exists, generating a new one")
         uid = shake_256(uid.encode()).hexdigest(5)
     
     # get creation timestamp
@@ -319,7 +346,7 @@ def add_to_stock(user, properties, db):
 
     # create the document to insert
     stock_document = {
-        "UID": uid,
+        "UniqueID": uid,
         "User": user,
         "SourceID": properties["SourceID"],
         "Genotype": genotype,
@@ -370,15 +397,15 @@ def get_stock(user, uid, db, admin_include=False):
     stocks_collection = db["stocks"]
 
     # Try to find the stock in the user's collection
-    stock = stocks_collection.find_one({"UID": uid, "User": user})
+    stock = stocks_collection.find_one({"UniqueID": uid, "User": user})
     
     # If not found and admin_include is True, search in the admin's collection
     if not stock and admin_include and user != "admin":
-        stock = stocks_collection.find_one({"UID": uid, "User": "admin"})
+        stock = stocks_collection.find_one({"UniqueID": uid, "User": "admin"})
     
     return stock
 
-from pymongo import MongoClient
+
 
 def flip_stock(user, uid, db, timestamp, new_status=None, added_comment=None):
     """
@@ -401,13 +428,16 @@ def flip_stock(user, uid, db, timestamp, new_status=None, added_comment=None):
     
     # Define the user's collection
     stocks_collection = db["stocks"]
-
+    print(f"Flipping stock {uid} for user {user}")
     # Prepare the update fields
     update_fields = {}
     
     # Update the LastFlipDate and FlipLog
     ts = timestamp.replace('T', ' ')
-    current_stock = stocks_collection.find_one({"UID": uid, "User": user})
+    current_stock = stocks_collection.find_one({"UniqueID": uid, "User": user})
+
+    # If the stock exists
+    print(current_stock)
     
     if current_stock:
         # Update LastFlipDate
@@ -438,11 +468,14 @@ def flip_stock(user, uid, db, timestamp, new_status=None, added_comment=None):
             new_modification_log = "; ".join(modification_log_entries)
             update_fields['ModificationLog'] = f"{new_modification_log}; {modification_log}" if modification_log else new_modification_log
 
+        print(update_fields)
+
         # Update the stock document in MongoDB
         stocks_collection.update_one(
-            {"UID": uid, "User": user},
+            {"UniqueID": uid, "User": user},
             {"$set": update_fields}
         )
+
 
 def delete_stock(user, uid, db):
     """
@@ -465,7 +498,7 @@ def delete_stock(user, uid, db):
     stocks_collection = db["stocks"]
     
     # Attempt to delete the stock
-    result = stocks_collection.delete_one({"UID": uid, "User": user})
+    result = stocks_collection.delete_one({"UniqueID": uid, "User": user})
     
     # Check if any document was deleted
     if result.deleted_count > 0:
@@ -507,7 +540,7 @@ def edit_stock(user, uid, db, updates):
     
     # If there are updates, add to the ModificationLog and DataModifiedDate
     if modification_log_entries:
-        current_stock = stocks_collection.find_one({"UID": uid, "User": user})
+        current_stock = stocks_collection.find_one({"UniqueID": uid, "User": user})
         if current_stock:
             modification_log = current_stock.get('ModificationLog', '')
             new_modification_log = "; ".join(modification_log_entries)
@@ -516,7 +549,259 @@ def edit_stock(user, uid, db, updates):
             
             # Update the stock document in MongoDB
             result = stocks_collection.update_one(
-                {"UID": uid, "User": user},
+                {"UniqueID": uid, "User": user},
+                {"$set": update_fields}
+            )
+            
+            return result.matched_count > 0
+    
+    return False
+
+
+def add_to_cross(user, properties, db):
+    """
+    Add a cross to the user's cross collection in MongoDB.
+    
+    Parameters:
+    user: str
+        The username of the user.
+    properties: dict
+        The properties of the cross.
+        Properties:
+            MaleUniqueID (required)
+            FemaleUniqueID (required)
+            MaleGenotype (required)
+            FemaleGenotype (required)
+            Name (required)
+            FoodType (required)
+            TrayID (optional)
+            TrayPosition (optional)
+            Status (required)
+            Comments (optional)
+    db: pymongo.database.Database
+        The MongoDB database instance.
+
+    Returns:
+    bool
+        True if the cross was added, False otherwise.
+    uid: str
+        The unique identifier of the cross.
+    """
+
+    # Check for required fields
+    assert "MaleUniqueID" in properties, "MaleUniqueID is required"
+    assert "FemaleUniqueID" in properties, "FemaleUniqueID is required"
+    assert "MaleGenotype" in properties, "MaleGenotype is required"
+    assert "FemaleGenotype" in properties, "FemaleGenotype is required"
+    assert "Name" in properties, "Name is required"
+    assert "Status" in properties, "Status is required"
+    assert "FoodType" in properties, "FoodType is required"
+
+    # Create a UniqueID for the cross based on Male and Female UniqueID + User + Name
+    uid = str(user) + str(properties["MaleUniqueID"]) + str(properties["FemaleUniqueID"]) + str(properties["Name"])
+    uid = shake_256(uid.encode()).hexdigest(5)
+
+    # Ensure the UniqueID is unique
+    while uid_exists(uid, db):
+        print("UniqueID already exists, generating a new one")
+        uid = shake_256(uid.encode()).hexdigest(5)
+
+    # Get the current timestamp
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Create the document to insert
+    cross_document = {
+        "UniqueID": uid,
+        "User": user,
+        "MaleUniqueID": properties["MaleUniqueID"],
+        "FemaleUniqueID": properties["FemaleUniqueID"],
+        "MaleGenotype": properties["MaleGenotype"],
+        "FemaleGenotype": properties["FemaleGenotype"],
+        "Name": properties["Name"],
+        "FoodType": properties["FoodType"],
+        "TrayID": properties.get("TrayID", ""),
+        "TrayPosition": properties.get("TrayPosition", ""),
+        "Status": properties["Status"],
+        "Comments": properties.get("Comments", ""),
+        "CreationDate": timestamp,
+        "DataModifiedDate": timestamp,
+        "ModificationLog": f"{timestamp} : Cross created"
+    }
+
+    # Insert the document into the MongoDB collection
+    crosses_collection = db["crosses"]
+    crosses_collection.insert_one(cross_document)
+
+    return True, uid
+
+def get_cross(user, uid, db, admin_include=False):
+    """
+    Get the cross from the user's cross collection in MongoDB.
+    
+    Parameters:
+    user: str
+        The username of the user.
+    uid: str
+        The unique identifier of the cross.
+    db: pymongo.database.Database
+        The MongoDB database instance.
+    admin_include: bool
+        Whether to include admin crosses as well.
+    
+    Returns:
+    cross: dict
+        The properties of the cross.
+    """
+
+    # Define the user's collection
+    crosses_collection = db["crosses"]
+
+    # Try to find the cross in the user's collection
+    cross = crosses_collection.find_one({"UniqueID": uid, "User": user})
+    
+    # If not found and admin_include is True, search in the admin's collection
+    if not cross and admin_include and user != "admin":
+        cross = crosses_collection.find_one({"UniqueID": uid, "User": "admin"})
+    
+    return cross
+
+def flip_cross(user, uid, db, timestamp, new_status=None, added_comment=None):
+    """
+    Flip the status of the cross in MongoDB.
+    
+    Parameters:
+    user: str
+        The username of the user.
+    uid: str
+        The unique identifier of the cross.
+    db: pymongo.database.Database
+        The MongoDB database instance.
+    timestamp: str
+        The special timestamp to use.
+    new_status: str
+        The new status of the cross.
+    added_comment: str
+        The comment to add to the cross.
+    """
+    
+    # Define the user's collection
+    crosses_collection = db["crosses"]
+
+    # Prepare the update fields
+    update_fields = {}
+    
+    # Update the LastFlipDate and FlipLog
+    ts = timestamp.replace('T', ' ')
+    current_cross = crosses_collection.find_one({"UniqueID": uid, "User": user})
+
+    if current_cross:
+        # Update LastFlipDate
+        update_fields['LastFlipDate'] = ts
+
+        # Update FlipLog
+        flip_log = current_cross.get('FlipLog', '')
+        update_fields['FlipLog'] = f"{ts}; {flip_log}" if flip_log else ts
+
+        # Prepare the modification log
+        modification_log_entries = []
+        
+        # If new status is provided and different from current, update it
+        if new_status and current_cross.get('Status') != new_status:
+            update_fields['Status'] = new_status
+            update_fields['DataModifiedDate'] = ts
+            modification_log_entries.append(f"{ts} : Status changed from {current_cross.get('Status')} to {new_status}")
+
+        # If comment is provided, add it to the comments and the modification log
+        if added_comment:
+            comments = current_cross.get('Comments', '')
+            update_fields['Comments'] = f"{added_comment}; {comments}" if comments else added_comment
+            modification_log_entries.append(f"{ts} : Comments added: {added_comment}")
+
+        # If there are modification log entries, concatenate them with the existing log
+        if modification_log_entries:
+            modification_log = current_cross.get('ModificationLog', '')
+            new_modification_log = "; ".join(modification_log_entries)
+            update_fields['ModificationLog'] = f"{new_modification_log}; {modification_log}" if modification_log else new_modification_log
+
+        # Update the cross document in MongoDB
+        crosses_collection.update_one(
+            {"UniqueID": uid, "User": user},
+            {"$set": update_fields}
+        )
+
+def delete_cross(user, uid, db):
+    """
+    Delete a cross from the user's cross collection.
+    
+    Parameters:
+    user: str
+        The username of the user.
+    uid: str
+        The unique identifier of the cross.
+    db: pymongo.database.Database
+        The MongoDB database instance.
+    
+    Returns:
+    bool
+        True if the cross was deleted, False if not found.
+    """
+    
+    # Define the user's collection
+    crosses_collection = db["crosses"]
+    
+    # Attempt to delete the cross
+    result = crosses_collection.delete_one({"UniqueID": uid, "User": user})
+    
+    # Check if any document was deleted
+    if result.deleted_count > 0:
+        return True
+    else:
+        return False
+
+def edit_cross(user, uid, db, updates):
+    """
+    Edit specific fields of a cross in the user's cross collection.
+    
+    Parameters:
+    user: str
+        The username of the user.
+    uid: str
+        The unique identifier of the cross.
+    db: pymongo.database.Database
+        The MongoDB database instance.
+    updates: dict
+        A dictionary of the fields to update and their new values.
+    
+    Returns:
+    bool
+        True if the cross was updated, False if not found.
+    """
+    
+    # Define the user's collection
+    crosses_collection = db["crosses"]
+    
+    # Prepare the update fields and log the modification
+    update_fields = {}
+    modification_log_entries = []
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Loop through the updates and apply them
+    for field, value in updates.items():
+        update_fields[field] = value
+        modification_log_entries.append(f"{timestamp} : {field} updated to {value}")
+    
+    # If there are updates, add to the ModificationLog and DataModifiedDate
+    if modification_log_entries:
+        current_cross = crosses_collection.find_one({"UniqueID": uid, "User": user})
+        if current_cross:
+            modification_log = current_cross.get('ModificationLog', '')
+            new_modification_log = "; ".join(modification_log_entries)
+            update_fields['ModificationLog'] = f"{new_modification_log}; {modification_log}" if modification_log else new_modification_log
+            update_fields['DataModifiedDate'] = timestamp
+            
+            # Update the cross document in MongoDB
+            result = crosses_collection.update_one(
+                {"UniqueID": uid, "User": user},
                 {"$set": update_fields}
             )
             
@@ -539,11 +824,12 @@ def get_metadata(metadata_type, db):
     metadata: list
         A list of dictionaries representing the metadata.
     """
-    assert metadata_type in ["types", "food_types", "provenances", "transgenesX", "transgenes2nd", 
-                             "transgenes3rd", "transgenes4th"], "Invalid metadata type"
+    assert metadata_type in ["types", "food_types", "provenances", "genesX", "genes2nd", 
+                             "genes3rd", "genes4th"], "Invalid metadata type"
     metadata_collection = db[metadata_type]
     metadata = list(metadata_collection.find())
-    return metadata
+    values = [m["Value"] for m in metadata]
+    return values
 
 def add_metadata(metadata_type, metadata_value, db):
     """
@@ -561,8 +847,8 @@ def add_metadata(metadata_type, metadata_value, db):
     bool
         True if the metadata was added, False otherwise.
     """
-    assert metadata_type in ["types", "food_types", "provenances", "transgenesX", "transgenes2nd",
-                             "transgenes3rd", "transgenes4th"], "Invalid metadata type"
+    assert metadata_type in ["types", "food_types", "provenances", "genesX", "genes2nd",
+                             "genes3rd", "genes4th"], "Invalid metadata type"
     
     # Define the metadata collection
     metadata_collection = db[metadata_type]
@@ -596,8 +882,8 @@ def delete_metadata(metadata_type, metadata_value, db):
     bool
         True if the metadata was deleted, False otherwise.
     """
-    assert metadata_type in ["types", "food_types", "provenances", "transgenesX", "transgenes2nd",
-                             "transgenes3rd", "transgenes4th"], "Invalid metadata type"
+    assert metadata_type in ["types", "food_types", "provenances", "genesX", "genes2nd",
+                             "genes3rd", "genes4th"], "Invalid metadata type"
     
     # Define the metadata collection
     metadata_collection = db[metadata_type]
@@ -629,8 +915,8 @@ def edit_metadata(metadata_type, old_value, new_value, db):
     bool
         True if the metadata was updated, False otherwise.
     """
-    assert metadata_type in ["types", "food_types", "provenances", "transgenesX", "transgenes2nd",
-                             "transgenes3rd", "transgenes4th"], "Invalid metadata type"
+    assert metadata_type in ["types", "food_types", "provenances", "genesX", "genes2nd",
+                             "genes3rd", "genes4th"], "Invalid metadata type"
     
     # Define the metadata collection
     metadata_collection = db[metadata_type]

@@ -1,5 +1,23 @@
 # Description: This file contains functions for fly genetics.
 
+import requests
+import pandas as pd
+
+def refresh_bloomington_data():
+    """
+    Refresh the bloomington data.
+    """
+    url = "https://bdsc.indiana.edu/pdf/bloomington.csv"
+    r = requests.get(url, allow_redirects=True)
+    open('data/bloomington.csv', 'wb').write(r.content)
+
+def get_bloomington_data():
+    """
+    Get the bloomington data.
+    """    
+    df = pd.read_csv("data/bloomington.csv")
+    return df
+
 def qc_genotype(genotype):
     """
     Check if the genotype is in the correct format.
@@ -8,7 +26,7 @@ def qc_genotype(genotype):
         return False, "Genotype must be a string"
     
     # Check if the genotype is in the correct format xchromosome; chromosome1; chromosome2
-    if not genotype.count(";") == 2:
+    if not genotype.count(";") == 3:
         return False, "Genotype must be in the format xchromosome; chromosome1; chromosome2"
     
     # clean the genotype
@@ -44,7 +62,9 @@ def get_genetic_components(genotype):
         if chr.count("/") == 1:
             alleles = chr.split("/")
             alleles.sort()
+            # replace "" with "+"
+            alleles = [allele if allele != "" else "+" for allele in alleles]
             components.append(alleles)
         else:
-            components.append([chr, chr])
+            components.append([chr if chr != "" else "+", chr if chr != "" else "+"])
     return components

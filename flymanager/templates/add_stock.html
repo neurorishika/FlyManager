@@ -11,14 +11,45 @@
     {% endif %}
 
     <form method="POST" action="/add_stock">
+        
         <div class="form-group">
             <label for="sourceID"><strong>Source ID | </strong> Format: [JRF/BDSC/INTERNAL/OTHER]_[StockID/UNK]:</label>
             <input type="text" class="form-control" id="sourceID" name="sourceID" required>
         </div>
-        <div class="form-group">
-            <label for="genotype">Genotype:</label>
-            <input type="text" class="form-control" id="genotype" name="genotype" required>
+        <label for="genotypeX"><strong>Genotype | </strong> Add up to 2 genes:</label>
+        <div class="form-row">
+            <div class="form-group col-md-2">
+                <label for="genotypeX">Chromosome X:</label>
+            </div>
+            <div class="form-group col-md-10">
+                <input type="text" id="genotypeX" name="genotypeX" class="form-control tag-input">
+            </div>
         </div>
+        <div class="form-row">
+            <div class="form-group col-md-2">
+                <label for="genotype2">Chromosome 2:</label>
+            </div>
+            <div class="form-group col-md-10">
+                <input type="text" id="genotype2" name="genotype2" class="form-control tag-input">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-md-2">
+                <label for="genotype3">Chromosome 3:</label>
+            </div>
+            <div class="form-group col-md-10">
+                <input type="text" id="genotype3" name="genotype3" class="form-control tag-input">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-md-2">
+                <label for="genotype4">Chromosome 4:</label>
+            </div>
+            <div class="form-group col-md-10">
+                <input type="text" id="genotype4" name="genotype4" class="form-control tag-input">
+            </div>
+        </div>
+
         <div class="form-group">
             <label for="name">Name:</label>
             <input type="text" class="form-control" id="name" name="name" required>
@@ -27,9 +58,31 @@
             <label for="altReference">Alt Reference (optional):</label>
             <input type="text" class="form-control" id="altReference" name="altReference">
         </div>
+        
         <div class="form-group">
             <label for="type">Type:</label>
-            <input type="text" class="form-control" id="type" name="type" required>
+            <input type="text" id="type" name="type" class="form-control tag-input">
+        </div>
+        
+        <div class="form-group">
+            <label for="foodType">Food Type (optional):</label>
+            <input type="text" id="foodType" name="foodType" class="form-control tag-input">
+        </div>
+        
+        <div class="form-group">
+            <label for="provenance">Provenance (optional):</label>
+            <input type="text" id="provenance" name="provenance" class="form-control tag-input">
+        </div>
+
+        <div class="form-group">
+            <label for="status">Status:</label>
+            <select class="form-control status-select" id="status" name="status" required>
+                <option value="Healthy" data-color="green">Healthy</option>
+                <option value="Showing Issues" data-color="brown">Showing Issues</option>
+                <option value="Needs refresh" data-color="red">Needs refresh</option>
+                <option value="Ordered" data-color="blue">Ordered</option>
+                <option value="No longer maintained" data-color="pink">No longer maintained</option>
+            </select>
         </div>
         <div class="form-group">
             <label for="seriesID">Series ID:</label>
@@ -48,28 +101,53 @@
             <input type="text" class="form-control" id="trayPosition" name="trayPosition">
         </div>
         <div class="form-group">
-            <label for="status">Status:</label>
-            <select class="form-control" id="status" name="status" required>
-                <option value="Healthy">Healthy</option>
-                <option value="Showing Issues">Showing Issues</option>
-                <option value="Needs refresh">Needs refresh</option>
-                <option value="Ordered">Ordered</option>
-                <option value="No longer maintained">No longer maintained</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label for="foodType">Food Type (optional):</label>
-            <input type="text" class="form-control" id="foodType" name="foodType">
-        </div>
-        <div class="form-group">
-            <label for="provenance">Provenance (optional):</label>
-            <input type="text" class="form-control" id="provenance" name="provenance">
-        </div>
-        <div class="form-group">
             <label for="comments">Comments (optional):</label>
             <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>
         </div>
         <button type="submit" class="btn btn-success btn-block">Add Stock</button>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.polyfills.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Example of initializing Tagify on all tag-input fields
+        let tagifyX = new Tagify(document.querySelector('#genotypeX'), {
+            maxTags: 2,
+            whitelist: {{ genesX | tojson }}
+        });
+
+        let tagify2 = new Tagify(document.querySelector('#genotype2'), {
+            maxTags: 2,
+            whitelist: {{ genes2 | tojson }}
+        });
+
+        let tagify3 = new Tagify(document.querySelector('#genotype3'), {
+            maxTags: 2,
+            whitelist: {{ genes3 | tojson }}
+        });
+
+        let tagify4 = new Tagify(document.querySelector('#genotype4'), {
+            maxTags: 2,
+            whitelist: {{ genes4 | tojson }}
+        });
+        
+        let tagifyType = new Tagify(document.querySelector('#type'), {
+            whitelist: {{ types | tojson }}
+        });
+
+        let tagifyFoodType = new Tagify(document.querySelector('#foodType'), {
+            whitelist: {{ food_types | tojson }}
+        });
+
+        let tagifyProvenance = new Tagify(document.querySelector('#provenance'), {
+            whitelist: {{ provenances | tojson }}
+        });
+        
+    });
+</script>
 {% endblock %}

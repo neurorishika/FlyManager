@@ -1,0 +1,194 @@
+1239 ax[1] 1;2
+1408 Diap1[th-1] st[1] cp[1] in[1] kni[ri-1] Kg[V] Ki[1] p[p]/TM3, ry[RK] Sb[1] Ser[1] 1;3
+1802 P{ry[+t7.2]=neoFRT}42D 2;3
+2103 y[1] w[67c23]; ninaE[7] 3
+4461 F(3L)2, ru[1] hry[2]; F(3R)4, se[1] e[s]/TM3, Sb[1] 3
+5572 Su(z)2[1.b7]/CyO 1;2
+7307 w[*]; Ab(2L;2Rh)34-14/CyO, y[+] 1;2
+7459 P{ry[+t7.2]=hsFLP}12, y[1] w[*]; P{w[+mC]=Rh6-GAL4.D}2 1;2;3
+7462 P{ry[+t7.2]=hsFLP}12, y[1] w[*]; P{w[+mC]=Rh4-EGFP.P}2/CyO 1;2;3
+9687 E(bx)[Nurf301-3]/TM6B, Sb[1] Tb[1] ca[1] 1;3
+9962 w[*]; P{w[+mC]=Or33a-GAL4.F}126.4A 1;2;3
+10935 cn[1] P{ry[+t7.2]=PZ}eEF1alpha1[00248]/CyO 2;3
+11257 cn[1] P{ry[+t7.2]=PZ}Sema2a[03021]/CyO 2;3
+11776 P{ry[+t7.2]=PZ}koi[09967], ms(2)42D[09967] cn[1]/CyO 2;3
+14711 y[1]; P{y[+mDint2] w[BR.E.BR]=SUPor-P}Tpr2[KG08262] 1;2;3
+14796 y[1]; P{y[+mDint2] w[BR.E.BR]=SUPor-P}Scim12[2]/SM6a 1;2;3
+19147 w[1118]; P{w[+mC]=XP}ldbr[d00740] 1;2;3
+23126 w[*]; P{w[+mC]=Or82a-GAL4.F}135.2/TM3, Sb[1] 1;2;3
+24517 w[*]; P{w[+mC]=UAS-pinta.W}2; pinta[1] 1;2
+25102 P{w[+mC]=UAS-faf.H}2, w[*]; st[1] faf[BX4]/TM6B, Tb[1] 1;2;3
+27602 w[*]; P{w[+mC]=UAS-HA-UPRT}2.1 1;2;3
+27603 w[*]; P{w[+mC]=UAS-UPRT.M}3.1 1;2;3
+28847 P{w[+mC]=hs-GAL4-DHR3.LBD.HA}53.65; P{w[+mC]=UAS-Stinger}3 1;2;3
+29649 w[*]; P{w[+mC]=UAS-shot.L(A)-DeltaPlakin-GFP}2, shot[3]/CyO, P{ry[+t7.2]=en1}wg[en11] 1;2;3
+32070 w[1118]; Herm{3xP3-ECFP,alphatub-piggyBacK10}M6 1;2;3
+32247 w[*]; P{y[+t7.7] w[+mC]=UAS-HDAC3.V5}attP24/CyO 1;2;3
+33216 P{ry[+t7.2]=hsFLP}12, y[1] w[*] M{vas-int.B}ZH-2A; Pri[1]/TM3, Sb[1] 1;2;3
+44412 w[*]; P{w[+mC]=UAS-GFP.RNAi.R}143/CyO 1;2;3
+51602 y[1] w[*]; PBac{y[+mDint2] w[+mC]=I-SceI(FRT.RabX4-GAL4.ORF(loxP.3xP3-RFP))}VK00033 1;2;3
+57659 w[*]; P{w[+mC]=Gr63a-GAL4.0.8}1/TM3, Sb[1] 1;2;3
+58989 w[*]; P{w[+mC]=UASp-F-Tractin.tdTomato}15A/SM6b 1;2;3
+64177 y[1] w[67c23]; Harwich |P-cytotype| 1;2;3
+66696 TI{GAL4}fru[GAL4.P1.D]/TM3, Sb[1] 1;3
+67094 y[1] w[*] P{y[+t7.7] w[+mC]=dpn(KDRT.stop)cre.PEST}su(Hw)attP8; P{y[+t7.7] w[+mC]=Act(loxP.GAL80.stop)lexA::p65}attP40 P{y[+t7.7] w[+mC]=lexAop-rCD2::RFP-p10.UAS-mCD8::GFP-p10}su(Hw)attP5; TM3, Sb[1]/TM6B, Tb[+] 1;2
+67613 w[*]; P{y[+t7.7] w[+mC]=LexAop2-myr::4xCLIPf}attP40 1;2;3
+67615 w[*]; P{y[+t7.7] w[+mC]=UAS-myr::4xSNAPf}attP40 1;2;3
+68904 w[1118]; P{y[+t7.7] w[+mC]=R86H04-p65.AD}attP40 1;2;3
+70330 w[1118] P{y[+t7.7] w[+mC]=10xUAS-IVS-myr::smGdP-HA}attP18 P{y[+t7.7] w[+mC]=13xLexAop2-IVS-myr::smGdP-V5}su(Hw)attP8; P{y[+t7.7] w[+mC]=R70H11-GAL4.DBD}attP2 1;2;3
+70443 w[1118] P{y[+t7.7] w[+mC]=10xUAS-IVS-myr::smGdP-HA}attP18 P{y[+t7.7] w[+mC]=13xLexAop2-IVS-myr::smGdP-V5}su(Hw)attP8; P{y[+t7.7] w[+mC]=R79D11-GAL4.DBD}attP2 1;2;3
+70462 w[1118]; P{y[+t7.7] w[+mC]=R88H09-p65.AD}attP40/CyO 1;2;3
+70485 w[1118]; P{y[+t7.7] w[+mC]=R29F08-p65.AD}attP40 1;2;3
+70540 w[1118]; P{y[+t7.7] w[+mC]=R12E04-p65.AD}attP40 1;2;3
+70563 w[1118]; P{y[+t7.7] w[+mC]=R16A07-p65.AD}attP40 1;2;3
+70622 w[1118]; P{y[+t7.7] w[+mC]=R25F07-p65.AD}attP40 1;2;3
+70758 w[1118]; P{y[+t7.7] w[+mC]=R60C01-p65.AD}attP40 1;2;3
+70772 w[1118]; P{y[+t7.7] w[+mC]=R64H04-p65.AD}attP40 1;2;3
+70916 w[1118]; P{y[+t7.7] w[+mC]=R28D10-p65.AD}attP40/CyO 1;2;3
+70919 w[1118]; P{y[+t7.7] w[+mC]=R17H01-p65.AD}attP40 1;2;3
+71006 w[1118]; P{y[+t7.7] w[+mC]=R65C02-p65.AD}attP40/SM6a 1;2;3
+76676 y[1] w[*]; Mi{Trojan-GAL4.1}Ance[MI05748-TG4.1]/CyO 1;2;3
+78358 w[1118]; P{w[+mC]=srpHemo-3XmCherry}2/CyO 1;2;3
+78362 w[1118]; P{w[+mC]=srpHemo-Moe.3XmCherry}3 1;2;3
+78396 y[1] w[*]; M{w[+mC]=UAS-hSLC18A1.HA}ZH-86Fb 1;2;3
+78434 y[1] w[*]; PBac{y[+mDint2] w[+mC]=UAS-hPANK1.HA}VK00037 1;2;3
+81121 P{ry[+t7.2]=GAL4-Adh.Dmul}2/CyO; ry[506] 2
+81236 w[*]; P{y[+t7.7] w[+mC]=Ir60e-GAL4.2466}attP2/TM6B, Tb[1] 1;2;3
+81629 w[*]; P{y[+t7.7] w[+mC]=Ir60d-GAL4.339}attP2/TM3, Sb[1] 1;2;3
+81632 w[*]; P{y[+t7.7] w[+mC]=Ir94f-GAL4.2493}attP2/TM3, Sb[1] 1;2;3
+82185 y[1] w[*] Mi{DH.0}CG6966[MI00805-DH.PT-GFSTF.0] 1;3
+82987 wg[Sp-1]/CyO; Mi{Trojan-GAL4DBD.2}Gad1[MI09277-TG4DBD.2]/TM6B, Tb[1] 1;2;3
+82991 w[*]; betaTub60D[Pin-1]/CyO; Mi{Trojan-p65AD.1}Dr[MI14348-Tp65AD.1] 1;3
+82992 w[*]; betaTub60D[Pin-1]/CyO; TI{2A-GAL4(DBD)::Zip-}HGTX[DBD]/TM6B, Tb[1] 1;3
+83132 y[1] w[1118] P{w[+mC]=UAS-mCD8::GFP.L}Ptp4E[LL4] P{w[+mC]=QUAS-mtdTomato-3xHA}22 PBac{y[+mDint2] w[+mC]=Act-DBS-S-QF}VK00038; PBac{y[+mDint2] w[+mC]=QUAS-GAL4.B}VK00031/TM3, Ser[1] 1;2;3
+83179 y[1] w[*]; TI{GFP[3xP3.cLa]=CRIMIC.TG4.0}MagR[CR00510-TG4.0]/FM7h 1
+83245 y[1] w[*]; TI{GFP[3xP3.cLa]=CRIMIC.TG4.1}dpr18[CR01004-TG4.1] 1
+83246 y[1] w[*]; TI{GFP[3xP3.cLa]=CRIMIC.TG4.1}ERp44[CR01005-TG4.1] 1
+83350 w[*]; P{w[+mC]=stg-lacZ.beta-E2.2}2, P{w[+mW.hs]=en2.4-GAL4}e16E 1;2;3
+83351 w[*]; P{w[+mC]=stg-lacZ.beta-E4.9}2, P{w[+mW.hs]=en2.4-GAL4}e16E 1;2;3
+83635 P{y[+t7.7] w[+mC]=UAS-plx.HA}attP40/CyO 1;2
+84238 P{w[+mC]=Ret-GAL4.P1}3 1;3
+84302 w[*]; P{w[+mC]=bs-GAL4.Term}G1/CyO; P{w[+mC]=UAS-GC3Ai}3 1;3
+84962 TI{2A-lexA::GAD}CCHa2[2A-lexA]/TM3, Sb[1] 1;3
+84970 PBac{y[+mDint2]=20XUAS-IVS-jYCaMP1-p10}VK00005 1;3
+85125 w[1118] PBac{w[+mC]=RB}CG42232[e01479]/TM6B, Tb[1] 1;3
+85162 w[1118]; PBac{w[+mC]=RB}cerv[e03931] 1
+85411 w[1118] P{w[+mC]=XP}Cam[d01888]/CyO 1;2
+86148 w[*]; P{w[+mC]=UAS-Octbeta3R.RF}2; TM2/TM6B, Tb[1] 1;2
+86149 w[*]; P{w[+mC]=UAS-Octbeta3R.RK}2; TM2/TM6B, Tb[1] 1;2
+86321 TI{20XUAS-SPARC-I-jGCaMP7f}CR-P40 2;3
+86374 y[1] w[*]; TI{GFP[3xP3.cLa]=CRIMIC.TG4.1}eag[CR01421-TG4.1] 1
+86459 y[1] w[*]; TI{GFP[3xP3.cLa]=CRIMIC.TG4.1}CG8945[CR01593-TG4.1] CG4955[CR01593-TG4.1-X] 1
+86571 w[*]; stau[2] PBac{y[+mDint2] w[+mC]=alphaTub67C-stau.PA.mGFP6}VK00037/SM6a 2
+86572 w[*]; stau[2] PBac{y[+mDint2] w[+mC]=alphaTub67C-stau.PB}VK00037/SM6a 2
+86784 w[1118]; TI{GAL4(DBD)::Zip-}dsx[GAL4(DBD)::Zip-] PBac{y[+mDint2] w[+mC]=Tdc2-p65.AD}VK00027/MKRS 1;2;3
+86836 w[1118]; TI{GAL4(DBD)::Zip-}dsx[GAL4(DBD)::Zip-] P{y[+t7.7] w[+mC]=VT002064-p65.AD}attP2/TM6B, Tb[1] 1;2;3
+90314 zfh1[2]/TM3, Sb[1] Ser[1] 1;3
+90842 w[1118]; CyO/wg[Sp-1]; P{w[+mC]=UAS-CqOR2.U}3/TM3, Sb[1] 1;3
+90848 P{w[+mC]=UAS-BmorOR1.S}1, w[1118]; CyO/wg[Sp-1] 1
+90849 w[1118]; CyO/wg[Sp-1]; P{w[+mC]=UAS-BmorOR1.S}3 1;3
+90855 y[1] w[*]; Adv[1]/CyO; P{w[+mC]=UAS-Ubqn.L}3/TM6B, Tb[+] 1;3
+90936 lqf[L71] P{ry[+t7.2]=neoFRT}80B/TM3, Sb[1] 1;3
+91387 w[*]; P{w[+mC]=UAS-Gr64f.J}2; MKRS/TM6B, Tb[1] 1;2
+91412 M{RFP[3xP3.PB] w[+mC]=Su(H)GBE-smGdP::V5::nls}ZH-2A w[*] P{y[+t7.7] w[+mC]=mira-His2A.mCherry.HA}su(Hw)attP8; P{w[+mC]=UAS-Stinger}2 1;2;3
+91542 y[1] w[*]; P{w[+mC]=UAS-bin.Z}35 1
+91657 w[*]; TI{TI}Nipped-A[HA]; TM2/TM6B, Tb[1] 1;3
+91671 w[*]; P{w[+mC]=Hs-DeltacyclinB3}II.1 1;2;3
+91683 w[*], P{w[+mC]=dap.1gm}II.1/CyO, P{ry[+t7.2]=ftz-lacB}E3 1;2
+91757 w[*], P{w[+mC]=UAS-pim-myc}II.2 1;2
+91758 w[*], P{w[+mC]=UAS-pim-myc}III.2 1;3
+92205 y[1] w[*]; TI{GFP[3xP3.cLa]=CRIMIC.TG4.0}hang[CR02226-TG4.0] 1
+92206 y[1] w[*]; TI{GFP[3xP3.cLa]=CRIMIC.TG4.1}Spt6[CR02229-TG4.1] 1
+92359 w[*]; otk[3]/CyO, P{ry[+t7.2]=en1}wg[en11] 2
+92392 w[*]; TI{RFP[mCh.3xP3.cPa]=2A-QF2}Ir25a[2A-QF2] 1;2;3
+92649 w[1118]; P{w[+mC]=Tmem63-GAL4.L}3 3
+92650 w[1118]; P{w[+mC]=UAS-Tmem63.L}3 3
+92651 w[1118]; TI{w[+mW.hs]=TI}Tmem63[1] 2
+92652 w[1118]; TI{w[+mC]=TI}Tmem63[2] 2
+92688 y[1] w[*]; TI{GFP[3xP3.cLa]=CRIMIC.TG4.0}CtsB[CR70028-TG4.0]/FM7h 1
+92689 y[1] w[*]; TI{GFP[3xP3.cLa]=CRIMIC.TG4.2}Ppt1[CR70032-TG4.2] 1
+92691 y[1] w[*]; TI{GFP[3xP3.cLa]=CRIMIC.TG4.0}Tob[CR70035-TG4.0]/FM7h 1
+92697 y[1] w[*]; TI{GFP[3xP3.cLa]=CRIMIC.TG4.2}CG3226[CR70071-TG4.2] 1
+92712 y[1] w[*]; TI{GFP[3xP3.cLa]=CRIMIC.TG4.1}Mfe2[CR70121-TG4.1] kat80[CR70121-TG4.1-X]/FM7h 1
+92783 y[1] w[1118]; betaTub60D[Pin-1]/CyO; P{w[+mC]=tubP-GAL4}LL7 P{ry[+t7.2]=neoFRT}82B P{w[+mC]=tubP-GAL80}LL3/TM6B, Tb[1] 1;3
+92960 y[1] w[*]; PBac{y[+mDint2] w[+mC]=UAS-hNRBP1.B}VK00037/CyO; TM2/TM6B, Tb[1] 1;2
+92961 y[1] w[*]; PBac{y[+mDint2] w[+mC]=UAS-hDIP2C.B}VK00037; TM2/TM6B, Tb[1] 1;2
+92963 y[1] w[*]; L[1]/CyO; M{RFP[3xP3.PB] w[+mC]=UAS-hEPHA1.V567I.HA}ZH-86Fb 1;3
+92967 y[1] w[*]; P{w[+m*]=bap-RFP.3}7; Dr[1]/TM3, P{w[+mC]=GAL4-twi.G}2.3, P{UAS-2xEGFP}AH2.3, Sb[1] Ser[1] 1;2
+93413 w[*]; wg[Sp-1]/CyO; P{w[+mC]=UAS-NLS-APEX.GFP}3/TM6B, Tb[1] 1;3
+93415 w[*]; Kr[If-1]/CyO; P{w[+mC]=UAS-NES-APEX.FLAG}3 1;3
+93416 w[*]; P{w[+mC]=UAS-NES-APEX.FLAG}2; MKRS/TM6B, Tb[1] 1;2
+93417 w[*]; P{w[+mC]=UAS-mito-APEX.FLAG}2; MKRS/TM6B, Tb[1] 1;2
+93418 w[*]; P{w[+mC]=UAS-NES-APEX.GFP}2/CyO; MKRS/TM6B, Tb[1] 1;2
+93419 w[*]; Kr[If-1]/CyO; P{w[+mC]=UAS-NES-APEX.GFP}3 1;3
+93420 w[*]; wg[Sp-1]/CyO; P{w[+mC]=UAS-NLS-APEX.FLAG}3 1;3
+93422 w[*]; Kr[If-1]/CyO; P{w[+mC]=UAS-mito-APEX.FLAG}3 1;3
+93423 w[*]; Kr[If-1]/CyO; P{w[+mC]=UAS-mito-APEX.GFP}3 1;3
+94000 w[1118]; Tdc2[RO54] cn[1] bw[1]/CyO 2
+94146 w[*]; PBac{w[+mC]=RB}Jarid2[e03131] P{ry[+t7.2]=neoFRT}80B/TM3, P{w[+mC]=GAL4-twi.G}2.3, P{UAS-2xEGFP}AH2.3, Sb[1] Ser[1] 1;2;3
+94271 b[1] pr[1] cn[1] Rx[10155] bw[1]/CyO 1;2
+94281 b[1] pr[1] cn[1] hbn[4028] bw[1]/CyO 1;2
+94282 b[1] pr[1] cn[1] hbn[15227] bw[1]/CyO 1;2
+94292 b[1] pr[1] cn[1] otp[1024] bw[1]/CyO 1;2
+94293 b[1] pr[1] cn[1] otp[13064] bw[1]/CyO 1;2
+94588 Mi{Trojan-GAL4.0}CRMP[MI06892-TG4.0]/TM3, ry[RK] Sb[1] Ser[1] 1;3
+94623 Mi{Trojan-GAL4.un}Rim[MI07142-TG4.un]/TM3, Sb[1] Ser[1] 1;3
+94754 w[1118]; PBac{y[+mDint2] w[+mC]=GMR65B12-lexA}VK00022; MKRS/TM6B, Tb[1] 1;2
+94757 w[1118]; PBac{y[+mDint2] w[+mC]=GMR38B06-lexA}VK00022; MKRS/TM6B, Tb[1] 1;2
+94758 w[1118]; PBac{y[+mDint2] w[+mC]=GMR38E07-lexA}VK00022; MKRS/TM6B, Tb[1] 1;2
+94759 w[1118]; PBac{y[+mDint2] w[+mC]=GMR60D05-lexA}VK00022/CyO; MKRS/TM6B, Tb[1] 1;2
+94790 w[1118]; TI{TI}Dif[A-GFP]; MKRS/TM6B, Tb[1] 1;2
+94888 y[1] w[*]; L[1]/CyO; P{w[+mC]=UAS-Stacl.RE.EGFP}3/TM3, Sb[1] 1;3
+94926 w[*]; Kr[If-1]/CyO; P{w[+mC]=sM3MCA}33 1;3
+95264 y[1] w[*]; Kr[If-1]/CyO; P{w[+mC]=UAS-PolG1.D185A.D268A}3 1;3
+95538 y[1] w[67c23]; htt[int]/TM6B, Tb[1] y[+] 3
+96811 w[*]; BicD[r5]/SM1; P{w[+mC]=hsBic-D.scs}94/TM6C, Sb[1] 1;3
+97291 w[*]; P{w[+mC]=UAS-sli.C}1 1
+97301 y[1] w[*]; TI{GFP[3xP3.cLa]=CRIMIC.TG4.0}spri[CR70334-KO-TG4.0] 1
+97376 w[*]: Ance-3[3] 1;2
+97395 Gba1b[Delta1] 1;3
+97528 w[*]; P{w[+mC]=ET-lexA::GAD.GB}VGlut[OK371-LG]; TM2/TM6B, Tb[1] 1;3
+98346 w[*]; P{ry[+t7.2]=neoFRT}82B Dfd[16]/TM6B, Tb[1] 3
+99008 w[*]; M{RFP[3xP3.PB] w[+mC]=UASp-TTLL5.Venus}ZH-58A/CyO; M{UASp-TTLL5.Venus}ZH-64A/TM3, Sb[1] 1;3
+99258 y[1] w[*]; P{y[+t7.7] w[+mC]=UAS-nBitbow.1.0}su(Hw)attP5/CyO 1;2;3
+99266 y[1] w[*]; P{y[+t7.7] w[+mC]=UAS-gBitbow.1.0}attP40/CyO, P{y[+t7.7] w[+mC]=UAS-mBitbow.1.0}attP2, PBac{y[+mDint2] w[+mC]=UAS-nBitbow.1.0}VK00027 1;2;3
+99721 w[*]; P{w[+mC]=UASp-HA-Rab11}2; Sb[1]/TM3, Ser[1] 1;2
+600166 w[*], P{w[+mC]=UAS-Fit1.GFP}41 1;2
+600242 w[*]; w[*]; M{RFP[3xP3.PB] w[+mC]=UASp-mGFP6.mito.TagRFP}ZH-51D/CyO 1;2
+600248 w[*]; P{w[+mC]=Ilk.mCherry}2; TM2/TM6B, Tb[1] 1;2
+600273 y[1] w[*]; wg[Sp-1]/CyO, P{Dfd-GMR-nvYFP}2; PBac{y[+mDint2] w[+mC]=UAS-SA-KDEL-S}VK00031 M{RFP[3xP3.PB] w[+mC]=UAS-SA-KDEL-S}ZH-86Fa 1;2
+600280 y[1] w[*]; wg[Sp-1]/CyO, P{Dfd-GMR-nvYFP}2; PBac{y[+mDint2] w[+mC]=UAS-ST-KDEL}VK00031 M{RFP[3xP3.PB]=UAS-ST-KDEL}ZH-86Fa 1;3
+600300 w[1118]; wg[Sp-1]/CyO, P{Wee-P.ph0}Bacc[Wee-P20]; PBac{y[+mDint2] w[+mC]=UAS-hDYRK1A-SPARK}VK00033 1;3
+600374 P{y[+t7.7] w[+mC]=UAS-mKir2.1.T2A.tdTomato}attP40; P{w[+mC]=tubP-GAL80[ts]}2 1;2;3
+600375 P{y[+t7.7] w[+mC]=UAS-mKcnj2.nc.T2A.tdTomato}attP40; P{w[+mC]=tubP-GAL80[ts]}2 1;2;3
+600486 w[*] P{w[+mC]=UAS-pio.GFP}2; P{UAS-pio.GFP}3 1;2;3
+600493 y[1] w[1118]; sna[Sco] speck[1]/CyO; P{w[+mC]=Ubi-cora}H 1;3
+600534 w[*]; Tao[50]/FM7c, P{Dfd-GMR-nvYFP}1, sn[+]; sna[Sco]/CyO, P{w[BmC]=Dfd-EYFP.w[BmC]}2 1;2
+600546 w[1118]; PBac{RFP[DsRed.3xP3.cUa] y[+mDint2]=yki-YFP}VK00037; MKRS/TM6B, Tb[1] 1;2
+600630 w[1118]; PBac{y[+mDint2] w[+mC]=R52G04-p65.AD}VK00027 1;2;3
+600632 w[1118]; PBac{y[+mDint2] w[+mC]=R73H08-p65.AD}VK00027 1;2;3
+600633 w[1118]; PBac{y[+mDint2] w[+mC]=R93D10-p65.AD}VK00027 1;2;3
+600734 w[1118]; P{y[+t7.7] w[+mC]=R65B09-p65.AD}attP40; MKRS/TM6B, Tb[1] 1;2
+600736 w[1118]; P{y[+t7.7] w[+mC]=R38B06-p65.AD}attP40/CyO, P{w[+mC]=2xTb[1]-RFP}CyO; MKRS/TM6B, Tb[1] 1;2
+600737 w[1118]; P{y[+t7.7] w[+mC]=R37H01-p65.AD}attP40; MKRS/TM6B, Tb[1] 1;2
+600738 w[1118]; P{y[+t7.7] w[+mC]=R93F07-p65.AD}attP40/CyO, P{w[+mC]=2xTb[1]-RFP}CyO; MKRS/TM6B, Tb[1] 1;2
+600740 w[1118]; Kr[If-1]/CyO, P{w[+mC]=2xTb[1]-RFP}CyO; P{y[+t7.7] w[+mC]=R15E12-GAL4.DBD}attP2 1;3
+600741 w[1118]; Kr[If-1]/CyO, P{w[+mC]=2xTb[1]-RFP}CyO; P{y[+t7.7] w[+mC]=R21H11-GAL4.DBD}attP2 1;3
+600742 w[1118]; Kr[If-1]/CyO, P{w[+mC]=2xTb[1]-RFP}CyO; P{y[+t7.7] w[+mC]=R37H01-GAL4.DBD}attP2 1;3
+600744 w[1118]; Kr[If-1]/CyO, P{w[+mC]=2xTb[1]-RFP}CyO; P{y[+t7.7] w[+mC]=R93G02-GAL4.DBD}attP2/TM6B, Tb[1] 1;3
+601947 w[1118]; wg[Sp-1]/CyO; PBac{y[+mDint2] w[+mC]=R81B12-GAL4.DBD}VK00027 1;3
+601948 w[1118]; P{y[+t7.7] w[+mC]=R43D09-p65.AD}attP40; MKRS/TM6B, Tb[1] 1;2
+603167 y[1] w[*] TI{GFP[3xP3.cLa]=KozakGAL4}Torsin[CR71060-KO-kG4]/FM7h 1;4
+603441 w[1118]; PBac{y[+mDint2] w[+mC]=R58E02-p65.AD}VK00027/CyO, P{w[+mC]=2xTb[1]-RFP}CyO; P{y[+t7.7] w[+mC]=R32G08-GAL4.DBD}attP2 1;3
+605064 w[*]; PBac{y[+mDint2] w[+mC]=UAS-spGFP1-10.K}VK00022; TI{TI}HT2B[GFP11-HA] 1;3
+605065 w[*]; PBac{y[+mDint2] w[+mC]=UAS-spGFP1-10.K}VK00022; TI{TI}HT7[GFP11-HA] 1;3
+605098 y[1] w[*]; P{y[+t7.7] w[+mC]=13XlexAop-Ace2N-2AA-mNeon2,20XUAS-pAce}attP40; MKRS/TM6B, Tb[1] 1;2
+605254 w[*]; P{w[+mC]=UAS-GFP-Bsg}3/TM6B, Tb[1] 1
+Existing components for chromosome 1: 7
+Existing components for chromosome 2: 18
+Existing components for chromosome 3: 12
+Existing components for chromosome 4: 1
+Unique components for chromosome 1: 8032
+Unique components for chromosome 2: 38898
+Unique components for chromosome 3: 38874
+Unique components for chromosome 4: 3057
