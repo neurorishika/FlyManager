@@ -2,47 +2,6 @@
 
 import pandas as pd
 
-# csv to mongo and vice versa
-def csv_to_mongo(file_path, collection, db):
-    """
-    Load a CSV file (each column is a field, each row is a document) into a MongoDB collection.
-    Parameters:
-    file_path: str
-        The path to the CSV file.
-    collection: str
-        The name of the collection to insert the data into.
-    db: pymongo.database.Database
-        The MongoDB database instance.
-    """
-    # Load the CSV file into a pandas DataFrame
-    df = pd.read_csv(file_path)
-    
-    # Convert the DataFrame to a dictionary
-    data = df.to_dict(orient="records")
-    
-    # Insert the data into the MongoDB collection
-    db[collection].insert_many(data)
-
-def mongo_to_csv(collection, file_path, db):
-    """
-    Load a MongoDB collection into a CSV file.
-    Parameters:
-    collection: str
-        The name of the collection to load the data from.
-    file_path: str
-        The path to the CSV file.
-    db: pymongo.database.Database
-        The MongoDB database instance.
-    """
-    # Query all documents in the collection
-    documents = db[collection].find()
-    
-    # Convert the documents to a DataFrame
-    df = pd.DataFrame(documents)
-    
-    # Save the DataFrame to a CSV file
-    df.to_csv(file_path, index=False)
-
 def get_collection_names(db):
     """
     Get the names of all the collections in the MongoDB database.
@@ -84,8 +43,6 @@ def xls_to_mongo(file_path, db):
             continue
         if "Cross" in sheet_name:
             crosses.append(sheet_name)
-            continue
-        if "metadata" in sheet_name:
             continue
 
         # Load the sheet into a DataFrame
@@ -153,6 +110,9 @@ def mongo_to_xls(db, file_path):
         
         # Convert the documents to a DataFrame
         df = pd.DataFrame(documents)
+
+        # Remove the "_id" field
+        df = df.drop(columns=["_id"])
         
         # Save the DataFrame to the Excel file
         df.to_excel(writer, sheet_name=collection_name, index=False)
@@ -162,6 +122,8 @@ def mongo_to_xls(db, file_path):
     usernames = db["stocks"].distinct("User")
     for username in usernames:
         stock_df = pd.DataFrame(list(db["stocks"].find({"User": username})))
+        # Remove the "_id" field
+        stock_df = stock_df.drop(columns=["_id"])
         stock_df.to_excel(writer, sheet_name=username + "_Stock", index=False)
 
     # Process cross data
@@ -169,6 +131,8 @@ def mongo_to_xls(db, file_path):
     usernames = db["crosses"].distinct("User")
     for username in usernames:
         cross_df = pd.DataFrame(list(db["crosses"].find({"User": username})))
+        # Remove the "_id" field
+        cross_df = cross_df.drop(columns=["_id"])
         cross_df.to_excel(writer, sheet_name=username + "_Cross", index=False)
     
     # Save the Excel file

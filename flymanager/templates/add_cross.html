@@ -157,7 +157,7 @@
             }
         });
 
-        socket.on('qr_scanned', function(data) {
+        socket.on('stock_scanned', function(data) {
             if (currentThreadId) {
                 if (document.getElementById('scanMaleUIDBtn').textContent === "Stop Scan") {
                     document.getElementById('maleUniqueID').value = data.uniqueID;

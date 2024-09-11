@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const comment = document.getElementById('comment').value;
             const uniqueID = document.getElementById('uniqueID').textContent;
 
-            return fetch('/flip_stock', {
+            return fetch('/flip_vial', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -39,6 +39,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 document.getElementById('replicateID').textContent = '';
                 document.getElementById('name').textContent = '';
                 document.getElementById('genotype').textContent = '';
+                document.getElementById('maleGenotype').textContent = '';
+                document.getElementById('femaleGenotype').textContent = '';
                 document.querySelector(`input[name="status"][value="Healthy"]`).checked = true;
                 document.getElementById('flipTime').value = getLocalDateTime();
                 document.getElementById('comment').value = '';
@@ -47,6 +49,7 @@ document.addEventListener("DOMContentLoaded", function() {
             })
         }
         else {
+            stockDetails.style.display = 'none';
             return Promise.resolve()
         }
     }
@@ -105,7 +108,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    socket.on('qr_scanned', function(data) {
+    socket.on('stock_scanned', function(data) {
         // check if there is a fly being viewed
         if (stockDetails.style.display === 'block') {
             // flip the stock
@@ -115,7 +118,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const uniqueID = document.getElementById('uniqueID').textContent;
 
             // send the flip request and wait for the response, then display the stock details
-            fetch('/flip_stock', {
+            fetch('/flip_vial', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -134,6 +137,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 document.getElementById('genotype').textContent = data.genotype;
                 document.querySelector(`input[name="status"][value="${data.status}"]`).checked = true;
                 document.getElementById('flipTime').value = getLocalDateTime();
+
+                stockDetails.style.display = 'block';
             });
         }
         else {
@@ -145,6 +150,53 @@ document.addEventListener("DOMContentLoaded", function() {
             document.getElementById('replicateID').textContent = data.replicateID;
             document.getElementById('name').textContent = data.name;
             document.getElementById('genotype').textContent = data.genotype;
+            document.querySelector(`input[name="status"][value="${data.status}"]`).checked = true;
+            document.getElementById('flipTime').value = getLocalDateTime();
+
+            stockDetails.style.display = 'block';
+        }
+    });
+
+    socket.on('cross_scanned', function(data) {
+        // check if there is a fly being viewed
+        if (stockDetails.style.display === 'block') {
+            // flip the stock
+            const status = document.querySelector('input[name="status"]:checked').value;
+            const flipTime = document.getElementById('flipTime').value;
+            const comment = document.getElementById('comment').value;
+            const uniqueID = document.getElementById('uniqueID').textContent;
+
+            // send the flip request and wait for the response, then display the stock details
+            fetch('/flip_vial', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ status: status, flipTime: flipTime, comment: comment, uniqueID: uniqueID })
+            })
+            .then(response => response.json())
+            .then(info => {
+                // display the stock details
+                document.getElementById('trayID').textContent = data.trayID;
+                document.getElementById('trayPosition').textContent = data.trayPosition;
+                document.getElementById('uniqueID').textContent = data.uniqueID;
+                document.getElementById('maleGenotype').textContent = data.maleGenotype;
+                document.getElementById('femaleGenotype').textContent = data.femaleGenotype;
+                document.getElementById('name').textContent = data.name;
+                document.querySelector(`input[name="status"][value="${data.status}"]`).checked = true;
+                document.getElementById('flipTime').value = getLocalDateTime();
+
+                stockDetails.style.display = 'block';
+            });
+        }
+        else {
+            // display the stock details
+            document.getElementById('trayID').textContent = data.trayID;
+            document.getElementById('trayPosition').textContent = data.trayPosition;
+            document.getElementById('uniqueID').textContent = data.uniqueID;
+            document.getElementById('maleGenotype').textContent = data.maleGenotype;
+            document.getElementById('femaleGenotype').textContent = data.femaleGenotype;
+            document.getElementById('name').textContent = data.name;
             document.querySelector(`input[name="status"][value="${data.status}"]`).checked = true;
             document.getElementById('flipTime').value = getLocalDateTime();
 
@@ -164,7 +216,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const comment = document.getElementById('comment').value;
         const uniqueID = document.getElementById('uniqueID').textContent;
         
-        fetch('/flip_stock', {
+        fetch('/flip_vial', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -174,7 +226,7 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(response => response.json())
         .then(data => {
             stockDetails.style.display = 'none';
-            alert('Stock flipped successfully!');
+            alert('Vial flipped successfully!');
         });
     });
 

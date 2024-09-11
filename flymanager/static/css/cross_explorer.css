@@ -45,12 +45,24 @@
     color: white;
 }
 
-.cross-item[data-status="Active"] {
+.cross-item[data-status="Healthy"] {
     border-color: green;
 }
 
-.cross-item[data-status="Inactive"] {
+.cross-item[data-status="Showing Issues"] {
     border-color: rgb(96, 32, 32);
+}
+
+.cross-item[data-status="Needs refresh"] {
+    border-color: red;
+}
+
+.cross-item[data-status="Ordered"] {
+    border-color: blue;
+}
+
+.cross-item[data-status="No longer maintained"] {
+    border-color: pink;
 }
 
 .cross-item h5 {
