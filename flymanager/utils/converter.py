@@ -1,6 +1,7 @@
 # Description: This file contains functions to convert data between different formats (e.g., CSV, Excel, MongoDB).
 
 import pandas as pd
+from flymanager.utils.genetics import qc_genotype
 
 def get_collection_names(db):
     """
@@ -61,6 +62,8 @@ def xls_to_mongo(file_path, db):
         username = stock.split("_")[0]
         user_stock = pd.read_excel(xls, stock)
         user_stock["User"] = username
+        # qc the genotypes
+        user_stock["Genotype"] = user_stock["Genotype"].apply(lambda x: qc_genotype(x)[1])
         stock_df = pd.concat([stock_df, user_stock], ignore_index=True)
     
     # replace NaN values with empty strings
@@ -71,6 +74,9 @@ def xls_to_mongo(file_path, db):
         username = cross.split("_")[0]
         user_cross = pd.read_excel(xls, cross)
         user_cross["User"] = username
+        # qc the genotypes
+        user_cross["MaleGenotype"] = user_cross["MaleGenotype"].apply(lambda x: qc_genotype(x)[1])
+        user_cross["FemaleGenotype"] = user_cross["FemaleGenotype"].apply(lambda x: qc_genotype(x)[1])
         cross_df = pd.concat([cross_df, user_cross], ignore_index=True)
 
     # replace NaN values with empty strings

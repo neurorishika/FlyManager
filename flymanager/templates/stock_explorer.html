@@ -30,6 +30,9 @@
                     <button class="btn btn-link btn-sm expand-btn" onclick="toggleDetails({{ loop.index }})">
                         <i class="fas fa-chevron-down"></i>
                     </button>
+                    <button class="btn btn-link btn-sm duplicate-stock-btn" onclick="duplicateStock('{{ stock.UniqueID }}')">
+                        <i class="fas fa-clone"></i>
+                    </button>
                     <button class="btn btn-link btn-sm view-details-btn" onclick="viewDetails('{{ stock.UniqueID }}')">
                         <i class="fas fa-external-link-alt"></i>
                     </button>

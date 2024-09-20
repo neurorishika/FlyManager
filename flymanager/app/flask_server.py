@@ -28,6 +28,7 @@ from flymanager.utils.labels import *
 from flymanager.utils.scanner import *
 from flymanager.utils.utils import *
 from flymanager.utils.converter import *
+from flymanager.utils.genetics import *
 
 # setup dotenv
 from dotenv import load_dotenv
@@ -52,7 +53,7 @@ app.secret_key = os.getenv("SECRET_KEY")
 # set the session type to filesystem
 app.config["SESSION_TYPE"] = "filesystem"
 app.config["SESSION_PERMANENT"] = False
-app.config["PERMANENT_SESSION_LIFETIME"] = 600
+app.config["PERMANENT_SESSION_LIFETIME"] = 3600
 
 # clear the session on restart
 app.config["SESSION_FILE_DIR"] = "/tmp"
@@ -190,10 +191,7 @@ def stock():
     stocks = get_user_stocks(username, db)
 
     # sort by TrayID and TrayPosition
-    stocks = sorted(stocks, key=lambda x: (x['TrayID'], int(x['TrayPosition'])))
-
-    print('Number of stocks:', len(stocks))
-    print('First stock:', stocks[0])
+    stocks = sorted(stocks, key=lambda x: (x['TrayID'], int(x['TrayPosition'] if x['TrayPosition']!='' else 0)))
 
     # Extract unique values for filtering
     unique_values = {
@@ -207,6 +205,10 @@ def stock():
     if request.method == 'GET':
         # Check if there are filters stored in session
         filter_state = session.get('filter_state', {})
+
+        # remove the 'No longer maintained' stocks from the list
+        stocks = [stock for stock in stocks if str(stock['Status']) != 'No longer maintained']
+
         return render_template("stock_explorer.html", username=username, stocks=stocks, unique_values=unique_values, filter_state=filter_state)
     elif request.method == 'POST':
         if 'clear_filters' in request.form:
@@ -240,6 +242,8 @@ def stock():
             filtered_stocks = [stock for stock in filtered_stocks if str(stock['TrayID']) == filter_tray_id]
         if filter_status:
             filtered_stocks = [stock for stock in filtered_stocks if str(stock['Status']) == filter_status]
+        else:
+            filtered_stocks = [stock for stock in filtered_stocks if str(stock['Status']) != 'No longer maintained']
         if filter_food_type:
             filtered_stocks = [stock for stock in filtered_stocks if str(stock['FoodType']) == filter_food_type]
         if filter_provenance:
@@ -279,13 +283,14 @@ def stock():
 
 # define a route for the add stock page
 @app.route('/add_stock', methods=['GET', 'POST'])
-def add_stock():
+@app.route('/add_stock/<unique_id>', methods=['GET', 'POST'])
+def add_stock(unique_id=None):
     if not session.get("username"):
         return redirect("/login")
-    
+
     username = session.get("username")
-    
-    # get metadata lists
+
+    # Get metadata lists
     types = get_metadata('types', db)
     food_types = get_metadata('food_types', db)
     provenances = get_metadata('provenances', db)
@@ -294,43 +299,67 @@ def add_stock():
     genes3 = get_metadata('genes3rd', db)
     genes4 = get_metadata('genes4th', db)
 
-
+    # If a unique_id is provided, fetch the stock data
+    stock_data = {}
+    if unique_id:
+        stock = db['stocks'].find_one({"UniqueID": unique_id})
+        if stock:
+            stock_data = {
+                'sourceType': 'INTERNAL',
+                'sourceID': stock['UniqueID'],
+                'genotype': stock['Genotype'],
+                'name': stock['Name'],
+                'altReference': stock.get('AltReference', ''),
+                'type': stock['Type'],
+                'foodType': stock.get('FoodType', 'Molasses'),
+                'status': stock['Status'],
+                'seriesID': stock['SeriesID'],
+                'replicateID': increment_replicate_id(stock['ReplicateID']),
+                'vialLifetime': stock.get('VialLifetime', 14),
+                'flipFrequency': stock.get('FlipFrequency', 7),
+                'comments': stock.get('Comments', ''),
+                'provenance': stock.get('Provenance', '')
+            }
+        else:
+            return jsonify({"error": "Stock not found."}), 404
+    
     if request.method == 'POST':
 
-        genesX_input = clean_tagify_data(request.form.get('genotypeX')) # multiple genotypes can be selected
-        # if its new chromosome, add it to the database
+        # Handle chromosome data
+        genesX_input = clean_tagify_data(request.form.get('genotypeX'))
         for gene in genesX_input:
             if gene not in genesX:
                 add_metadata('genesX', gene, db)
-        genesX_input = ";".join(genesX_input) if len(genesX_input) > 1 else genesX_input[0]
+        genesX_input = "/".join(genesX_input) if len(genesX_input) > 0 else ""
 
-        genes2_input = clean_tagify_data(request.form.get('genotype2')) # multiple genotypes can be selected
+        genes2_input = clean_tagify_data(request.form.get('genotype2'))
         for gene in genes2_input:
             if gene not in genes2:
                 add_metadata('genes2nd', gene, db)
-        genes2_input = ";".join(genes2_input) if len(genes2_input) > 1 else genes2_input[0]
+        genes2_input = "/".join(genes2_input) if len(genes2_input) > 0 else ""
 
-        genes3_input = clean_tagify_data(request.form.get('genotype3')) # multiple genotypes can be selected
+        genes3_input = clean_tagify_data(request.form.get('genotype3'))
         for gene in genes3_input:
             if gene not in genes3:
                 add_metadata('genes3rd', gene, db)
-        genes3_input = ";".join(genes3_input) if len(genes3_input) > 1 else genes3_input[0]
+        genes3_input = "/".join(genes3_input) if len(genes3_input) > 0 else ""
 
-        genes4_input = clean_tagify_data(request.form.get('genotype4')) # multiple genotypes can be selected
+        genes4_input = clean_tagify_data(request.form.get('genotype4'))
         for gene in genes4_input:
             if gene not in genes4:
                 add_metadata('genes4th', gene, db)
-        genes4_input = ";".join(genes4_input) if len(genes4_input) > 1 else genes4_input[0]
+        genes4_input = "/".join(genes4_input) if len(genes4_input) > 0 else ""
 
-        type_input = clean_tagify_data(request.form.get('type'))[0] # only one type can be selected
+        # Handle other fields
+        type_input = clean_tagify_data(request.form.get('type'))[0]
         if type_input not in types:
             add_metadata('types', type_input, db)
 
-        food_type_input = clean_tagify_data(request.form.get('foodType'))[0] # only one food type can be selected
+        food_type_input = clean_tagify_data(request.form.get('foodType'))[0]
         if food_type_input not in food_types:
             add_metadata('food_types', food_type_input, db)
 
-        provenance_input = clean_tagify_data(request.form.get('provenance')) # multiple provenances can be selected
+        provenance_input = clean_tagify_data(request.form.get('provenance'))
         for provenance in provenance_input:
             if provenance not in provenances:
                 add_metadata('provenances', provenance, db)
@@ -350,6 +379,8 @@ def add_stock():
             'Status': request.form.get('status'),
             'FoodType': food_type_input,
             'Provenance': provenance_input,
+            'VialLifetime': request.form.get('vialLifetime', 14),
+            'FlipFrequency': request.form.get('flipFrequency', 7),
             'Comments': request.form.get('comments')
         }
 
@@ -366,12 +397,191 @@ def add_stock():
             return render_template('add_stock.html', error=uid_or_message, username=username, 
                                    types=types, food_types=food_types, provenances=provenances, 
                                    genesX=genesX, genes2=genes2, genes3=genes3, 
-                                   genes4=genes4)
+                                   genes4=genes4, stock_data=stock_data)
 
     return render_template('add_stock.html', username=username, types=types, food_types=food_types, 
                            provenances=provenances, genesX=genesX, genes2=genes2, 
-                           genes3=genes3, genes4=genes4)
+                           genes3=genes3, genes4=genes4, stock_data=stock_data)
 
+@app.route('/get_internal_stock/<unique_id>', methods=['GET'])
+def get_internal_stock(unique_id):
+    """
+    Fetches stock data for an internal stock using its Source ID (unique_id).
+    
+    Parameters:
+    unique_id: str
+        The Source ID of the internal stock.
+    
+    Returns:
+    JSON object containing stock details or an error message.
+    """
+    # Check if the user is logged in
+    if not session.get("username"):
+        return jsonify({"error": "User not logged in."}), 401
+    
+    username = session.get("username")
+    
+    # Check if stock exists in internal user's stock collection
+    stock = db['stocks'].find_one({"UniqueID": unique_id})
+    
+    if not stock:
+        return jsonify({"error": "Stock not found in INTERNAL records."}), 404
+    
+    # get the user who owns the stock
+    user = stock.get('User')
+
+    # Append provenance to the stock data if its a different user's stock
+    if user != username:
+        stock['Provenance'] = username + "@" + os.getenv("ORG_ABV") + '/' + stock.get('Provenance', "")
+
+    # Structure the response to include the necessary fields
+    stock_data = {
+        # "genotype": qc_genotype(stock.get('Genotype'))[1],
+        "genotype": stock.get('Genotype'),
+        "name": stock.get('Name'),
+        "altReference": stock.get('AltReference', ""),
+        "type": stock.get('Type', ""),
+        "foodType": stock.get('FoodType', ""),
+        "provenance": stock.get('Provenance', ""),
+        "status": stock.get('Status'),
+        "vialLifetime": stock.get('VialLifetime', ""),
+        "flipFrequency": stock.get('FlipFrequency', ""),
+    }
+    
+    return jsonify(stock_data), 200
+
+@app.route('/get_bloomington_genotype/<stock_id>', methods=['GET'])
+def get_bloomington_genotype(stock_id):
+    """
+    Fetches genotype data for a BDSC stock using its Source ID (stock_id).
+    
+    Parameters:
+    stock_id: str
+        The Source ID of the BDSC stock.
+    
+    Returns:
+    JSON object containing genotype details or an error message.
+    """
+    genotype, error = get_stock_genotype(stock_id)
+    
+    if error:
+        return jsonify({"error": error}), 400
+
+    return jsonify({"genotype": genotype}), 200
+
+@app.route('/autopopulate_series_replicate', methods=['POST'])
+def autopopulate_series_replicate():
+    """
+    Auto-populates Series ID and Replicate ID based on the user's existing stocks and genotype.
+    """
+    if not session.get("username"):
+        return jsonify({"error": "User not logged in."}), 401
+    
+    username = session.get("username")
+    genotype = request.json.get('genotype')
+
+    # split the genotype into its components
+    genotype = genotype.split(';')
+
+    # clean each genotype component using clean_tagify_data
+    genotype = ["/".join(clean_tagify_data(gene)) for gene in genotype]
+
+    # join the cleaned genotype components back together
+    genotype = "; ".join(genotype)
+    
+    # QC the genotype
+    qc_result = qc_genotype(genotype)
+    if qc_result[0] == False:
+        return jsonify({"error": qc_result[1]}), 400
+    genotype = qc_result[1]
+
+    if not genotype:
+        return jsonify({"error": "Genotype is required."}), 400
+
+    # find the number of stocks with the same genotype
+    count = db['stocks'].count_documents({"User": username, "Genotype": genotype})
+    
+    if count == 0:
+        # If no stocks with the same genotype, find the overall highest SeriesID for the user
+        highest_series = db['stocks'].find_one({"User": username}, sort=[("SeriesID", -1)])
+        if highest_series:
+            series_id = int(highest_series.get('SeriesID', '0')) + 1
+        else:
+            series_id = 1
+
+        return jsonify({"seriesID": str(series_id), "replicateID": "a"}), 200
+    
+    # Fetch all stocks with the same genotype for the user
+    user_stocks = db['stocks'].find({"User": username, "Genotype": genotype})
+
+    # Find highest SeriesID and ReplicateID
+    max_series = 0
+    max_replicate = 'a'
+
+    for stock in user_stocks:
+        series_id = int(stock.get('SeriesID', '0'))
+        replicate_id = stock.get('ReplicateID', 'a')
+
+        # Update max seriesID
+        if series_id > max_series:
+            max_series = series_id
+        
+        # If this is the max series, check for the highest replicate
+        if series_id == max_series and replicate_id > max_replicate:
+            max_replicate = replicate_id
+
+    # If exact genotype exists, increment replicate ID
+    next_replicate = increment_replicate_id(max_replicate)
+    
+    return jsonify({"seriesID": str(max_series), "replicateID": next_replicate}), 200
+
+def increment_replicate_id(replicate_id):
+    """
+    Increments the replicate ID by following alphabetical order (a, b, ..., z, aa, ab, ..., az, ba, ..., zz, aaa, etc.).
+    
+    Parameters:
+    replicate_id: str
+        The current replicate ID.
+    
+    Returns:
+    str
+        The next replicate ID in sequence.
+    """
+
+    # If replicate_id is empty, return 'a'
+    if replicate_id == "":
+        return "a"
+    
+    def incr_chr(c):
+        """
+        Helper function that increments a single character, handling wraparound from 'z' to 'a'.
+        
+        Returns:
+        (carry, next_char) where:
+        - carry: 1 if wrapping from 'z' to 'a', otherwise 0.
+        - next_char: the next character in sequence.
+        """
+        if c == 'z':
+            return 1, 'a'  # wrap from 'z' to 'a' with carry 1
+        else:
+            return 0, chr(ord(c) + 1)  # normal increment with no carry
+    
+    # Convert the replicate_id into a list of characters
+    lst = list(replicate_id)
+    result = []
+    
+    # Loop through the list from the rightmost character (the least significant)
+    while lst:
+        carry, next_ = incr_chr(lst.pop())  # increment the last letter in the list
+        result.append(next_)                # add incremented character to the result
+
+        if not carry:                       # if no carry, we are done
+            break
+        if not lst:                         # if the list is empty but we still have a carry, prepend 'a'
+            result.append('a')
+    
+    result += lst[::-1]                     # append the remaining characters (if any) in reverse order
+    return ''.join(result[::-1])            # convert list back to string in reverse order
 
 # define a route for the generate labels page
 @app.route('/generate_stock_labels', methods=['POST'])
@@ -390,6 +600,9 @@ def generate_stock_labels():
     # get the selected stocks
     stocks = get_user_stocks(username, db)
     selected_stocks = [stock for stock in stocks if str(stock['UniqueID']) in selected_uids]
+
+    # Sort the selected stocks by TrayID and TrayPosition
+    selected_stocks = sorted(selected_stocks, key=lambda x: (x['TrayID'], int(x['TrayPosition'] if x['TrayPosition']!='' else 0)))
 
     # duplicate the selected stocks based on the quantities
     selected_stocks = [stock for stock, quantity in zip(selected_stocks, quantities) for _ in range(int(quantity))]
@@ -428,6 +641,9 @@ def generate_cross_labels():
     # get the selected stocks
     crosses = get_user_crosses(username, db)
     selected_crosses = [cross for cross in crosses if str(cross['UniqueID']) in selected_uids]
+
+    # Sort the selected stocks by TrayID and TrayPosition
+    selected_crosses = sorted(selected_crosses, key=lambda x: (x['TrayID'], int(x['TrayPosition'] if x['TrayPosition']!='' else 0)))
 
     # duplicate the selected stocks based on the quantities
     selected_crosses = [cross for cross, quantity in zip(selected_crosses, quantities) for _ in range(int(quantity))]
@@ -473,10 +689,8 @@ def cross():
     username = session.get("username")
     crosses = get_user_crosses(username, db)
 
-    print('Number of crosses:', len(crosses))
-
     # nested sort by TrayID and TrayPosition
-    crosses = sorted(crosses, key=lambda x: (str(x['TrayID']), int(x['TrayPosition'])))
+    crosses = sorted(crosses, key=lambda x: (str(x['TrayID']), int(x['TrayPosition'] if x['TrayPosition']!='' else 0)))
 
     # Extract unique values for filtering
     unique_values = {
@@ -490,6 +704,8 @@ def cross():
     if request.method == 'GET':
         # Check if there are filters stored in session
         filter_state = session.get('filter_state', {})
+        # remove the 'No longer maintained' crosses from the list
+        crosses = [cross for cross in crosses if str(cross['Status']) != 'No longer maintained']
         return render_template("cross_explorer.html", username=username, crosses=crosses, unique_values=unique_values, filter_state=filter_state)
     elif request.method == 'POST':
         if 'clear_filters' in request.form:
@@ -525,6 +741,8 @@ def cross():
             filtered_crosses = [cross for cross in filtered_crosses if str(cross['TrayID']) == filter_tray_id]
         if filter_status:
             filtered_crosses = [cross for cross in filtered_crosses if str(cross['Status']) == filter_status]
+        else:
+            filtered_crosses = [cross for cross in filtered_crosses if str(cross['Status']) != 'No longer maintained']
         if filter_food_type:
             filtered_crosses = [cross for cross in filtered_crosses if str(cross['FoodType']) == filter_food_type]
         

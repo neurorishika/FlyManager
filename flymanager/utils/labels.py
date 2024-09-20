@@ -141,16 +141,17 @@ def render_stock_label(canvas, width, height, stock, uid, genotype, status, comm
     if stock != "":
         
         # write the common name as a watermark
-        canvas.setFont("Courier-Bold", 8)
+        canvas.setFont("Courier-Bold", 7)
         canvas.setFillColorRGB(0.8, 0.8, 0.8)
         canvas.drawString(5, 5, common_name)
 
         # draw the stock
-        canvas.setFont("Courier-Bold", 10)
+        canvas.setFont("Courier-Bold", 8)
         canvas.setFillColorRGB(0, 0, 0)
         canvas.drawString(10, height - 15, f"{stock} | {datetime.now().strftime('%Y-%m-%d')}")
+        
         # draw the genotype
-        canvas.setFont("Courier", 8)
+        canvas.setFont("Courier", 6)
         if status == "Healthy":
             canvas.setFillColorRGB(*hex_to_rgb("#006400"))
         elif status == "Showing Issues":
@@ -159,17 +160,23 @@ def render_stock_label(canvas, width, height, stock, uid, genotype, status, comm
             canvas.setFillColorRGB(*hex_to_rgb("#8B0000"))
         # if the genotype is too long, split it into multiple lines
         genotype = genotype + "(" + alt_name + ")" if alt_name != "" else genotype
-        split_genotype = [genotype[i:i+25] for i in range(0, len(genotype), 25)]
+        split_genotype = [genotype[i:i+32] for i in range(0, len(genotype), 32)]
         for i, genotype in enumerate(split_genotype):
-            canvas.drawString(10, height - 30 - i*10, f"{genotype}")
+            canvas.drawString(10, height - 25 - i*7, f"{genotype}")
         
+        # Add a small text with the UID above the QR code
+        canvas.setFont("Courier-Bold", 6)
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.drawString(width - 50, 60, f"{uid}")
+
         # add a qr code on the bottom right corner
         text = str(uid)
+        
         # generate the qr code
         qr = segno.make(f"{text}")
         qr.save("temp/{0}.png".format(uid), scale=5)
         canvas.drawImage("temp/{}.png".format(uid),
-                        width - 50, 5, width=45, height=45)
+                        width - 55, 12, width=45, height=45)
 
 def generate_stock_label_pdf(filename, user_initial, selected_stocks, num_blank, num_labels, path="flymanager/static/generated_labels/", debug=False):
 

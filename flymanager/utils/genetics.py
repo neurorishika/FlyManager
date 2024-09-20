@@ -47,10 +47,7 @@ def get_bloomington_genes(ch_all, genotype):
         for ch, gen in zip(ch_components, genotype_components):
             try:
                 ch_num = int(ch)
-                # split by / and add each component to the corresponding chromosome
-                compos = gen.strip().split("/")
-                for comp in compos:
-                    genes[ch_num-1] += comp
+                genes[ch_num-1] = gen.strip()
             except ValueError:
                 return None, f"Error: Unable to parse chromosome number '{ch}'"
             except IndexError:

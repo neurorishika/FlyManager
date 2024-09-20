@@ -11,12 +11,27 @@
     {% endif %}
 
     <form method="POST" action="/add_stock">
-        
-        <div class="form-group">
-            <label for="sourceID"><strong>Source ID | </strong> Format: [JRF/BDSC/INTERNAL/OTHER]_[StockID/UNK]:</label>
-            <input type="text" class="form-control" id="sourceID" name="sourceID" required>
+        <!-- Row 1: Source Dropdown, Source ID Input, and Autopopulate Button -->
+        <div class="form-row">
+            <div class="form-group col-md-3">
+                <label for="sourceType">Source Type:</label>
+                <select id="sourceType" name="sourceType" class="form-control">
+                    <option value="BDSC">BDSC</option>
+                    <option value="JRC">JRC</option>
+                    <option value="INTERNAL">INTERNAL</option>
+                    <option value="OTHER" selected>OTHER</option>
+                </select>
+            </div>
+            <div class="form-group col-md-6">
+                <label for="sourceID">Source ID:</label>
+                <input type="text" class="form-control" id="sourceID" name="sourceID">
+            </div>
+            <div class="form-group col-md-3">
+                <button type="button" id="autopopulateBtn" class="btn btn-primary mt-4 btn-block" disabled>Autopopulate</button>
+            </div>
         </div>
-        <label for="genotypeX"><strong>Genotype | </strong> Add up to 2 genes:</label>
+
+        <!-- Row 2: Chromosomes X, 2, 3, 4 -->
         <div class="form-row">
             <div class="form-group col-md-2">
                 <label for="genotypeX">Chromosome X:</label>
@@ -50,60 +65,90 @@
             </div>
         </div>
 
-        <div class="form-group">
-            <label for="name">Name:</label>
-            <input type="text" class="form-control" id="name" name="name" required>
+        <!-- Row 3: Name and Alt Reference -->
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label for="name">Name:</label>
+                <input type="text" class="form-control" id="name" name="name" required>
+            </div>
+            <div class="form-group col-md-6">
+                <label for="altReference">Alt Reference (optional):</label>
+                <input type="text" class="form-control" id="altReference" name="altReference">
+            </div>
         </div>
-        <div class="form-group">
-            <label for="altReference">Alt Reference (optional):</label>
-            <input type="text" class="form-control" id="altReference" name="altReference">
+
+        <!-- Row 4: Type, Food Type, and Status -->
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="type">Type:</label>
+                <input type="text" id="type" name="type" class="form-control tag-input">
+            </div>
+            <div class="form-group col-md-4">
+                <label for="foodType">Food Type:</label>
+                <input type="text" id="foodType" name="foodType" class="form-control tag-input" value="Molasses">
+            </div>
+            <div class="form-group col-md-4">
+                <label for="status">Status:</label>
+                <select class="form-control" id="status" name="status" required>
+                    <option value="Healthy" data-color="green">Healthy</option>
+                    <option value="Showing Issues" data-color="brown">Showing Issues</option>
+                    <option value="Needs refresh" data-color="red">Needs refresh</option>
+                    <option value="Ordered" data-color="blue">Ordered</option>
+                    <option value="No longer maintained" data-color="pink">No longer maintained</option>
+                </select>
+            </div>
         </div>
-        
-        <div class="form-group">
-            <label for="type">Type:</label>
-            <input type="text" id="type" name="type" class="form-control tag-input">
-        </div>
-        
-        <div class="form-group">
-            <label for="foodType">Food Type (optional):</label>
-            <input type="text" id="foodType" name="foodType" class="form-control tag-input">
-        </div>
-        
+
+        <!-- Row 5: Provenance -->
         <div class="form-group">
             <label for="provenance">Provenance (optional):</label>
             <input type="text" id="provenance" name="provenance" class="form-control tag-input">
         </div>
 
-        <div class="form-group">
-            <label for="status">Status:</label>
-            <select class="form-control status-select" id="status" name="status" required>
-                <option value="Healthy" data-color="green">Healthy</option>
-                <option value="Showing Issues" data-color="brown">Showing Issues</option>
-                <option value="Needs refresh" data-color="red">Needs refresh</option>
-                <option value="Ordered" data-color="blue">Ordered</option>
-                <option value="No longer maintained" data-color="pink">No longer maintained</option>
-            </select>
+        <!-- Row 6: Series ID, Replicate ID, Tray ID, Tray Position -->
+        <div class="form-row">
+            <div class="form-group col-md-3">
+                <label for="seriesID">Series ID:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="seriesID" name="seriesID" required>
+                    <div class="input-group-append">
+                        <button type="button" id="autopopulateSeriesBtn" class="btn btn-secondary">Refresh</button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-3">
+                <label for="replicateID">Replicate ID:</label>
+                <input type="text" class="form-control" id="replicateID" name="replicateID" required>
+            </div>
+            <div class="form-group col-md-3">
+                <label for="trayID">Tray ID (optional):</label>
+                <input type="text" class="form-control" id="trayID" name="trayID">
+            </div>
+            <div class="form-group col-md-3">
+                <label for="trayPosition">Tray Position (optional):</label>
+                <input type="text" class="form-control" id="trayPosition" name="trayPosition">
+            </div>
         </div>
-        <div class="form-group">
-            <label for="seriesID">Series ID:</label>
-            <input type="text" class="form-control" id="seriesID" name="seriesID" required>
+
+
+        <!-- Row 7: Vial Lifetime and Flip Frequency -->
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label for="vialLifetime">Vial Lifetime (days):</label>
+                <input type="number" class="form-control" id="vialLifetime" name="vialLifetime" value="14">
+            </div>
+            <div class="form-group col-md-6">
+                <label for="flipFrequency">Flip Frequency (days):</label>
+                <input type="number" class="form-control" id="flipFrequency" name="flipFrequency" value="7">
+            </div>
         </div>
-        <div class="form-group">
-            <label for="replicateID">Replicate ID:</label>
-            <input type="text" class="form-control" id="replicateID" name="replicateID" required>
-        </div>
-        <div class="form-group">
-            <label for="trayID">Tray ID (optional):</label>
-            <input type="text" class="form-control" id="trayID" name="trayID">
-        </div>
-        <div class="form-group">
-            <label for="trayPosition">Tray Position (optional):</label>
-            <input type="text" class="form-control" id="trayPosition" name="trayPosition">
-        </div>
-        <div class="form-group">
-            <label for="comments">Comments (optional):</label>
+
+        <!-- Row 8: Comments -->
+        <div class= "form-group">
+            <label for="comments">Comments:</label>
             <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>
         </div>
+
         <button type="submit" class="btn btn-success btn-block">Add Stock</button>
     </form>
 </div>
@@ -115,25 +160,47 @@
 <link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Example of initializing Tagify on all tag-input fields
+
+        const stockData = {{ stock_data | tojson }};
+
+        const autopopulateBtn = document.getElementById('autopopulateBtn');
+        const sourceTypeSelect = document.getElementById('sourceType');
+        const autopopulateSeriesBtn = document.getElementById('autopopulateSeriesBtn');
+        const genotypeFields = ['#genotypeX', '#genotype2', '#genotype3', '#genotype4'];
+
+        sourceTypeSelect.addEventListener('change', function() {
+            const sourceType = sourceTypeSelect.value;
+            if (sourceType === 'BDSC' || sourceType === 'INTERNAL') {
+                autopopulateBtn.disabled = false;
+            } else {
+                autopopulateBtn.disabled = true;
+            }
+        });
+
+        // Initialize Tagify for all inputs
+        // dont separate by comma, as we're using '/' to separate genes
         let tagifyX = new Tagify(document.querySelector('#genotypeX'), {
             maxTags: 2,
-            whitelist: {{ genesX | tojson }}
+            whitelist: {{ genesX | tojson }},
+            delimiters: null
         });
 
         let tagify2 = new Tagify(document.querySelector('#genotype2'), {
             maxTags: 2,
-            whitelist: {{ genes2 | tojson }}
+            whitelist: {{ genes2 | tojson }},
+            delimiters: null
         });
 
         let tagify3 = new Tagify(document.querySelector('#genotype3'), {
             maxTags: 2,
-            whitelist: {{ genes3 | tojson }}
+            whitelist: {{ genes3 | tojson }},
+            delimiters: null
         });
 
         let tagify4 = new Tagify(document.querySelector('#genotype4'), {
             maxTags: 2,
-            whitelist: {{ genes4 | tojson }}
+            whitelist: {{ genes4 | tojson }},
+            delimiters: null
         });
         
         let tagifyType = new Tagify(document.querySelector('#type'), {
@@ -147,6 +214,130 @@
         let tagifyProvenance = new Tagify(document.querySelector('#provenance'), {
             whitelist: {{ provenances | tojson }}
         });
+
+        // Autopopulate series and replicate IDs
+        autopopulateSeriesBtn.addEventListener('click', function() {
+            // Get the complete genotype from the fields
+            let genotype = genotypeFields.map(id => document.querySelector(id).value).join('; ');
+
+            fetch('/autopopulate_series_replicate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ genotype: genotype })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.seriesID) {
+                    document.getElementById('seriesID').value = data.seriesID;
+                }
+                if (data.replicateID) {
+                    document.getElementById('replicateID').value = data.replicateID;
+                }
+            });
+        });
+
+        // Handle autopopulate based on the source type
+        autopopulateBtn.addEventListener('click', function() {
+            const sourceType = sourceTypeSelect.value;
+            const sourceID = document.getElementById('sourceID').value;
+
+            if (sourceType === 'BDSC') {
+                fetch(`/get_bloomington_genotype/${sourceID}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.genotype) {
+                            const genes = data.genotype.split('; ');
+                            //clear all tags
+                            tagifyX.removeAllTags();
+                            tagify2.removeAllTags();
+                            tagify3.removeAllTags();
+                            tagify4.removeAllTags();
+
+                            // split each gene using '/' and add to tagify one by one
+                            tagifyX.addTags(genes[0].split('/'));
+                            tagify2.addTags(genes[1].split('/'));
+                            tagify3.addTags(genes[2].split('/'));
+                            tagify4.addTags(genes[3].split('/'));
+                        }
+                    });
+            } else if (sourceType === 'INTERNAL') {
+                fetch(`/get_internal_stock/${sourceID}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.genotype) {
+                            const genes = data.genotype.split('; ');
+                            //clear all tags
+                            tagifyX.removeAllTags();
+                            tagify2.removeAllTags();
+                            tagify3.removeAllTags();
+                            tagify4.removeAllTags();
+
+                            // split each gene using '/' and add to tagify one by one
+                            tagifyX.addTags(genes[0].split('/'));
+                            tagify2.addTags(genes[1].split('/'));
+                            tagify3.addTags(genes[2].split('/'));
+                            tagify4.addTags(genes[3].split('/'));
+                        }
+                        // Populate other fields from internal data
+                        document.getElementById('name').value = data.name;
+                        document.getElementById('altReference').value = data.altReference;
+                        document.getElementById('type').value = data.type;
+                        document.getElementById('foodType').value = data.foodType;
+                        // Set status dropdown
+                        const statusSelect = document.getElementById('status');
+                        for (let i = 0; i < statusSelect.options.length; i++) {
+                            if (statusSelect.options[i].value === data.status) {
+                                statusSelect.selectedIndex = i;
+                                break;
+                            }
+                        }
+                        // split provenance by / and add to tagify
+                        tagifyProvenance.removeAllTags();
+                        tagifyProvenance.addTags(data.provenance.split('/'));
+
+                        // Trigger a click event to autopopulate Series and Replicate IDs
+                        autopopulateSeriesBtn.click();
+                    });
+            }
+        });
+
+        // Populate the form if we have stock_data
+        // check if stockData is not empty
+        if (Object.keys(stockData).length > 0) {
+            // Set the source type and source ID
+            document.getElementById('sourceType').value = stockData.sourceType;
+            document.getElementById('sourceID').value = stockData.sourceID;
+            document.getElementById('name').value = stockData.name;
+            document.getElementById('altReference').value = stockData.altReference;
+            document.getElementById('type').value = stockData.type;
+            document.getElementById('foodType').value = stockData.foodType;
+            document.getElementById('seriesID').value = stockData.seriesID;
+            document.getElementById('replicateID').value = stockData.replicateID;
+            document.getElementById('vialLifetime').value = stockData.vialLifetime;
+            document.getElementById('flipFrequency').value = stockData.flipFrequency;
+            document.getElementById('comments').value = stockData.comments;
+
+            // Set the status dropdown
+            document.getElementById('status').value = stockData.status;
+
+            // Split the genotype by ';' and add to tagify one by one
+            const genes = stockData.genotype.split('; ');
+            tagifyX.removeAllTags();
+            tagify2.removeAllTags();
+            tagify3.removeAllTags();
+            tagify4.removeAllTags();
+
+            tagifyX.addTags(genes[0].split('/'));
+            tagify2.addTags(genes[1].split('/'));
+            tagify3.addTags(genes[2].split('/'));
+            tagify4.addTags(genes[3].split('/'));
+
+            // Split provenance by / and add to tagify (if)
+            tagifyProvenance.removeAllTags();
+            tagifyProvenance.addTags(stockData.provenance.split('/'));
+        }
         
     });
 </script>
