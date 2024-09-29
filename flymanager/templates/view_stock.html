@@ -1,0 +1,514 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center">Stock Viewer</h1>
+
+    {% if error %}
+    <div class="alert alert-danger" role="alert">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/view_stock/{{ stock_data.uniqueID }}">
+        <!-- Row 1: Source ID and Unique ID -->
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label for="sourceID">Source ID:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="sourceID" name="sourceID" required>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-6">
+                <label for="uniqueID">Unique ID:</label>
+                <input type="text" class="form-control" id="uniqueID" name="uniqueID" required>
+            </div>
+        </div>
+
+        <!-- Row 2: Chromosomes X, 2, 3, 4 -->
+        <div class="form-row">
+            <div class="form-group col-md-2">
+                <label for="genotypeX">Chromosome X:</label>
+            </div>
+            <div class="form-group col-md-10">
+                <div class="input-group">
+                    <input type="text" id="genotypeX" name="genotypeX" class="form-control tag-input">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-md-2">
+                <label for="genotype2">Chromosome 2:</label>
+            </div>
+            <div class="form-group col-md-10">
+                <div class="input-group">
+                    <input type="text" id="genotype2" name="genotype2" class="form-control tag-input">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-md-2">
+                <label for="genotype3">Chromosome 3:</label>
+            </div>
+            <div class="form-group col-md-10">
+                <div class="input-group">
+                    <input type="text" id="genotype3" name="genotype3" class="form-control tag-input">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-md-2">
+                <label for="genotype4">Chromosome 4:</label>
+            </div>
+            <div class="form-group col-md-10">
+                <div class="input-group">
+                    <input type="text" id="genotype4" name="genotype4" class="form-control tag-input">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3: Name and Alt Reference -->
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label for="name">Name:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="name" name="name" required>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-6">
+                <label for="altReference">Alt Reference:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="altReference" name="altReference">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4: Type, Food Type, and Status -->
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="type">Type:</label>
+                <div class="input-group">
+                    <input type="text" id="type" name="type" class="form-control tag-input">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="foodType">Food Type:</label>
+                <div class="input-group">
+                    <input type="text" id="foodType" name="foodType" class="form-control tag-input">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="status">Status:</label>
+                <div class="input-group">
+                    <select class="form-control" id="status" name="status" required>
+                        <option value="Healthy" {% if stock_data.status == "Healthy" %}selected{% endif %}>Healthy</option>
+                        <option value="Showing Issues" {% if stock_data.status == "Showing Issues" %}selected{% endif %}>Showing Issues</option>
+                        <option value="Needs refresh" {% if stock_data.status == "Needs refresh" %}selected{% endif %}>Needs refresh</option>
+                        <option value="Ordered" {% if stock_data.status == "Ordered" %}selected{% endif %}>Ordered</option>
+                        <option value="No longer maintained" {% if stock_data.status == "No longer maintained" %}selected{% endif %}>No longer maintained</option>
+                    </select>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5: Provenance -->
+        <div class="form-group">
+            <label for="provenance">Provenance:</label>
+            <div class="input-group">
+                <input type="text" id="provenance" name="provenance" class="form-control tag-input">
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 6: Series ID, Replicate ID, Tray ID, Tray Position -->
+        <div class="form-row">
+            <div class="form-group col-md-3">
+                <label for="seriesID">Series ID:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="seriesID" name="seriesID" required>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-3">
+                <label for="replicateID">Replicate ID:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="replicateID" name="replicateID" required>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-3">
+                <label for="trayID">Tray ID:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="trayID" name="trayID">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-3">
+                <label for="trayPosition">Tray Position:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="trayPosition" name="trayPosition">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 7: Vial Lifetime, Flip Frequency and Developmental Time -->
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="vialLifetime">Vial Lifetime (days):</label>
+                <div class="input-group">
+                    <input type="number" class="form-control" id="vialLifetime" name="vialLifetime">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="flipFrequency">Flip Frequency (days):</label>
+                <div class="input-group">
+                    <input type="number" class="form-control" id="flipFrequency" name="flipFrequency">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="developmentalTime">Mating->Virgin Adult (days):</label>
+                <div class="input-group">
+                    <input type="number" class="form-control" id="developmentalTime" name="developmentalTime">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 8: Comments -->
+        <div class="form-group">
+            <label for="comments">Comments:</label>
+            <div class="input-group">
+                <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 9: Creation Date, Last Flip Date, and currently alive vials -->
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="creationDate">Creation Date:</label>
+                <input type="text" class="form-control" id="creationDate" name="creationDate">
+            </div>
+            <div class="form-group col-md-4">
+                <label for="lastFlipDate">Last Flip Date:</label>
+                <input type="text" class="form-control" id="lastFlipDate" name="lastFlipDate">
+            </div>
+            <div class="form-group col-md-4">
+                <label for="currentlyAliveVials">Currently Alive Vials:</label>
+                <input type="text" class="form-control" id="currentlyAliveVials" name="currentlyAliveVials">
+            </div>  
+        </div>
+
+        <!-- Row 10: Flip Log -->
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="flipLog">Flip Log:</label>
+                <textarea class="form-control" id="flipLog" name="flipLog" rows="7"></textarea>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="nextFlipDates">Next Flip Dates:</label>
+                <textarea class="form-control" id="nextFlipDates" name="nextFlipDates" rows="7"></textarea>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="nextEclosionDates">Next Eclosion Dates:</label>
+                <textarea class="form-control" id="nextEclosionDates" name="nextEclosionDates" rows="7"></textarea>
+            </div>
+        </div>
+
+        <!-- Row 11: Data Modified Date -->
+        <div class="form-group">
+            <label for="dataModifiedDate">Data Modified Date:</label>
+            <input type="text" class="form-control" id="dataModifiedDate" name="dataModifiedDate">
+        </div>
+
+        <!-- Row 12: Modification Log -->
+        <div class="form-group">
+            <label for="modificationLog">Modification Log:</label>
+            <textarea class="form-control" id="modificationLog" name="modificationLog" rows="3"></textarea>
+        </div>
+
+
+        <button type="submit" class="btn btn-success btn-block">Save Changes</button>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.polyfills.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+
+    const stockData = {{ stock_data | tojson }};
+    const genotypeFields = ['#genotypeX', '#genotype2', '#genotype3', '#genotype4'];
+
+    // Initialize Tagify for all inputs
+    let tagifyX = new Tagify(document.querySelector('#genotypeX'), {
+        maxTags: 2,
+        whitelist: {{ genesX | tojson }},
+        delimiters: null,
+        readonly: true
+    });
+
+    let tagify2 = new Tagify(document.querySelector('#genotype2'), {
+        maxTags: 2,
+        whitelist: {{ genes2 | tojson }},
+        delimiters: null,
+        readonly: true
+    });
+
+    let tagify3 = new Tagify(document.querySelector('#genotype3'), {
+        maxTags: 2,
+        whitelist: {{ genes3 | tojson }},
+        delimiters: null,
+        readonly: true
+    });
+
+    let tagify4 = new Tagify(document.querySelector('#genotype4'), {
+        maxTags: 2,
+        whitelist: {{ genes4 | tojson }},
+        delimiters: null,
+        readonly: true
+    });
+
+    let tagifyType = new Tagify(document.querySelector('#type'), {
+        whitelist: {{ types | tojson }},
+        maxTags: 1,
+        readonly: true
+    });
+
+    let tagifyFoodType = new Tagify(document.querySelector('#foodType'), {
+        whitelist: {{ food_types | tojson }},
+        maxTags: 1,
+        readonly: true
+    });
+
+    let tagifyProvenance = new Tagify(document.querySelector('#provenance'), {
+        whitelist: {{ provenances | tojson }},
+        delimiters: null,
+        readonly: true
+    });
+
+    // Disable all input fields by default
+    document.querySelectorAll('input, textarea, select').forEach(input => {
+        input.disabled = true;
+    });
+
+    // Populate the form with stock data
+    if (Object.keys(stockData).length > 0) {
+        document.getElementById('sourceID').value = stockData.sourceID;
+        document.getElementById('uniqueID').value = stockData.uniqueID;
+        document.getElementById('name').value = stockData.name;
+        document.getElementById('altReference').value = stockData.altReference;
+        document.getElementById('seriesID').value = stockData.seriesID;
+        document.getElementById('replicateID').value = stockData.replicateID;
+        document.getElementById('trayID').value = stockData.trayID;
+        document.getElementById('trayPosition').value = stockData.trayPosition;
+        document.getElementById('vialLifetime').value = stockData.vialLifetime;
+        document.getElementById('flipFrequency').value = stockData.flipFrequency;
+        document.getElementById('developmentalTime').value = stockData.developmentalTime;
+        document.getElementById('comments').value = stockData.comments;
+        document.getElementById('creationDate').value = stockData.creationDate;
+        document.getElementById('lastFlipDate').value = stockData.lastFlipDate;
+        document.getElementById('currentlyAliveVials').value = stockData.currentlyAliveVials;
+        document.getElementById('flipLog').value = stockData.flipLog;
+        document.getElementById('nextFlipDates').value = stockData.nextFlipDates;
+        document.getElementById('nextEclosionDates').value = stockData.nextEclosionDates;
+        document.getElementById('dataModifiedDate').value = stockData.dataModifiedDate;
+        document.getElementById('modificationLog').value = stockData.modificationLog;
+
+        // Set the status dropdown value
+        const statusSelect = document.getElementById('status');
+        for (let i = 0; i < statusSelect.options.length; i++) {
+            if (statusSelect.options[i].value === stockData.status) {
+                statusSelect.selectedIndex = i;
+                break;
+            }
+        }
+
+        // Split the genotype by ';' and add to Tagify one by one
+        const genes = stockData.genotype.split('; ');
+        tagifyX.removeAllTags();
+        tagify2.removeAllTags();
+        tagify3.removeAllTags();
+        tagify4.removeAllTags();
+
+        tagifyX.addTags(genes[0].split('/'));
+        tagify2.addTags(genes[1].split('/'));
+        tagify3.addTags(genes[2].split('/'));
+        tagify4.addTags(genes[3].split('/'));
+
+        // Split provenance by / and add to tagify
+        tagifyProvenance.removeAllTags();
+        tagifyProvenance.addTags(stockData.provenance.split('/'));
+
+        // Add type and food type
+        tagifyType.removeAllTags();
+        tagifyType.addTags(stockData.type);
+
+        tagifyFoodType.removeAllTags();
+        tagifyFoodType.addTags(stockData.foodType);
+    }
+
+    // Make fields editable when "Edit" button is clicked
+    const editButtons = document.querySelectorAll('.input-group-append button');
+    editButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const inputField = this.closest('.input-group').querySelector('input, textarea, select');
+
+            if (inputField && inputField.tagName === 'INPUT' && inputField.classList.contains('tag-input')) {
+                inputField.disabled = false;  // Enable Tagify input fields
+                if (inputField.id === 'genotypeX') {
+                    // destroy the tagify instance and recreates it
+                    let previousValue = inputField.value;
+                    tagifyX.destroy();
+                    tagifyX = new Tagify(inputField, {
+                        maxTags: 2,
+                        whitelist: {{ genesX | tojson }},
+                        delimiters: null,
+                        readonly: false
+                    });
+                    
+                } else if (inputField.id === 'genotype2') {
+                    // destroy the tagify instance and recreates it
+                    let previousValue = inputField.value;
+                    tagify2.destroy();
+                    tagify2 = new Tagify(inputField, {
+                        maxTags: 2,
+                        whitelist: {{ genes2 | tojson }},
+                        delimiters: null,
+                        readonly: false
+                    });
+
+                } else if (inputField.id === 'genotype3') {
+                    // destroy the tagify instance and recreates it
+                    let previousValue = inputField.value;
+                    tagify3.destroy();
+                    tagify3 = new Tagify(inputField, {
+                        maxTags: 2,
+                        whitelist: {{ genes3 | tojson }},
+                        delimiters: null,
+                        readonly: false
+                    });
+                    
+                } else if (inputField.id === 'genotype4') {
+                    // destroy the tagify instance and recreates it
+                    let previousValue = inputField.value;
+                    tagify4.destroy();
+                    tagify4 = new Tagify(inputField, {
+                        maxTags: 2,
+                        whitelist: {{ genes4 | tojson }},
+                        delimiters: null,
+                        readonly: false
+                    });
+                    
+                } else if (inputField.id === 'provenance') {
+                    // destroy the tagify instance and recreates it
+                    let previousValue = inputField.value;
+                    tagifyProvenance.destroy();
+                    tagifyProvenance = new Tagify(inputField, {
+                        whitelist: {{ provenances | tojson }},
+                        delimiters: null,
+                        readonly: false
+                    });
+                    
+                } else if (inputField.id === 'type') {
+                    // destroy the tagify instance and recreates it
+                    let previousValue = inputField.value;
+                    tagifyType.destroy();
+                    tagifyType = new Tagify(inputField, {
+                        whitelist: {{ types | tojson }},
+                        maxTags: 1,
+                        readonly: false
+                    });
+                    
+                } else if (inputField.id === 'foodType') {
+                    // destroy the tagify instance and recreates it
+                    let previousValue = inputField.value;
+                    tagifyFoodType.destroy();
+                    tagifyFoodType = new Tagify(inputField, {
+                        whitelist: {{ food_types | tojson }},
+                        maxTags: 1,
+                        readonly: false
+                    });
+
+                }
+        
+            } else {
+                inputField.disabled = false;  // Enable normal input fields
+            }
+
+            this.disabled = true;  // Disable the "Edit" button
+        });
+    });
+
+    // Confirm before submitting the form
+    document.querySelector('form').addEventListener('submit', function(event) {
+        if (!confirm('Are you sure you want to submit the changes?')) {
+            event.preventDefault();  // Prevent form submission if user cancels
+        } else {
+            // Re-enable all input fields before submitting
+            document.querySelectorAll('input, textarea, select').forEach(input => {
+                input.disabled = false;
+            });
+        }
+    });
+});
+
+
+</script>
+{% endblock %}

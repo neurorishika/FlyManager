@@ -9,6 +9,9 @@
 {% block content %}
 <div class="filters">
     <h3>Filters</h3>
+    <div class="alert alert-info" role="alert">
+        <strong>Note:</strong> Stocks/Crosses with the status "No longer maintained" are excluded by default. To view them, please filter by the "No longer maintained" status.
+    </div>
     {% include 'filter_cross.html' %}
 </div>
 <div class="mb-3">
@@ -24,11 +27,16 @@
                     <div class="badges">
                         <span class="badge badge-info">{{ cross.FoodType }}</span>
                         <span class="badge badge-secondary">{{ cross.Status }}</span>
+                        <span class="badge badge-flip" style="background-color:{{ cross.FlipInColor }}">{{ cross.FlipIn }}</span>
+                        <span class="badge badge-eclose">Ecloses in {{ cross.EclosesIn }}</span>
                     </div>
                 </div>
                 <div style="display: flex; align-items: center;">
                     <button class="btn btn-link btn-sm expand-btn" onclick="toggleDetails({{ loop.index }})">
                         <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <button class="btn btn-link btn-sm duplicate-cross-btn" onclick="duplicateCross('{{ cross.UniqueID }}')">
+                        <i class="fas fa-clone"></i>
                     </button>
                     <button class="btn btn-link btn-sm view-details-btn" onclick="viewDetails('{{ cross.UniqueID }}')">
                         <i class="fas fa-external-link-alt"></i>

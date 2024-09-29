@@ -34,6 +34,10 @@ from flymanager.utils.genetics import *
 from dotenv import load_dotenv
 load_dotenv()
 
+
+### TEMPORARY PARAMETERS (THESE WILL BECOME CONFIGURABLE) ###
+MIN_FLIP_DIFFERENCE = 30*60  # 30 minutes
+
 # define the allowed file extensions
 ALLOWED_EXTENSIONS = {'xlsx'}
 def allowed_file(filename):
@@ -104,6 +108,18 @@ def login():
             if get_all_users(db=db)[username] == hashlib.shake_256((username+password).encode()).hexdigest(5):
                 # store the username in the session
                 session["username"] = username
+                # update the stock vials
+                stocks = get_user_stocks(username, db)
+                for stock in stocks:
+                    update_stock_vials(stock, username, db)
+                print("Updated stock vials")
+                # update the cross vials
+                crosses = get_user_crosses(username, db)
+                for cross in crosses:
+                    update_cross_vials(cross, username, db)
+                print("Updated cross vials")
+                # write the activity to the user's activity sheet
+                write_activity(username, 'Logged in', db)
                 return redirect("/home")
             else:
                 return render_template("auth/login.html", users=users, message="Incorrect password")
@@ -191,7 +207,12 @@ def stock():
     stocks = get_user_stocks(username, db)
 
     # sort by TrayID and TrayPosition
-    stocks = sorted(stocks, key=lambda x: (x['TrayID'], int(x['TrayPosition'] if x['TrayPosition']!='' else 0)))
+    stocks = sorted(stocks, key=lambda x: (x['TrayID'], int(x['TrayPosition'].split('.')[0] if x['TrayPosition']!='' else 0)))
+
+    # add FlipIn and EclosesIn fields
+    for stock in stocks:
+        stock['FlipIn'] = get_flip_in(stock)
+        stock['EclosesIn'] = get_eclosion_in(stock)
 
     # Extract unique values for filtering
     unique_values = {
@@ -315,8 +336,9 @@ def add_stock(unique_id=None):
                 'status': stock['Status'],
                 'seriesID': stock['SeriesID'],
                 'replicateID': increment_replicate_id(stock['ReplicateID']),
-                'vialLifetime': stock.get('VialLifetime', 14),
-                'flipFrequency': stock.get('FlipFrequency', 7),
+                'vialLifetime': stock.get('VialLifetime'),
+                'flipFrequency': stock.get('FlipFrequency'),
+                'developmentalTime': stock.get('DevelopmentalTime'),
                 'comments': stock.get('Comments', ''),
                 'provenance': stock.get('Provenance', '')
             }
@@ -381,6 +403,7 @@ def add_stock(unique_id=None):
             'Provenance': provenance_input,
             'VialLifetime': request.form.get('vialLifetime', 14),
             'FlipFrequency': request.form.get('flipFrequency', 7),
+            'DevelopmentalTime': request.form.get('developmentalTime', 10),
             'Comments': request.form.get('comments')
         }
 
@@ -400,6 +423,136 @@ def add_stock(unique_id=None):
                                    genes4=genes4, stock_data=stock_data)
 
     return render_template('add_stock.html', username=username, types=types, food_types=food_types, 
+                           provenances=provenances, genesX=genesX, genes2=genes2, 
+                           genes3=genes3, genes4=genes4, stock_data=stock_data)
+
+@app.route('/view_stock/<unique_id>', methods=['GET', 'POST'])
+def view_stock(unique_id):
+    if not session.get("username"):
+        return redirect("/login")
+
+    username = session.get("username")
+
+    # Get metadata lists
+    types = get_metadata('types', db)
+    food_types = get_metadata('food_types', db)
+    provenances = get_metadata('provenances', db)
+    genesX = get_metadata('genesX', db)
+    genes2 = get_metadata('genes2nd', db)
+    genes3 = get_metadata('genes3rd', db)
+    genes4 = get_metadata('genes4th', db)
+
+    # If a unique_id is provided, fetch the stock data
+    stock = db['stocks'].find_one({"UniqueID": unique_id})
+    if stock:
+        stock_data = {
+            'sourceID': stock['SourceID'],
+            'uniqueID': stock['UniqueID'],
+            'genotype': stock['Genotype'],
+            'name': stock['Name'],
+            'altReference': stock.get('AltReference', ''),
+            'type': stock['Type'],
+            'foodType': stock.get('FoodType', 'Molasses'),
+            'status': stock['Status'],
+            'seriesID': stock['SeriesID'],
+            'replicateID': stock['ReplicateID'],
+            'vialLifetime': stock.get('VialLifetime'),
+            'flipFrequency': stock.get('FlipFrequency'),
+            'developmentalTime': stock.get('DevelopmentalTime'),
+            'comments': stock.get('Comments', ''),
+            'provenance': stock.get('Provenance', ''),
+            'trayID': stock.get('TrayID', ''),
+            'trayPosition': stock.get('TrayPosition', ''),
+            'creationDate': stock.get('CreationDate', ''),
+            'lastFlipDate': stock.get('LastFlipDate', ''),
+            'currentlyAliveVials': stock.get('CurrentlyAliveVials', ''),
+            'flipLog': stock.get('FlipLog', '').replace('; ', '\n'),
+            'nextFlipDates': stock.get('NextFlipDates', '').replace(', ', '\n'),
+            'nextEclosionDates': stock.get('NextEclosionDates', '').replace(', ', '\n'),
+            'dataModifiedDate': stock.get('DataModifiedDate', ''),
+            'modificationLog': stock.get('ModificationLog', '').replace('; ', '\n'),
+        }   
+    else:
+        return jsonify({"error": "Stock not found."}), 404
+    
+    if request.method == 'POST':
+
+        # Handle chromosome data
+        genesX_input = clean_tagify_data(request.form.get('genotypeX'))
+        for gene in genesX_input:
+            if gene not in genesX:
+                add_metadata('genesX', gene, db)
+        genesX_input = "/".join(genesX_input) if len(genesX_input) > 0 else ""
+
+        genes2_input = clean_tagify_data(request.form.get('genotype2'))
+        for gene in genes2_input:
+            if gene not in genes2:
+                add_metadata('genes2nd', gene, db)
+        genes2_input = "/".join(genes2_input) if len(genes2_input) > 0 else ""
+
+        genes3_input = clean_tagify_data(request.form.get('genotype3'))
+        for gene in genes3_input:
+            if gene not in genes3:
+                add_metadata('genes3rd', gene, db)
+        genes3_input = "/".join(genes3_input) if len(genes3_input) > 0 else ""
+
+        genes4_input = clean_tagify_data(request.form.get('genotype4'))
+        for gene in genes4_input:
+            if gene not in genes4:
+                add_metadata('genes4th', gene, db)
+        genes4_input = "/".join(genes4_input) if len(genes4_input) > 0 else ""
+
+        # Handle other fields
+        type_input = clean_tagify_data(request.form.get('type'))[0]
+        if type_input not in types:
+            add_metadata('types', type_input, db)
+
+        food_type_input = clean_tagify_data(request.form.get('foodType'))[0]
+        if food_type_input not in food_types:
+            add_metadata('food_types', food_type_input, db)
+
+        provenance_input = clean_tagify_data(request.form.get('provenance'))
+        for provenance in provenance_input:
+            if provenance not in provenances:
+                add_metadata('provenances', provenance, db)
+        provenance_input = "/".join(provenance_input) if len(provenance_input) > 1 else provenance_input[0]
+
+        # Collect form data
+        updated_stock_data = {
+            'SourceID': request.form.get('sourceID'),
+            'Genotype': qc_genotype(genesX_input + ";" + genes2_input + ";" + genes3_input + ";" + genes4_input)[1],
+            'Name': request.form.get('name'),
+            'AltReference': request.form.get('altReference'),
+            'Type': type_input,
+            'SeriesID': request.form.get('seriesID'),
+            'ReplicateID': request.form.get('replicateID'),
+            'TrayID': request.form.get('trayID'),
+            'TrayPosition': request.form.get('trayPosition'),
+            'Status': request.form.get('status'),
+            'FoodType': food_type_input,
+            'Provenance': provenance_input,
+            'VialLifetime': request.form.get('vialLifetime'),
+            'FlipFrequency': request.form.get('flipFrequency'),
+            'DevelopmentalTime': request.form.get('developmentalTime'),
+            'Comments': request.form.get('comments')
+        }
+
+        # remove empty fields
+        updated_stock_data = {k: v for k, v in updated_stock_data.items() if v}
+
+        # check if the stock data has changed and only keep the changed fields
+        changed_fields = {k: v for k, v in updated_stock_data.items() if v != stock.get(k, '')}
+
+        # Edit stock in the user's sheet
+        success = edit_stock(username, unique_id, db, changed_fields)
+
+        if success:
+            return redirect('/stock_explorer')
+        else:
+            # Handle error (e.g., QC failure)
+            return render_template('stock_explorer.html', error=uid_or_message, username=username,)
+
+    return render_template('view_stock.html', username=username, types=types, food_types=food_types, 
                            provenances=provenances, genesX=genesX, genes2=genes2, 
                            genes3=genes3, genes4=genes4, stock_data=stock_data)
 
@@ -446,6 +599,7 @@ def get_internal_stock(unique_id):
         "status": stock.get('Status'),
         "vialLifetime": stock.get('VialLifetime', ""),
         "flipFrequency": stock.get('FlipFrequency', ""),
+        "developmentalTime": stock.get('DevelopmentalTime', ""),
     }
     
     return jsonify(stock_data), 200
@@ -503,9 +657,11 @@ def autopopulate_series_replicate():
     
     if count == 0:
         # If no stocks with the same genotype, find the overall highest SeriesID for the user
-        highest_series = db['stocks'].find_one({"User": username}, sort=[("SeriesID", -1)])
-        if highest_series:
-            series_id = int(highest_series.get('SeriesID', '0')) + 1
+        stocks = db['stocks'].find({"User": username})
+        if stocks.count() > 0:
+            # get the highest SeriesID
+            highest_series = np.max([int(stock.get('SeriesID', '0')) for stock in stocks])
+            series_id = highest_series + 1
         else:
             series_id = 1
 
@@ -608,7 +764,7 @@ def generate_stock_labels():
     selected_stocks = [stock for stock, quantity in zip(selected_stocks, quantities) for _ in range(int(quantity))]
     
     # generate the labels
-    filename = datetime.now().strftime('%Y-%m-%d')
+    filename = datetime.datetime.now().strftime('%Y-%m-%d')
     generate_stock_label_pdf(
         filename,
         user_initials, 
@@ -649,7 +805,7 @@ def generate_cross_labels():
     selected_crosses = [cross for cross, quantity in zip(selected_crosses, quantities) for _ in range(int(quantity))]
     
     # generate the labels
-    filename = datetime.now().strftime('%Y-%m-%d')
+    filename = datetime.datetime.now().strftime('%Y-%m-%d')
     generate_cross_label_pdf(
         filename,
         user_initials, 
@@ -664,17 +820,6 @@ def generate_cross_labels():
     write_activity(username, 'Generated labels for {} stocks'.format(len(selected_crosses)), db)
     
     return redirect(pdf_file_path)
-
-# define a route for the view stock page
-@app.route('/view_stock/<unique_id>')
-def view_stock(unique_id):
-    if not session.get("username"):
-        return redirect("/login")
-    
-    # get user name
-    username = session.get("username")
-    stock = get_stock(username, unique_id, db)
-    return render_template('view_stock.html', username=username, stock=stock)
 
 
 ### CROSS MANAGEMENT ROUTES ###
@@ -691,6 +836,12 @@ def cross():
 
     # nested sort by TrayID and TrayPosition
     crosses = sorted(crosses, key=lambda x: (str(x['TrayID']), int(x['TrayPosition'] if x['TrayPosition']!='' else 0)))
+
+    # add FlipIn and EclosesIn fields
+    for cross in crosses:
+        cross['FlipIn'] = get_flip_in(cross)
+        cross['FlipInColor'] = 'green'
+        cross['EclosesIn'] = get_eclosion_in(cross)
 
     # Extract unique values for filtering
     unique_values = {
@@ -777,7 +928,8 @@ def cross():
     
 # define a route for the add cross page
 @app.route('/add_cross', methods=['GET', 'POST'])
-def add_cross():
+@app.route('/add_cross/<unique_id>', methods=['GET', 'POST'])
+def add_cross(unique_id=None):
     if not session.get("username"):
         return redirect("/login")
 
@@ -786,20 +938,53 @@ def add_cross():
 
     # get metadata lists
     food_types = get_metadata('food_types', db)
+    
     genotypes = get_all_genotypes(username, db)
+
+    # If a unique_id is provided, fetch the cross data
+    cross_data = {}
+    if unique_id:
+        cross = db['crosses'].find_one({"UniqueID": unique_id})
+        if cross:
+            cross_data = {
+                'maleUniqueID': cross['MaleUniqueID'],
+                'femaleUniqueID': cross['FemaleUniqueID'],
+                'maleGenotype': cross['MaleGenotype'],
+                'femaleGenotype': cross['FemaleGenotype'],
+                'status': cross['Status'],
+                'foodType': cross['FoodType'],
+                'name': cross['Name'],
+                'vialLifetime': cross.get('VialLifetime'),
+                'flipFrequency': cross.get('FlipFrequency'),
+                'developmentalTime': cross.get('DevelopmentalTime'),
+                'comments': cross['Comments']
+            }
+        else:
+            return jsonify({"error": "Cross not found."}), 404
+
 
     if request.method == 'POST':
         # Collect form data
+        male_genotype_input = clean_tagify_data(request.form.get('maleGenotype'))[0]
+        female_genotype_input = clean_tagify_data(request.form.get('femaleGenotype'))[0]
+        
+        food_type_input = clean_tagify_data(request.form.get('foodType'))[0]
+        if food_type_input not in food_types:
+            add_metadata('food_types', food_type_input, db)
+
         new_cross_data = {
             'MaleUniqueID': request.form.get('maleUniqueID'),
             'FemaleUniqueID': request.form.get('femaleUniqueID'),
-            'MaleGenotype': request.form.get('maleGenotype').split('"')[-2],
-            'FemaleGenotype': request.form.get('femaleGenotype').split('"')[-2],
+            'MaleGenotype': male_genotype_input,
+            'FemaleGenotype': female_genotype_input,
             'TrayID': request.form.get('trayID'),
             'TrayPosition': request.form.get('trayPosition'),
             'Status': request.form.get('status'),
-            'FoodType': request.form.get('foodType'),
+            'FoodType': food_type_input,
             'Name': request.form.get('name'),
+            'VialLifetime': request.form.get('vialLifetime', 14),
+            'FlipFrequency': request.form.get('flipFrequency', 7),
+            'DevelopmentalTime': request.form.get('developmentalTime', 10),
             'Comments': request.form.get('comments')
         }
 
@@ -814,10 +999,96 @@ def add_cross():
         else:
             # Handle error (e.g., QC failure)
             return render_template('add_cross.html', error=uid_or_message, username=username,
-                                   food_types=food_types, genotypes=genotypes, ports=ports)
+                                   food_types=food_types, genotypes=genotypes, ports=ports, cross_data=cross_data)
 
     return render_template('add_cross.html', username=username,
-                           food_types=food_types, genotypes=genotypes, ports=ports)
+                           food_types=food_types, genotypes=genotypes, ports=ports, cross_data=cross_data)
+
+# define a route for the view cross page
+@app.route('/view_cross/<unique_id>', methods=['GET', 'POST'])
+def view_cross(unique_id):
+    if not session.get("username"):
+        return redirect("/login")
+
+    username = session.get("username")
+
+    # Get metadata lists
+    food_types = get_metadata('food_types', db)
+    genotypes = get_all_genotypes(username, db)
+
+    # If a unique_id is provided, fetch the cross data
+    cross = db['crosses'].find_one({"UniqueID": unique_id})
+    if cross:
+        cross_data = {
+            'uniqueID': cross['UniqueID'],
+            'maleUniqueID': cross['MaleUniqueID'],
+            'femaleUniqueID': cross['FemaleUniqueID'],
+            'maleGenotype': cross['MaleGenotype'],
+            'femaleGenotype': cross['FemaleGenotype'],
+            'trayID': cross.get('TrayID', ''),
+            'trayPosition': cross.get('TrayPosition', ''),
+            'status': cross['Status'],
+            'foodType': cross.get('FoodType', 'Molasses'),
+            'name': cross['Name'],
+            'comments': cross['Comments'],
+            'vialLifetime': cross.get('VialLifetime'),
+            'flipFrequency': cross.get('FlipFrequency'),
+            'developmentalTime': cross.get('DevelopmentalTime'),
+            'creationDate': cross.get('CreationDate', ''),
+            'lastFlipDate': cross.get('LastFlipDate', ''),
+            'currentlyAliveVials': cross.get('CurrentlyAliveVials', ''),
+            'flipLog': cross.get('FlipLog', '').replace('; ', '\n'),
+            'nextFlipDates': cross.get('NextFlipDates', '').replace('; ', '\n'),
+            'nextEclosionDates': cross.get('NextEclosionDates', '').replace('; ', '\n'),
+            'dataModifiedDate': cross.get('DataModifiedDate', ''),
+            'modificationLog': cross.get('ModificationLog', '').replace('; ', '\n'),
+        }
+    else:
+        return jsonify({"error": "Cross not found."}), 404
+
+    if request.method == 'POST':
+        # Handle form data
+        male_genotype_input = clean_tagify_data(request.form.get('maleGenotype'))[0]
+        female_genotype_input = clean_tagify_data(request.form.get('femaleGenotype'))[0]
+
+        food_type_input = clean_tagify_data(request.form.get('foodType'))[0]
+        if food_type_input not in food_types:
+            add_metadata('food_types', food_type_input, db)
+            
+        # Collect form data
+        updated_cross_data = {
+            'MaleUniqueID': request.form.get('maleUniqueID'),
+            'FemaleUniqueID': request.form.get('femaleUniqueID'),
+            'MaleGenotype': male_genotype_input,
+            'FemaleGenotype': female_genotype_input,
+            'TrayID': request.form.get('trayID'),
+            'TrayPosition': request.form.get('trayPosition'),
+            'Status': request.form.get('status'),
+            'FoodType': food_type_input,
+            'Name': request.form.get('name'),
+            'Comments': request.form.get('comments'),
+            'VialLifetime': request.form.get('vialLifetime', 14),
+            'FlipFrequency': request.form.get('flipFrequency', 7),
+            'DevelopmentalTime': request.form.get('developmentalTime', 10),
+        }
+
+        # Remove empty fields
+        updated_cross_data = {k: v for k, v in updated_cross_data.items() if v}
+
+        # Check if the cross data has changed and only keep the changed fields
+        changed_fields = {k: v for k, v in updated_cross_data.items() if v != cross.get(k, '')}
+
+        # Edit cross in the user's collection
+        success = edit_cross(username, unique_id, db, changed_fields)
+
+        if success:
+            return redirect('/cross_explorer')
+        else:
+            # Handle error (e.g., QC failure)
+            return render_template('cross_explorer.html', error=uid_or_message, username=username)
+
+    return render_template('view_cross.html', username=username, food_types=food_types, 
+                           genotypes=genotypes, cross_data=cross_data)
 
 # Route to fetch genotype based on Unique ID
 @app.route('/get_genotype/<unique_id>')
@@ -833,9 +1104,13 @@ from urllib.parse import unquote
 
 @app.route('/get_uids/<genotype>', methods=['GET'])
 def get_uids(genotype):
+    username = session.get("username")
     decoded_genotype = unquote(unquote(genotype))
     
-    uids = db['stocks'].find({"Genotype": decoded_genotype}, {"UniqueID": 1})
+    # clean the genotype
+    decoded_genotype = qc_genotype(decoded_genotype)[1]
+
+    uids = db['stocks'].find({"Genotype": decoded_genotype, "User": username})
     uid_list = [doc['UniqueID'] for doc in uids]
     
     return jsonify({'uids': uid_list})
@@ -983,10 +1258,24 @@ def handle_flip_vial():
     matching_cross = next((cross for cross in crosses if cross['UniqueID'] == uid), None)
 
     if matching_stock and not matching_cross:
+        # check if the stock is already flipped, if so ignore
+        if 'LastFlipDate' in matching_stock and matching_stock['LastFlipDate']:
+            last_flip_time =  datetime.datetime.strptime(matching_stock['LastFlipDate'], '%Y-%m-%d %H:%M')
+            print('Last flip time:', last_flip_time, 'Current time:', datetime.datetime.now(), 'Difference:', (datetime.datetime.now() - last_flip_time).seconds)
+            if (datetime.datetime.now() - last_flip_time).seconds < MIN_FLIP_DIFFERENCE:
+                print('Stock already flipped recently!')
+                return jsonify({'message': 'Stock already flipped recently!'})
+        
         print('Flipping stock:', uid)
         flip_stock(username, uid, db, flip_time, new_status=status, added_comment=comment)
         return jsonify({'message': 'Stock flipped successfully!'})
     elif matching_cross and not matching_stock:
+        # check if the cross is already flipped, if so ignore
+        if 'LastFlipDate' in matching_cross and matching_cross['LastFlipDate']:
+            last_flip_time =  datetime.datetime.strptime(matching_cross['LastFlipDate'], '%Y-%m-%d %H:%M')
+            print('Last flip time:', last_flip_time, 'Current time:', datetime.datetime.now(), 'Difference:', (datetime.datetime.now() - last_flip_time).seconds)
+            if (datetime.datetime.now() - last_flip_time).seconds < MIN_FLIP_DIFFERENCE:
+                return jsonify({'message': 'Cross already flipped recently!'})
         print('Flipping cross:', uid)
         flip_cross(username, uid, db, flip_time, new_status=status, added_comment=comment)
         return jsonify({'message': 'Cross flipped successfully!'})

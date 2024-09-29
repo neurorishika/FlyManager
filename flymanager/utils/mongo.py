@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import datetime
 from hashlib import shake_256
 from flymanager.utils.genetics import qc_genotype
+from flymanager.utils.utils import clean_log_entry
 
 
 # Load environment variables from .env file
@@ -51,7 +52,7 @@ def write_activity(user, activity, db):
         the database instance for MongoDB
     """
     # get timestamp
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     
     # create the activity document
     activity_document = {
@@ -196,6 +197,28 @@ def get_user_initials(user, db):
     else:
         return None
 
+def get_user_flip_days(user, db):
+    """
+    Get the preferred flip days of the user
+    Parameters:
+    user: str
+        the username of the user
+    db: pymongo.database.Database
+        the MongoDB database instance
+    Returns:
+    flip_days: list
+        the preferred flip days of the user
+    """
+    users_collection = db['users']
+    
+    # Find the user document by username
+    user_document = users_collection.find_one({"Username": user})
+    
+    if user_document:
+        return user_document.get("FlipDays")
+    else:
+        return None
+
 def get_user_crosses(user, db):
     """
     Connect to the MongoDB collection for the given user's crosses.
@@ -285,6 +308,8 @@ def uid_exists(uid, db):
 
     return stock is not None or cross is not None
 
+### Stock Management
+
 def add_to_stock(user, properties, db):
     """
     Add a stock to the user's stock collection in MongoDB.
@@ -302,6 +327,9 @@ def add_to_stock(user, properties, db):
             Type (required)
             SeriesID (required)
             ReplicateID (required)
+            VialLifetime (required)
+            FlipFrequency (required)
+            DevelopmentalTime (required)
             TrayID (optional)
             TrayPosition (optional)
             Status (required)
@@ -325,6 +353,9 @@ def add_to_stock(user, properties, db):
     assert "SeriesID" in properties, "SeriesID is required"
     assert "ReplicateID" in properties, "ReplicateID is required"
     assert "Status" in properties, "Status is required"
+    assert "VialLifetime" in properties, "VialLifetime is required"
+    assert "FlipFrequency" in properties, "FlipFrequency is required"
+    assert "DevelopmentalTime" in properties, "DevelopmentalTime is required"
 
     # make sure genotype meets the qc
     qc, genotype = qc_genotype(properties["Genotype"])
@@ -342,7 +373,7 @@ def add_to_stock(user, properties, db):
         uid = shake_256(uid.encode()).hexdigest(5)
     
     # get creation timestamp
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
     # create the document to insert
     stock_document = {
@@ -357,6 +388,9 @@ def add_to_stock(user, properties, db):
         "ReplicateID": properties["ReplicateID"],
         "TrayID": properties.get("TrayID", ""),
         "TrayPosition": properties.get("TrayPosition", ""),
+        "VialLifetime": properties["VialLifetime"],
+        "FlipFrequency": properties["FlipFrequency"],
+        "DevelopmentalTime": properties["DevelopmentalTime"],
         "Status": properties["Status"],
         "FoodType": properties.get("FoodType", ""),
         "Provenance": properties.get("Provenance", ""),
@@ -437,16 +471,26 @@ def flip_stock(user, uid, db, timestamp, new_status=None, added_comment=None):
     current_stock = stocks_collection.find_one({"UniqueID": uid, "User": user})
 
     # If the stock exists
-    print(current_stock)
-    
     if current_stock:
         # Update LastFlipDate
         update_fields['LastFlipDate'] = ts
 
-        # Update FlipLog
+        # Update FlipLog and CurrentAliveVials
         flip_log = current_stock.get('FlipLog', '')
-        update_fields['FlipLog'] = f"{ts}; {flip_log}" if flip_log else ts
+        currently_alive_vials = current_stock.get('CurrentlyAliveVials', '')
 
+        if "," in flip_log:
+            last_vial = int(flip_log.split(",")[0].strip()[1:])
+            last_vial += 1
+            flip_log = f"V{last_vial}, {ts}; {flip_log}"
+            currently_alive_vials = f"{currently_alive_vials}, V{last_vial}"
+        else:
+            flip_log = f"V1, {ts}"
+            currently_alive_vials = "V1"
+
+        update_fields['FlipLog'] = flip_log
+        update_fields['CurrentlyAliveVials'] = currently_alive_vials
+        
         # Prepare the modification log
         modification_log_entries = []
         
@@ -468,13 +512,16 @@ def flip_stock(user, uid, db, timestamp, new_status=None, added_comment=None):
             new_modification_log = "; ".join(modification_log_entries)
             update_fields['ModificationLog'] = f"{new_modification_log}; {modification_log}" if modification_log else new_modification_log
 
-        print(update_fields)
-
         # Update the stock document in MongoDB
         stocks_collection.update_one(
             {"UniqueID": uid, "User": user},
             {"$set": update_fields}
         )
+
+    # get the updated stock
+    updated_stock = stocks_collection.find_one({"UniqueID": uid, "User": user})
+    update_stock_vials(updated_stock, user, db)
+
 
 
 def delete_stock(user, uid, db):
@@ -506,7 +553,7 @@ def delete_stock(user, uid, db):
     else:
         return False
 
-def edit_stock(user, uid, db, updates):
+def edit_stock(user, uid, db, updates, log_activity=True, refresh_vials=True):
     """
     Edit specific fields of a stock in the user's stock collection.
     
@@ -519,6 +566,10 @@ def edit_stock(user, uid, db, updates):
         The MongoDB database instance.
     updates: dict
         A dictionary of the fields to update and their new values.
+    log_activity: bool
+        Whether to log the activity of the stock update.
+    refresh_vials: bool
+        Whether to refresh the vials of the stock.
     
     Returns:
     bool
@@ -531,7 +582,7 @@ def edit_stock(user, uid, db, updates):
     # Prepare the update fields and log the modification
     update_fields = {}
     modification_log_entries = []
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     
     # Loop through the updates and apply them
     for field, value in updates.items():
@@ -542,20 +593,187 @@ def edit_stock(user, uid, db, updates):
     if modification_log_entries:
         current_stock = stocks_collection.find_one({"UniqueID": uid, "User": user})
         if current_stock:
-            modification_log = current_stock.get('ModificationLog', '')
-            new_modification_log = "; ".join(modification_log_entries)
-            update_fields['ModificationLog'] = f"{new_modification_log}; {modification_log}" if modification_log else new_modification_log
-            update_fields['DataModifiedDate'] = timestamp
+            if log_activity:
+                modification_log = current_stock.get('ModificationLog', '')
+                new_modification_log = "; ".join(modification_log_entries)
+                update_fields['ModificationLog'] = f"{new_modification_log}; {modification_log}" if modification_log else new_modification_log
+                update_fields['DataModifiedDate'] = timestamp
             
             # Update the stock document in MongoDB
             result = stocks_collection.update_one(
                 {"UniqueID": uid, "User": user},
                 {"$set": update_fields}
             )
+
+            # Refresh the vials if requested
+            if refresh_vials:
+                update_stock_vials(current_stock, user, db)
             
             return result.matched_count > 0
     
     return False
+
+
+def update_stock_vials(stock, username, db):
+    """
+    Refresh the stock vials based on the flip log.
+
+    Parameters:
+    stock : dict
+        The stock dictionary.
+    username : str
+        The username of the user.
+    db : pymongo.database.Database
+        The database object.
+
+    Returns:
+    bool
+        True if the stock was updated successfully, False otherwise.
+    """
+    uid = stock["UniqueID"]
+
+    # check if the stock doesnt have the key "CurrentlyAliveVials"
+    if "CurrentlyAliveVials" not in stock:
+        assert all([x in stock for x in ["FlipLog","VialLifetime","FlipFrequency","DevelopmentalTime"]]), "Stock must have the keys FlipLog, VialLifetime, and FlipFrequency"
+        
+        # get the stock details
+        flipLog = stock["FlipLog"]
+        vialLifetime = float(stock["VialLifetime"])
+        flipFrequency = float(stock["FlipFrequency"])
+        developmentalTime = float(stock["DevelopmentalTime"])
+        # split the flip log into a list by ";"
+        flipLog = flipLog.split(";")
+        _, flip_dates = zip(*[clean_log_entry(flip) for flip in flipLog])
+
+        # reverse the order of the vials and dates
+        flip_dates = flip_dates[::-1]
+            
+        vials = ["V{}".format(i) for i in range(1,len(flip_dates)+1)]
+        next_flip_dates = [date+datetime.timedelta(days=flipFrequency) for date in flip_dates]
+        next_eclosion_dates = [date+datetime.timedelta(days=developmentalTime) for date in flip_dates]
+
+        # recreate a new flip log
+        flipLog = [f"{vial}, {date.strftime('%Y-%m-%d %H:%M')}" for vial, date in zip(vials[::-1],flip_dates[::-1])]
+        flipLog = "; ".join(flipLog)
+
+        # remove HH:MM:SS from the dates
+        flip_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in flip_dates]
+        next_flip_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in next_flip_dates]
+        next_eclosion_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in next_eclosion_dates]
+
+        # determine the dead vials
+        currently_alive_vials = vials.copy()
+        to_delete = []
+        for vial, flip_date, next_flip_date in zip(vials,flip_dates,next_flip_dates):
+            death_date = flip_date + datetime.timedelta(days=vialLifetime)
+            # if death date has passed and there is atleast one flip AFTER the scheduled death date
+            if datetime.datetime.now() > death_date and any([date >= next_flip_date for date in flip_dates]):
+                # get the index of the vial
+                index = currently_alive_vials.index(vial)
+                to_delete.append(index)
+                print(f"Vial {vial} for stock {uid} has died")
+
+        # remove the dead vials
+        currently_alive_vials = [vial for i,vial in enumerate(currently_alive_vials) if i not in to_delete] 
+        next_flip_dates = [date for i,date in enumerate(next_flip_dates) if i not in to_delete]
+        next_eclosion_dates = [date for i,date in enumerate(next_eclosion_dates) if i not in to_delete]
+
+        # get the last flip date
+        last_flip_date = datetime.datetime.strptime(stock["LastFlipDate"], "%Y-%m-%d %H:%M")
+        # remove HH:MM:SS from the last flip date
+        last_flip_date = last_flip_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # remove all next flip dates that are before the last flip date + 1 day to account for early flips
+        next_flip_dates = [date for date in next_flip_dates if date > last_flip_date + datetime.timedelta(days=1)]
+
+
+        # define the currently alive vials
+        currently_alive_vials = ", ".join(currently_alive_vials)
+        # define the next flip dates
+        next_flip_dates = ", ".join([date.strftime('%Y-%m-%d') for date in next_flip_dates])
+        # define the next eclosion dates
+        next_eclosion_dates = ", ".join([date.strftime('%Y-%m-%d') for date in next_eclosion_dates])
+        # update the stock
+        update_properties = {
+            "FlipLog":flipLog,
+            "CurrentlyAliveVials":currently_alive_vials,
+            "NextFlipDates":next_flip_dates,
+            "NextEclosionDates":next_eclosion_dates
+        }
+        # edit the stock
+        success = edit_stock(username, uid, db, update_properties, log_activity=False)
+        
+    else:
+        # get all flip dates
+        flipLog = stock["FlipLog"]
+        flipLog = flipLog.split(";")
+        date_map = {}
+        flip_dates = []
+
+        for flip in flipLog:
+            vial, date = clean_log_entry(flip)
+            date_map[vial] = date
+            flip_dates.append(date)
+
+        # get the currently alive vials
+        currently_alive_vials = stock["CurrentlyAliveVials"].split(", ")
+        # keep only the alive vials
+        dates = [date_map[vial] for vial in currently_alive_vials]
+        # get the next flip dates
+        flipFrequency = float(stock["FlipFrequency"])
+        next_flip_dates = [date+datetime.timedelta(days=flipFrequency) for date in dates]
+        # get the next eclosion dates
+        developmentalTime = float(stock["DevelopmentalTime"])
+        next_eclosion_dates = [date+datetime.timedelta(days=developmentalTime) for date in dates]
+
+        # remove HH:MM:SS from the dates
+        flip_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in flip_dates]
+        next_flip_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in next_flip_dates]
+        next_eclosion_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in next_eclosion_dates]
+
+        # determine the dead vials
+        vialLifetime = float(stock["VialLifetime"])
+        to_delete = []
+        for vial, flip_date, next_flip_date in zip(currently_alive_vials,dates,next_flip_dates):
+            death_date = flip_date + datetime.timedelta(days=vialLifetime)
+            # if death date has passed and there is atleast one flip AFTER the scheduled death date
+            if datetime.datetime.now() > death_date and any([date >= next_flip_date for date in flip_dates]):
+                # get the index of the vial
+                index = currently_alive_vials.index(vial)
+                to_delete.append(index)
+                print(f"Vial {vial} for stock {uid} has died")
+        
+        # remove the dead vials
+        currently_alive_vials = [vial for i,vial in enumerate(currently_alive_vials) if i not in to_delete]
+        next_flip_dates = [date for i,date in enumerate(next_flip_dates) if i not in to_delete]
+        next_eclosion_dates = [date for i,date in enumerate(next_eclosion_dates) if i not in to_delete]
+
+        # get the last flip date
+        last_flip_date = datetime.datetime.strptime(stock["LastFlipDate"], "%Y-%m-%d %H:%M")
+        # remove HH:MM:SS from the last flip date
+        last_flip_date = last_flip_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # remove all next flip dates that are before the last flip date + 1 day to account for early flips
+        next_flip_dates = [date for date in next_flip_dates if date > last_flip_date + datetime.timedelta(days=1)]
+        
+        # define the currently alive vials
+        currently_alive_vials = ", ".join(currently_alive_vials)
+        # define the next flip dates
+        next_flip_dates = ", ".join([date.strftime('%Y-%m-%d') for date in next_flip_dates])
+        # define the next eclosion dates
+        next_eclosion_dates = ", ".join([date.strftime('%Y-%m-%d') for date in next_eclosion_dates])
+        # update the stock
+        update_properties = {
+            "CurrentlyAliveVials":currently_alive_vials,
+            "NextFlipDates":next_flip_dates,
+            "NextEclosionDates":next_eclosion_dates
+        }
+        # edit the stock
+        success = edit_stock(username, uid, db, update_properties, log_activity=False, refresh_vials=False)
+    return success
+    
+
+### Cross Management
 
 
 def add_to_cross(user, properties, db):
@@ -574,6 +792,9 @@ def add_to_cross(user, properties, db):
             FemaleGenotype (required)
             Name (required)
             FoodType (required)
+            VialLifetime (required)
+            FlipFrequency (required)
+            DevelopmentalTime (required)
             TrayID (optional)
             TrayPosition (optional)
             Status (required)
@@ -596,6 +817,9 @@ def add_to_cross(user, properties, db):
     assert "Name" in properties, "Name is required"
     assert "Status" in properties, "Status is required"
     assert "FoodType" in properties, "FoodType is required"
+    assert "VialLifetime" in properties, "VialLifetime is required"
+    assert "FlipFrequency" in properties, "FlipFrequency is required"
+    assert "DevelopmentalTime" in properties, "DevelopmentalTime is required"
 
     # Create a UniqueID for the cross based on Male and Female UniqueID + User + Name
     uid = str(user) + str(properties["MaleUniqueID"]) + str(properties["FemaleUniqueID"]) + str(properties["Name"])
@@ -607,7 +831,7 @@ def add_to_cross(user, properties, db):
         uid = shake_256(uid.encode()).hexdigest(5)
 
     # Get the current timestamp
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
     # Create the document to insert
     cross_document = {
@@ -621,6 +845,9 @@ def add_to_cross(user, properties, db):
         "FoodType": properties["FoodType"],
         "TrayID": properties.get("TrayID", ""),
         "TrayPosition": properties.get("TrayPosition", ""),
+        "VialLifetime": properties["VialLifetime"],
+        "FlipFrequency": properties["FlipFrequency"],
+        "DevelopmentalTime": properties["DevelopmentalTime"],
         "Status": properties["Status"],
         "Comments": properties.get("Comments", ""),
         "CreationDate": timestamp,
@@ -698,9 +925,21 @@ def flip_cross(user, uid, db, timestamp, new_status=None, added_comment=None):
         # Update LastFlipDate
         update_fields['LastFlipDate'] = ts
 
-        # Update FlipLog
+        # Update FlipLog and CurrentAliveVials
         flip_log = current_cross.get('FlipLog', '')
-        update_fields['FlipLog'] = f"{ts}; {flip_log}" if flip_log else ts
+        currently_alive_vials = current_cross.get('CurrentlyAliveVials', '')
+
+        if "," in flip_log:
+            last_vial = int(flip_log.split(",")[0].strip()[1:])
+            last_vial += 1
+            flip_log = f"V{last_vial}, {ts}; {flip_log}"
+            currently_alive_vials = f"{currently_alive_vials}, V{last_vial}"
+        else:
+            flip_log = f"V1, {ts}"
+            currently_alive_vials = "V1"
+
+        update_fields['FlipLog'] = flip_log
+        update_fields['CurrentlyAliveVials'] = currently_alive_vials
 
         # Prepare the modification log
         modification_log_entries = []
@@ -728,6 +967,10 @@ def flip_cross(user, uid, db, timestamp, new_status=None, added_comment=None):
             {"UniqueID": uid, "User": user},
             {"$set": update_fields}
         )
+
+    # get the updated cross
+    updated_cross = crosses_collection.find_one({"UniqueID": uid, "User": user})
+    update_cross_vials(updated_cross, user, db)
 
 def delete_cross(user, uid, db):
     """
@@ -758,7 +1001,7 @@ def delete_cross(user, uid, db):
     else:
         return False
 
-def edit_cross(user, uid, db, updates):
+def edit_cross(user, uid, db, updates, log_activity=True, refresh_vials=True):
     """
     Edit specific fields of a cross in the user's cross collection.
     
@@ -771,6 +1014,10 @@ def edit_cross(user, uid, db, updates):
         The MongoDB database instance.
     updates: dict
         A dictionary of the fields to update and their new values.
+    log_activity: bool
+        Whether to log the activity of the cross update.
+    refresh_vials: bool
+        Whether to refresh the vials of the cross.
     
     Returns:
     bool
@@ -783,7 +1030,7 @@ def edit_cross(user, uid, db, updates):
     # Prepare the update fields and log the modification
     update_fields = {}
     modification_log_entries = []
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     
     # Loop through the updates and apply them
     for field, value in updates.items():
@@ -794,22 +1041,182 @@ def edit_cross(user, uid, db, updates):
     if modification_log_entries:
         current_cross = crosses_collection.find_one({"UniqueID": uid, "User": user})
         if current_cross:
-            modification_log = current_cross.get('ModificationLog', '')
-            new_modification_log = "; ".join(modification_log_entries)
-            update_fields['ModificationLog'] = f"{new_modification_log}; {modification_log}" if modification_log else new_modification_log
-            update_fields['DataModifiedDate'] = timestamp
+            if log_activity:
+                modification_log = current_cross.get('ModificationLog', '')
+                new_modification_log = "; ".join(modification_log_entries)
+                update_fields['ModificationLog'] = f"{new_modification_log}; {modification_log}" if modification_log else new_modification_log
+                update_fields['DataModifiedDate'] = timestamp
             
             # Update the cross document in MongoDB
             result = crosses_collection.update_one(
                 {"UniqueID": uid, "User": user},
                 {"$set": update_fields}
             )
+
+            # update the cross vials if requested
+            if refresh_vials:
+                update_cross_vials(current_cross, user, db)
             
             return result.matched_count > 0
     
     return False
 
-# Metadata Management
+def update_cross_vials(cross, username, db):
+    """
+    Refresh the cross vials based on the flip log.
+
+    Parameters:
+    cross : dict
+        The cross dictionary.   
+    username : str
+        The username of the user.
+    db : pymongo.database.Database
+        The database object.
+
+    Returns:
+    bool
+        True if the cross was updated successfully, False otherwise.
+    """
+    uid = cross["UniqueID"]
+
+    # check if the cross doesnt have the key "CurrentlyAliveVials"
+    if "CurrentlyAliveVials" not in cross:
+        assert all([x in cross for x in ["FlipLog","VialLifetime","FlipFrequency","DevelopmentalTime"]]), "Stock must have the keys FlipLog, VialLifetime, and FlipFrequency"
+        
+        # get the cross details
+        flipLog = cross["FlipLog"]
+        vialLifetime = float(cross["VialLifetime"])
+        flipFrequency = float(cross["FlipFrequency"])
+        developmentalTime = float(cross["DevelopmentalTime"])
+        # split the flip log into a list by ";"
+        flipLog = flipLog.split(";")
+        _, flip_dates = zip(*[clean_log_entry(flip) for flip in flipLog])
+
+        # reverse the order of the vials and dates
+        flip_dates = flip_dates[::-1]
+            
+        vials = ["V{}".format(i) for i in range(1,len(flip_dates)+1)]
+        next_flip_dates = [date+datetime.timedelta(days=flipFrequency) for date in flip_dates]
+        next_eclosion_dates = [date+datetime.timedelta(days=developmentalTime) for date in flip_dates]
+
+        # recreate a new flip log
+        flipLog = [f"{vial}, {date.strftime('%Y-%m-%d %H:%M')}" for vial, date in zip(vials[::-1],flip_dates[::-1])]
+        flipLog = "; ".join(flipLog)
+
+        # remove HH:MM:SS from the dates
+        flip_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in flip_dates]
+        next_flip_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in next_flip_dates]
+        next_eclosion_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in next_eclosion_dates]
+
+        # determine the dead vials
+        currently_alive_vials = vials.copy()
+        to_delete = []
+        for vial, flip_date, next_flip_date in zip(vials,flip_dates,next_flip_dates):
+            death_date = flip_date + datetime.timedelta(days=vialLifetime)
+            # if death date has passed and there is atleast one flip AFTER the scheduled death date
+            if datetime.datetime.now() > death_date and any([date >= next_flip_date for date in flip_dates]):
+                # get the index of the vial
+                index = currently_alive_vials.index(vial)
+                to_delete.append(index)
+        # remove the dead vials
+        currently_alive_vials = [vial for i,vial in enumerate(currently_alive_vials) if i not in to_delete] 
+        next_flip_dates = [date for i,date in enumerate(next_flip_dates) if i not in to_delete]
+        next_eclosion_dates = [date for i,date in enumerate(next_eclosion_dates) if i not in to_delete]
+
+        # get the last flip date
+        last_flip_date = datetime.datetime.strptime(cross["LastFlipDate"], "%Y-%m-%d %H:%M")
+        # remove HH:MM:SS from the last flip date
+        last_flip_date = last_flip_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # remove all next flip dates that are before the last flip date + 1 day to account for early flips
+        next_flip_dates = [date for date in next_flip_dates if date > last_flip_date + datetime.timedelta(days=1)]
+        
+        # define the currently alive vials
+        currently_alive_vials = ", ".join(currently_alive_vials)
+        # define the next flip dates
+        next_flip_dates = ", ".join([date.strftime('%Y-%m-%d') for date in next_flip_dates])
+        # define the next eclosion dates
+        next_eclosion_dates = ", ".join([date.strftime('%Y-%m-%d') for date in next_eclosion_dates])
+        # update the cross
+        update_properties = {
+            "FlipLog":flipLog,
+            "CurrentlyAliveVials":currently_alive_vials,
+            "NextFlipDates":next_flip_dates,
+            "NextEclosionDates":next_eclosion_dates
+        }
+        # edit the cross
+        success = edit_cross(username, uid, db, update_properties, log_activity=False)
+        
+    else:
+        # get all flip dates
+        flipLog = cross["FlipLog"]
+        flipLog = flipLog.split(";")
+        date_map = {}
+        flip_dates = []
+        for flip in flipLog:
+            vial, date = clean_log_entry(flip)
+            date_map[vial] = date
+            flip_dates.append(date)
+
+        # get the currently alive vials
+        currently_alive_vials = cross["CurrentlyAliveVials"].split(", ")
+        # keep only the alive vials
+        dates = [date_map[vial] for vial in currently_alive_vials]
+        # get the next flip dates
+        flipFrequency = float(cross["FlipFrequency"])
+        next_flip_dates = [date+datetime.timedelta(days=flipFrequency) for date in dates]
+        # get the next eclosion dates
+        developmentalTime = float(cross["DevelopmentalTime"])
+        next_eclosion_dates = [date+datetime.timedelta(days=developmentalTime) for date in dates]
+
+        # remove HH:MM:SS from the dates
+        flip_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in flip_dates]
+        next_flip_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in next_flip_dates]
+        next_eclosion_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in next_eclosion_dates]
+
+        # determine the dead vials
+        vialLifetime = float(cross["VialLifetime"])
+        to_delete = []
+        for vial, flip_date, next_flip_date in zip(currently_alive_vials,dates,next_flip_dates):
+            death_date = flip_date + datetime.timedelta(days=vialLifetime)
+            # if death date has passed and there is atleast one flip AFTER the scheduled death date
+            if datetime.datetime.now() > death_date and any([date >= next_flip_date for date in flip_dates]):
+                # get the index of the vial
+                index = currently_alive_vials.index(vial)
+                to_delete.append(index)
+                
+        # remove the dead vials
+        currently_alive_vials = [vial for i,vial in enumerate(currently_alive_vials) if i not in to_delete]
+        next_flip_dates = [date for i,date in enumerate(next_flip_dates) if i not in to_delete]
+        next_eclosion_dates = [date for i,date in enumerate(next_eclosion_dates) if i not in to_delete]
+
+        # get the last flip date
+        last_flip_date = datetime.datetime.strptime(cross["LastFlipDate"], "%Y-%m-%d %H:%M")
+        # remove HH:MM:SS from the last flip date
+        last_flip_date = last_flip_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # remove all next flip dates that are before the last flip date  + 1 day to account for early flips
+        next_flip_dates = [date for date in next_flip_dates if date > last_flip_date + datetime.timedelta(days=1)]
+        
+        # define the currently alive vials
+        currently_alive_vials = ", ".join(currently_alive_vials)
+        # define the next flip dates
+        next_flip_dates = ", ".join([date.strftime('%Y-%m-%d') for date in next_flip_dates])
+        # define the next eclosion dates
+        next_eclosion_dates = ", ".join([date.strftime('%Y-%m-%d') for date in next_eclosion_dates])
+        # update the cross
+        update_properties = {
+            "CurrentlyAliveVials":currently_alive_vials,
+            "NextFlipDates":next_flip_dates,
+            "NextEclosionDates":next_eclosion_dates
+        }
+        # edit the cross
+        success = edit_cross(username, uid, db, update_properties, log_activity=False, refresh_vials=False)
+    return success
+    
+
+### Metadata Management
+
 def get_metadata(metadata_type, db):
     """
     Get the metadata for a specific type from the MongoDB database.
@@ -929,16 +1336,32 @@ def edit_metadata(metadata_type, old_value, new_value, db):
 
     return result.matched_count > 0
 
+### Special Utility Functions
 
+def get_flip_in(item):
+    """
+    Get the flip in for a stock or cross.
+    """
+    vals = []
+    for val in item["NextFlipDates"].split(", "):
+        try:
+            next_time = datetime.datetime.strptime(val, "%Y-%m-%d").replace(hour=0, minute=0, second=0, microsecond=0)
+            now = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            vals.append(round((next_time - now).days))
+        except:
+            vals.append("N/A")
+    return ", ".join([str(val) for val in vals]) + " days"
 
-
-
-
-
-
-
-
-
-
-
-
+def get_eclosion_in(item):
+    """
+    Get the eclosion in for a stock or cross.
+    """
+    vals = []
+    for val in item["NextEclosionDates"].split(", "):
+        try:
+            next_time = datetime.datetime.strptime(val, "%Y-%m-%d").replace(hour=0, minute=0, second=0, microsecond=0)
+            now = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            vals.append(round((next_time - now).days))
+        except:
+            vals.append("N/A")
+    return ", ".join([str(val) for val in vals]) + " days"

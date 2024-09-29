@@ -226,7 +226,8 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(response => response.json())
         .then(data => {
             stockDetails.style.display = 'none';
-            alert('Vial flipped successfully!');
+            // show the message
+            alert(data.message);
         });
     });
 

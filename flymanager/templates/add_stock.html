@@ -131,15 +131,19 @@
         </div>
 
 
-        <!-- Row 7: Vial Lifetime and Flip Frequency -->
+        <!-- Row 7: Vial Lifetime, Flip Frequency and Developmental Time -->
         <div class="form-row">
-            <div class="form-group col-md-6">
+            <div class="form-group col-md-4">
                 <label for="vialLifetime">Vial Lifetime (days):</label>
                 <input type="number" class="form-control" id="vialLifetime" name="vialLifetime" value="14">
             </div>
-            <div class="form-group col-md-6">
+            <div class="form-group col-md-4">
                 <label for="flipFrequency">Flip Frequency (days):</label>
                 <input type="number" class="form-control" id="flipFrequency" name="flipFrequency" value="7">
+            </div>
+            <div class="form-group col-md-4">
+                <label for="developmentalTime">Mating->Virgin Adult (days):</label>
+                <input type="number" class="form-control" id="developmentalTime" name="developmentalTime" value="7">
             </div>
         </div>
 
@@ -311,16 +315,21 @@
             document.getElementById('sourceID').value = stockData.sourceID;
             document.getElementById('name').value = stockData.name;
             document.getElementById('altReference').value = stockData.altReference;
-            document.getElementById('type').value = stockData.type;
-            document.getElementById('foodType').value = stockData.foodType;
             document.getElementById('seriesID').value = stockData.seriesID;
             document.getElementById('replicateID').value = stockData.replicateID;
             document.getElementById('vialLifetime').value = stockData.vialLifetime;
             document.getElementById('flipFrequency').value = stockData.flipFrequency;
+            document.getElementById('developmentalTime').value = stockData.developmentalTime;
             document.getElementById('comments').value = stockData.comments;
 
-            // Set the status dropdown
-            document.getElementById('status').value = stockData.status;
+            // Set the status dropdown value
+            const statusSelect = document.getElementById('status');
+            for (let i = 0; i < statusSelect.options.length; i++) {
+                if (statusSelect.options[i].value === stockData.status) {
+                    statusSelect.selectedIndex = i;
+                    break;
+                }
+            }
 
             // Split the genotype by ';' and add to tagify one by one
             const genes = stockData.genotype.split('; ');
@@ -337,6 +346,13 @@
             // Split provenance by / and add to tagify (if)
             tagifyProvenance.removeAllTags();
             tagifyProvenance.addTags(stockData.provenance.split('/'));
+
+            // Remove and add type, foodType
+            tagifyType.removeAllTags();
+            tagifyType.addTags(stockData.type);
+
+            tagifyFoodType.removeAllTags();
+            tagifyFoodType.addTags(stockData.foodType);
         }
         
     });

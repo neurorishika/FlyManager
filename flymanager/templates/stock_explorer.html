@@ -9,6 +9,9 @@
 {% block content %}
 <div class="filters">
     <h3>Filters</h3>
+    <div class="alert alert-info" role="alert">
+        <strong>Note:</strong> Stocks/Crosses with the status "No longer maintained" are excluded by default. To view them, please filter by the "No longer maintained" status.
+    </div>
     {% include 'filter_stock.html' %}
 </div>
 <div class="mb-3">
@@ -24,6 +27,8 @@
                     <div class="badges">
                         <span class="badge badge-info">{{ stock.FoodType }}</span>
                         <span class="badge badge-secondary">{{ stock.Type }}</span>
+                        <span class="badge badge-flip">Flip in {{ stock.FlipIn }}</span>
+                        <span class="badge badge-eclose">Ecloses in {{ stock.EclosesIn }}</span>
                     </div>
                 </div>
                 <div style="display: flex; align-items: center;">

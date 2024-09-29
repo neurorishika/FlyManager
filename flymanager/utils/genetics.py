@@ -146,3 +146,5 @@ def get_genetic_components(genotype):
         else:
             components.append([chr if chr != "" else "+", chr if chr != "" else "+"])
     return components
+
+    

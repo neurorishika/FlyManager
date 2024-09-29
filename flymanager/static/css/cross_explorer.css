@@ -20,7 +20,7 @@
     display: flex;
     flex-direction: column;
     font-size: 14px;
-    border: 2px solid transparent;
+    border: 3px solid transparent;
     position: relative;
 }
 
@@ -42,6 +42,16 @@
 
 .badge-secondary {
     background-color: #6c757d;
+    color: white;
+}
+
+.badge-flip {
+    background-color: #ffffff;
+    color: black;
+}
+
+.badge-eclose {
+    background-color: #0a4f02;
     color: white;
 }
 

@@ -22,62 +22,91 @@
     </div>
 
     <form method="POST" action="/add_cross">
-        <!-- Male Section -->
-        <div class="form-group">
-            <label for="maleUniqueID">Male Unique ID:</label>
-            <div class="input-group">
-                <input type="text" class="form-control" id="maleUniqueID" name="maleUniqueID">
-                <button id="scanMaleUIDBtn" class="btn btn-secondary" type="button">Scan UID</button>
+        <!-- Row 1: Male Unique ID and Genotype -->
+        <div class="form-row">
+            <div class="form-group col-md-3">
+                <label for="maleUniqueID">Male Unique ID:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="maleUniqueID" name="maleUniqueID">
+                    <button id="scanMaleUIDBtn" class="btn btn-secondary" type="button">Scan UID</button>
+                </div>
+                
+            </div>
+            <div class="form-group col-md-9">
+                <label for="maleGenotype">Male Genotype:</label>
+                <input type="text" id="maleGenotype" name="maleGenotype" class="form-control tag-input">
+                <div id="maleUIDOptions" class="mt-2"></div> <!-- Placeholder for UID buttons -->
             </div>
         </div>
-        <div class="form-group">
-            <label for="maleGenotype">Male Genotype:</label>
-            <input type="text" id="maleGenotype" name="maleGenotype" class="form-control tag-input">
-        </div>
-        <div id="maleUIDOptions" class="mt-2"></div> <!-- Placeholder for UID buttons -->
 
-        <!-- Female Section -->
-        <div class="form-group">
-            <label for="femaleUniqueID">Female Unique ID:</label>
-            <div class="input-group">
-                <input type="text" class="form-control" id="femaleUniqueID" name="femaleUniqueID">
-                <button id="scanFemaleUIDBtn" class="btn btn-secondary" type="button">Scan UID</button>
+        <!-- Row 2: Female Unique ID and Genotype -->
+        <div class="form-row">
+            <div class="form-group col-md-3">
+                <label for="femaleUniqueID">Female Unique ID:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="femaleUniqueID" name="femaleUniqueID">
+                    <button id="scanFemaleUIDBtn" class="btn btn-secondary" type="button">Scan UID</button>
+                </div>
+                
+            </div>
+            <div class="form-group col-md-9">
+                <label for="femaleGenotype">Female Genotype:</label>
+                <input type="text" id="femaleGenotype" name="femaleGenotype" class="form-control tag-input">
+                <div id="femaleUIDOptions" class="mt-2"></div> <!-- Placeholder for UID buttons -->
             </div>
         </div>
-        <div class="form-group">
-            <label for="femaleGenotype">Female Genotype:</label>
-            <input type="text" id="femaleGenotype" name="femaleGenotype" class="form-control tag-input">
-        </div>
-        <div id="femaleUIDOptions" class="mt-2"></div> <!-- Placeholder for UID buttons -->
 
-        <!-- Tray and Other Details -->
-        <div class="form-group">
-            <label for="trayID">Tray ID:</label>
-            <input type="text" class="form-control" id="trayID" name="trayID">
+        <!-- Row 3: Tray ID, Tray Position, and Status -->
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="trayID">Tray ID:</label>
+                <input type="text" class="form-control" id="trayID" name="trayID">
+            </div>
+            <div class="form-group col-md-4">
+                <label for="trayPosition">Tray Position:</label>
+                <input type="text" class="form-control" id="trayPosition" name="trayPosition">
+            </div>
+            <div class="form-group col-md-4">
+                <label for="status">Status:</label>
+                <select class="form-control" id="status" name="status">
+                    <option value="Healthy" data-color="green">Healthy</option>
+                    <option value="Showing Issues" data-color="brown">Showing Issues</option>
+                    <option value="Needs refresh" data-color="red">Needs refresh</option>
+                    <option value="Ordered" data-color="blue">Ordered</option>
+                    <option value="No longer maintained" data-color="pink">No longer maintained</option>
+                </select>
+            </div>
         </div>
-        <div class="form-group">
-            <label for="trayPosition">Tray Position:</label>
-            <input type="text" class="form-control" id="trayPosition" name="trayPosition">
+
+        <!-- Row 4: Food Type and Cross Name -->
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label for="foodType">Food Type:</label>
+                <input type="text" id="foodType" name="foodType" class="form-control tag-input" value="Molasses">
+            </div>
+            <div class="form-group col-md-6">
+                <label for="name">Cross Name:</label>
+                <input type="text" class="form-control" id="name" name="name">
+            </div>
         </div>
-        <div class="form-group">
-            <label for="status">Status:</label>
-            <select class="form-control" id="status" name="status">
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-            </select>
+
+        <!-- Row 5: Vial Lifetime, Flip Frequency and Developmental Time -->
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="vialLifetime">Vial Lifetime (days):</label>
+                <input type="number" class="form-control" id="vialLifetime" name="vialLifetime" value="14">
+            </div>
+            <div class="form-group col-md-4">
+                <label for="flipFrequency">Flip Frequency (days):</label>
+                <input type="number" class="form-control" id="flipFrequency" name="flipFrequency" value="7">
+            </div>
+            <div class="form-group col-md-4">
+                <label for="developmentalTime">Mating->Virgin Adult (days):</label>
+                <input type="number" class="form-control" id="developmentalTime" name="developmentalTime" value="7">
+            </div>
         </div>
-        <div class="form-group">
-            <label for="foodType">Food Type:</label>
-            <select class="form-control" id="foodType" name="foodType">
-                {% for foodtype in food_types %}
-                <option value="{{ foodtype }}">{{ foodtype }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-group">
-            <label for="name">Cross Name:</label>
-            <input type="text" class="form-control" id="name" name="name">
-        </div>
+
+        <!-- Row 6: Comments -->
         <div class="form-group">
             <label for="comments">Comments:</label>
             <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>
@@ -88,12 +117,16 @@
 </div>
 {% endblock %}
 
+
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
 <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.polyfills.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
 <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 <script>
+
+    const crossData = {{ cross_data | tojson }};
+
     document.addEventListener("DOMContentLoaded", function() {
         const socket = io.connect('http://127.0.0.1:5000');
         let currentThreadId = null;
@@ -184,7 +217,8 @@
             enforceWhitelist: true,
             dropdown: {
                 enabled: 1
-            }
+            },
+            delimiters: null
         });
 
         let tagifyFemaleGenotype = new Tagify(document.querySelector('#femaleGenotype'), {
@@ -193,7 +227,8 @@
             enforceWhitelist: true,
             dropdown: {
                 enabled: 1
-            }
+            },
+            delimiters: null
         });
 
         // Fetch UIDs when Male Genotype is selected
@@ -210,7 +245,7 @@
                             button.className = 'btn btn-outline-primary btn-sm m-1 m-uid-button';
                             button.textContent = uid;
                             button.type = 'button';
-                            button.style.display = 'block';
+                            button.style.display = 'inline-block';
                             button.onclick = function() {
                                 document.getElementById('maleUniqueID').value = uid;
                                 document.querySelectorAll('.m-uid-button').forEach(button => {
@@ -237,7 +272,7 @@
                             button.className = 'btn btn-outline-primary btn-sm m-1 f-uid-button';
                             button.textContent = uid;
                             button.type = 'button';
-                            button.style.display = 'block';
+                            button.style.display = 'inline-block';
                             button.onclick = function() {
                                 document.getElementById('femaleUniqueID').value = uid;
                                 document.querySelectorAll('.f-uid-button').forEach(button => {
@@ -280,6 +315,43 @@
                     });
             }
         });
+
+        let tagifyFoodType = new Tagify(document.querySelector('#foodType'), {
+            whitelist: {{ food_types | tojson }},
+            maxTags: 1,
+        });
+
+        // Populate form fields if cross data is provided
+        // check if crossData is not empty
+        if (Object.keys(crossData).length > 0) {
+            document.getElementById('maleUniqueID').value = crossData.maleUniqueID;
+            document.getElementById('femaleUniqueID').value = crossData.femaleUniqueID;
+            document.getElementById('vialLifetime').value = crossData.vialLifetime;
+            document.getElementById('flipFrequency').value = crossData.flipFrequency;
+            document.getElementById('developmentalTime').value = crossData.developmentalTime;
+            
+            // Remove any existing tags
+            tagifyMaleGenotype.removeAllTags();
+            tagifyMaleGenotype.addTags([crossData.maleGenotype]);
+            tagifyFemaleGenotype.removeAllTags();
+            tagifyFemaleGenotype.addTags([crossData.femaleGenotype]);
+
+            // set the status dropdown
+            const statusDropdown = document.getElementById('status');
+            for (let i = 0; i < statusDropdown.options.length; i++) {
+                if (statusDropdown.options[i].value === crossData.status) {
+                    statusDropdown.selectedIndex = i;
+                    break;
+                }
+            }
+
+            // Remove any existing tags on food type
+            tagifyFoodType.removeAllTags();
+            tagifyFoodType.addTags([crossData.foodType]);
+
+            document.getElementById('name').value = crossData.name;
+            document.getElementById('comments').value = crossData.comments;
+        }
     });
 </script>
 {% endblock %}

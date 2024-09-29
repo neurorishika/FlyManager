@@ -136,6 +136,10 @@ function viewDetails(uniqueId) {
     window.open('/view_cross/' + uniqueId, '_blank');
 }
 
+function duplicateCross(uniqueId) {
+    window.open('/add_cross/' + uniqueId, '_blank');
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     updateCart();
 });

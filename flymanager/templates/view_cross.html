@@ -1,0 +1,338 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center">Cross Viewer</h1>
+
+    {% if error %}
+    <div class="alert alert-danger" role="alert">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/view_cross/{{ cross_data.uniqueID }}">
+        <!-- Row 1: Male Unique ID and Genotype -->
+        <div class="form-row">
+            <div class="form-group col-md-3">
+                <label for="maleUniqueID">Male Unique ID:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="maleUniqueID" name="maleUniqueID" disabled>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-9">
+                <label for="maleGenotype">Male Genotype:</label>
+                <div class="input-group">
+                    <input type="text" id="maleGenotype" name="maleGenotype" class="form-control tag-input" disabled>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: Female Unique ID and Genotype -->
+        <div class="form-row">
+            <div class="form-group col-md-3">
+                <label for="femaleUniqueID">Female Unique ID:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="femaleUniqueID" name="femaleUniqueID" disabled>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-9">
+                <label for="femaleGenotype">Female Genotype:</label>
+                <div class="input-group">
+                    <input type="text" id="femaleGenotype" name="femaleGenotype" class="form-control tag-input" disabled>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3: Tray ID, Tray Position, and Status -->
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="trayID">Tray ID:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="trayID" name="trayID" disabled>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="trayPosition">Tray Position:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="trayPosition" name="trayPosition" disabled>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="status">Status:</label>
+                <div class="input-group">
+                    <select class="form-control" id="status" name="status" required disabled>
+                        <option value="Healthy">Healthy</option>
+                        <option value="Showing Issues">Showing Issues</option>
+                        <option value="Needs refresh">Needs refresh</option>
+                        <option value="Ordered">Ordered</option>
+                        <option value="No longer maintained">No longer maintained</option>
+                    </select>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4: Food Type and Cross Name -->
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label for="foodType">Food Type:</label>
+                <div class="input-group">
+                    <input type="text" id="foodType" name="foodType" class="form-control tag-input" disabled>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-6">
+                <label for="name">Cross Name:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="name" name="name" disabled>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5: Comments -->
+        <div class="form-group">
+            <label for="comments">Comments:</label>
+            <div class="input-group">
+                <textarea class="form-control" id="comments" name="comments" rows="3" disabled></textarea>
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 6: Vial Lifetime, Flip Frequency and Developmental Time -->
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="vialLifetime">Vial Lifetime (days):</label>
+                <div class="input-group">
+                    <input type="number" class="form-control" id="vialLifetime" name="vialLifetime">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="flipFrequency">Flip Frequency (days):</label>
+                <div class="input-group">
+                    <input type="number" class="form-control" id="flipFrequency" name="flipFrequency">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="developmentalTime">Mating->Virgin Adult (days):</label>
+                <div class="input-group">
+                    <input type="number" class="form-control" id="developmentalTime" name="developmentalTime">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 7: Creation Date, Last Flip Date, Currently Alive Vials -->
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="creationDate">Creation Date:</label>
+                <input type="text" class="form-control" id="creationDate" name="creationDate" disabled>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="lastFlipDate">Last Flip Date:</label>
+                <input type="text" class="form-control" id="lastFlipDate" name="lastFlipDate" disabled>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="currentlyAliveVials">Currently Alive Vials:</label>
+                <input type="text" class="form-control" id="currentlyAliveVials" name="currentlyAliveVials" disabled>
+            </div>
+        </div>
+
+        <!-- Row 8: Flip Log, Next Flip Dates, Next Eclosion Dates -->
+        <div class="form-group">
+            <div class="form-row">
+                <div class="form-group col-md-4">
+                    <label for="flipLog">Flip Log:</label>
+                    <textarea class="form-control" id="flipLog" name="flipLog" rows="7" disabled></textarea>
+                </div>
+                <div class="form-group col-md-4">
+                    <label for="nextFlipDates">Next Flip Dates:</label>
+                    <textarea class="form-control" id="nextFlipDates" name="nextFlipDates" rows="7" disabled></textarea>
+                </div>
+                <div class="form-group  col-md-4">
+                    <label for="nextEclosionDates">Next Eclosion Dates:</label>
+                    <textarea class="form-control" id="nextEclosionDates" name="nextEclosionDates" rows="7" disabled></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="dataModifiedDate">Data Modified Date:</label>
+            <input type="text" class="form-control" id="dataModifiedDate" name="dataModifiedDate" disabled>
+        </div>
+
+        <div class="form-group">
+            <label for="modificationLog">Modification Log:</label>
+            <textarea class="form-control" id="modificationLog" name="modificationLog" rows="3" disabled></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-success btn-block">Save Changes</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.polyfills.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+
+    const crossData = {{ cross_data | tojson }};
+    
+    // Initialize Tagify for Male and Female Genotypes
+    let tagifyMaleGenotype = new Tagify(document.querySelector('#maleGenotype'), {
+        whitelist: {{ genotypes | tojson }},
+        maxTags: 1,
+        readonly: true,
+        delimiters: null
+    });
+
+    let tagifyFemaleGenotype = new Tagify(document.querySelector('#femaleGenotype'), {
+        whitelist: {{ genotypes | tojson }},
+        maxTags: 1,
+        readonly: true,
+        delimiters: null
+    });
+
+    let tagifyFoodType = new Tagify(document.querySelector('#foodType'), {
+        whitelist: {{ food_types | tojson }},
+        maxTags: 1,
+        readonly: true
+    });
+
+    // Disable all input fields by default
+    document.querySelectorAll('input, textarea, select').forEach(input => {
+        input.disabled = true;
+    });
+
+    // Populate the form with cross data
+    if (Object.keys(crossData).length > 0) {
+        document.getElementById('maleUniqueID').value = crossData.maleUniqueID;
+        document.getElementById('femaleUniqueID').value = crossData.femaleUniqueID;
+        document.getElementById('trayID').value = crossData.trayID;
+        document.getElementById('trayPosition').value = crossData.trayPosition;
+        document.getElementById('name').value = crossData.name;
+        document.getElementById('vialLifetime').value = crossData.vialLifetime;
+        document.getElementById('flipFrequency').value = crossData.flipFrequency;
+        document.getElementById('developmentalTime').value = crossData.developmentalTime;
+        document.getElementById('comments').value = crossData.comments;
+        document.getElementById('creationDate').value = crossData.creationDate;
+        document.getElementById('lastFlipDate').value = crossData.lastFlipDate;
+        document.getElementById('currentlyAliveVials').value = crossData.currentlyAliveVials;
+        document.getElementById('flipLog').value = crossData.flipLog;
+        document.getElementById('nextFlipDates').value = crossData.nextFlipDates;
+        document.getElementById('nextEclosionDates').value = crossData.nextEclosionDates;
+        document.getElementById('dataModifiedDate').value = crossData.dataModifiedDate;
+        document.getElementById('modificationLog').value = crossData.modificationLog;
+
+        // Set the status dropdown value
+        const statusSelect = document.getElementById('status');
+        for (let i = 0; i < statusSelect.options.length; i++) {
+            if (statusSelect.options[i].value === crossData.status) {
+                statusSelect.selectedIndex = i;
+                break;
+            }
+        }
+
+        // Populate genotypes for Male and Female
+        tagifyMaleGenotype.removeAllTags();
+        tagifyMaleGenotype.addTags([crossData.maleGenotype]);
+        tagifyFemaleGenotype.removeAllTags();
+        tagifyFemaleGenotype.addTags([crossData.femaleGenotype]);
+
+        // Populate food type
+        tagifyFoodType.removeAllTags();
+        tagifyFoodType.addTags([crossData.foodType]);
+    }
+
+    // Make fields editable when "Edit" button is clicked
+    const editButtons = document.querySelectorAll('.input-group-append button');
+    editButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const inputField = this.closest('.input-group').querySelector('input, textarea, select');
+
+            if (inputField && inputField.classList.contains('tag-input')) {
+                inputField.disabled = false;  // Enable Tagify input fields
+                if (inputField.id === 'maleGenotype') {
+                    tagifyMaleGenotype.destroy();
+                    tagifyMaleGenotype = new Tagify(inputField, {
+                        whitelist: {{ genotypes | tojson }},
+                        maxTags: 1,
+                        readonly: false
+                    });
+                    
+                } else if (inputField.id === 'femaleGenotype') {
+                    tagifyFemaleGenotype.destroy();
+                    tagifyFemaleGenotype = new Tagify(inputField, {
+                        whitelist: {{ genotypes | tojson }},
+                        maxTags: 1,
+                        readonly: false
+                    });
+                    
+                } else if (inputField.id === 'foodType') {
+                    tagifyFoodType.destroy();
+                    tagifyFoodType = new Tagify(inputField, {
+                        whitelist: {{ food_types | tojson }},
+                        maxTags: 1,
+                        readonly: false
+                    });
+                }
+        
+            } else {
+                inputField.disabled = false;  // Enable normal input fields
+            }
+
+            this.disabled = true;  // Disable the "Edit" button
+        });
+    });
+
+    // Confirm before submitting the form
+    document.querySelector('form').addEventListener('submit', function(event) {
+        if (!confirm('Are you sure you want to submit the changes?')) {
+            event.preventDefault();  // Prevent form submission if user cancels
+        } else {
+            // Re-enable all input fields before submitting
+            document.querySelectorAll('input, textarea, select').forEach(input => {
+                input.disabled = false;
+            });
+        }
+    });
+});
+</script>
+{% endblock %}
