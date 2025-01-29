@@ -1,10 +1,11 @@
 import os
+import math
 from pymongo import MongoClient
 from dotenv import load_dotenv
 import datetime
 from hashlib import shake_256
 from flymanager.utils.genetics import qc_genotype
-from flymanager.utils.utils import clean_log_entry
+from flymanager.utils.utils import clean_log_entry, day_str_to_num
 
 
 # Load environment variables from .env file
@@ -199,15 +200,31 @@ def get_user_initials(user, db):
 
 def get_user_flip_days(user, db):
     """
-    Get the preferred flip days of the user
+    Get the preferred flip days of the user from the database.
+    Parameters:
+    user: str
+        The username of the user.
+    db: pymongo.database.Database
+        The MongoDB database instance.
+    Returns:
+    list
+        A list of the preferred flip days of the user
+    """
+    users_collection = db['users']
+    user_document = users_collection.find_one({"Username": user})
+    return user_document.get("FlipDays").split(',') if user_document else []
+
+def get_user_email(user, db):
+    """
+    Get the email of the user
     Parameters:
     user: str
         the username of the user
     db: pymongo.database.Database
         the MongoDB database instance
     Returns:
-    flip_days: list
-        the preferred flip days of the user
+    email: str
+        the email of the user
     """
     users_collection = db['users']
     
@@ -215,7 +232,7 @@ def get_user_flip_days(user, db):
     user_document = users_collection.find_one({"Username": user})
     
     if user_document:
-        return user_document.get("FlipDays")
+        return user_document.get("Email")
     else:
         return None
 
@@ -684,7 +701,7 @@ def update_stock_vials(stock, username, db):
         last_flip_date = last_flip_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
         # remove all next flip dates that are before the last flip date + 1 day to account for early flips
-        next_flip_dates = [date for date in next_flip_dates if date > last_flip_date + datetime.timedelta(days=1)]
+        next_flip_dates = [date for date in next_flip_dates if date > last_flip_date + datetime.timedelta(days=math.floor(flipFrequency//2))]
 
 
         # define the currently alive vials
@@ -693,13 +710,19 @@ def update_stock_vials(stock, username, db):
         next_flip_dates = ", ".join([date.strftime('%Y-%m-%d') for date in next_flip_dates])
         # define the next eclosion dates
         next_eclosion_dates = ", ".join([date.strftime('%Y-%m-%d') for date in next_eclosion_dates])
+        
         # update the stock
         update_properties = {
             "FlipLog":flipLog,
             "CurrentlyAliveVials":currently_alive_vials,
             "NextFlipDates":next_flip_dates,
-            "NextEclosionDates":next_eclosion_dates
+            "NextEclosionDates":next_eclosion_dates,
         }
+
+        # check if currently alive vials is empty
+        if currently_alive_vials == "":
+            update_properties["Status"] = "No longer maintained"
+
         # edit the stock
         success = edit_stock(username, uid, db, update_properties, log_activity=False)
         
@@ -754,7 +777,7 @@ def update_stock_vials(stock, username, db):
         last_flip_date = last_flip_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
         # remove all next flip dates that are before the last flip date + 1 day to account for early flips
-        next_flip_dates = [date for date in next_flip_dates if date > last_flip_date + datetime.timedelta(days=1)]
+        next_flip_dates = [date for date in next_flip_dates if date > last_flip_date + datetime.timedelta(days=math.floor(flipFrequency//2))]
         
         # define the currently alive vials
         currently_alive_vials = ", ".join(currently_alive_vials)
@@ -768,6 +791,11 @@ def update_stock_vials(stock, username, db):
             "NextFlipDates":next_flip_dates,
             "NextEclosionDates":next_eclosion_dates
         }
+
+        # check if currently alive vials is empty
+        if currently_alive_vials == "":
+            update_properties["Status"] = "No longer maintained"
+
         # edit the stock
         success = edit_stock(username, uid, db, update_properties, log_activity=False, refresh_vials=False)
     return success
@@ -820,6 +848,7 @@ def add_to_cross(user, properties, db):
     assert "VialLifetime" in properties, "VialLifetime is required"
     assert "FlipFrequency" in properties, "FlipFrequency is required"
     assert "DevelopmentalTime" in properties, "DevelopmentalTime is required"
+    assert "MaxCrossLifetime" in properties, "MaxCrossLifetime is required"
 
     # Create a UniqueID for the cross based on Male and Female UniqueID + User + Name
     uid = str(user) + str(properties["MaleUniqueID"]) + str(properties["FemaleUniqueID"]) + str(properties["Name"])
@@ -848,11 +877,14 @@ def add_to_cross(user, properties, db):
         "VialLifetime": properties["VialLifetime"],
         "FlipFrequency": properties["FlipFrequency"],
         "DevelopmentalTime": properties["DevelopmentalTime"],
+        "MaxCrossLifetime": properties["MaxCrossLifetime"],
         "Status": properties["Status"],
         "Comments": properties.get("Comments", ""),
         "CreationDate": timestamp,
         "DataModifiedDate": timestamp,
-        "ModificationLog": f"{timestamp} : Cross created"
+        "ModificationLog": f"{timestamp} : Cross created",
+        "LastFlipDate": timestamp,
+        "FlipLog": timestamp,
     }
 
     # Insert the document into the MongoDB collection
@@ -1079,21 +1111,31 @@ def update_cross_vials(cross, username, db):
     """
     uid = cross["UniqueID"]
 
+    assert "MaxCrossLifetime" in cross, "MaxCrossLifetime is required"
+    assert "FlipLog" in cross, "FlipLog is required"
+    assert "VialLifetime" in cross, "VialLifetime is required"
+    assert "FlipFrequency" in cross, "FlipFrequency is required"
+    assert "DevelopmentalTime" in cross, "DevelopmentalTime is required"
+    
     # check if the cross doesnt have the key "CurrentlyAliveVials"
     if "CurrentlyAliveVials" not in cross:
-        assert all([x in cross for x in ["FlipLog","VialLifetime","FlipFrequency","DevelopmentalTime"]]), "Stock must have the keys FlipLog, VialLifetime, and FlipFrequency"
         
         # get the cross details
         flipLog = cross["FlipLog"]
         vialLifetime = float(cross["VialLifetime"])
         flipFrequency = float(cross["FlipFrequency"])
         developmentalTime = float(cross["DevelopmentalTime"])
+        maxCrossLifetime = float(cross["MaxCrossLifetime"])
+
         # split the flip log into a list by ";"
         flipLog = flipLog.split(";")
         _, flip_dates = zip(*[clean_log_entry(flip) for flip in flipLog])
 
         # reverse the order of the vials and dates
         flip_dates = flip_dates[::-1]
+
+        # get the first flip date
+        first_flip_date = flip_dates[0]
             
         vials = ["V{}".format(i) for i in range(1,len(flip_dates)+1)]
         next_flip_dates = [date+datetime.timedelta(days=flipFrequency) for date in flip_dates]
@@ -1129,8 +1171,11 @@ def update_cross_vials(cross, username, db):
         last_flip_date = last_flip_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
         # remove all next flip dates that are before the last flip date + 1 day to account for early flips
-        next_flip_dates = [date for date in next_flip_dates if date > last_flip_date + datetime.timedelta(days=1)]
+        next_flip_dates = [date for date in next_flip_dates if date > last_flip_date + datetime.timedelta(days=math.floor(flipFrequency//2))]
         
+        # remove all next flip dates that are after the max cross lifetime from the first flip date
+        next_flip_dates = [date for date in next_flip_dates if date <= first_flip_date + datetime.timedelta(days=maxCrossLifetime)]
+
         # define the currently alive vials
         currently_alive_vials = ", ".join(currently_alive_vials)
         # define the next flip dates
@@ -1144,6 +1189,11 @@ def update_cross_vials(cross, username, db):
             "NextFlipDates":next_flip_dates,
             "NextEclosionDates":next_eclosion_dates
         }
+
+        # check if currently alive vials is empty
+        if currently_alive_vials == "":
+            update_properties["Status"] = "No longer maintained"
+
         # edit the cross
         success = edit_cross(username, uid, db, update_properties, log_activity=False)
         
@@ -1151,6 +1201,11 @@ def update_cross_vials(cross, username, db):
         # get all flip dates
         flipLog = cross["FlipLog"]
         flipLog = flipLog.split(";")
+
+        # get the first flip date
+        first_flip_date = clean_log_entry(flipLog[-1])[1]
+
+        # create a dictionary of vials and their flip dates
         date_map = {}
         flip_dates = []
         for flip in flipLog:
@@ -1168,7 +1223,9 @@ def update_cross_vials(cross, username, db):
         # get the next eclosion dates
         developmentalTime = float(cross["DevelopmentalTime"])
         next_eclosion_dates = [date+datetime.timedelta(days=developmentalTime) for date in dates]
-
+        # get the max cross lifetime
+        maxCrossLifetime = float(cross["MaxCrossLifetime"])
+        
         # remove HH:MM:SS from the dates
         flip_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in flip_dates]
         next_flip_dates = [date.replace(hour=0, minute=0, second=0, microsecond=0) for date in next_flip_dates]
@@ -1196,8 +1253,11 @@ def update_cross_vials(cross, username, db):
         last_flip_date = last_flip_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
         # remove all next flip dates that are before the last flip date  + 1 day to account for early flips
-        next_flip_dates = [date for date in next_flip_dates if date > last_flip_date + datetime.timedelta(days=1)]
+        next_flip_dates = [date for date in next_flip_dates if date > last_flip_date + datetime.timedelta(days=math.floor(flipFrequency//2))]
         
+        # remove all next flip dates that are after the max cross lifetime from the first flip date
+        next_flip_dates = [date for date in next_flip_dates if date <= first_flip_date + datetime.timedelta(days=maxCrossLifetime)]
+
         # define the currently alive vials
         currently_alive_vials = ", ".join(currently_alive_vials)
         # define the next flip dates
@@ -1210,6 +1270,11 @@ def update_cross_vials(cross, username, db):
             "NextFlipDates":next_flip_dates,
             "NextEclosionDates":next_eclosion_dates
         }
+
+        # check if currently alive vials is empty
+        if currently_alive_vials == "":
+            update_properties["Status"] = "No longer maintained"
+            
         # edit the cross
         success = edit_cross(username, uid, db, update_properties, log_activity=False, refresh_vials=False)
     return success
@@ -1336,8 +1401,70 @@ def edit_metadata(metadata_type, old_value, new_value, db):
 
     return result.matched_count > 0
 
+### Flip related functions
+
+# Function to group stocks/crosses by date
+def get_flip_schedule(user, db):
+    """
+    Get a date-by-date schedule for which stocks and crosses need to be flipped, including tray info and links.
+
+    Parameters:
+    user (str): The username of the current user.
+    db (MongoClient): The database instance.
+
+    Returns:
+    dict: A dictionary where the keys are dates and the values are lists of stocks/crosses to flip on those dates.
+    """
+    # Retrieve user's stocks and crosses
+    stocks = db['stocks'].find({"User": user})
+    crosses = db['crosses'].find({"User": user})
+
+    # Remove ones with Status = "No longer maintained"
+    stocks = [stock for stock in stocks if stock["Status"] != "No longer maintained"]
+    crosses = [cross for cross in crosses if cross["Status"] != "No longer maintained"]
+
+    # Sort stocks and crosses by TrayID and TrayPosition
+    stocks = sorted(stocks, key=lambda x: (x["TrayID"], int(x["TrayPosition"]) if x["TrayPosition"]!='' else 0))
+    crosses = sorted(crosses, key=lambda x: (x["TrayID"], int(x["TrayPosition"]) if x["TrayPosition"]!='' else 0))
+
+    # Get user's preferred flip days
+    flip_days = get_user_flip_days(user, db)
+
+    # Initialize a schedule dictionary where each key is a date and value is a list of stocks/crosses
+    schedule = {}
+
+    # Process stocks
+    for stock in stocks:
+        next_flip_dates = stock['NextFlipDates'].split(', ')
+        for next_flip_date in next_flip_dates:
+            closest_flip_day = find_closest_flip_day(next_flip_date, flip_days)
+            if closest_flip_day:
+                flip_date_str = closest_flip_day.strftime('%Y-%m-%d')
+                tray_info = f"{stock['TrayID']} - {stock['TrayPosition']}"
+                link = f"<a href='/view_stock/{stock['UniqueID']}'>{stock['Name']}</a>"
+                schedule.setdefault(flip_date_str, []).append(f"Stock: {link} (ID: {stock['UniqueID']}, {tray_info})")
+            else:
+                print(f"No valid flip day found for stock {stock['UniqueID']} on {next_flip_date}")
+    
+    # Process crosses
+    for cross in crosses:
+        next_flip_dates = cross['NextFlipDates'].split(', ')
+        for next_flip_date in next_flip_dates:
+            closest_flip_day = find_closest_flip_day(next_flip_date, flip_days)
+            if closest_flip_day:
+                flip_date_str = closest_flip_day.strftime('%Y-%m-%d')
+                tray_info = f"{cross['TrayID']} - {cross['TrayPosition']}"
+                link = f"<a href='/view_cross/{cross['UniqueID']}'>{cross['Name']}</a>"
+                schedule.setdefault(flip_date_str, []).append(f"Cross: {link} (ID: {cross['UniqueID']}, {tray_info})")
+
+    # Sort the schedule by date
+    sorted_schedule = dict(sorted(schedule.items()))
+
+    return sorted_schedule
+
 ### Special Utility Functions
 
+# Get the flip in for a stock or cross
 def get_flip_in(item):
     """
     Get the flip in for a stock or cross.
@@ -1352,6 +1479,7 @@ def get_flip_in(item):
             vals.append("N/A")
     return ", ".join([str(val) for val in vals]) + " days"
 
+# Get the eclosion in for a stock or cross
 def get_eclosion_in(item):
     """
     Get the eclosion in for a stock or cross.
@@ -1365,3 +1493,74 @@ def get_eclosion_in(item):
         except:
             vals.append("N/A")
     return ", ".join([str(val) for val in vals]) + " days"
+
+# Function to find the closest flip day
+def find_closest_flip_day(next_flip_date, flip_days, debug=False):
+    """
+    Find the closest preferred flip day to the next flip date.
+
+    Parameters:
+    next_flip_date (datetime or str): The next flip date.
+    flip_days (list): List of user's preferred flip days in string format like ["Mo", "We", "Fr"].
+
+    Returns:
+    datetime: The closest flip date based on user's preferred days or None if no valid day is found.
+    """
+
+    # Convert preferred flip days from string to day numbers (0 = Monday, ..., 6 = Sunday)
+    preferred_days = [day_str_to_num(day) for day in flip_days]
+
+    # if next_flip_date is empty, return None
+    if not next_flip_date:
+        return None
+
+    # Convert next flip date to datetime if it's a string
+    next_flip_date = datetime.datetime.strptime(next_flip_date, "%Y-%m-%d")
+    
+    assert isinstance(next_flip_date, datetime.datetime), "next_flip_date must be a datetime object"
+
+    # Get the day of the week for the next flip date (0 = Monday, ..., 6 = Sunday)
+    next_flip_day = next_flip_date.weekday()
+
+    # if the current day is a preferred flip day, return the next flip date
+    if next_flip_day in preferred_days:
+        return next_flip_date
+
+    # order the preferred days starting from the next flip day
+    preferred_days = sorted(preferred_days, key=lambda x: (x - next_flip_day) % 7)
+
+    if debug:
+        print(f"Next flip date: {next_flip_date}, Next flip day: {next_flip_day}, Preferred days: {preferred_days}")
+
+    # Initialize variables for the closest day
+    closest_day = None
+    min_diff = float('inf')
+
+    # Check preferred flip days to find the closest valid one
+    for preferred_day in preferred_days:
+        # Calculate the difference in days (can only be one day before or up to two days after)
+        diff_forward = (preferred_day - next_flip_day + 7) % 7  # Days after the next flip date
+        diff_backward = (next_flip_day - preferred_day + 7) % 7  # Days before the next flip date
+
+        if debug:
+            print(f"Preferred day: {preferred_day}, Forward diff: {diff_forward}, Backward diff: {diff_backward}")
+
+        if diff_forward <= 2:  # Check for days up to two days after
+            if diff_forward < min_diff:
+                min_diff = diff_forward
+                closest_day = preferred_day
+
+        if diff_backward == 1:  # Check for exactly one day before
+            if diff_backward < min_diff:
+                min_diff = diff_backward
+                closest_day = preferred_day
+
+    # If a closest day is found, calculate the date for that day
+    if closest_day is not None:
+        if min_diff <= 2:
+            days_ahead = (closest_day - next_flip_day + 7) % 7
+            closest_flip_date = next_flip_date + datetime.timedelta(days=days_ahead)
+            return closest_flip_date
+
+    # If no valid day is found, return the original next flip date
+    return next_flip_date

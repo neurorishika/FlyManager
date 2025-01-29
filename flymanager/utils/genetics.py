@@ -1,5 +1,7 @@
 # Description: This file contains functions for fly genetics.
 
+import numpy as np
+from itertools import product
 import requests
 import pandas as pd
 
@@ -96,6 +98,7 @@ def get_stock_genotype(stock_id):
         return None, error
     return genotype, None
 
+# Function to check if the genotype is in the correct format
 def qc_genotype(genotype):
     """
     Check if the genotype is in the correct format.
@@ -128,15 +131,27 @@ def qc_genotype(genotype):
 
     return True, genotype
 
-def get_genetic_components(genotype):
+# Function to get the genetic components from the genotype
+def get_genetic_components(genotype, sex):
     """
     Get the chromosomes from the genotype.
     """
+    assert sex in ["male","female"], "Sex must be either male or female"
     chromosomes = genotype.split(";")
     chromosomes = [x.strip() for x in chromosomes]
     # for each chromosome, get the alleles
     components = []
-    for chr in chromosomes:
+    # handle the X chromosome
+    if chromosomes[0] == "":
+        components.append(["+", "+"] if sex == "female" else ["+","0"])
+    else:
+        if chromosomes[0].count("/") == 1:
+            chromosomes[0] = chromosomes[0].split("/")
+            chromosomes[0].sort()
+            components.append([chromosomes[0][0], chromosomes[0][1]] if sex == "female" else ["[" + "or".join(chromosomes[0]) + "]", "0"])
+        else:
+            components.append([chromosomes[0], chromosomes[0]] if sex == "female" else [chromosomes[0], "0"])
+    for chr in chromosomes[1:]:
         if chr.count("/") == 1:
             alleles = chr.split("/")
             alleles.sort()
@@ -147,4 +162,82 @@ def get_genetic_components(genotype):
             components.append([chr if chr != "" else "+", chr if chr != "" else "+"])
     return components
 
+# Function to get the genotype from the genetic components
+def get_genotype_from_components(components):
+    """
+    Convert genetic components back into a genotype string, inferring sex from the X chromosome.
+    If both alleles are '+', the field will be left empty (for homozygous '+' cases).
+    """
+    # Prepare the list to store chromosomes
+    genotype = []
+
+    sex = "female"
+    
+    # Handle the X chromosome (infer sex from the first chromosome component)
+    x_chromosome = components[0]
+    if "0" in x_chromosome:
+        # Male case (X0), one of the X alleles is "0"
+        # append the other allele
+        genotype.append(x_chromosome[0] if x_chromosome[0] != "0" else x_chromosome[1])
+        sex = "male"
+
+    else:
+        # Female case (XX or heterozygous X chromosomes)
+        if x_chromosome[0] == x_chromosome[1]:
+            # Homozygous X chromosome case
+            genotype.append(x_chromosome[0] if x_chromosome[0] != "+" else "")
+        else:
+            # Heterozygous X chromosomes case
+            x_chromosome.sort()  # Sort to maintain consistency
+            genotype.append("/".join(x_chromosome))
+    
+    # Handle the autosomal chromosomes
+    for chr_components in components[1:]:
+        if chr_components[0] == chr_components[1]:
+            # Homozygous case (e.g., both alleles are the same)
+            # Leave empty if both are '+'
+            genotype.append("" if chr_components[0] == "+" else chr_components[0])
+        else:
+            # Heterozygous case (e.g., different alleles)
+            chr_components.sort()  # Ensure the alleles are sorted alphabetically
+            genotype.append("/".join(chr_components))
+    
+    # Join the chromosomes with "; " and return the genotype string
+    return qc_genotype("; ".join(genotype))[1], sex
+
+# Function to sort the alleles in each chromosome pair alphabetically
+def sort_components_alphabetically(t):
+    """
+    Sort the alleles in each chromosome pair alphabetically.
+    """
+    return [list(sorted(x)) for x in t]
+
+# Function to cross two genotypes
+def cross_genotypes(male_genotype,female_genotype):
+    """
+    Cross two genotypes.
+    """
+    male_components = get_genetic_components(qc_genotype(male_genotype)[1],"male")
+    female_components = get_genetic_components(qc_genotype(female_genotype)[1],"female")
+    # get all possible combinations of chromosomes for each chromosome pair
+    combinations = [sort_components_alphabetically(list(product(m,f))) for m,f in zip(male_components,female_components)]
+    # get all possible combinations of chromosomes
+    combinations = list(product(*combinations))
+    # convert the combinations into genotypes
+    genotypes = ["|".join(get_genotype_from_components(list(comb))) for comb in combinations]
+    # get the unique genotypes along with probabilities
+    genotypes, counts = np.unique(genotypes, return_counts=True)
+    probabilities = counts/np.sum(counts)
+    # sort the genotypes by probability AND alphabetically
+    indices = np.lexsort((genotypes,probabilities))[::-1]
+    genotypes = genotypes[indices]
+    probabilities = probabilities[indices]
+    
+    # indices = np.argsort(probabilities)[::-1]
+    # genotypes = genotypes[indices]
+    # probabilities = probabilities[indices]
+    # convert back to [genotype, sex, probability] format
+    combinations = [[genotype.split("|")[0],genotype.split("|")[1],probability] for genotype,probability in zip(genotypes,probabilities)]
+
+    return combinations
     

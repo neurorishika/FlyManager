@@ -165,3 +165,6 @@ directory.path
 
 # Mac OS
 **/.DS_Store
+
+# generated labels
+flymanager/static/generated_labels/*

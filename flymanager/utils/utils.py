@@ -57,3 +57,16 @@ def clean_log_entry(entry):
         except:
             date = datetime.datetime.strptime(entry.split(",")[1].strip(), "%Y-%m-%d %H:%M:%S")
         return vial, date
+
+# Helper function to map day strings to numbers
+def day_str_to_num(day_str):
+    day_map = {
+        "Mo": 0,  # Monday
+        "Tu": 1,  # Tuesday
+        "We": 2,  # Wednesday
+        "Th": 3,  # Thursday
+        "Fr": 4,  # Friday
+        "Sa": 5,  # Saturday
+        "Su": 6   # Sunday
+    }
+    return day_map.get(day_str)

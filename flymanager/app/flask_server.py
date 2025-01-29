@@ -10,17 +10,22 @@
 
 # external imports
 from datetime import datetime
-from flask import Flask, jsonify, render_template, request, redirect, Response, session, jsonify, send_file, flash, url_for
-from werkzeug.utils import secure_filename
 import io
-from flask_cors import CORS
-from flask_session import Session
-from flask_socketio import SocketIO, emit
-from fuzzywuzzy import fuzz
 import hashlib
 import os
 import serial
 import threading
+
+# flask imports
+from flask import Flask, jsonify, render_template, request, redirect, Response, session, jsonify, send_file, flash, url_for
+from flask_cors import CORS
+from flask_session import Session
+from flask_socketio import SocketIO, emit
+from flask_apscheduler import APScheduler
+from flask_mail import Mail, Message
+
+from fuzzywuzzy import fuzz
+from werkzeug.utils import secure_filename
 
 # internal imports
 from flymanager.utils.mongo import *
@@ -36,7 +41,9 @@ load_dotenv()
 
 
 ### TEMPORARY PARAMETERS (THESE WILL BECOME CONFIGURABLE) ###
-MIN_FLIP_DIFFERENCE = 30*60  # 30 minutes
+MIN_FLIP_DIFFERENCE = 12*60*60  # 12 hours
+
+
 
 # define the allowed file extensions
 ALLOWED_EXTENSIONS = {'xlsx'}
@@ -75,6 +82,109 @@ socketio = SocketIO(app)
 
 # enable CORS
 CORS(app)
+
+# Configuration for Flask-Mail
+app.config.update(
+    MAIL_SERVER=os.getenv("SMTP_SERVER"),
+    MAIL_PORT=int(os.getenv("SMTP_PORT")),
+    MAIL_USE_TLS=True,
+    MAIL_USE_SSL=False,
+    MAIL_USERNAME=os.getenv("SMTP_USERNAME"),
+    MAIL_PASSWORD=os.getenv("SMTP_PASSWORD"),
+    MAIL_DEFAULT_SENDER=os.getenv("SMTP_SENDER")
+)
+
+# initialize the mail server and the scheduler
+scheduler = APScheduler()
+mail = Mail(app)
+
+### SCHEDULED TASKS ###
+def send_flip_reminder(username, db, email_service):
+    """
+    Send an email reminder to the user about today's flip schedule and any overdue flips.
+    """
+    today = datetime.datetime.now().strftime('%Y-%m-%d')
+    schedule = get_flip_schedule(username, db)
+
+    # extract overdue flips from the schedule
+    overdue_flips = []
+    for date, items in schedule.items():
+        if date < today:
+            overdue_flips.extend(items)
+
+    # extract today's flips from the schedule
+    today_schedule = schedule.get(today, [])
+
+    # get the number of vials that need to be flipped today
+    num_vials = len(today_schedule) + len(overdue_flips)
+
+    if num_vials == 0:
+        print(f"No flips scheduled for {today} for {username}")
+        return
+    
+    # Compose the email subject
+    if overdue_flips:
+        email_subject = f"URGENT: Overdue Flips and Today's Flip Reminder for {today}"
+    else:
+        email_subject = f"Daily Flip Reminder for {today}"
+    
+    # Start composing the email body with HTML
+    email_body = f"<html><body>"
+    
+    # Add overdue flips at the top in red if they exist
+    if overdue_flips:
+        email_body += "<h3 style='color: red;'>Overdue Flips:</h3><ul>"
+        for overdue_item in overdue_flips:
+            email_body += f"<li style='color: red;'>{overdue_item}</li>"
+        email_body += "</ul><br>"
+    else:
+        email_body += "<p>No overdue flips.</p><br>"
+    
+    # Add today's flip schedule
+    email_body += f"<h3>Flip Schedule for {today}:</h3><ul>"
+    
+    if today_schedule:
+        for item in today_schedule:
+            email_body += f"<li>{item}</li>"
+    else:
+        email_body += "<p>No flips scheduled for today.</p>"
+
+    # Close the HTML body
+    email_body += "</ul></body></html>"
+    
+    # Send the email
+    user_email = get_user_email(username, db)
+    
+    # Use Flask-Mail to send the email
+    msg = Message(subject=email_subject, recipients=[user_email], html=email_body)
+    try:
+        email_service.send(msg)
+    except Exception as e:
+        print(f"Failed to send email to {username}: {e}")
+
+# Scheduler job to send the daily flip reminder to all users
+def daily_flip_reminder():
+    """
+    Scheduled task to send flip reminders every day to all users.
+    """
+    with app.app_context():
+        # Get a list of all users from the database
+        all_users = get_all_users(db)
+        
+        # Loop over each user and send the flip reminder email
+        for username in all_users.keys():
+            send_flip_reminder(username, db, mail)  # Pass the mail instance for email sending
+
+# Add scheduled job to send email reminders every day at 8:00 AM
+scheduler.add_job(id='daily_flip_reminder', func=daily_flip_reminder, trigger='cron', hour=8, minute=0)
+
+# Start the scheduler
+scheduler.start()
+
+@app.route('/test_send_reminder')
+def test_send_reminder():
+    daily_flip_reminder()  # Manually call the function
+    return "Test reminder sent!"
 
 # define a route for the default URL
 @app.route('/')
@@ -212,6 +322,24 @@ def stock():
     # add FlipIn and EclosesIn fields
     for stock in stocks:
         stock['FlipIn'] = get_flip_in(stock)
+
+        day_value = stock['FlipIn'].split(' ')[0].split(',')[0].strip()
+        day_value = int(day_value) if day_value != 'N/A' else -999
+
+        # process the FlipIn field
+        if day_value == -999:
+            stock['FlipIn'] = 'No Flip'
+            stock['FlipInColor'] = '#ffcce0'
+        elif day_value < 0:
+            stock['FlipIn'] = 'Overdue'
+            stock['FlipInColor'] = '#f25567'
+        elif day_value < 1:
+            stock['FlipIn'] = 'Flip today'
+            stock['FlipInColor'] = '#fca15b'
+        else:
+            stock['FlipIn'] = 'Flip in {} day{}'.format(day_value, 's' if day_value > 1 else '')
+            stock['FlipInColor'] = '#66fa78'
+        
         stock['EclosesIn'] = get_eclosion_in(stock)
 
     # Extract unique values for filtering
@@ -389,7 +517,7 @@ def add_stock(unique_id=None):
 
         # Collect form data
         new_stock_data = {
-            'SourceID': request.form.get('sourceID'),
+            'SourceID': request.form.get('sourceID',' UNK'),
             'Genotype': genesX_input + ";" + genes2_input + ";" + genes3_input + ";" + genes4_input,
             'Name': request.form.get('name'),
             'AltReference': request.form.get('altReference'),
@@ -412,6 +540,12 @@ def add_stock(unique_id=None):
 
         # Add stock to the user's sheet
         success, uid_or_message = add_to_stock(username, new_stock_data, db)
+
+        # get the stock data
+        stock = db['stocks'].find_one({"UniqueID": uid_or_message})
+
+        # update the stock vials
+        update_stock_vials(stock, username, db)
 
         if success:
             return redirect('/stock_explorer')
@@ -546,6 +680,12 @@ def view_stock(unique_id):
         # Edit stock in the user's sheet
         success = edit_stock(username, unique_id, db, changed_fields)
 
+        # get the stock data
+        stock = db['stocks'].find_one({"UniqueID": unique_id})
+
+        # update the stock vials
+        update_stock_vials(stock, username, db)
+
         if success:
             return redirect('/stock_explorer')
         else:
@@ -657,8 +797,11 @@ def autopopulate_series_replicate():
     
     if count == 0:
         # If no stocks with the same genotype, find the overall highest SeriesID for the user
-        stocks = db['stocks'].find({"User": username})
-        if stocks.count() > 0:
+        
+        # get all users stocks
+        stocks = get_user_stocks(username, db)
+
+        if len(stocks) > 0:
             # get the highest SeriesID
             highest_series = np.max([int(stock.get('SeriesID', '0')) for stock in stocks])
             series_id = highest_series + 1
@@ -765,10 +908,11 @@ def generate_stock_labels():
     
     # generate the labels
     filename = datetime.datetime.now().strftime('%Y-%m-%d')
-    generate_stock_label_pdf(
+    generate_label_pdf(
         filename,
         user_initials, 
-        selected_stocks, 
+        selected_stocks,
+        ['stock']*len(selected_stocks),
         blank_spaces, 
         len(selected_stocks)
     )
@@ -806,10 +950,11 @@ def generate_cross_labels():
     
     # generate the labels
     filename = datetime.datetime.now().strftime('%Y-%m-%d')
-    generate_cross_label_pdf(
+    generate_label_pdf(
         filename,
         user_initials, 
-        selected_crosses, 
+        selected_crosses,
+        ['cross']*len(selected_crosses),
         blank_spaces, 
         len(selected_crosses)
     )
@@ -840,7 +985,24 @@ def cross():
     # add FlipIn and EclosesIn fields
     for cross in crosses:
         cross['FlipIn'] = get_flip_in(cross)
-        cross['FlipInColor'] = 'green'
+
+        day_value = cross['FlipIn'].split(' ')[0].split(',')[0].strip()
+        day_value = int(day_value) if day_value != 'N/A' else -999
+
+        # process the FlipIn field
+        if day_value == -999:
+            cross['FlipIn'] = 'No Flip'
+            cross['FlipInColor'] = '#ffcce0'
+        elif day_value < 0:
+            cross['FlipIn'] = 'Overdue'
+            cross['FlipInColor'] = '#f25567'
+        elif day_value == 0:
+            cross['FlipIn'] = 'Flip today'
+            cross['FlipInColor'] = '#fca15b'
+        else:
+            cross['FlipIn'] = 'Flip in {} day{}'.format(day_value, 's' if day_value > 1 else '')
+            cross['FlipInColor'] = '#66fa78'
+
         cross['EclosesIn'] = get_eclosion_in(cross)
 
     # Extract unique values for filtering
@@ -957,6 +1119,7 @@ def add_cross(unique_id=None):
                 'vialLifetime': cross.get('VialLifetime'),
                 'flipFrequency': cross.get('FlipFrequency'),
                 'developmentalTime': cross.get('DevelopmentalTime'),
+                'maxCrossLifetime': cross.get('MaxCrossLifetime'),
                 'comments': cross['Comments']
             }
         else:
@@ -982,9 +1145,10 @@ def add_cross(unique_id=None):
             'Status': request.form.get('status'),
             'FoodType': food_type_input,
             'Name': request.form.get('name'),
-            'VialLifetime': request.form.get('vialLifetime', 14),
-            'FlipFrequency': request.form.get('flipFrequency', 7),
+            'VialLifetime': request.form.get('vialLifetime', 12),
+            'FlipFrequency': request.form.get('flipFrequency', 2),
             'DevelopmentalTime': request.form.get('developmentalTime', 10),
+            'MaxCrossLifetime': request.form.get('maxCrossLifetime',10),
             'Comments': request.form.get('comments')
         }
 
@@ -993,6 +1157,12 @@ def add_cross(unique_id=None):
 
         # Add cross to the user's sheet
         success, uid_or_message = add_to_cross(username, new_cross_data, db)
+
+        # get the cross data
+        cross = db['crosses'].find_one({"UniqueID": uid_or_message})
+
+        # update the cross vials
+        update_cross_vials(cross, username, db)
 
         if success:
             return redirect('/cross_explorer')
@@ -1034,6 +1204,7 @@ def view_cross(unique_id):
             'vialLifetime': cross.get('VialLifetime'),
             'flipFrequency': cross.get('FlipFrequency'),
             'developmentalTime': cross.get('DevelopmentalTime'),
+            'maxCrossLifetime': cross.get('MaxCrossLifetime'),
             'creationDate': cross.get('CreationDate', ''),
             'lastFlipDate': cross.get('LastFlipDate', ''),
             'currentlyAliveVials': cross.get('CurrentlyAliveVials', ''),
@@ -1045,6 +1216,9 @@ def view_cross(unique_id):
         }
     else:
         return jsonify({"error": "Cross not found."}), 404
+
+    # Predict offspring genotypes
+    predicted_offspring = cross_genotypes(cross_data['maleGenotype'], cross_data['femaleGenotype'])
 
     if request.method == 'POST':
         # Handle form data
@@ -1070,6 +1244,7 @@ def view_cross(unique_id):
             'VialLifetime': request.form.get('vialLifetime', 14),
             'FlipFrequency': request.form.get('flipFrequency', 7),
             'DevelopmentalTime': request.form.get('developmentalTime', 10),
+            'MaxCrossLifetime': request.form.get('maxCrossLifetime',18),
         }
 
         # Remove empty fields
@@ -1081,6 +1256,12 @@ def view_cross(unique_id):
         # Edit cross in the user's collection
         success = edit_cross(username, unique_id, db, changed_fields)
 
+        # Get the updated cross data
+        cross = db['crosses'].find_one({"UniqueID": unique_id})
+
+        # Update the cross vials
+        update_cross_vials(cross, username, db)
+
         if success:
             return redirect('/cross_explorer')
         else:
@@ -1088,7 +1269,7 @@ def view_cross(unique_id):
             return render_template('cross_explorer.html', error=uid_or_message, username=username)
 
     return render_template('view_cross.html', username=username, food_types=food_types, 
-                           genotypes=genotypes, cross_data=cross_data)
+                           genotypes=genotypes, cross_data=cross_data, predicted_offspring=predicted_offspring)
 
 # Route to fetch genotype based on Unique ID
 @app.route('/get_genotype/<unique_id>')
@@ -1237,6 +1418,7 @@ def stop_scan():
 
     return jsonify({'success': True, 'message': 'Stopped scanning'})
 
+# Route to handle flipping a stock
 @app.route('/flip_vial', methods=['POST'])
 def handle_flip_vial():
     if not session.get("username"):
@@ -1261,26 +1443,146 @@ def handle_flip_vial():
         # check if the stock is already flipped, if so ignore
         if 'LastFlipDate' in matching_stock and matching_stock['LastFlipDate']:
             last_flip_time =  datetime.datetime.strptime(matching_stock['LastFlipDate'], '%Y-%m-%d %H:%M')
-            print('Last flip time:', last_flip_time, 'Current time:', datetime.datetime.now(), 'Difference:', (datetime.datetime.now() - last_flip_time).seconds)
-            if (datetime.datetime.now() - last_flip_time).seconds < MIN_FLIP_DIFFERENCE:
-                print('Stock already flipped recently!')
-                return jsonify({'message': 'Stock already flipped recently!'})
+            # get the difference in seconds (taking account of the date)
+            difference = (datetime.datetime.now() - last_flip_time).total_seconds()
+            print('Last flip time:', last_flip_time, 'Current time:', datetime.datetime.now(), 'Difference:', difference, 'seconds')
+            if difference < MIN_FLIP_DIFFERENCE:
+                print('Stock already flipped recently', difference, 'seconds ago')
+                return jsonify({'message': 'Stock already flipped recently at: {}'.format(last_flip_time)})
         
         print('Flipping stock:', uid)
         flip_stock(username, uid, db, flip_time, new_status=status, added_comment=comment)
         return jsonify({'message': 'Stock flipped successfully!'})
+        
     elif matching_cross and not matching_stock:
         # check if the cross is already flipped, if so ignore
         if 'LastFlipDate' in matching_cross and matching_cross['LastFlipDate']:
             last_flip_time =  datetime.datetime.strptime(matching_cross['LastFlipDate'], '%Y-%m-%d %H:%M')
-            print('Last flip time:', last_flip_time, 'Current time:', datetime.datetime.now(), 'Difference:', (datetime.datetime.now() - last_flip_time).seconds)
-            if (datetime.datetime.now() - last_flip_time).seconds < MIN_FLIP_DIFFERENCE:
-                return jsonify({'message': 'Cross already flipped recently!'})
+            # get the difference in seconds (taking account of the date)
+            difference = (datetime.datetime.now() - last_flip_time).total_seconds()
+            print('Last flip time:', last_flip_time, 'Current time:', datetime.datetime.now(), 'Difference:', difference, 'seconds')
+            if difference < MIN_FLIP_DIFFERENCE:
+                print('Cross already flipped recently', difference, 'seconds ago')
+                return jsonify({'message': 'Cross already flipped recently at: {}'.format(last_flip_time)})
+
         print('Flipping cross:', uid)
         flip_cross(username, uid, db, flip_time, new_status=status, added_comment=comment)
         return jsonify({'message': 'Cross flipped successfully!'})
     else:
         return jsonify({'message': 'UID not recognized!'})
+
+# Route to display the flip schedule
+@app.route('/flip_schedule')
+def flip_schedule():
+    if not session.get("username"):
+        return redirect("/login")
+    
+    username = session.get("username")
+    schedule = get_flip_schedule(username, db)  # Fetch the flip schedule
+
+    # Prepare a new schedule with additional tray info and day of the week
+    enhanced_schedule = {}
+    
+    # Fetch stocks and crosses for the user
+    stocks = get_user_stocks(username, db)
+    crosses = get_user_crosses(username, db)
+    
+    # Iterate over each date and gather necessary data
+    for date_str, data_items in schedule.items():
+        # Convert the date string to a datetime object
+        date_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d')
+        
+        # Get the day of the week (e.g., "Monday")
+        day_of_week = date_obj.strftime('%A')
+        
+        # Collect tray IDs for that date
+        trays_needed = set()  # Using a set to avoid duplicates
+        
+        # Check for stocks
+        for item in data_items:
+            if "Stock" in item:
+                uid = item.split("(ID: ")[1].split(",")[0].strip()
+                for stock in stocks:
+                    if stock['UniqueID'] == uid:
+                        trays_needed.add(stock['TrayID'])
+
+            # Check for crosses
+            elif "Cross" in item:
+                uid = item.split("(ID: ")[1].split(",")[0].strip()
+                for cross in crosses:
+                    if cross['UniqueID'] == uid:
+                        trays_needed.add(cross['TrayID'])
+
+        # Convert the set of trays to a sorted list
+        trays_list = sorted(list(trays_needed))
+        
+        # Add the enhanced data to the schedule
+        enhanced_schedule[date_str] = {
+            'flip_items': data_items,  # Changed "items" to "flip_items" here
+            'day_of_week': day_of_week,
+            'trays': trays_list
+        }
+
+    
+    # Render the template with the enhanced schedule
+    return render_template('flip_schedule.html', schedule=enhanced_schedule, username=username)
+
+# Route to generate labels for the day
+@app.route('/generate_labels_for_day', methods=['POST'])
+def generate_labels_for_day():
+    if not session.get("username"):
+        return redirect("/login")
+    
+    date = request.form.get('date')
+    blank_spaces = int(request.form.get('blank_spaces', 0))
+    username = session.get("username")
+
+    # Fetch stocks and crosses for the selected date
+    schedule = get_flip_schedule(username, db)
+    items_for_date = schedule.get(date, [])
+    
+    # Separate stocks and crosses and collect their UIDs
+    selected_uids = []
+    item_types = []
+    for item in items_for_date:
+        if "Stock" in item:
+            uid = item.split("(ID: ")[1].split(",")[0].strip()
+            selected_uids.append(uid)
+            item_types.append("stock")
+        elif "Cross" in item:
+            uid = item.split("(ID: ")[1].split(",")[0].strip()
+            selected_uids.append(uid)
+            item_types.append("cross")
+    
+    # Get user initials
+    user_initials = get_user_initials(username, db)
+
+    # Fetch the stocks and crosses using their UIDs
+    stocks = get_user_stocks(username, db)
+    crosses = get_user_crosses(username, db)
+    selected_stocks = [stock for stock in stocks if stock['UniqueID'] in selected_uids]
+    selected_crosses = [cross for cross in crosses if cross['UniqueID'] in selected_uids]
+
+    # sort the selected stocks and crosses by TrayID and TrayPosition
+    selected_stocks = sorted(selected_stocks, key=lambda x: (x['TrayID'], int(x['TrayPosition'] if x['TrayPosition']!='' else 0)))
+    selected_crosses = sorted(selected_crosses, key=lambda x: (x['TrayID'], int(x['TrayPosition'] if x['TrayPosition']!='' else 0)))
+
+    # Combine stocks and crosses and generate labels
+    selected_items = selected_stocks + selected_crosses
+    selected_types = item_types
+
+    filename = datetime.datetime.now().strftime('%Y-%m-%d')
+    generate_label_pdf(
+        filename,
+        user_initials,
+        selected_items,
+        selected_types,
+        blank_spaces,
+        len(selected_items)
+    )
+    
+    pdf_file_path = '/static/generated_labels/{}.pdf'.format(filename)
+    return redirect(pdf_file_path)
 
 
 @app.route('/download_data', methods=['GET'])

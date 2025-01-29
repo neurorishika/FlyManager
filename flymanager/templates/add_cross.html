@@ -90,19 +90,23 @@
             </div>
         </div>
 
-        <!-- Row 5: Vial Lifetime, Flip Frequency and Developmental Time -->
+        <!-- Row 5: Vial Lifetime, Flip Frequency, Developmental Time and Max Cross Lifetime -->
         <div class="form-row">
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
                 <label for="vialLifetime">Vial Lifetime (days):</label>
                 <input type="number" class="form-control" id="vialLifetime" name="vialLifetime" value="14">
             </div>
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
                 <label for="flipFrequency">Flip Frequency (days):</label>
                 <input type="number" class="form-control" id="flipFrequency" name="flipFrequency" value="7">
             </div>
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
                 <label for="developmentalTime">Mating->Virgin Adult (days):</label>
                 <input type="number" class="form-control" id="developmentalTime" name="developmentalTime" value="7">
+            </div>
+            <div class="form-group col-md-3">
+                <label for="maxCrossLifetime">Max Cross Lifetime (days):</label>
+                <input type="number" class="form-control" id="maxCrossLifetime" name="maxCrossLifetime" value="18">
             </div>
         </div>
 
@@ -119,9 +123,9 @@
 
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
-<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.polyfills.min.js"></script>
-<link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3"></script>
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.polyfills.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.css" rel="stylesheet" type="text/css" />
 <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 <script>
 
@@ -329,6 +333,7 @@
             document.getElementById('vialLifetime').value = crossData.vialLifetime;
             document.getElementById('flipFrequency').value = crossData.flipFrequency;
             document.getElementById('developmentalTime').value = crossData.developmentalTime;
+            document.getElementById('maxCrossLifetime').value = crossData.maxCrossLifetime;
             
             // Remove any existing tags
             tagifyMaleGenotype.removeAllTags();

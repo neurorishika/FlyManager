@@ -125,9 +125,9 @@
             </div>
         </div>
 
-        <!-- Row 6: Vial Lifetime, Flip Frequency and Developmental Time -->
+        <!-- Row 6: Vial Lifetime, Flip Frequency, Developmental Time and Max Cross Lifetime -->
         <div class="form-row">
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
                 <label for="vialLifetime">Vial Lifetime (days):</label>
                 <div class="input-group">
                     <input type="number" class="form-control" id="vialLifetime" name="vialLifetime">
@@ -136,7 +136,7 @@
                     </div>
                 </div>
             </div>
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
                 <label for="flipFrequency">Flip Frequency (days):</label>
                 <div class="input-group">
                     <input type="number" class="form-control" id="flipFrequency" name="flipFrequency">
@@ -145,10 +145,19 @@
                     </div>
                 </div>
             </div>
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
                 <label for="developmentalTime">Mating->Virgin Adult (days):</label>
                 <div class="input-group">
                     <input type="number" class="form-control" id="developmentalTime" name="developmentalTime">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-3">
+                <label for="maxCrossLifetime">Max Cross Lifetime (days):</label>
+                <div class="input-group">
+                    <input type="number" class="form-control" id="maxCrossLifetime" name="maxCrossLifetime">
                     <div class="input-group-append">
                         <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
                     </div>
@@ -200,6 +209,29 @@
             <textarea class="form-control" id="modificationLog" name="modificationLog" rows="3" disabled></textarea>
         </div>
 
+        <!-- Predicted Offspring Section -->
+        <div class="mt-4">
+            <h4>Predicted Offspring Genotypes</h4>
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Genotype</th>
+                        <th>Sex</th>
+                        <th>Frequency (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for offspring in predicted_offspring %}
+                    <tr>
+                        <td>{{ offspring[0] }}</td>
+                        <td>{{ offspring[1] }}</td>
+                        <td>{{ (offspring[2] * 100) | round(2) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
         <button type="submit" class="btn btn-success btn-block">Save Changes</button>
     </form>
 </div>
@@ -207,9 +239,9 @@
 
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
-<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.polyfills.min.js"></script>
-<link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3"></script>
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.polyfills.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.css" rel="stylesheet" type="text/css" />
 <script>
     document.addEventListener("DOMContentLoaded", function() {
 
@@ -251,6 +283,7 @@
         document.getElementById('vialLifetime').value = crossData.vialLifetime;
         document.getElementById('flipFrequency').value = crossData.flipFrequency;
         document.getElementById('developmentalTime').value = crossData.developmentalTime;
+        document.getElementById('maxCrossLifetime').value = crossData.maxCrossLifetime;
         document.getElementById('comments').value = crossData.comments;
         document.getElementById('creationDate').value = crossData.creationDate;
         document.getElementById('lastFlipDate').value = crossData.lastFlipDate;
