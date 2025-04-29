@@ -9,6 +9,9 @@
 {% block content %}
 <div class="filters">
     <h3>Filters</h3>
+    <div class="alert alert-info" role="alert">
+        <strong>Note:</strong> Stocks/Crosses with the status "No longer maintained" are excluded by default. To view them, please filter by the "No longer maintained" status.
+    </div>
     {% include 'filter_stock.html' %}
 </div>
 <div class="mb-3">
@@ -24,11 +27,16 @@
                     <div class="badges">
                         <span class="badge badge-info">{{ stock.FoodType }}</span>
                         <span class="badge badge-secondary">{{ stock.Type }}</span>
+                        <span class="badge badge-flip" style="background-color:{{ stock.FlipInColor }}">{{ stock.FlipIn }}</span>
+                        <span class="badge badge-eclose">Ecloses in {{ stock.EclosesIn }}</span>
                     </div>
                 </div>
                 <div style="display: flex; align-items: center;">
                     <button class="btn btn-link btn-sm expand-btn" onclick="toggleDetails({{ loop.index }})">
                         <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <button class="btn btn-link btn-sm duplicate-stock-btn" onclick="duplicateStock('{{ stock.UniqueID }}')">
+                        <i class="fas fa-clone"></i>
                     </button>
                     <button class="btn btn-link btn-sm view-details-btn" onclick="viewDetails('{{ stock.UniqueID }}')">
                         <i class="fas fa-external-link-alt"></i>
@@ -78,7 +86,7 @@
     <div id="cartItems"></div>
     <button type="button" id="emptyCartBtn" class="btn btn-danger mt-3">Empty Cart</button>
 </div>
-<form id="generateLabelsForm" method="post" action="/generate_labels" target="_blank">
+<form id="generateLabelsForm" method="post" action="/generate_stock_labels" target="_blank">
     <input type="hidden" name="selected_uids" id="selectedUids">
     <input type="hidden" name="blank_spaces" id="blankSpaces">
     <input type="hidden" name="quantities" id="quantities">

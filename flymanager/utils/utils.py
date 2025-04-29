@@ -1,3 +1,8 @@
+# Description: Utility functions for the FlyManager application
+
+import datetime
+
+# take an console input from the user and validate it against a list of valid options
 def validated_input(prompt, valid_options, default=None, show_options=True):
     """
     Ask the user for input, validate it against a list of valid options
@@ -16,9 +21,52 @@ def validated_input(prompt, valid_options, default=None, show_options=True):
         else:
             print(f"Invalid option '{response}'. Please try again.")
 
+# convert a hex color code to RGB
 def hex_to_rgb(hex):
     """
     Convert a hex color code to RGB
     """
     hex = hex.lstrip("#")
     return tuple(int(hex[i:i+2], 16)/255 for i in (0, 2, 4))
+
+# clean the data from the tagify input
+def clean_tagify_data(form_data):
+    if form_data == '':
+        return form_data
+    form_data_elements = form_data.split('"')[1::2]
+    # remove all elements that are "value"
+    form_data_elements = [element for element in form_data_elements if element != 'value']
+    return form_data_elements
+
+# check if each one has a vial name and a date in the correct format: (VialID, YYYY-MM-DD HH:MM)
+def clean_log_entry(entry):
+    """ 
+    Clean the log entry to get the vial and the date.
+    """
+    if entry.count(",") != 1:
+        vial = None
+        try:
+            date = datetime.datetime.strptime(entry.strip(), "%Y-%m-%d %H:%M")
+        except:
+            date = datetime.datetime.strptime(entry.strip(), "%Y-%m-%d %H:%M:%S")
+        return vial, date
+    else:
+        vial = entry.split(", ")[0].strip()
+        try:
+            date = datetime.datetime.strptime(entry.split(",")[1].strip(), "%Y-%m-%d %H:%M")
+        except:
+            date = datetime.datetime.strptime(entry.split(",")[1].strip(), "%Y-%m-%d %H:%M:%S")
+        return vial, date
+
+# Helper function to map day strings to numbers
+def day_str_to_num(day_str):
+    day_map = {
+        "Mo": 0,  # Monday
+        "Tu": 1,  # Tuesday
+        "We": 2,  # Wednesday
+        "Th": 3,  # Thursday
+        "Fr": 4,  # Friday
+        "Sa": 5,  # Saturday
+        "Su": 6   # Sunday
+    }
+    return day_map.get(day_str)

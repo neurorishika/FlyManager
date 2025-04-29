@@ -136,6 +136,10 @@ function viewDetails(uniqueId) {
     window.open('/view_stock/' + uniqueId, '_blank');
 }
 
+function duplicateStock(uniqueId) {
+    window.open('/add_stock/' + uniqueId, '_blank');
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     updateCart();
 });
