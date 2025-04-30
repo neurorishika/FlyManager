@@ -1,4 +1,9 @@
 # flymanager/app/__init__.py
+"""
+Flask application factory module.
+Creates and configures the Flask application.
+"""
+
 import os
 import hashlib
 import threading
@@ -12,8 +17,9 @@ from flask_mail import Mail, Message
 from flask_apscheduler import APScheduler
 from dotenv import load_dotenv
 
+
 # internal imports
-from flymanager.utils.mongo import create_mongo_client, get_database, get_all_users, get_user_email, get_flip_schedule
+from flymanager.utils.mongo import create_mongo_client, get_database, get_all_users, get_user_email, get_flip_schedule, get_settings
 from flymanager.utils.scanner import get_available_ports # Assuming this exists
 
 # Load environment variables
@@ -39,7 +45,9 @@ def allowed_file(filename):
 
 # --- Application Factory ---
 def create_app():
-    app = Flask(__name__, template_folder="templates", static_folder="static")
+    """Create and configure the Flask application."""
+    
+    app = Flask(__name__, instance_relative_config=True, template_folder="templates", static_folder="static")
 
     # --- Configuration ---
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
@@ -55,7 +63,6 @@ def create_app():
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(app.config["SESSION_FILE_DIR"], exist_ok=True)
 
-
     app.config.update(
         MAIL_SERVER=os.getenv("SMTP_SERVER"),
         MAIL_PORT=int(os.getenv("SMTP_PORT", 587)), # Provide default
@@ -66,17 +73,21 @@ def create_app():
         MAIL_DEFAULT_SENDER=os.getenv("SMTP_SENDER")
     )
 
-    # --- Initialize Extensions ---
     sess.init_app(app)
     socketio.init_app(app)
     cors.init_app(app)
     mail.init_app(app)
     scheduler.init_app(app)
 
+     # --- Make settings available to all templates ---
+    @app.context_processor
+    def inject_settings():
+        return dict(settings=get_settings(db))
+
 
     with app.app_context():
         # --- Import and Register Blueprints ---
-        from .routes import main, auth, stock, cross, flip, data, tray
+        from .routes import main, auth, stock, cross, flip, data, tray, settings
         app.register_blueprint(main.bp)
         app.register_blueprint(auth.bp)
         app.register_blueprint(stock.bp, url_prefix='/stock')
@@ -84,6 +95,7 @@ def create_app():
         app.register_blueprint(flip.bp, url_prefix='/flip')
         app.register_blueprint(data.bp, url_prefix='/data')
         app.register_blueprint(tray.bp, url_prefix='/tray')
+        app.register_blueprint(settings.bp)
 
         # --- Import Services (to ensure they are loaded) ---
         from .services import email as email_service
@@ -93,14 +105,18 @@ def create_app():
         # --- Initialize Scheduler ---
         if not scheduler.running:
              # Add scheduled job using the function from services
-            scheduler.add_job(id='daily_flip_reminder_job', func=scheduler_service.schedule_daily_flip_reminders, trigger='cron', hour=8, minute=0)
+            scheduler.add_job(id='daily_flip_reminder_job', 
+                func=scheduler_service.schedule_daily_flip_reminders, 
+                trigger='cron', 
+                hour=8, 
+                minute=0
+            )
             scheduler.start()
             print("Scheduler started.")
         
         @app.errorhandler(404)
         def page_not_found(error):
             return render_template("404.html", page_title="Not Found"), 404
-
 
         # --- Root Redirect ---
         @app.route('/')

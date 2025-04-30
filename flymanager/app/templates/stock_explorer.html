@@ -15,15 +15,15 @@
     {% include 'filter_stock.html' %}
 </div>
 <div class="mb-3">
-    <a href="{{ url_for('stock.add_stock') }}" class="btn btn-success">Add New Stock</a>
+    <a href="{{ url_for('stock.add_stock') }}"><button class="btn btn-success">Add New Stock</button></a>
 </div>
 <div class="stock-container">
     <div class="stock-items-grid">
         {% for stock in stocks %}
-        <div class="stock-item" data-status="{{ stock.Status }}" id="item-{{ loop.index }}">
+        <div class="stock-item" data-status="{{ stock.Status }}" id="item-{{ loop.index }}" onclick="toggleCheckbox('stock{{ loop.index }}', event)">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div class="checkbox-and-badges">
-                    <input type="checkbox" id="stock{{ loop.index }}">
+                    <input type="checkbox" id="stock{{ loop.index }}" onclick="toggleCheckbox('stock{{ loop.index }}', event)">
                     <div class="badges">
                         <span class="badge badge-info">{{ stock.FoodType }}</span>
                         <span class="badge badge-secondary">{{ stock.Type }}</span>
@@ -32,13 +32,13 @@
                     </div>
                 </div>
                 <div style="display: flex; align-items: center;">
-                    <button class="btn btn-link btn-sm expand-btn" onclick="toggleDetails({{ loop.index }})">
+                    <button class="btn btn-link btn-sm expand-btn" onclick="event.stopPropagation(); toggleDetails({{ loop.index }})">
                         <i class="fas fa-chevron-down"></i>
                     </button>
-                    <button class="btn btn-link btn-sm duplicate-stock-btn" onclick="duplicateStock('{{ stock.UniqueID }}')">
+                    <button class="btn btn-link btn-sm duplicate-stock-btn" onclick="event.stopPropagation(); duplicateStock('{{ stock.UniqueID }}')">
                         <i class="fas fa-clone"></i>
                     </button>
-                    <button class="btn btn-link btn-sm view-details-btn" onclick="viewDetails('{{ stock.UniqueID }}')">
+                    <button class="btn btn-link btn-sm view-details-btn" onclick="event.stopPropagation(); viewDetails('{{ stock.UniqueID }}')">
                         <i class="fas fa-external-link-alt"></i>
                     </button>
                 </div>

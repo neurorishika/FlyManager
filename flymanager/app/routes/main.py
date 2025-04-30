@@ -1,5 +1,5 @@
 # flymanager/app/routes/main.py
-from flask import Blueprint, render_template, session, redirect, url_for
+from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify
 from flymanager.app import db
 from flymanager.utils.mongo import get_user_activities
 from flymanager.app.services.scheduler import schedule_daily_flip_reminders # For testing
@@ -30,3 +30,13 @@ def test_send_reminder_route():
     except Exception as e:
         print(f"Error triggering test reminder: {e}")
         return f"Error triggering test reminder: {e}", 500
+
+@bp.route('/update_theme', methods=['POST'])
+def update_theme():
+    if request.is_json:
+        data = request.get_json()
+        theme = data.get('theme')
+        if theme in ['light', 'dark']:
+            session['theme'] = theme
+            return jsonify({'status': 'success'})
+    return jsonify({'status': 'error'}), 400

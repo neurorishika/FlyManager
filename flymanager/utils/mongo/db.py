@@ -56,6 +56,7 @@ def reset_database(db):
     db.create_collection("genes2nd")
     db.create_collection("genes3rd")
     db.create_collection("genes4th")
+    db.create_collection("settings")
 
 def uid_exists(uid, db):
     """

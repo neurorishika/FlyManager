@@ -306,3 +306,16 @@ document.getElementById('emptyCartBtn').addEventListener('click', function() {
         emptyCart();
     }
 });
+
+function toggleCheckbox(checkboxId, event) {
+    const checkbox = document.getElementById(checkboxId);
+    if (event.target !== checkbox) {
+        checkbox.checked = !checkbox.checked;
+    }
+    const card = checkbox.closest('.cross-item');
+    if (checkbox.checked) {
+        card.classList.add('checked');
+    } else {
+        card.classList.remove('checked');
+    }
+}

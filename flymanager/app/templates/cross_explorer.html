@@ -15,15 +15,16 @@
     {% include 'filter_cross.html' %}
 </div>
 <div class="mb-3">
-    <a href="{{ url_for('cross.add_cross') }}" class="btn btn-success">Add New Cross</a>
+    <a href="{{ url_for('cross.add_cross') }}"><button class="btn btn-success">Add New Cross</button></a>
+
 </div>
 <div class="cross-container">
     <div class="cross-items-grid">
         {% for cross in crosses %}
-        <div class="cross-item" data-status="{{ cross.Status }}" id="item-{{ loop.index }}">
+        <div class="cross-item" data-status="{{ cross.Status }}" id="item-{{ loop.index }}" onclick="toggleCheckbox('cross{{ loop.index }}', event)">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div class="checkbox-and-badges">
-                    <input type="checkbox" id="cross{{ loop.index }}">
+                    <input type="checkbox" id="cross{{ loop.index }}" onclick="toggleCheckbox('cross{{ loop.index }}', event)">
                     <div class="badges">
                         <span class="badge badge-info">{{ cross.FoodType }}</span>
                         <span class="badge badge-secondary">{{ cross.Status }}</span>
@@ -32,13 +33,13 @@
                     </div>
                 </div>
                 <div style="display: flex; align-items: center;">
-                    <button class="btn btn-link btn-sm expand-btn" onclick="toggleDetails({{ loop.index }})">
+                    <button class="btn btn-link btn-sm expand-btn" onclick="event.stopPropagation(); toggleDetails({{ loop.index }})">
                         <i class="fas fa-chevron-down"></i>
                     </button>
-                    <button class="btn btn-link btn-sm duplicate-cross-btn" onclick="duplicateCross('{{ cross.UniqueID }}')">
+                    <button class="btn btn-link btn-sm duplicate-cross-btn" onclick="event.stopPropagation(); duplicateCross('{{ cross.UniqueID }}')">
                         <i class="fas fa-clone"></i>
                     </button>
-                    <button class="btn btn-link btn-sm view-details-btn" onclick="viewDetails('{{ cross.UniqueID }}')">
+                    <button class="btn btn-link btn-sm view-details-btn" onclick="event.stopPropagation(); viewDetails('{{ cross.UniqueID }}')">
                         <i class="fas fa-external-link-alt"></i>
                     </button>
                 </div>

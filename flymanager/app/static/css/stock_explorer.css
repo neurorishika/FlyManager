@@ -88,6 +88,11 @@
     font-size: 12px;
 }
 
+.stock-item.checked {
+    border: 5px solid var(--highlighted-border-color);
+    background-color: var(--highlighted-card-bg);
+}
+
 .details {
     padding-top: 10px;
     width: 100%;

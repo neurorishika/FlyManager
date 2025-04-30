@@ -35,6 +35,9 @@ from .helpers import (
 # Activity logging
 from .activity import write_activity
 
+# Settings functions
+from .settings import get_settings, update_settings
+
 # Make all functions available directly from the mongo module
 __all__ = [
     # DB functions
@@ -63,4 +66,7 @@ __all__ = [
     
     # Activity functions
     'write_activity'
+
+    # Settings functions
+    'get_settings', 'update_settings'
 ]
