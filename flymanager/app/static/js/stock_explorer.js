@@ -18,6 +18,9 @@ function updateCart() {
             </div>`;
         });
     }
+    
+    // Update cart count
+    document.getElementById('cartCount').textContent = cart.length;
     saveCart();
 }
 
@@ -47,14 +50,16 @@ function getLocalDateTime() {
 document.getElementById('selectAllBtn').addEventListener('click', function() {
     document.querySelectorAll('.stock-item input[type="checkbox"]').forEach(function(checkbox) {
         checkbox.checked = true;
-        document.getElementById('item-' + checkbox.id.replace('stock', '')).classList.add('selected');
+        const card = document.getElementById('item-' + checkbox.id.replace('stock', ''));
+        card.classList.add('checked');
     });
 });
 
 document.getElementById('deselectAllBtn').addEventListener('click', function() {
     document.querySelectorAll('.stock-item input[type="checkbox"]').forEach(function(checkbox) {
         checkbox.checked = false;
-        document.getElementById('item-' + checkbox.id.replace('stock', '')).classList.remove('selected');
+        const card = document.getElementById('item-' + checkbox.id.replace('stock', ''));
+        card.classList.remove('checked');
     });
 });
 
@@ -316,5 +321,18 @@ function toggleCheckbox(checkboxId, event) {
         card.classList.add('checked');
     } else {
         card.classList.remove('checked');
+    }
+}
+
+function toggleCart() {
+    const cartContainer = document.querySelector('.floating-cart-container');
+    cartContainer.classList.toggle('expanded');
+    const icon = cartContainer.querySelector('.toggle-cart-btn i');
+    if (cartContainer.classList.contains('expanded')) {
+        icon.classList.remove('fa-chevron-up');
+        icon.classList.add('fa-chevron-down');
+    } else {
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-up');
     }
 }

@@ -18,6 +18,9 @@ function updateCart() {
             </div>`;
         });
     }
+    
+    // Update cart count
+    document.getElementById('cartCount').textContent = cart.length;
     saveCart();
 }
 
@@ -47,6 +50,8 @@ function getLocalDateTime() {
 document.getElementById('selectAllBtn').addEventListener('click', function() {
     document.querySelectorAll('.cross-item input[type="checkbox"]').forEach(function(checkbox) {
         checkbox.checked = true;
+        const card = document.getElementById('item-' + checkbox.id.replace('cross', ''));
+        card.classList.add('checked');
         document.getElementById('item-' + checkbox.id.replace('cross', '')).classList.add('selected');
     });
 });
@@ -54,6 +59,8 @@ document.getElementById('selectAllBtn').addEventListener('click', function() {
 document.getElementById('deselectAllBtn').addEventListener('click', function() {
     document.querySelectorAll('.cross-item input[type="checkbox"]').forEach(function(checkbox) {
         checkbox.checked = false;
+        const card = document.getElementById('item-' + checkbox.id.replace('cross', ''));
+        card.classList.remove('checked');
         document.getElementById('item-' + checkbox.id.replace('cross', '')).classList.remove('selected');
     });
 });
@@ -317,5 +324,18 @@ function toggleCheckbox(checkboxId, event) {
         card.classList.add('checked');
     } else {
         card.classList.remove('checked');
+    }
+}
+
+function toggleCart() {
+    const cartContainer = document.querySelector('.floating-cart-container');
+    cartContainer.classList.toggle('expanded');
+    const icon = cartContainer.querySelector('.toggle-cart-btn i');
+    if (cartContainer.classList.contains('expanded')) {
+        icon.classList.remove('fa-chevron-up');
+        icon.classList.add('fa-chevron-down');
+    } else {
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-up');
     }
 }

@@ -40,3 +40,7 @@ def update_theme():
             session['theme'] = theme
             return jsonify({'status': 'success'})
     return jsonify({'status': 'error'}), 400
+
+@bp.route('/user_guide')
+def user_guide():
+    return render_template('user_guide.html')

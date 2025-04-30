@@ -78,31 +78,49 @@
     </div>
 </div>
 
-<button type="button" id="addToCartBtn" class="btn btn-warning mt-3">Add to Cart</button>
-<button type="button" id="selectAllBtn" class="btn btn-info mt-3">Select All</button>
-<button type="button" id="deselectAllBtn" class="btn btn-info mt-3">Deselect All</button>
-<div id="cart" class="mt-5">
-    <h3>Cart</h3>
-    <div id="cartItems"></div>
-    <div class="cart-actions mt-3">
-        <button type="button" id="emptyCartBtn" class="btn btn-danger">Empty Cart</button>
-        <button type="button" id="generateLabelsBtn" class="btn btn-primary ml-2">Generate Labels</button>
-        <button type="button" id="bulkFlipBtn" class="btn btn-success ml-2">Bulk Flip</button>
-        <div class="dropdown d-inline-block">
-            <button class="btn btn-secondary dropdown-toggle" type="button" id="bulkStatusBtn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                Change Status
+<div class="floating-cart-container">
+    <div class="cart-header" onclick="toggleCart()">
+        <h3>Cart (<span id="cartCount">0</span> items)</h3>
+        <div class="cart-header-actions">
+            <button type="button" id="addToCartBtn" class="btn btn-link" title="Add to Cart" onclick="event.stopPropagation();">
+                <i class="fas fa-cart-plus"></i>
             </button>
-            <div class="dropdown-menu" aria-labelledby="bulkStatusBtn">
-                <a class="dropdown-item bulk-status-item" href="#" data-status="Healthy">Healthy</a>
-                <a class="dropdown-item bulk-status-item" href="#" data-status="Showing Issues">Showing Issues</a>
-                <a class="dropdown-item bulk-status-item" href="#" data-status="Needs refresh">Needs refresh</a>
-                <a class="dropdown-item bulk-status-item" href="#" data-status="Ordered">Ordered</a>
-                <a class="dropdown-item bulk-status-item" href="#" data-status="No longer maintained">No longer maintained</a>
-            </div>
+            <button type="button" id="selectAllBtn" class="btn btn-link" title="Select All" onclick="event.stopPropagation();">
+                <i class="fas fa-check-square"></i>
+            </button>
+            <button type="button" id="deselectAllBtn" class="btn btn-link" title="Deselect All" onclick="event.stopPropagation();">
+                <i class="fas fa-square"></i>
+            </button>
+            <button type="button" id="emptyCartBtn" class="btn btn-link" title="Empty Cart" onclick="event.stopPropagation();">
+                <i class="fas fa-trash"></i>
+            </button>
+            <button class="toggle-cart-btn">
+                <i class="fas fa-chevron-up"></i>
+            </button>
         </div>
-        <button type="button" id="removeFromTrayBtn" class="btn btn-warning ml-2">Remove from Tray</button>
+    </div>
+    <div class="cart-content">
+        <div id="cartItems"></div>
+        <div class="cart-actions">
+            <button type="button" id="generateLabelsBtn" class="btn btn-primary">Generate Labels</button>
+            <button type="button" id="bulkFlipBtn" class="btn btn-success">Bulk Flip</button>
+            <div class="dropdown d-inline-block">
+                <button class="btn btn-secondary dropdown-toggle" type="button" id="bulkStatusBtn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    Change Status
+                </button>
+                <div class="dropdown-menu" aria-labelledby="bulkStatusBtn">
+                    <a class="dropdown-item bulk-status-item" href="#" data-status="Healthy">Healthy</a>
+                    <a class="dropdown-item bulk-status-item" href="#" data-status="Showing Issues">Showing Issues</a>
+                    <a class="dropdown-item bulk-status-item" href="#" data-status="Needs refresh">Needs refresh</a>
+                    <a class="dropdown-item bulk-status-item" href="#" data-status="Ordered">Ordered</a>
+                    <a class="dropdown-item bulk-status-item" href="#" data-status="No longer maintained">No longer maintained</a>
+                </div>
+            </div>
+            <button type="button" id="removeFromTrayBtn" class="btn btn-warning">Remove from Tray</button>
+        </div>
     </div>
 </div>
+
 <form id="generateLabelsForm" method="post" action="{{ url_for('stock.generate_stock_labels') }}" target="_blank">
     <input type="hidden" name="selected_uids" id="selectedUids">
     <input type="hidden" name="blank_spaces" id="blankSpaces">
