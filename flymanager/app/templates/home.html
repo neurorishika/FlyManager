@@ -5,26 +5,35 @@
 {% block head %}
 <style>
     .introduction {
-        background-color: #fff;
+        background-color: var(--card-bg);
+        color: var(--text-color);
         padding: 20px;
         border-radius: 10px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         margin-bottom: 20px;
+        border: 1px solid var(--border-color);
     }
     .quick-access button {
         margin: 5px;
     }
     .recent-activity,
     .statistics {
-        background-color: #fff;
+        background-color: var(--card-bg);
+        color: var(--text-color);
         padding: 20px;
         border-radius: 10px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         margin-bottom: 20px;
+        border: 1px solid var(--border-color);
     }
     .activity-item {
         padding: 10px;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .list-group-item {
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        border-color: var(--border-color);
     }
 </style>
 {% endblock %}

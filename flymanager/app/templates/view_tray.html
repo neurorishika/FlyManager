@@ -267,20 +267,62 @@
     </div>
 </div>
 
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Item to Position <span id="addItemPosition"></span></h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" id="showAllItemsPopup">
+                        <label class="custom-control-label" for="showAllItemsPopup">Show all items</label>
+                    </div>
+                </div>
+                <ul class="nav nav-tabs" id="addItemTabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="add-stock-tab" data-toggle="tab" href="#add-stock-content" role="tab">Stocks</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="add-cross-tab" data-toggle="tab" href="#add-cross-content" role="tab">Crosses</a>
+                    </li>
+                </ul>
+                
+                <div class="tab-content mt-3" id="addItemTabsContent">
+                    <div class="tab-pane fade show active" id="add-stock-content" role="tabpanel">
+                        <input type="text" class="form-control mb-3" id="addStockSearch" placeholder="Search stocks...">
+                        <div class="add-item-list" id="addStocksList"></div>
+                    </div>
+                    <div class="tab-pane fade" id="add-cross-content" role="tabpanel">
+                        <input type="text" class="form-control mb-3" id="addCrossSearch" placeholder="Search crosses...">
+                        <div class="add-item-list" id="addCrossesList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- CSS Styles for Tray Visualization -->
 <style>
     .tray-grid {
         display: grid;
         gap: 2px;
         margin: auto;
-        border: 1px solid #ccc;
+        border: 1px solid var(--border-color);
         padding: 2px;
-        background-color: #f8f9fa;
+        background-color: var(--bg-color);
     }
     
     .tray-cell {
-        border: 1px solid #ddd;
-        background-color: #fff;
+        border: 1px solid var(--border-color);
+        background-color: var(--card-bg);
+        color: var(--text-color);
         padding: 8px;
         min-height: 60px;
         display: flex;
@@ -292,22 +334,22 @@
     }
     
     .tray-cell.empty {
-        background-color: #f8f9fa;
+        background-color: var(--bg-color);
     }
     
     .tray-cell.stock {
-        background-color: #d4edda;
-        border-color: #c3e6cb;
+        background-color: rgba(40, 167, 69, 0.1);
+        border-color: rgba(40, 167, 69, 0.2);
     }
     
     .tray-cell.cross {
-        background-color: #cce5ff;
-        border-color: #b8daff;
+        background-color: rgba(0, 123, 255, 0.1);
+        border-color: rgba(0, 123, 255, 0.2);
     }
     
     .tray-cell.blocked {
-        background-color: #e9ecef;
-        border-color: #dee2e6;
+        background-color: var(--card-bg);
+        border-color: var(--border-color);
         cursor: not-allowed;
         opacity: 0.8;
     }
@@ -317,7 +359,8 @@
         top: 2px;
         left: 2px;
         font-size: 0.7em;
-        color: #666;
+        color: var(--text-color);
+        opacity: 0.7;
     }
     
     .tray-cell .content {
@@ -326,70 +369,93 @@
     }
     
     .tray-cell.highlight {
-        border: 2px dashed #007bff;
+        border: 2px dashed var(--header-bg);
     }
     
     .tray-legend {
         display: flex;
         justify-content: center;
         gap: 20px;
+        margin-top: 1rem;
     }
     
     .legend-item {
         display: flex;
         align-items: center;
         gap: 5px;
+        color: var(--text-color);
     }
     
     .legend-color {
         width: 20px;
         height: 20px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color);
     }
     
     .legend-empty {
-        background-color: #f8f9fa;
+        background-color: var(--bg-color);
     }
     
     .legend-stock {
-        background-color: #d4edda;
+        background-color: rgba(40, 167, 69, 0.1);
     }
     
     .legend-cross {
-        background-color: #cce5ff;
+        background-color: rgba(0, 123, 255, 0.1);
     }
     
     .legend-blocked {
-        background-color: #e9ecef;
+        background-color: var(--card-bg);
     }
     
     .blocked-info {
         font-size: 0.8em;
-        color: #6c757d;
+        color: var(--text-color);
+        opacity: 0.7;
         text-align: center;
     }
     
     .item-list {
         max-height: 400px;
         overflow-y: auto;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color);
         padding: 10px;
         border-radius: 4px;
     }
     
     .drag-item {
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color);
         padding: 10px;
         margin-bottom: 10px;
         border-radius: 4px;
         cursor: grab;
-        background-color: #fff;
+        background-color: var(--card-bg);
+        color: var(--text-color);
         transition: all 0.2s;
+        font-size: 0.9em;
     }
     
     .drag-item:hover {
-        background-color: #f8f9fa;
+        background-color: var(--header-bg);
+        color: var(--header-text);
         transform: translateY(-2px);
+    }
+    
+    .drag-item .item-header {
+        font-size: 0.95em;
+    }
+    
+    .drag-item .item-genotype {
+        font-size: 0.85em;
+        opacity: 0.8;
+    }
+    
+    .drag-item .item-info {
+        font-size: 0.85em;
+    }
+    
+    .drag-item .badge {
+        font-size: 0.8em;
     }
     
     .stock-item {
@@ -407,17 +473,67 @@
     
     .item-genotype {
         font-size: 0.8rem;
-        color: #666;
+        color: var(--text-color);
+        opacity: 0.8;
     }
     
     .item-info {
         margin-top: 5px;
     }
     
-    /* Drag and drop styles */
     .drag-over {
-        border: 2px dashed #007bff;
+        border: 2px dashed var(--header-bg);
         background-color: rgba(0, 123, 255, 0.1);
+    }
+    
+    .add-item-list {
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
+    
+    .add-item-option {
+        padding: 8px;
+        margin: 4px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+        background-color: var(--card-bg);
+        color: var(--text-color);
+    }
+    
+    .add-item-option:hover {
+        background-color: var(--header-bg);
+        color: var(--header-text);
+        transform: translateY(-2px);
+    }
+    
+    .add-item-option.stock {
+        border-left: 4px solid #28a745;
+    }
+    
+    .add-item-option.cross {
+        border-left: 4px solid #007bff;
+    }
+    
+    .add-item-option .item-header {
+        font-size: 0.95em;
+    }
+    
+    .add-item-option .item-genotype {
+        font-size: 0.85em;
+        opacity: 0.8;
+    }
+    
+    .add-item-option .item-info {
+        font-size: 0.85em;
+    }
+    
+    .add-item-option .badge {
+        font-size: 0.8em;
     }
 </style>
 
@@ -476,10 +592,14 @@
         const trayGrid = document.getElementById('trayGrid');
         trayGrid.innerHTML = '';
         
-        // Generate grid cells
+        // Generate grid cells with transposed numbering
         for (let row = 1; row <= rows; row++) {
             for (let col = 1; col <= columns; col++) {
-                const position = ((row - 1) * columns + col).toString();
+                // Calculate position using transposed system:
+                // col determines tens place (1, 11, 21...)
+                // row determines ones place (1, 2, 3...)
+                const position = ((col - 1) * 10 + row).toString();
+                
                 const cell = document.createElement('div');
                 cell.className = 'tray-cell empty';
                 cell.dataset.position = position;
@@ -528,6 +648,10 @@
         }
     }
     
+    let scrollInterval = null;
+    const SCROLL_SPEED = 15;
+    const SCROLL_ZONE = 100; // pixels from top/bottom to trigger scroll
+    
     function setupDragAndDrop() {
         // Make items draggable
         const dragItems = document.querySelectorAll('.drag-item');
@@ -543,6 +667,46 @@
             cell.addEventListener('dragenter', handleDragEnter);
             cell.addEventListener('dragleave', handleDragLeave);
             cell.addEventListener('drop', handleDrop);
+        });
+        
+        // Setup autoscroll
+        window.addEventListener('dragover', function(e) {
+            e.preventDefault(); // Required for drag and drop
+            
+            const mouseY = e.clientY;
+            const windowHeight = window.innerHeight;
+            
+            // Clear any existing scroll interval
+            if (scrollInterval) {
+                clearInterval(scrollInterval);
+                scrollInterval = null;
+            }
+            
+            // If near the top of the window, scroll up
+            if (mouseY < SCROLL_ZONE) {
+                scrollInterval = setInterval(() => {
+                    window.scrollBy(0, -SCROLL_SPEED);
+                }, 50);
+            }
+            // If near the bottom of the window, scroll down
+            else if (mouseY > windowHeight - SCROLL_ZONE) {
+                scrollInterval = setInterval(() => {
+                    window.scrollBy(0, SCROLL_SPEED);
+                }, 50);
+            }
+        });
+        
+        // Clear scroll interval when drag ends
+        window.addEventListener('dragend', function() {
+            if (scrollInterval) {
+                clearInterval(scrollInterval);
+                scrollInterval = null;
+            }
+        });
+        
+        // Setup empty cell click handlers
+        document.querySelectorAll('.tray-cell.empty').forEach(cell => {
+            cell.addEventListener('click', handleEmptyCellClick);
         });
     }
     
@@ -604,12 +768,20 @@
             const requiredVials = parseInt(data.vials);
             const currentPosition = parseInt(position);
             
-            // Check if any of the next positions are occupied or blocked
+            // Calculate row and column from position
+            const column = Math.floor((currentPosition - 1) / 10) + 1; // Get tens place (column)
+            const row = ((currentPosition - 1) % 10) + 1; // Get ones place (row)
+            
+            // Check if enough positions are available in the same row
             for (let i = 0; i < requiredVials; i++) {
-                const checkPosition = (currentPosition + i).toString();
+                // Calculate next position in the row
+                const nextColumn = column + i;
+                const checkPosition = ((nextColumn - 1) * 10 + row).toString();
                 const cell = document.querySelector(`.tray-cell[data-position="${checkPosition}"]`);
+                
+                // Check if position exists and is available
                 if (!cell || !cell.classList.contains('empty') || cell.classList.contains('blocked')) {
-                    alert(`Cannot place item here - needs ${requiredVials} consecutive empty positions.`);
+                    alert(`Cannot place item here - needs ${requiredVials} consecutive positions in row ${row}`);
                     return;
                 }
             }
@@ -619,6 +791,150 @@
         } catch (error) {
             console.error('Error handling item drop:', error);
         }
+    }
+    
+    function handleEmptyCellClick(e) {
+        // Only handle clicks on empty cells that aren't blocked
+        if (!this.classList.contains('empty') || this.classList.contains('blocked')) {
+            return;
+        }
+        
+        const position = this.dataset.position;
+        document.getElementById('addItemPosition').textContent = position;
+        
+        // Clone available items into the add item modal
+        const stocksList = document.getElementById('stocksList');
+        const crossesList = document.getElementById('crossesList');
+        const addStocksList = document.getElementById('addStocksList');
+        const addCrossesList = document.getElementById('addCrossesList');
+        
+        // Clear previous content and event listeners
+        addStocksList.innerHTML = '';
+        addCrossesList.innerHTML = '';
+        
+        // Get all items from the main lists and clone them
+        const allStockItems = Array.from(stocksList.querySelectorAll('.drag-item'));
+        const allCrossItems = Array.from(crossesList.querySelectorAll('.drag-item'));
+        
+        // Create clickable items for all items (don't filter yet)
+        allStockItems.forEach(item => {
+            const clone = createClickableItem(item, position);
+            addStocksList.appendChild(clone);
+        });
+        
+        allCrossItems.forEach(item => {
+            const clone = createClickableItem(item, position);
+            addCrossesList.appendChild(clone);
+        });
+        
+        // Sync show all items checkbox state with main list and apply initial filtering
+        const showAllCheckbox = document.getElementById('showAllItemsPopup');
+        showAllCheckbox.checked = document.getElementById('showAllItems').checked;
+        
+        // Apply initial filtering
+        filterAddItemsWithOrphan('addStocksList', document.getElementById('addStockSearch').value);
+        filterAddItemsWithOrphan('addCrossesList', document.getElementById('addCrossSearch').value);
+        
+        // Setup search handlers - make sure to remove any existing listeners first
+        const addStockSearch = document.getElementById('addStockSearch');
+        const addCrossSearch = document.getElementById('addCrossSearch');
+        
+        // Remove existing listeners by cloning and replacing the elements
+        const newStockSearch = addStockSearch.cloneNode(true);
+        const newCrossSearch = addCrossSearch.cloneNode(true);
+        addStockSearch.parentNode.replaceChild(newStockSearch, addStockSearch);
+        addCrossSearch.parentNode.replaceChild(newCrossSearch, addCrossSearch);
+        
+        // Add new listeners
+        newStockSearch.addEventListener('input', function(e) {
+            filterAddItemsWithOrphan('addStocksList', e.target.value);
+        });
+        
+        newCrossSearch.addEventListener('input', function(e) {
+            filterAddItemsWithOrphan('addCrossesList', e.target.value);
+        });
+        
+        // Remove existing listener from checkbox by cloning and replacing
+        const newShowAllCheckbox = showAllCheckbox.cloneNode(true);
+        showAllCheckbox.parentNode.replaceChild(newShowAllCheckbox, showAllCheckbox);
+        
+        // Add new listener to checkbox
+        newShowAllCheckbox.addEventListener('change', function() {
+            filterAddItemsWithOrphan('addStocksList', newStockSearch.value);
+            filterAddItemsWithOrphan('addCrossesList', newCrossSearch.value);
+        });
+        
+        // Show the modal
+        $('#addItemModal').modal('show');
+    }
+
+    function filterAddItemsWithOrphan(containerId, query) {
+        const container = document.getElementById(containerId);
+        const items = container.querySelectorAll('.add-item-option');
+        const showAllItems = document.getElementById('showAllItemsPopup').checked;
+        
+        query = query.toLowerCase();
+        
+        items.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            const hasWarningBadge = item.querySelector('.badge-warning') !== null;
+            const isOrphan = !hasWarningBadge;
+            
+            // Show item if it matches the search query AND (showAllItems is true OR item is an orphan)
+            if (text.includes(query) && (showAllItems || isOrphan)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+    
+    function createClickableItem(dragItem, position) {
+        const clickableItem = document.createElement('div');
+        clickableItem.className = `add-item-option ${dragItem.classList.contains('stock-item') ? 'stock' : 'cross'}`;
+        clickableItem.innerHTML = dragItem.innerHTML;
+        
+        // Add click handler
+        clickableItem.addEventListener('click', function() {
+            const data = {
+                type: dragItem.dataset.type,
+                id: dragItem.dataset.id,
+                name: dragItem.dataset.name,
+                vials: dragItem.dataset.vials
+            };
+            
+            const trayId = document.getElementById('trayGrid').dataset.trayId;
+            
+            // Check space availability before placing
+            const requiredVials = parseInt(data.vials);
+            const currentPosition = parseInt(position);
+            
+            // Calculate row and column from position
+            const column = Math.floor((currentPosition - 1) / 10) + 1; // Get tens place (column)
+            const row = ((currentPosition - 1) % 10) + 1; // Get ones place (row)
+            
+            // Check if enough positions are available in the same row
+            for (let i = 0; i < requiredVials; i++) {
+                // Calculate next position in the row
+                const nextColumn = column + i;
+                const checkPosition = ((nextColumn - 1) * 10 + row).toString();
+                const cell = document.querySelector(`.tray-cell[data-position="${checkPosition}"]`);
+                
+                // Check if position exists and is available
+                if (!cell || !cell.classList.contains('empty') || cell.classList.contains('blocked')) {
+                    alert(`Cannot place item here - needs ${requiredVials} consecutive positions in row ${row}`);
+                    return;
+                }
+            }
+            
+            // Move item to selected position
+            moveItemToTray(data.type, data.id, trayId, position);
+            
+            // Close the modal
+            $('#addItemModal').modal('hide');
+        });
+        
+        return clickableItem;
     }
     
     function moveItemToTray(itemType, itemId, trayId, position) {

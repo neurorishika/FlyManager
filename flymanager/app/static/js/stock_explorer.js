@@ -231,6 +231,45 @@ document.querySelectorAll('.bulk-status-item').forEach(function(item) {
     });
 });
 
+// Bulk Remove from Tray Button
+document.getElementById('removeFromTrayBtn').addEventListener('click', function() {
+    if (cart.length === 0) {
+        alert('Your cart is empty. Please add items to remove from trays.');
+        return;
+    }
+    
+    const uniqueIDs = cart.map(item => item.uid);
+    
+    if (confirm(`Are you sure you want to remove ${cart.length} items from their trays?`)) {
+        fetch(bulkRemoveFromTrayUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                item_type: 'stock',
+                uniqueIDs: uniqueIDs
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            
+            // Clear cart if successful
+            if (data.results && data.results.success && data.results.success.length > 0) {
+                emptyCart();
+            }
+            
+            // Refresh page to show updated trays
+            window.location.reload();
+        })
+        .catch(error => {
+            console.error('Error during bulk remove from tray:', error);
+            alert('Error occurred during bulk remove from tray operation.');
+        });
+    }
+});
+
 function toggleDetails(index) {
     var details = document.getElementById('details-' + index);
     var icon = document.querySelector('#item-' + index + ' .expand-btn i');

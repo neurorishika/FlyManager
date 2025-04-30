@@ -100,6 +100,7 @@
                 <a class="dropdown-item bulk-status-item" href="#" data-status="No longer maintained">No longer maintained</a>
             </div>
         </div>
+        <button type="button" id="removeFromTrayBtn" class="btn btn-warning ml-2">Remove from Tray</button>
     </div>
 </div>
 <form id="generateLabelsForm" method="post" action="{{ url_for('stock.generate_stock_labels') }}" target="_blank">
@@ -162,6 +163,7 @@
     const addStockUrlBase = "{{ url_for('stock.add_stock', unique_id='UNIQUE_ID_PLACEHOLDER') }}";
     const bulkFlipUrl = "{{ url_for('flip.bulk_flip_route') }}";
     const bulkStatusUrl = "{{ url_for('flip.bulk_status_change_route') }}";
+    const bulkRemoveFromTrayUrl = "{{ url_for('tray.bulk_remove_from_tray') }}";
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
 <script src="{{ url_for('static', filename='js/stock_explorer.js') }}"></script>

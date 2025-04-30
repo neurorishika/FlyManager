@@ -38,7 +38,8 @@ def tray_management():
         trays=trays,
         stocks=stocks,
         crosses=crosses,
-        page_title="Tray Management"
+        page_title="Tray Management",
+        username=user
     )
 
 @bp.route('/tray/<tray_id>')
@@ -80,7 +81,8 @@ def view_tray(tray_id):
         occupancy=occupancy,
         stocks=stocks,
         crosses=crosses,
-        page_title=f"Tray: {tray['TrayID']} - {tray['Name']}"
+        page_title=f"Tray: {tray['TrayID']} - {tray['Name']}",
+        username=user
     )
 
 @bp.route('/add_tray', methods=['GET', 'POST'])
@@ -122,7 +124,7 @@ def add_tray_route():
             return redirect(url_for('tray.tray_management'))
     
     # GET request, show the add tray form
-    return render_template('add_tray.html', page_title="Add New Tray")
+    return render_template('add_tray.html', page_title="Add New Tray", username=session.get('username'))
 
 @bp.route('/edit_tray/<tray_id>', methods=['GET', 'POST'])
 @login_required
@@ -166,7 +168,7 @@ def edit_tray_route(tray_id):
             flash(f"Failed to update tray", "error")
     
     # For GET or failed POST, show edit form with current values
-    return render_template('edit_tray.html', tray=tray, page_title=f"Edit Tray {tray_id}")
+    return render_template('edit_tray.html', tray=tray, page_title=f"Edit Tray {tray_id}", username=user)
 
 @bp.route('/delete_tray/<tray_id>', methods=['POST'])
 @login_required
@@ -243,6 +245,48 @@ def move_to_tray_route():
         return jsonify({"success": True})
     else:
         return jsonify({"success": False, "message": "Failed to move item"})
+
+@bp.route('/bulk_remove_from_tray', methods=['POST'])
+@login_required
+def bulk_remove_from_tray():
+    """
+    Remove multiple items from their trays.
+    """
+    data = request.get_json()
+    item_type = data.get('item_type')  # 'stock' or 'cross'
+    unique_ids = data.get('uniqueIDs', [])
+    
+    if not unique_ids:
+        return jsonify({"success": False, "message": "No items selected"})
+    
+    user = session.get('username')
+    success_count = 0
+    
+    for item_id in unique_ids:
+        # Use move_item_to_tray with empty tray_id and position to remove from tray
+        if move_item_to_tray(user, item_type, item_id, '', '', db):
+            success_count += 1
+    
+    if success_count > 0:
+        write_activity(
+            user,
+            f"Bulk removed {success_count} {item_type}s from trays",
+            db
+        )
+        message = f"Successfully removed {success_count} out of {len(unique_ids)} items from trays"
+        return jsonify({
+            "success": True,
+            "message": message,
+            "results": {
+                "success": unique_ids[:success_count],
+                "failed": unique_ids[success_count:]
+            }
+        })
+    else:
+        return jsonify({
+            "success": False,
+            "message": "Failed to remove any items from trays"
+        })
 
 # API endpoint to get tray occupancy data for the UI
 @bp.route('/api/tray/<tray_id>/occupancy')

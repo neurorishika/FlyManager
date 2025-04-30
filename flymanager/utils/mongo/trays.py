@@ -209,6 +209,10 @@ def get_tray_occupancy(user, tray_id, db):
             required_vials = calculate_required_vials(stock)
             position_int = int(position)
             
+            # Calculate row and column for horizontal blocking
+            row = ((position_int - 1) % 10) + 1
+            column = ((position_int - 1) // 10) + 1
+            
             # Add the main position
             occupancy[position] = {
                 "type": "stock",
@@ -220,9 +224,11 @@ def get_tray_occupancy(user, tray_id, db):
                 "display_name": f"{stock['Name']} ({stock['UniqueID']})"
             }
             
-            # Block the next positions
+            # Block the next positions horizontally in the same row
             for i in range(1, required_vials):
-                blocked_pos = str(position_int + i)
+                # Calculate next position in the row
+                next_column = column + i
+                blocked_pos = str(((next_column - 1) * 10) + row)
                 occupancy[blocked_pos] = {
                     "type": "blocked",
                     "blocked_by": position,
@@ -237,6 +243,10 @@ def get_tray_occupancy(user, tray_id, db):
             # Calculate required vials for blocking
             required_vials = calculate_required_vials(cross)
             position_int = int(position)
+            
+            # Calculate row and column for horizontal blocking
+            row = ((position_int - 1) % 10) + 1
+            column = ((position_int - 1) // 10) + 1
             
             # Get the stock IDs for male and female
             male_stock = stocks_collection.find_one({"User": user, "UniqueID": cross["MaleUniqueID"]})
@@ -259,9 +269,11 @@ def get_tray_occupancy(user, tray_id, db):
                 "display_name": f"{cross['Name']} ({cross['UniqueID']}, ♂:{male_id}, ♀:{female_id})"
             }
             
-            # Block the next positions
+            # Block the next positions horizontally in the same row
             for i in range(1, required_vials):
-                blocked_pos = str(position_int + i)
+                # Calculate next position in the row
+                next_column = column + i
+                blocked_pos = str(((next_column - 1) * 10) + row)
                 occupancy[blocked_pos] = {
                     "type": "blocked",
                     "blocked_by": position,
@@ -354,10 +366,14 @@ def move_item_to_tray(user, item_type, item_id, tray_id, position, db):
         position_int = int(position)
         if position_int <= 0 or position_int > (tray["Rows"] * tray["Columns"]):
             return False
+        
+        # Calculate row and column for horizontal validation
+        row = ((position_int - 1) % 10) + 1
+        column = ((position_int - 1) // 10) + 1
             
-        # Check if the last required position would be beyond tray bounds
-        last_position = position_int + required_vials - 1
-        if last_position > (tray["Rows"] * tray["Columns"]):
+        # Check if the last required position would be beyond tray bounds horizontally
+        last_column = column + required_vials - 1
+        if last_column > tray["Columns"]:
             return False
     except ValueError:
         return False
@@ -365,7 +381,9 @@ def move_item_to_tray(user, item_type, item_id, tray_id, position, db):
     # Check if any of the required positions are occupied
     occupancy = get_tray_occupancy(user, tray_id, db)
     for i in range(required_vials):
-        check_pos = str(position_int + i)
+        # Calculate next position in the row
+        next_column = column + i
+        check_pos = str(((next_column - 1) * 10) + row)
         if check_pos in occupancy:
             return False
     

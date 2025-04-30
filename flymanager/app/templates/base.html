@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,68 +10,203 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     {% block head %}{% endblock %}
     <style>
+        :root[data-theme="light"] {
+            --bg-color: #f0f0f0;
+            --text-color: #212529;
+            --header-bg: #007BFF;
+            --header-text: #fff;
+            --card-bg: #fff;
+            --border-color: #dee2e6;
+        }
+        
+        :root[data-theme="dark"] {
+            --bg-color: #1a1a1a;
+            --text-color: #e1e1e1;
+            --header-bg: #004a99;
+            --header-text: #fff;
+            --card-bg: #2d2d2d;
+            --border-color: #404040;
+        }
+
         body {
             font-family: 'Roboto', sans-serif;
-            background-color: #f0f0f0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin-bottom: 75px;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
+
         .header {
-            background-color: #007BFF;
-            color: #fff;
+            background-color: var(--header-bg);
+            color: var(--header-text);
             padding: 10px 0;
             position: fixed;
             width: 100%;
             top: 0;
             z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+
         .header .container {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
+
         .header a {
-            color: #fff;
+            color: var(--header-text);
             margin: 0 10px;
             text-decoration: none;
             font-weight: 500;
+            transition: opacity 0.2s ease;
         }
+
+        .header a:hover {
+            opacity: 0.8;
+            text-decoration: none;
+            color: var(--header-text);
+        }
+
         .main-content {
             padding: 80px 20px 20px;
         }
+
         .footer {
-            background-color: #007BFF;
-            color: #fff;
+            background-color: var(--header-bg);
+            color: var(--header-text);
             padding: 10px 0;
             text-align: center;
             position: fixed;
             width: 100%;
             bottom: 0;
             z-index: 1000;
+            box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
         }
+
         .footer a {
-            color: #fff;
+            color: var(--header-text);
             text-decoration: none;
+        }
+
+        .footer a:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-color: var(--border-color);
+        }
+
+        .theme-toggle {
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            background: rgba(255,255,255,0.1);
+            margin-right: 15px;
+        }
+
+        .theme-toggle i {
+            margin-right: 5px;
+        }
+
+        .nav-item .dropdown-menu {
+            background-color: var(--card-bg);
+            border-color: var(--border-color);
+        }
+
+        .nav-item .dropdown-item {
+            color: var(--text-color);
+        }
+
+        .nav-item .dropdown-item:hover {
+            background-color: var(--header-bg);
+            color: var(--header-text);
+        }
+
+        .table {
+            color: var(--text-color);
+        }
+
+        .alert {
+            background-color: var(--card-bg);
+            border-color: var(--border-color);
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+        }
+
+        .alert-info {
+            background-color: rgba(0, 123, 255, 0.1);
+            border-color: rgba(0, 123, 255, 0.1);
+            color: var(--text-color);
+        }
+
+        .breadcrumb {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+        }
+
+        @media (max-width: 991px) {
+            .header .nav-links {
+                display: none;
+            }
+            .header .mobile-nav {
+                display: block;
+            }
         }
     </style>
 </head>
 <body>
     <header class="header">
         <div class="container">
-            <div>Welcome, <strong>{{ username }}</strong></div>
-            <nav>
-                <a href="/">Home</a>
-                <!-- <a href="/cross_generator">Cross Generator</a> -->
-                <!-- <a href="/tray_generator">Tray Generator</a> -->
-                <!-- <a href="/flip">Fly Flipper</a> -->
-                <a href="{{ url_for('flip.flip_interface') }}">Fly Flipper</a>
-                <!-- <a href="/flip_schedule">Flip Schedule</a> -->
-                <a href="{{ url_for('flip.flip_schedule_display') }}">Flip Schedule</a>
-                <!-- <a href="/cross_explorer">Cross Explorer</a> -->
-                <a href="{{ url_for('cross.cross_explorer') }}">Cross Explorer</a>
-                <!-- <a href="/stock_explorer">Stock Explorer</a> -->
-                <a href="{{ url_for('stock.stock_explorer') }}">Stock Explorer</a>
-                <a href="{{ url_for('tray.tray_management') }}"><i class="fas fa-th"></i> Tray Management</a>
-                <a style="font-weight: 700;" href="{{ url_for('auth.logout') }}">Logout</a>
+            <div class="d-flex align-items-center">
+                <div class="theme-toggle" onclick="toggleTheme()">
+                    <i class="fas fa-sun"></i>
+                </div>
+                <div>Welcome, <strong>{{ username }}</strong></div>
+            </div>
+            <nav class="d-flex align-items-center">
+                <a href="/" class="d-none d-lg-inline-block">Home</a>
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-bars"></i> Menu
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
+                        <a class="dropdown-item" href="/"><i class="fas fa-home"></i> Home</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('flip.flip_interface') }}">
+                            <i class="fas fa-cogs"></i> Flipper
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('flip.flip_schedule_display') }}">
+                            <i class="fas fa-calendar-alt"></i> Schedule
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('cross.cross_explorer') }}">
+                            <i class="fas fa-heart"></i> Cross Explorer
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('stock.stock_explorer') }}">
+                            <i class="fas fa-box"></i> Stock Explorer
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('tray.tray_management') }}">
+                            <i class="fas fa-th"></i> Tray Management
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('data.download_data_route') }}">
+                            <i class="fas fa-download"></i> Download Data
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('data.upload_data_route') }}">
+                            <i class="fas fa-upload"></i> Upload Data
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('auth.logout') }}">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a>
+                    </div>
+                </div>
             </nav>
         </div>
     </header>
@@ -80,17 +215,34 @@
     </div>
     <footer class="footer mt-auto py-3">
         <div>For support, contact admin: Rishika Mohanta <a href="mailto:rmohanta@rockefeller.edu">rmohanta@rockefeller.edu</a></div>
-        <div class="container text-center">
-            <span>
-                <!-- Add links to download and upload data -->
-                <a href="{{ url_for('data.download_data_route') }}">Download Data</a> |
-                <a href="{{ url_for('data.upload_data_route') }}">Upload Data</a>
-            </span>
-        </div>
     </footer>
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     {% block scripts %}{% endblock %}
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            
+            // Update theme toggle icon
+            const themeIcon = document.querySelector('.theme-toggle i');
+            themeIcon.className = newTheme === 'light' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+
+        // Set initial theme from localStorage or default to light
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            // Set initial icon
+            const themeIcon = document.querySelector('.theme-toggle i');
+            themeIcon.className = savedTheme === 'light' ? 'fas fa-sun' : 'fas fa-moon';
+        });
+    </script>
 </body>
 </html>
