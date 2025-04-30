@@ -168,3 +168,6 @@ directory.path
 
 # generated labels
 flymanager/static/generated_labels/*
+
+# .old directories
+**/.old

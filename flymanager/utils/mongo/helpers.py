@@ -1,4 +1,5 @@
 import datetime
+from flask import url_for
 from flymanager.utils.utils import day_str_to_num
 
 # Metadata Management
@@ -167,7 +168,7 @@ def get_flip_schedule(user, db):
             if closest_flip_day:
                 flip_date_str = closest_flip_day.strftime('%Y-%m-%d')
                 tray_info = f"{stock['TrayID']} - {stock['TrayPosition']}"
-                link = f"<a href='/view_stock/{stock['UniqueID']}'>{stock['Name']}</a>"
+                link = f"<a href='{url_for('stock.view_stock', unique_id=stock['UniqueID'])}'>{stock['Name']}</a>"
                 schedule.setdefault(flip_date_str, []).append(f"Stock: {link} (ID: {stock['UniqueID']}, {tray_info})")
             else:
                 print(f"No valid flip day found for stock {stock['UniqueID']} on {next_flip_date}")

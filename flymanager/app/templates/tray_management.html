@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1>Tray Management</h1>
+            <div class="mb-4">
+                <a href="{{ url_for('tray.add_tray_route') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Add New Tray
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            {% if trays %}
+            <div class="card">
+                <div class="card-header">
+                    <h2>Your Trays</h2>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Tray ID</th>
+                                    <th>Name</th>
+                                    <th>Size</th>
+                                    <th>Capacity</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tray in trays %}
+                                <tr>
+                                    <td>{{ tray.TrayID }}</td>
+                                    <td>{{ tray.Name }}</td>
+                                    <td>{{ tray.Rows }} x {{ tray.Columns }}</td>
+                                    <td>{{ tray.Rows * tray.Columns }} positions</td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('tray.view_tray', tray_id=tray.TrayID) }}" class="btn btn-sm btn-info">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                            <a href="{{ url_for('tray.edit_tray_route', tray_id=tray.TrayID) }}" class="btn btn-sm btn-warning">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </a>
+                                            <button class="btn btn-sm btn-danger" 
+                                                    onclick="confirmDelete('{{ tray.TrayID }}', '{{ tray.Name }}')">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <h3>No trays found</h3>
+                <p>You haven't created any trays yet. Click the "Add New Tray" button to get started.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete tray <span id="deleteTrayName"></span>?</p>
+                <p class="text-danger">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <form id="deleteForm" method="POST">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function confirmDelete(trayId, trayName) {
+        document.getElementById('deleteForm').action = "{{ url_for('tray.delete_tray_route', tray_id='') }}" + trayId;
+        document.getElementById('deleteTrayName').textContent = trayId + " - " + trayName;
+        $('#deleteModal').modal('show');
+    }
+</script>
+{% endblock %}

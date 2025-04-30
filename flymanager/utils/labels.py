@@ -216,7 +216,7 @@ def render_cross_label(canvas, width, height, cross, uid, male_genotype, female_
         canvas.drawImage(f"temp/{uid}.png", width - 55, 12, width=45, height=45)
 
 # create a general label pdf generator that accepts both stock and cross labels
-def generate_label_pdf(filename, user_initial, selected_items, item_type, num_blank, num_labels, path="flymanager/static/generated_labels/", row_first=True, debug=False):
+def generate_label_pdf(filename, user_initial, selected_items, item_type, num_blank, num_labels, path="/", row_first=True, debug=False):
     """
     Generate labels for stocks and crosses in PDF format.
     
@@ -253,7 +253,7 @@ def generate_label_pdf(filename, user_initial, selected_items, item_type, num_bl
     if path[-1] != "/":
         path += "/"
 
-    label.open(f"{path}{filename}.pdf")
+    label.open(f"{path}{filename}")
     label.debug = debug
 
     # Render blank labels

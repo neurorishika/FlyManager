@@ -147,7 +147,7 @@ def flip_stock(user, uid, db, timestamp, new_status=None, added_comment=None):
         The unique identifier of the stock.
     db: pymongo.database.Database
         The MongoDB database instance.
-    timestamp: str
+    timestamp: str or datetime
         The special timestamp to use.
     new_status: str
         The new status of the stock.
@@ -155,14 +155,22 @@ def flip_stock(user, uid, db, timestamp, new_status=None, added_comment=None):
         The comment to add to the stock.
     """
     
+    # Ensure timestamp is a string in ISO format
+    if isinstance(timestamp, datetime.datetime):
+        timestamp = timestamp.isoformat()
+    elif not isinstance(timestamp, str):
+        raise TypeError("timestamp must be a string or datetime object")
+
+    # Replace 'T' with a space for compatibility
+    ts = timestamp.replace('T', ' ')
+
     # Define the user's collection
     stocks_collection = db["stocks"]
     print(f"Flipping stock {uid} for user {user}")
     # Prepare the update fields
     update_fields = {}
-    
+
     # Update the LastFlipDate and FlipLog
-    ts = timestamp.replace('T', ' ')
     current_stock = stocks_collection.find_one({"UniqueID": uid, "User": user})
 
     # If the stock exists
@@ -371,7 +379,10 @@ def update_stock_vials(stock, username, db):
         next_eclosion_dates = [date for i,date in enumerate(next_eclosion_dates) if i not in to_delete]
 
         # get the last flip date
-        last_flip_date = datetime.datetime.strptime(stock["LastFlipDate"], "%Y-%m-%d %H:%M")
+        try:
+            last_flip_date = datetime.datetime.strptime(stock["LastFlipDate"], "%Y-%m-%d %H:%M")
+        except:
+            last_flip_date = datetime.datetime.strptime(stock["LastFlipDate"], "%Y-%m-%d %H:%M:%S")
         # remove HH:MM:SS from the last flip date
         last_flip_date = last_flip_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -447,7 +458,10 @@ def update_stock_vials(stock, username, db):
         next_eclosion_dates = [date for i,date in enumerate(next_eclosion_dates) if i not in to_delete]
 
         # get the last flip date
-        last_flip_date = datetime.datetime.strptime(stock["LastFlipDate"], "%Y-%m-%d %H:%M")
+        try:
+            last_flip_date = datetime.datetime.strptime(stock["LastFlipDate"], "%Y-%m-%d %H:%M")
+        except:
+            last_flip_date = datetime.datetime.strptime(stock["LastFlipDate"], "%Y-%m-%d %H:%M:%S")
         # remove HH:MM:SS from the last flip date
         last_flip_date = last_flip_date.replace(hour=0, minute=0, second=0, microsecond=0)
 

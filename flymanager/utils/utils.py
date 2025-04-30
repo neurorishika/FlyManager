@@ -1,5 +1,4 @@
 # Description: Utility functions for the FlyManager application
-
 import datetime
 
 # take an console input from the user and validate it against a list of valid options
@@ -70,3 +69,59 @@ def day_str_to_num(day_str):
         "Su": 6   # Sunday
     }
     return day_map.get(day_str)
+
+def increment_replicate_id(replicate_id):
+    """
+    Increments the replicate ID by following alphabetical order (a, b, ..., z, aa, ab, ..., az, ba, ..., zz, aaa, etc.).
+    
+    Parameters:
+    replicate_id: str
+        The current replicate ID.
+    
+    Returns:
+    str
+        The next replicate ID in sequence.
+    """
+
+    # If replicate_id is empty, return 'a'
+    if replicate_id == "":
+        return "a"
+    
+    def incr_chr(c):
+        """
+        Helper function that increments a single character, handling wraparound from 'z' to 'a'.
+        
+        Returns:
+        (carry, next_char) where:
+        - carry: 1 if wrapping from 'z' to 'a', otherwise 0.
+        - next_char: the next character in sequence.
+        """
+        if c == 'z':
+            return 1, 'a'  # wrap from 'z' to 'a' with carry 1
+        else:
+            return 0, chr(ord(c) + 1)  # normal increment with no carry
+    
+    # Convert the replicate_id into a list of characters
+    lst = list(replicate_id)
+    result = []
+    
+    # Loop through the list from the rightmost character (the least significant)
+    while lst:
+        carry, next_ = incr_chr(lst.pop())  # increment the last letter in the list
+        result.append(next_)                # add incremented character to the result
+
+        if not carry:                       # if no carry, we are done
+            break
+        if not lst:                         # if the list is empty but we still have a carry, prepend 'a'
+            result.append('a')
+    
+    result += lst[::-1]                     # append the remaining characters (if any) in reverse order
+    return ''.join(result[::-1])            # convert list back to string in reverse order
+
+# Helper to parse flip day value
+def parse_flip_day(flip_in_str):
+    try:
+        day_value_str = flip_in_str.split(' ')[0].split(',')[0].strip()
+        return int(day_value_str) if day_value_str != 'N/A' else -999
+    except:
+        return -999

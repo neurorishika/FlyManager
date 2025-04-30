@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h1>Edit Tray: {{ tray.TrayID }}</h1>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('tray.edit_tray_route', tray_id=tray.TrayID) }}" method="POST">
+                        <div class="form-group">
+                            <label for="tray_id">Tray ID:</label>
+                            <input type="text" class="form-control" id="tray_id" name="tray_id" 
+                                   value="{{ tray.TrayID }}" readonly>
+                            <small class="form-text text-muted">Tray ID cannot be changed</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="name">Name*:</label>
+                            <input type="text" class="form-control" id="name" name="name" 
+                                   value="{{ tray.Name }}" required>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="rows">Number of Rows*:</label>
+                                    <input type="number" class="form-control" id="rows" name="rows" 
+                                           value="{{ tray.Rows }}" min="1" max="50" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="columns">Number of Columns*:</label>
+                                    <input type="number" class="form-control" id="columns" name="columns" 
+                                           value="{{ tray.Columns }}" min="1" max="50" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="description">Description:</label>
+                            <textarea class="form-control" id="description" name="description" rows="3">{{ tray.Description }}</textarea>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i> 
+                            <strong>Warning:</strong> Reducing the number of rows or columns may make 
+                            items in those positions inaccessible until the tray is expanded again.
+                        </div>
+                        
+                        <div class="form-group text-right">
+                            <a href="{{ url_for('tray.view_tray', tray_id=tray.TrayID) }}" class="btn btn-secondary mr-2">
+                                Cancel
+                            </a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

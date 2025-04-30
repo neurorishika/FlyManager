@@ -20,6 +20,12 @@ from .crosses import (
     add_to_cross, get_cross, flip_cross, delete_cross, edit_cross, update_cross_vials
 )
 
+# Tray functions
+from .trays import (
+    add_tray, get_user_trays, get_tray, delete_tray, update_tray, 
+    get_tray_occupancy, calculate_required_vials, move_item_to_tray
+)
+
 # Helper functions
 from .helpers import (
     get_metadata, add_metadata, delete_metadata, edit_metadata,
@@ -46,6 +52,10 @@ __all__ = [
     
     # Cross functions
     'add_to_cross', 'get_cross', 'flip_cross', 'delete_cross', 'edit_cross', 'update_cross_vials',
+    
+    # Tray functions
+    'add_tray', 'get_user_trays', 'get_tray', 'delete_tray', 'update_tray',
+    'get_tray_occupancy', 'calculate_required_vials', 'move_item_to_tray',
     
     # Helper/metadata functions
     'get_metadata', 'add_metadata', 'delete_metadata', 'edit_metadata',

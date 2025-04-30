@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h1>Add New Tray</h1>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('tray.add_tray_route') }}" method="POST">
+                        <div class="form-group">
+                            <label for="tray_id">Tray ID*:</label>
+                            <input type="text" class="form-control" id="tray_id" name="tray_id" required
+                                placeholder="Enter a unique identifier for this tray (e.g., A1, B2, etc.)">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="name">Name*:</label>
+                            <input type="text" class="form-control" id="name" name="name" required
+                                placeholder="Enter a descriptive name for this tray">
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="rows">Number of Rows*:</label>
+                                    <input type="number" class="form-control" id="rows" name="rows" 
+                                        value="10" min="1" max="50" required>
+                                    <small class="form-text text-muted">Most standard trays are 10x10</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="columns">Number of Columns*:</label>
+                                    <input type="number" class="form-control" id="columns" name="columns" 
+                                        value="10" min="1" max="50" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="description">Description (optional):</label>
+                            <textarea class="form-control" id="description" name="description" rows="3"
+                                placeholder="Provide additional details about this tray"></textarea>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> 
+                            After creating your tray, you'll be able to add stocks and crosses to it.
+                        </div>
+                        
+                        <div class="form-group text-right">
+                            <a href="{{ url_for('tray.tray_management') }}" class="btn btn-secondary mr-2">
+                                Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Add Tray
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
