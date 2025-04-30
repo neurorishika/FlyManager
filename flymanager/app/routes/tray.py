@@ -201,7 +201,7 @@ def delete_tray_route(tray_id):
     
     return redirect(url_for('tray.tray_management'))
 
-@bp.route('/move_to_tray', methods=['POST'])
+@bp.route('/move_to_tray_route', methods=['POST'])
 @login_required
 def move_to_tray_route():
     """
@@ -215,22 +215,29 @@ def move_to_tray_route():
     position = data.get('position')
     
     # Validate required fields
-    if not all([item_type, item_id, tray_id, position]):
-        return jsonify({"success": False, "message": "Missing required fields"})
+    if not all([item_type, item_id]):
+        return jsonify({"success": False, "message": "Missing item type or ID"})
+    
+    # For removal from tray, tray_id and position should be empty strings
+    is_removal = tray_id == '' and position == ''
+    
+    # For moving to a tray, both tray_id and position are required
+    if not is_removal and not all([tray_id, position]):
+        return jsonify({"success": False, "message": "Missing tray ID or position"})
     
     # Get database connection
-    
     user = session.get('username')
     
-    # Move item to tray
+    # Move item to tray (or remove if tray_id and position are empty)
     success = move_item_to_tray(user, item_type, item_id, tray_id, position, db)
     
     if success:
         # Log activity
+        action = "Removed" if is_removal else "Moved"
+        location = "from tray" if is_removal else f"to tray {tray_id}, position {position}"
         write_activity(
             user, 
-            f"Moved {item_type} to tray", 
-            f"{item_id} to tray {tray_id}, position {position}", 
+            f"{action} {item_type} with {item_id} {location}", 
             db
         )
         return jsonify({"success": True})

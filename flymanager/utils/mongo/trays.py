@@ -189,7 +189,7 @@ def get_tray_occupancy(user, tray_id, db):
     
     Returns:
     dict
-        Dictionary of occupied positions with stock/cross info
+        Dictionary of occupied and blocked positions with stock/cross info
     """
     # Get stocks and crosses in this tray
     stocks_collection = db["stocks"]
@@ -204,27 +204,70 @@ def get_tray_occupancy(user, tray_id, db):
     # Add stocks to occupancy map
     for stock in stocks:
         position = stock.get("TrayPosition", "")
-        if position:
+        if position and stock["Status"] != "No longer maintained":
+            # Calculate required vials for blocking
+            required_vials = calculate_required_vials(stock)
+            position_int = int(position)
+            
+            # Add the main position
             occupancy[position] = {
                 "type": "stock",
                 "id": stock["UniqueID"],
                 "name": stock["Name"],
                 "genotype": stock["Genotype"],
-                "status": stock["Status"]
+                "status": stock["Status"],
+                "required_vials": required_vials,
+                "display_name": f"{stock['Name']} ({stock['UniqueID']})"
             }
+            
+            # Block the next positions
+            for i in range(1, required_vials):
+                blocked_pos = str(position_int + i)
+                occupancy[blocked_pos] = {
+                    "type": "blocked",
+                    "blocked_by": position,
+                    "blocked_by_type": "stock",
+                    "blocked_by_name": f"{stock['Name']} ({stock['UniqueID']})"
+                }
     
     # Add crosses to occupancy map
     for cross in crosses:
         position = cross.get("TrayPosition", "")
-        if position:
+        if position and cross["Status"] != "No longer maintained":
+            # Calculate required vials for blocking
+            required_vials = calculate_required_vials(cross)
+            position_int = int(position)
+            
+            # Get the stock IDs for male and female
+            male_stock = stocks_collection.find_one({"User": user, "UniqueID": cross["MaleUniqueID"]})
+            female_stock = stocks_collection.find_one({"User": user, "UniqueID": cross["FemaleUniqueID"]})
+            
+            male_id = male_stock["UniqueID"] if male_stock else "Unknown"
+            female_id = female_stock["UniqueID"] if female_stock else "Unknown"
+            
+            # Add the main position
             occupancy[position] = {
                 "type": "cross",
                 "id": cross["UniqueID"],
                 "name": cross["Name"],
                 "male_genotype": cross["MaleGenotype"],
                 "female_genotype": cross["FemaleGenotype"],
-                "status": cross["Status"]
+                "status": cross["Status"],
+                "required_vials": required_vials,
+                "male_stock_id": male_id,
+                "female_stock_id": female_id,
+                "display_name": f"{cross['Name']} ({cross['UniqueID']}, ♂:{male_id}, ♀:{female_id})"
             }
+            
+            # Block the next positions
+            for i in range(1, required_vials):
+                blocked_pos = str(position_int + i)
+                occupancy[blocked_pos] = {
+                    "type": "blocked",
+                    "blocked_by": position,
+                    "blocked_by_type": "cross",
+                    "blocked_by_name": f"{cross['Name']} ({cross['UniqueID']})"
+                }
     
     return occupancy
 
@@ -260,37 +303,71 @@ def move_item_to_tray(user, item_type, item_id, tray_id, position, db):
     item_id: str
         The UniqueID of the stock or cross.
     tray_id: str
-        The TrayID to move to.
+        The TrayID to move to, or empty string to remove from tray.
     position: str
-        The position in the tray (e.g. "1", "2", etc.).
+        The position in the tray (e.g. "1", "2", etc.), or empty string to remove from tray.
     db: pymongo.database.Database
         The MongoDB database instance.
     
     Returns:
     bool
-        True if the item was moved, False otherwise.
+        True if the item was moved/removed, False otherwise.
     """
     # Import to avoid circular imports
-    from .stocks import edit_stock
-    from .crosses import edit_cross
+    from .stocks import edit_stock, get_stock
+    from .crosses import edit_cross, get_cross
     
-    # Validate the tray exists
+    # Handle removal from tray (empty tray_id and position)
+    if tray_id == '' and position == '':
+        updates = {
+            "TrayID": "",
+            "TrayPosition": ""
+        }
+        if item_type == "stock":
+            return edit_stock(user, item_id, db, updates)
+        elif item_type == "cross":
+            return edit_cross(user, item_id, db, updates)
+        else:
+            return False
+    
+    # Validate the tray exists for moves to a tray
     tray = get_tray(user, tray_id, db)
     if not tray:
         return False
+    
+    # Get the item to calculate required vials
+    if item_type == "stock":
+        item = get_stock(user, item_id, db)
+    elif item_type == "cross":
+        item = get_cross(user, item_id, db)
+    else:
+        return False
+        
+    if not item or item.get("Status") == "No longer maintained":
+        return False
+    
+    # Calculate required vials
+    required_vials = calculate_required_vials(item)
     
     # Check if position is within tray bounds
     try:
         position_int = int(position)
         if position_int <= 0 or position_int > (tray["Rows"] * tray["Columns"]):
             return False
+            
+        # Check if the last required position would be beyond tray bounds
+        last_position = position_int + required_vials - 1
+        if last_position > (tray["Rows"] * tray["Columns"]):
+            return False
     except ValueError:
         return False
         
-    # Check if position is already occupied
+    # Check if any of the required positions are occupied
     occupancy = get_tray_occupancy(user, tray_id, db)
-    if position in occupancy:
-        return False
+    for i in range(required_vials):
+        check_pos = str(position_int + i)
+        if check_pos in occupancy:
+            return False
     
     # Move the item
     updates = {

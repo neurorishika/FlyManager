@@ -69,6 +69,10 @@
                                 <div class="legend-color legend-cross"></div>
                                 <span>Cross</span>
                             </div>
+                            <div class="legend-item">
+                                <div class="legend-color legend-blocked"></div>
+                                <span>Blocked Position</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -81,7 +85,13 @@
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header">
-                    <h3>Available Items</h3>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h3>Available Items</h3>
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input" id="showAllItems">
+                            <label class="custom-control-label" for="showAllItems">Show all items</label>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     <ul class="nav nav-tabs" id="itemTabs" role="tablist">
@@ -107,11 +117,16 @@
                                      data-id="{{ stock.UniqueID }}"
                                      data-name="{{ stock.Name }}"
                                      data-genotype="{{ stock.Genotype }}"
-                                     data-vials="{{ stock.required_vials }}">
-                                    <div class="item-header">{{ stock.Name }}</div>
+                                     data-vials="{{ stock.required_vials }}"
+                                     data-tray-id="{{ stock.TrayID }}"
+                                     data-tray-position="{{ stock.TrayPosition }}">
+                                    <div class="item-header">{{ stock.Name }} ({{ stock.UniqueID }})</div>
                                     <div class="item-genotype">{{ stock.Genotype }}</div>
                                     <div class="item-info">
                                         <span class="badge badge-info">{{ stock.required_vials }} vials needed</span>
+                                        {% if stock.TrayID and stock.TrayPosition %}
+                                        <span class="badge badge-warning">Currently in {{ stock.TrayID }}-{{ stock.TrayPosition }}</span>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 {% else %}
@@ -134,12 +149,17 @@
                                      data-name="{{ cross.Name }}"
                                      data-male="{{ cross.MaleGenotype }}"
                                      data-female="{{ cross.FemaleGenotype }}"
-                                     data-vials="{{ cross.required_vials }}">
-                                    <div class="item-header">{{ cross.Name }}</div>
-                                    <div class="item-genotype">Male: {{ cross.MaleGenotype }}</div>
-                                    <div class="item-genotype">Female: {{ cross.FemaleGenotype }}</div>
+                                     data-vials="{{ cross.required_vials }}"
+                                     data-tray-id="{{ cross.TrayID }}"
+                                     data-tray-position="{{ cross.TrayPosition }}">
+                                    <div class="item-header">{{ cross.Name }} ({{ cross.UniqueID }})</div>
+                                    <div class="item-genotype">Male: {{ cross.MaleGenotype }} ({{ cross.MaleUniqueID }})</div>
+                                    <div class="item-genotype">Female: {{ cross.FemaleGenotype }} ({{ cross.FemaleUniqueID }})</div>
                                     <div class="item-info">
                                         <span class="badge badge-info">{{ cross.required_vials }} vials needed</span>
+                                        {% if cross.TrayID and cross.TrayPosition %}
+                                        <span class="badge badge-warning">Currently in {{ cross.TrayID }}-{{ cross.TrayPosition }}</span>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 {% else %}
@@ -172,10 +192,11 @@
                                 </thead>
                                 <tbody>
                                     {% for pos, item in occupancy.items() %}
+                                    {% if item.type != 'blocked' %}
                                     <tr>
                                         <td>{{ pos }}</td>
                                         <td>{{ item.type|capitalize }}</td>
-                                        <td>{{ item.name }}</td>
+                                        <td>{{ item.display_name }}</td>
                                         <td>
                                             {% if item.type == 'stock' %}
                                             <a href="{{ url_for('stock.view_stock', unique_id=item.id) }}" class="btn btn-sm btn-info">View</a>
@@ -184,6 +205,7 @@
                                             {% endif %}
                                         </td>
                                     </tr>
+                                    {% endif %}
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -283,6 +305,13 @@
         border-color: #b8daff;
     }
     
+    .tray-cell.blocked {
+        background-color: #e9ecef;
+        border-color: #dee2e6;
+        cursor: not-allowed;
+        opacity: 0.8;
+    }
+    
     .tray-cell .position {
         position: absolute;
         top: 2px;
@@ -328,6 +357,16 @@
     
     .legend-cross {
         background-color: #cce5ff;
+    }
+    
+    .legend-blocked {
+        background-color: #e9ecef;
+    }
+    
+    .blocked-info {
+        font-size: 0.8em;
+        color: #6c757d;
+        text-align: center;
     }
     
     .item-list {
@@ -396,7 +435,7 @@
         trayGrid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
         
         // Fetch occupancy data from API
-        fetch(`/api/tray/${trayId}/occupancy`)
+        fetch(`{{ url_for('tray.get_tray_occupancy_api', tray_id='PLACEHOLDER') }}`.replace('PLACEHOLDER', trayId))
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -420,6 +459,17 @@
         document.getElementById('crossSearch').addEventListener('input', function(e) {
             filterItems('crossesList', e.target.value);
         });
+
+        // Add event listener for the show all items toggle
+        document.getElementById('showAllItems').addEventListener('change', function() {
+            // Reapply current filters
+            filterItems('stocksList', document.getElementById('stockSearch').value);
+            filterItems('crossesList', document.getElementById('crossSearch').value);
+        });
+        
+        // Hide non-orphaned items by default (trigger initial filter)
+        filterItems('stocksList', '');
+        filterItems('crossesList', '');
     });
     
     function generateTrayGrid(rows, columns, occupancy) {
@@ -444,21 +494,30 @@
                 const content = document.createElement('div');
                 content.className = 'content';
                 
-                // Check if this position is occupied
+                // Check if this position is occupied or blocked
                 if (occupancy && occupancy[position]) {
                     const item = occupancy[position];
                     cell.classList.remove('empty');
                     cell.classList.add(item.type);
-                    cell.dataset.type = item.type;
-                    cell.dataset.id = item.id;
                     
-                    // Add item details
-                    content.innerHTML = `<strong>${item.name}</strong>`;
-                    
-                    // Set click handler for viewing item details
-                    cell.addEventListener('click', function() {
-                        showItemDetails(item, position);
-                    });
+                    if (item.type === 'blocked') {
+                        content.innerHTML = `
+                            <div class="blocked-info">
+                                Blocked by ${item.blocked_by_type}<br>
+                                at position ${item.blocked_by}<br>
+                                (${item.blocked_by_name})
+                            </div>
+                        `;
+                    } else {
+                        cell.dataset.type = item.type;
+                        cell.dataset.id = item.id;
+                        content.innerHTML = `<strong>${item.display_name}</strong>`;
+                        
+                        // Set click handler for viewing item details
+                        cell.addEventListener('click', function() {
+                            showItemDetails(item, position);
+                        });
+                    }
                 } else {
                     content.textContent = 'Empty';
                 }
@@ -507,13 +566,15 @@
     }
     
     function handleDragOver(e) {
-        // Allow drop
-        e.preventDefault();
+        // Only allow drop on empty cells that aren't blocked
+        if (this.classList.contains('empty') && !this.classList.contains('blocked')) {
+            e.preventDefault();
+        }
     }
     
     function handleDragEnter(e) {
-        // Only highlight if the cell is empty
-        if (this.classList.contains('empty')) {
+        // Only highlight if the cell is empty and not blocked
+        if (this.classList.contains('empty') && !this.classList.contains('blocked')) {
             this.classList.add('drag-over');
         }
     }
@@ -528,8 +589,8 @@
         // Remove drag-over class
         this.classList.remove('drag-over');
         
-        // Only allow drop on empty cells
-        if (!this.classList.contains('empty')) {
+        // Only allow drop on empty cells that aren't blocked
+        if (!this.classList.contains('empty') || this.classList.contains('blocked')) {
             return;
         }
         
@@ -538,6 +599,20 @@
             const data = JSON.parse(e.dataTransfer.getData('text/plain'));
             const position = this.dataset.position;
             const trayId = document.getElementById('trayGrid').dataset.trayId;
+            
+            // Check if there's enough space for the required vials
+            const requiredVials = parseInt(data.vials);
+            const currentPosition = parseInt(position);
+            
+            // Check if any of the next positions are occupied or blocked
+            for (let i = 0; i < requiredVials; i++) {
+                const checkPosition = (currentPosition + i).toString();
+                const cell = document.querySelector(`.tray-cell[data-position="${checkPosition}"]`);
+                if (!cell || !cell.classList.contains('empty') || cell.classList.contains('blocked')) {
+                    alert(`Cannot place item here - needs ${requiredVials} consecutive empty positions.`);
+                    return;
+                }
+            }
             
             // Call API to move item to tray
             moveItemToTray(data.type, data.id, trayId, position);
@@ -548,7 +623,7 @@
     
     function moveItemToTray(itemType, itemId, trayId, position) {
         // API request to move item
-        fetch('/move_to_tray', {
+        fetch('{{ url_for('tray.move_to_tray_route') }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -582,7 +657,7 @@
         
         // Set modal content
         let detailContent = `
-            <p><strong>Name:</strong> ${item.name}</p>
+            <p><strong>Name:</strong> ${item.display_name}</p>
         `;
         
         if (item.type === 'stock') {
@@ -591,7 +666,7 @@
             `;
             
             // Set view link
-            document.getElementById('viewItemLink').href = `/view_stock/${item.id}`;
+            document.getElementById('viewItemLink').href = `{{ url_for('stock.view_stock', unique_id='PLACEHOLDER') }}`.replace('PLACEHOLDER', item.id);
         } else {
             detailContent += `
                 <p><strong>Male Genotype:</strong> ${item.male_genotype}</p>
@@ -599,7 +674,7 @@
             `;
             
             // Set view link
-            document.getElementById('viewItemLink').href = `/view_cross/${item.id}`;
+            document.getElementById('viewItemLink').href = `{{ url_for('cross.view_cross', unique_id='PLACEHOLDER') }}`.replace('PLACEHOLDER', item.id);
         }
         
         detailContent += `
@@ -621,7 +696,7 @@
     
     function removeFromTray(itemType, itemId) {
         // API request to move item to no tray (empty trayId and position)
-        fetch('/move_to_tray', {
+        fetch('{{ url_for('tray.move_to_tray_route') }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -652,14 +727,20 @@
     function filterItems(containerId, query) {
         const container = document.getElementById(containerId);
         const items = container.querySelectorAll('.drag-item');
+        const showAllItems = document.getElementById('showAllItems').checked;
         
         query = query.toLowerCase();
         
         items.forEach(item => {
             const name = item.dataset.name.toLowerCase();
             const genotype = (item.dataset.genotype || item.dataset.male).toLowerCase();
+            const isOrphan = !(item.dataset.trayId && item.dataset.trayPosition);
             
-            if (name.includes(query) || genotype.includes(query)) {
+            // Show item if:
+            // 1. It matches the search query (if any)
+            // 2. AND either showAllItems is true OR it's an orphan
+            if ((name.includes(query) || genotype.includes(query)) && 
+                (showAllItems || isOrphan)) {
                 item.style.display = '';
             } else {
                 item.style.display = 'none';
@@ -668,7 +749,7 @@
     }
     
     function confirmDelete(trayId, trayName) {
-        document.getElementById('deleteForm').action = "/delete_tray/" + trayId;
+        document.getElementById('deleteForm').action = "{{ url_for('tray.delete_tray_route', tray_id='PLACEHOLDER') }}".replace('PLACEHOLDER', trayId);
         document.getElementById('deleteTrayName').textContent = trayId + " - " + trayName;
         $('#deleteModal').modal('show');
     }
