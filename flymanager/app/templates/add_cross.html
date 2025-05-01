@@ -56,17 +56,14 @@
             </div>
         </div>
 
-        <!-- Row 3: Tray ID, Tray Position, and Status -->
+        <!-- Row 3: Cross Name, Status, Food Type-->
         <div class="form-row">
-            <div class="form-group col-md-4">
-                <label for="trayID">Tray ID:</label>
-                <input type="text" class="form-control" id="trayID" name="trayID">
+
+            <div class="form-group col-md-6">
+                <label for="name">Cross Name:</label>
+                <input type="text" class="form-control" id="name" name="name">
             </div>
-            <div class="form-group col-md-4">
-                <label for="trayPosition">Tray Position:</label>
-                <input type="text" class="form-control" id="trayPosition" name="trayPosition">
-            </div>
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
                 <label for="status">Status:</label>
                 <select class="form-control" id="status" name="status">
                     <option value="Healthy" data-color="green">Healthy</option>
@@ -76,21 +73,13 @@
                     <option value="No longer maintained" data-color="pink">No longer maintained</option>
                 </select>
             </div>
-        </div>
-
-        <!-- Row 4: Food Type and Cross Name -->
-        <div class="form-row">
-            <div class="form-group col-md-6">
+            <div class="form-group col-md-3">
                 <label for="foodType">Food Type:</label>
                 <input type="text" id="foodType" name="foodType" class="form-control tag-input" value="Molasses">
             </div>
-            <div class="form-group col-md-6">
-                <label for="name">Cross Name:</label>
-                <input type="text" class="form-control" id="name" name="name">
-            </div>
         </div>
 
-        <!-- Row 5: Vial Lifetime, Flip Frequency, Developmental Time and Max Cross Lifetime -->
+        <!-- Row 4: Vial Lifetime, Flip Frequency, Developmental Time and Max Cross Lifetime -->
         <div class="form-row">
             <div class="form-group col-md-3">
                 <label for="vialLifetime">Vial Lifetime (days):</label>
@@ -110,7 +99,7 @@
             </div>
         </div>
 
-        <!-- Row 6: Comments -->
+        <!-- Row 5: Comments -->
         <div class="form-group">
             <label for="comments">Comments:</label>
             <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>

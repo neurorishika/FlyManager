@@ -55,27 +55,9 @@
             </div>
         </div>
 
-        <!-- Row 3: Tray ID, Tray Position, and Status -->
+        <!-- Row 3: Status -->
         <div class="form-row">
-            <div class="form-group col-md-4">
-                <label for="trayID">Tray ID:</label>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="trayID" name="trayID" disabled>
-                    <div class="input-group-append">
-                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
-                    </div>
-                </div>
-            </div>
-            <div class="form-group col-md-4">
-                <label for="trayPosition">Tray Position:</label>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="trayPosition" name="trayPosition" disabled>
-                    <div class="input-group-append">
-                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
-                    </div>
-                </div>
-            </div>
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-12">
                 <label for="status">Status:</label>
                 <div class="input-group">
                     <select class="form-control" id="status" name="status" required disabled>
@@ -277,8 +259,6 @@
     if (Object.keys(crossData).length > 0) {
         document.getElementById('maleUniqueID').value = crossData.maleUniqueID;
         document.getElementById('femaleUniqueID').value = crossData.femaleUniqueID;
-        document.getElementById('trayID').value = crossData.trayID;
-        document.getElementById('trayPosition').value = crossData.trayPosition;
         document.getElementById('name').value = crossData.name;
         document.getElementById('vialLifetime').value = crossData.vialLifetime;
         document.getElementById('flipFrequency').value = crossData.flipFrequency;

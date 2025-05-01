@@ -1,7 +1,7 @@
 /* Floating Cart Styles */
 .floating-cart-container {
     position: fixed;
-    bottom: 55px; /* Position above footer */
+    bottom: 75px; /* Adjust this value to the height of your footer */
     left: 0;
     width: 100%;
     background-color: var(--card-bg);

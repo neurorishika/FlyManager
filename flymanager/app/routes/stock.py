@@ -267,8 +267,6 @@ def add_stock(source_stock_id=None):
                 'Type': type_input,
                 'SeriesID': request.form.get('seriesID'),
                 'ReplicateID': request.form.get('replicateID'),
-                'TrayID': request.form.get('trayID'),
-                'TrayPosition': request.form.get('trayPosition'),
                 'Status': request.form.get('status', 'Active'), # Default 'Active'
                 'FoodType': food_type_input,
                 'Provenance': provenance_str,
@@ -436,8 +434,6 @@ def view_stock(unique_id):
                 'Type': type_input,
                 'SeriesID': request.form.get('seriesID'),
                 'ReplicateID': request.form.get('replicateID'),
-                'TrayID': request.form.get('trayID'),
-                'TrayPosition': request.form.get('trayPosition'),
                 'Status': request.form.get('status'),
                 'FoodType': food_type_input,
                 'Provenance': provenance_str,

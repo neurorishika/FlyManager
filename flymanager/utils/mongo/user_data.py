@@ -112,7 +112,7 @@ def get_user_activities(user, db):
     activities_collection = db["activity"]
     
     # Find all activities where the 'username' field matches the given user
-    user_activities = list(activities_collection.find({"username": user}))
+    user_activities = list(activities_collection.find({"user": user}))
     
     return user_activities
 

@@ -114,4 +114,4 @@ def upload_data_route():
                      print(f"Error removing temporary file {file_path}: {remove_err}")
 
     # For GET request, just render the upload form
-    return render_template('upload_data.html', username=username)
+    return render_template('utilities/upload_data.html', username=username)

@@ -125,3 +125,31 @@ def parse_flip_day(flip_in_str):
         return int(day_value_str) if day_value_str != 'N/A' else -999
     except:
         return -999
+
+# Helper to parse date string irrespective of format
+def get_datetime_from_str(date_str):
+    """
+    Convert a date string to a datetime object.
+    Handles multiple formats: YYYY-MM-DD, YYYY/MM/DD, MM/DD/YYYY, DD/MM/YYYY.
+    """
+    formats = [
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y/%m/%d %H:%M:%S",
+        "%Y/%m/%d %H:%M",
+        "%m/%d/%Y %H:%M:%S",
+        "%m/%d/%Y %H:%M",
+        "%d/%m/%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M",
+        "%Y-%m-%d",
+        "%Y/%m/%d",
+        "%m/%d/%Y",
+        "%d/%m/%Y"
+    ]
+    
+    for fmt in formats:
+        try:
+            return datetime.datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    raise ValueError(f"Date string '{date_str}' does not match any expected format.")

@@ -152,9 +152,9 @@
             </div>
         </div>
 
-        <!-- Row 6: Series ID, Replicate ID, Tray ID, Tray Position -->
+        <!-- Row 6: Series ID and Replicate ID -->
         <div class="form-row">
-            <div class="form-group col-md-3">
+            <div class="form-group col-md-6">
                 <label for="seriesID">Series ID:</label>
                 <div class="input-group">
                     <input type="text" class="form-control" id="seriesID" name="seriesID" required>
@@ -163,28 +163,10 @@
                     </div>
                 </div>
             </div>
-            <div class="form-group col-md-3">
+            <div class="form-group col-md-6">
                 <label for="replicateID">Replicate ID:</label>
                 <div class="input-group">
                     <input type="text" class="form-control" id="replicateID" name="replicateID" required>
-                    <div class="input-group-append">
-                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
-                    </div>
-                </div>
-            </div>
-            <div class="form-group col-md-3">
-                <label for="trayID">Tray ID:</label>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="trayID" name="trayID">
-                    <div class="input-group-append">
-                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
-                    </div>
-                </div>
-            </div>
-            <div class="form-group col-md-3">
-                <label for="trayPosition">Tray Position:</label>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="trayPosition" name="trayPosition">
                     <div class="input-group-append">
                         <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
                     </div>
@@ -278,7 +260,6 @@
             <textarea class="form-control" id="modificationLog" name="modificationLog" rows="3"></textarea>
         </div>
 
-
         <button type="submit" class="btn btn-success btn-block">Save Changes</button>
     </form>
 </div>
@@ -356,8 +337,6 @@
         document.getElementById('altReference').value = stockData.altReference;
         document.getElementById('seriesID').value = stockData.seriesID;
         document.getElementById('replicateID').value = stockData.replicateID;
-        document.getElementById('trayID').value = stockData.trayID;
-        document.getElementById('trayPosition').value = stockData.trayPosition;
         document.getElementById('vialLifetime').value = stockData.vialLifetime;
         document.getElementById('flipFrequency').value = stockData.flipFrequency;
         document.getElementById('developmentalTime').value = stockData.developmentalTime;

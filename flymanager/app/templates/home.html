@@ -4,7 +4,7 @@
 
 {% block head %}
 <style>
-    .introduction {
+    .dashboard-section {
         background-color: var(--card-bg);
         color: var(--text-color);
         padding: 20px;
@@ -13,52 +13,365 @@
         margin-bottom: 20px;
         border: 1px solid var(--border-color);
     }
-    .quick-access button {
-        margin: 5px;
-    }
-    .recent-activity,
-    .statistics {
-        background-color: var(--card-bg);
-        color: var(--text-color);
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
         margin-bottom: 20px;
-        border: 1px solid var(--border-color);
     }
-    .activity-item {
+
+    .action-button {
+        display: flex;
+        align-items: center;
+        padding: 15px;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-color);
+        transition: all 0.3s ease;
+    }
+
+    .action-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .action-button i {
+        margin-right: 10px;
+        font-size: 1.2em;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .stat-card {
+        background-color: var(--card-bg);
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        text-align: center;
+    }
+
+    .stat-number {
+        font-size: 2em;
+        font-weight: bold;
+        color: {{ settings.theme.accent_color }};
+    }
+
+    .stat-label {
+        font-size: 0.9em;
+        opacity: 0.8;
+    }
+
+    .activity-date {
+        font-weight: bold;
+        margin-top: 15px;
+        padding: 5px;
+        background-color: var(--header-bg);
+        color: var(--header-text);
+        border-radius: 4px;
+    }
+
+    .schedule-item {
         padding: 10px;
+        margin: 5px 0;
+        border-left: 4px solid {{ settings.theme.accent_color }};
+        background-color: var(--card-bg);
+    }
+
+    .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+    }
+
+    .status-healthy { background-color: #28a745; }
+    .status-showing-issues { background-color: #ffc107; }
+    .status-needs-refresh { background-color: #dc3545; }
+    .status-ordered { background-color: #17a2b8; }
+    .status-no-longer-maintained { background-color: #6c757d; }
+    .status-unknown { background-color: #6c757d; }
+
+    .search-container {
+        margin-bottom: 20px;
+    }
+
+    .week-chart {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 5px;
+        margin-top: 10px;
+    }
+
+    .day-bar {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .bar {
+        width: 100%;
+        background-color: {{ settings.theme.accent_color }};
+        border-radius: 4px;
+        margin-bottom: 5px;
+    }
+
+    .day-label {
+        font-size: 0.8em;
+        text-align: center;
+    }
+
+    .urgent-item {
+        padding: 10px;
+        margin: 5px 0;
+        border-left: 4px solid #dc3545;
+        background-color: var(--card-bg);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .urgent-item .btn-sm {
+        padding: 2px 5px;
+        font-size: 0.8em;
+    }
+
+    .upcoming-day {
+        margin: 10px 0;
+        padding: 5px;
         border-bottom: 1px solid var(--border-color);
     }
-    .list-group-item {
-        background-color: var(--card-bg);
-        color: var(--text-color);
-        border-color: var(--border-color);
+
+    .upcoming-day-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .upcoming-count {
+        background-color: {{ settings.theme.accent_color }};
+        color: white;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8em;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="introduction">
-    <h2><strong>Welcome to the {{ settings.lab_info.lab_name }} Fly Manager 🪰</strong></h2>
-    <p>This app helps you manage and explore genetic crosses, trays, and stocks efficiently.</p>
+<div class="dashboard-section">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><strong>{{ settings.lab_info.lab_name }} Fly Manager 🪰</strong></h2>
+        <div>{{ today_date }}</div>
+    </div>
+    
+    <div class="quick-actions">
+        <a href="{{ url_for('stock.add_stock') }}" class="action-button">
+            <i class="fas fa-plus"></i> Add New Stock
+        </a>
+        <a href="{{ url_for('cross.add_cross') }}" class="action-button">
+            <i class="fas fa-heart"></i> Create Cross
+        </a>
+        <a href="{{ url_for('flip.flip_schedule_display') }}" class="action-button">
+            <i class="fas fa-calendar"></i> View Schedule
+        </a>
+        <a href="{{ url_for('tray.add_tray_route') }}" class="action-button">
+            <i class="fas fa-th"></i> Add Tray
+        </a>
+    </div>
 </div>
-<div class="recent-activity">
-    <h3>Recent Activity</h3>
-    {% if activities %}
-        <div class="list-group">
-            {% for activity in activities %}
-                <div class="list-group-item activity-item">
-                    <p class="mb-1"><small>{{ activity.timestamp }}</small> {{ activity.activity }}</p>
-                </div>
-            {% endfor %}
+
+<!-- Overview Section -->
+<div class="dashboard-section">
+    <h3>Overview</h3>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.total_stocks }}</div>
+            <div class="stat-label">Total Stocks</div>
         </div>
-    {% else %}
-        <p>No recent activity to display.</p>
-    {% endif %}
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.total_crosses }}</div>
+            <div class="stat-label">Total Crosses</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.needs_attention }}</div>
+            <div class="stat-label">Need Attention</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.tray_usage }}%</div>
+            <div class="stat-label">Tray Usage</div>
+        </div>
+    </div>
+
+    <h4>Vial Statistics</h4>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.total_stock_vials }}</div>
+            <div class="stat-label">Stock Vials</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.total_cross_vials }}</div>
+            <div class="stat-label">Cross Vials</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.total_vials }}</div>
+            <div class="stat-label">Total Vials</div>
+        </div>
+    </div>
+
+    <h4>Status Distribution</h4>
+    <div class="stats-grid">
+        {% for status, count in stats.status_distribution.items() %}
+        <div class="stat-card">
+            <div class="status-indicator status-{{ status.lower().replace(' ', '-') }}"></div>
+            <div class="stat-number">{{ count }}</div>
+            <div class="stat-label">{{ status }}</div>
+        </div>
+        {% endfor %}
+    </div>
 </div>
-<div class="statistics">
-    <h3>Statistics and Summaries</h3>
-    <p>No statistics to display.</p>
+
+<!-- Main Content Area -->
+<div class="row">
+    <!-- Left Column -->
+    <div class="col-md-6">
+        <!-- Urgent Items Section -->
+        {% if overdue_items or due_today_items %}
+        <div class="dashboard-section">
+            <h3>Urgent Items</h3>
+
+            {% if overdue_items %}
+            <h5 class="text-danger">
+                <i class="fas fa-exclamation-circle"></i> Overdue Items
+            </h5>
+            {% for item in overdue_items %}
+            <div class="urgent-item">
+                <div>
+                    <strong>{{ item.name }}</strong> ({{ item.id }})<br>
+                    <small class="text-danger">{{ item.days_overdue }} day{% if item.days_overdue != 1 %}s{% endif %} overdue</small>
+                    <small>Tray: {{ item.tray }}</small>
+                </div>
+                <div>
+                    <a href="{{ url_for('flip.flip_interface') }}" class="btn btn-danger btn-sm">Flip Now</a>
+                    <a href="{{ url_for(item.type ~ '.view_' ~ item.type, unique_id=item.id) }}" class="btn btn-secondary btn-sm">View</a>
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% if due_today_items %}
+            <h5 class="text-warning mt-3">
+                <i class="fas fa-clock"></i> Due Today
+            </h5>
+            {% for item in due_today_items %}
+            <div class="urgent-item">
+                <div>
+                    <strong>{{ item.name }}</strong> ({{ item.id }})<br>
+                    <small>Tray: {{ item.tray }}</small>
+                </div>
+                <div>
+                    <a href="{{ url_for('flip.flip_interface') }}" class="btn btn-warning btn-sm">Flip Now</a>
+                    <a href="{{ url_for(item.type ~ '.view_' ~ item.type, unique_id=item.id) }}" class="btn btn-secondary btn-sm">View</a>
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Today's Schedule -->
+        <div class="dashboard-section">
+            <h3>Today's Schedule</h3>
+            {% if schedule %}
+                {% for item in schedule %}
+                <div class="schedule-item">
+                    <small class="text-muted">{{ item.time }}</small>
+                    <div>{{ item.description | safe }}</div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>No tasks scheduled for today.</p>
+            {% endif %}
+        </div>
+
+        <!-- Weekly Activity Chart -->
+        <div class="dashboard-section">
+            <h3>Weekly Flip Activity</h3>
+            <div class="d-flex justify-content-between align-items-center">
+                <p>Total flips in the last 7 days: <strong>{{ stats.weekly_flips }}</strong></p>
+                <span>Daily average: <strong>{{ (stats.weekly_flips / 7) | round(1) }}</strong></span>
+            </div>
+            
+            <div class="week-chart">
+                {% set days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
+                {% set max_flips = stats.flips_by_day.values() | max if stats.flips_by_day.values() | list | length > 0 else 1 %}
+                
+                {% for day in days %}
+                    {% set flips = stats.flips_by_day.get(day, 0) %}
+                    {% set height = (flips / max_flips * 100) if max_flips > 0 else 0 %}
+                    <div class="day-bar">
+                        <div class="bar" style="height: {{ height }}px;"></div>
+                        <div class="day-label">{{ day[:3] }}</div>
+                        <div class="day-value">{{ flips }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column -->
+    <div class="col-md-6">
+        <!-- Upcoming Schedule -->
+        <div class="dashboard-section">
+            <h3>Upcoming Schedule</h3>
+            {% if upcoming_schedule %}
+                {% for date, day_data in upcoming_schedule.items() %}
+                <div class="upcoming-day">
+                    <div class="upcoming-day-header">
+                        <strong>{{ day_data.day_name }} ({{ day_data.date }})</strong>
+                        <span class="upcoming-count">{{ day_data.count }}</span>
+                    </div>
+                    <a href="{{ url_for('flip.flip_schedule_display') }}" class="btn btn-sm btn-outline-primary mt-2">
+                        View Schedule
+                    </a>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>No upcoming schedule for the next 7 days.</p>
+            {% endif %}
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="dashboard-section">
+            <h3>Recent Activity</h3>
+            {% if activities %}
+                {% for date, day_activities in activities.items() %}
+                    <div class="activity-date">{{ date }}</div>
+                    {% for activity in day_activities %}
+                        <div class="schedule-item">
+                            <small class="text-muted">{{ activity.timestamp }}</small>
+                            <div>{{ activity.activity }}</div>
+                        </div>
+                    {% endfor %}
+                {% endfor %}
+            {% else %}
+                <p>No recent activity to display.</p>
+            {% endif %}
+        </div>
+    </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
 {% endblock %}

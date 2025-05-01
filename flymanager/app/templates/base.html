@@ -71,6 +71,7 @@
             text-decoration: none;
             opacity: 0.8;
         }
+        
 
         .form-control, .form-control:disabled, .form-control[readonly] {
             background-color: var(--bg-color);
@@ -87,6 +88,12 @@
         .btn-primary {
             background-color: {{ settings.theme.accent_color }};
             border-color: {{ settings.theme.accent_color }};
+        }
+
+        .btn-primary:hover {
+            background-color: {{ settings.theme.accent_color }};
+            border-color: {{ settings.theme.accent_color }};
+            opacity: 0.8;
         }
 
         .header {
