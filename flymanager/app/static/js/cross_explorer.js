@@ -1,7 +1,14 @@
 let cart = JSON.parse(localStorage.getItem('crossCart')) || [];
+let currentView = localStorage.getItem('crossViewMode') || 'card';
+let currentSort = { column: '', direction: 'asc' };
 
 function saveCart() {
     localStorage.setItem('crossCart', JSON.stringify(cart));
+}
+
+// Save current view preference
+function saveViewPreference() {
+    localStorage.setItem('crossViewMode', currentView);
 }
 
 function updateCart() {
@@ -47,22 +54,285 @@ function getLocalDateTime() {
     return localTime.toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM
 }
 
-document.getElementById('selectAllBtn').addEventListener('click', function() {
-    document.querySelectorAll('.cross-item input[type="checkbox"]').forEach(function(checkbox) {
-        checkbox.checked = true;
-        const card = document.getElementById('item-' + checkbox.id.replace('cross', ''));
-        card.classList.add('checked');
-        document.getElementById('item-' + checkbox.id.replace('cross', '')).classList.add('selected');
+// Toggle between card and table views
+function toggleView(viewMode) {
+    const cardView = document.getElementById('cardView');
+    const tableView = document.getElementById('tableView');
+    const cardViewBtn = document.getElementById('cardViewBtn');
+    const tableViewBtn = document.getElementById('tableViewBtn');
+    
+    if (viewMode === 'card') {
+        cardView.style.display = 'grid';
+        tableView.style.display = 'none';
+        cardViewBtn.classList.add('active');
+        tableViewBtn.classList.remove('active');
+        currentView = 'card';
+    } else {
+        cardView.style.display = 'none';
+        tableView.style.display = 'block';
+        cardViewBtn.classList.remove('active');
+        tableViewBtn.classList.add('active');
+        currentView = 'table';
+    }
+    
+    saveViewPreference();
+}
+
+// Helper function for comparing tray values
+function compareTrayValues(a, b) {
+    console.log('Comparing trays:', { a, b });
+    
+    // Handle empty/null/undefined values
+    const emptyA = !a || a.trim() === '';
+    const emptyB = !b || b.trim() === '';
+    
+    // If both are empty, they're equal
+    if (emptyA && emptyB) {
+        console.log('Both values empty/null');
+        return 0;
+    }
+    
+    // Empty values should sort to the end
+    if (emptyA) return 1;  // a is empty, move it to end
+    if (emptyB) return -1; // b is empty, move it to end
+    
+    // Now we know both a and b are non-empty strings
+    const [aPrefix, aSuffix] = (a || '').split('-');
+    const [bPrefix, bSuffix] = (b || '').split('-');
+    
+    console.log('Split values:', { aPrefix, aSuffix, bPrefix, bSuffix });
+    
+    // Compare prefixes first (case-insensitive)
+    const prefixComparison = aPrefix.toLowerCase().localeCompare(bPrefix.toLowerCase());
+    if (prefixComparison !== 0) {
+        console.log(`Prefix comparison result: ${prefixComparison}`);
+        return prefixComparison;
+    }
+    
+    // If we get here, prefixes are equal, compare numeric suffixes
+    const aSuffixNum = aSuffix ? parseInt(aSuffix, 10) : NaN;
+    const bSuffixNum = bSuffix ? parseInt(bSuffix, 10) : NaN;
+    console.log('Parsed suffixes:', { aSuffixNum, bSuffixNum });
+    
+    // Handle cases where one or both suffixes are not valid numbers
+    if (isNaN(aSuffixNum) && isNaN(bSuffixNum)) {
+        console.log('Both suffixes are NaN');
+        return 0; // both invalid, consider equal
+    }
+    if (isNaN(aSuffixNum)) return 1; // a's suffix invalid, move to end
+    if (isNaN(bSuffixNum)) return -1; // b's suffix invalid, move to end
+    
+    // Both suffixes are valid numbers, compare them
+    console.log(`Comparing numbers: ${aSuffixNum} vs ${bSuffixNum}`);
+    return aSuffixNum - bSuffixNum;
+}
+
+// Sort table by column
+function sortTable(column) {
+    const table = document.querySelector('#tableView table');
+    const headers = table.querySelectorAll('th.sortable');
+    const rows = Array.from(table.querySelectorAll('tbody tr'));
+    
+    // Update sort direction
+    if (currentSort.column === column) {
+        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSort.column = column;
+        currentSort.direction = 'asc';
+    }
+    
+    // Update header classes
+    headers.forEach(header => {
+        header.classList.remove('asc', 'desc');
+        if (header.dataset.sort === column) {
+            header.classList.add(currentSort.direction);
+        }
     });
+    
+    // Get column index
+    const columnIndex = Array.from(headers).findIndex(header => header.dataset.sort === column) + 2; // +2 to account for checkbox and 1-based index
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        let aValue = a.querySelector(`td:nth-child(${columnIndex})`).textContent.trim();
+        let bValue = b.querySelector(`td:nth-child(${columnIndex})`).textContent.trim();
+
+        // Special case for tray column which might have format like "TrayID-Position"
+        if (column === 'tray') {
+            return compareTrayValues(aValue, bValue);
+        }
+
+        // Special sorting priority for time-based columns
+        if (column === 'flipin' || column === 'eclose') {
+            // Custom sort order for specific time phrases
+            const timeValues = {
+                'Overdue': 0,
+                'Today': 1,
+                'Tomorrow': 2,
+                'days': 3  // For sorting "X days" values
+            };
+            
+            // Extract numeric values from "X days" format
+            const aNumDays = aValue.match(/(\d+) days?/);
+            const bNumDays = bValue.match(/(\d+) days?/);
+            
+            // Determine priorities based on time phrases
+            let aPriority = 999;
+            let bPriority = 999;
+            
+            // Check for priority keywords
+            for (const [key, value] of Object.entries(timeValues)) {
+                if (aValue.includes(key)) {
+                    if (key === 'days' && aNumDays) {
+                        aPriority = value + parseInt(aNumDays[1], 10);
+                    } else {
+                        aPriority = value;
+                    }
+                }
+                if (bValue.includes(key)) {
+                    if (key === 'days' && bNumDays) {
+                        bPriority = value + parseInt(bNumDays[1], 10);
+                    } else {
+                        bPriority = value;
+                    }
+                }
+            }
+            
+            // Compare based on priority
+            if (aPriority !== bPriority) {
+                return currentSort.direction === 'asc' ? 
+                    aPriority - bPriority : 
+                    bPriority - aPriority;
+            }
+            
+            // If same priority type but with numbers, sort by the number
+            if (aNumDays && bNumDays) {
+                const aNum = parseInt(aNumDays[1], 10);
+                const bNum = parseInt(bNumDays[1], 10);
+                return currentSort.direction === 'asc' ? aNum - bNum : bNum - aNum;
+            }
+        }
+        
+        // Regular string comparison for other cases
+        const comparison = aValue.localeCompare(bValue, undefined, { numeric: true });
+        return currentSort.direction === 'asc' ? comparison : -comparison;
+    });
+    
+    // Reorder rows
+    const tbody = table.querySelector('tbody');
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Toggle row checkbox in table view
+function toggleTableCheckbox(checkboxId, event) {
+    event.stopPropagation();
+    const checkbox = document.getElementById(checkboxId);
+    const row = checkbox.closest('tr');
+    
+    if (checkbox.checked) {
+        row.classList.add('selected');
+    } else {
+        row.classList.remove('selected');
+    }
+    
+    // Sync with card view if same item
+    const index = checkboxId.replace('crossTable', '');
+    const cardCheckbox = document.getElementById('cross' + index);
+    if (cardCheckbox) {
+        cardCheckbox.checked = checkbox.checked;
+        const card = document.getElementById('item-' + index);
+        if (checkbox.checked) {
+            card.classList.add('checked');
+        } else {
+            card.classList.remove('checked');
+        }
+    }
+}
+
+// Toggle row selection when clicking on row
+function toggleRowSelection(row, event) {
+    if (event.target.tagName !== 'INPUT' && event.target.tagName !== 'BUTTON' && !event.target.closest('button')) {
+        const checkbox = row.querySelector('input[type="checkbox"]');
+        checkbox.checked = !checkbox.checked;
+        if (checkbox.checked) {
+            row.classList.add('selected');
+        } else {
+            row.classList.remove('selected');
+        }
+        
+        // Sync with card view
+        const index = checkbox.id.replace('crossTable', '');
+        const cardCheckbox = document.getElementById('cross' + index);
+        if (cardCheckbox) {
+            cardCheckbox.checked = checkbox.checked;
+            const card = document.getElementById('item-' + index);
+            if (checkbox.checked) {
+                card.classList.add('checked');
+            } else {
+                card.classList.remove('checked');
+            }
+        }
+    }
+}
+
+// Toggle details in table view
+function toggleTableDetails(index) {
+    const details = document.getElementById('tableDetails-' + index);
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+    } else {
+        details.style.display = 'none';
+    }
+}
+
+document.getElementById('selectAllBtn').addEventListener('click', function() {
+    if (currentView === 'card') {
+        document.querySelectorAll('.cross-item input[type="checkbox"]').forEach(function(checkbox) {
+            checkbox.checked = true;
+            const card = document.getElementById('item-' + checkbox.id.replace('cross', ''));
+            card.classList.add('checked');
+            document.getElementById('item-' + checkbox.id.replace('cross', '')).classList.add('selected');
+        });
+    } else {
+        document.getElementById('selectAllTable').checked = true;
+        document.querySelectorAll('#tableView tbody input[type="checkbox"]').forEach(function(checkbox) {
+            checkbox.checked = true;
+            checkbox.closest('tr').classList.add('selected');
+            
+            // Sync with card view
+            const index = checkbox.id.replace('crossTable', '');
+            const cardCheckbox = document.getElementById('cross' + index);
+            if (cardCheckbox) {
+                cardCheckbox.checked = true;
+                document.getElementById('item-' + index).classList.add('checked');
+            }
+        });
+    }
 });
 
 document.getElementById('deselectAllBtn').addEventListener('click', function() {
-    document.querySelectorAll('.cross-item input[type="checkbox"]').forEach(function(checkbox) {
-        checkbox.checked = false;
-        const card = document.getElementById('item-' + checkbox.id.replace('cross', ''));
-        card.classList.remove('checked');
-        document.getElementById('item-' + checkbox.id.replace('cross', '')).classList.remove('selected');
-    });
+    if (currentView === 'card') {
+        document.querySelectorAll('.cross-item input[type="checkbox"]').forEach(function(checkbox) {
+            checkbox.checked = false;
+            const card = document.getElementById('item-' + checkbox.id.replace('cross', ''));
+            card.classList.remove('checked');
+            document.getElementById('item-' + checkbox.id.replace('cross', '')).classList.remove('selected');
+        });
+    } else {
+        document.getElementById('selectAllTable').checked = false;
+        document.querySelectorAll('#tableView tbody input[type="checkbox"]').forEach(function(checkbox) {
+            checkbox.checked = false;
+            checkbox.closest('tr').classList.remove('selected');
+            
+            // Sync with card view
+            const index = checkbox.id.replace('crossTable', '');
+            const cardCheckbox = document.getElementById('cross' + index);
+            if (cardCheckbox) {
+                cardCheckbox.checked = false;
+                document.getElementById('item-' + index).classList.remove('checked');
+            }
+        });
+    }
 });
 
 document.querySelectorAll('.cross-item input[type="checkbox"]').forEach(function(checkbox) {
@@ -71,6 +341,18 @@ document.querySelectorAll('.cross-item input[type="checkbox"]').forEach(function
             document.getElementById('item-' + checkbox.id.replace('cross', '')).classList.add('selected');
         } else {
             document.getElementById('item-' + checkbox.id.replace('cross', '')).classList.remove('selected');
+        }
+        
+        // Sync with table view
+        const index = checkbox.id.replace('cross', '');
+        const tableCheckbox = document.getElementById('crossTable' + index);
+        if (tableCheckbox) {
+            tableCheckbox.checked = checkbox.checked;
+            if (checkbox.checked) {
+                tableCheckbox.closest('tr').classList.add('selected');
+            } else {
+                tableCheckbox.closest('tr').classList.remove('selected');
+            }
         }
     });
 });
@@ -82,28 +364,65 @@ document.querySelector('button[name="clear_filters"]').addEventListener('click',
 });
 
 document.getElementById('addToCartBtn').addEventListener('click', function() {
-    document.querySelectorAll('.cross-item input[type="checkbox"]:checked').forEach(function(checkbox) {
-        let index = checkbox.id.replace('cross', '');
-        let crossItem = document.getElementById('item-' + index);
-        let identifier = crossItem.querySelector('h5').textContent.split('|')[0].trim();
-        let name = crossItem.querySelector('h5').textContent.split('|')[1].trim();
-        let uid = crossItem.querySelector('p i').textContent.trim();
-        let item = {
-            id: index,
-            quantity: 1,
-            identifier: identifier,
-            name: name,
-            uid: uid
-        };
+    let checkedItems;
+    
+    if (currentView === 'card') {
+        checkedItems = document.querySelectorAll('.cross-item input[type="checkbox"]:checked');
+        checkedItems.forEach(function(checkbox) {
+            let index = checkbox.id.replace('cross', '');
+            let crossItem = document.getElementById('item-' + index);
+            let identifier = crossItem.querySelector('h5').textContent.split('|')[0].trim();
+            let name = crossItem.querySelector('h5').textContent.split('|')[1].trim();
+            let uid = crossItem.querySelector('p i').textContent.trim();
+            let item = {
+                id: index,
+                quantity: 1,
+                identifier: identifier,
+                name: name,
+                uid: uid
+            };
 
-        // Check if item is already in cart
-        let existingItem = cart.find(cartItem => cartItem.uid === item.uid);
-        if (existingItem) {
-            existingItem.quantity++;
-        } else {
-            cart.push(item);
-        }
-    });
+            // Check if item is already in cart
+            let existingItem = cart.find(cartItem => cartItem.uid === item.uid);
+            if (existingItem) {
+                existingItem.quantity++;
+            } else {
+                cart.push(item);
+            }
+        });
+    } else {
+        checkedItems = document.querySelectorAll('#tableView tbody input[type="checkbox"]:checked');
+        checkedItems.forEach(function(checkbox) {
+            let row = checkbox.closest('tr');
+            let index = checkbox.id.replace('crossTable', '');
+            let identifier = row.querySelector('.tray-cell').textContent.trim();
+            let name = row.querySelector('td:nth-child(3)').textContent.trim();
+            let uid = row.querySelector('.row-details strong:contains("Unique ID:")').nextSibling.textContent.trim();
+            // If the details aren't visible, get the uid from the card view
+            if (!uid) {
+                let crossItem = document.getElementById('item-' + index);
+                if (crossItem) {
+                    uid = crossItem.querySelector('p i').textContent.trim();
+                }
+            }
+            
+            let item = {
+                id: index,
+                quantity: 1,
+                identifier: identifier || "No tray",
+                name: name,
+                uid: uid
+            };
+
+            // Check if item is already in cart
+            let existingItem = cart.find(cartItem => cartItem.uid === item.uid);
+            if (existingItem) {
+                existingItem.quantity++;
+            } else {
+                cart.push(item);
+            }
+        });
+    }
 
     updateCart();
     clearSelection();
@@ -114,6 +433,13 @@ function clearSelection() {
         checkbox.checked = false;
         document.getElementById('item-' + checkbox.id.replace('cross', '')).classList.remove('selected');
     });
+    
+    document.querySelectorAll('#tableView tbody input[type="checkbox"]').forEach(function(checkbox) {
+        checkbox.checked = false;
+        checkbox.closest('tr').classList.remove('selected');
+    });
+    
+    document.getElementById('selectAllTable').checked = false;
 }
 
 document.getElementById('generateLabelsBtn').addEventListener('click', function() {
@@ -306,6 +632,66 @@ function duplicateCross(uniqueId) {
 
 document.addEventListener('DOMContentLoaded', function() {
     updateCart();
+    
+    // Initialize view mode from saved preference
+    toggleView(currentView);
+    
+    // View toggle button event listeners
+    document.getElementById('cardViewBtn').addEventListener('click', function() {
+        toggleView('card');
+    });
+    
+    document.getElementById('tableViewBtn').addEventListener('click', function() {
+        toggleView('table');
+    });
+    
+    // Table sorting
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.addEventListener('click', function() {
+            sortTable(this.dataset.sort);
+        });
+    });
+    
+    // Table row selection and toggle details
+    document.querySelectorAll('#tableView tbody tr').forEach(row => {
+        row.addEventListener('click', function(event) {
+            toggleRowSelection(this, event);
+        });
+    });
+    
+    document.querySelectorAll('.show-details-btn').forEach(btn => {
+        btn.addEventListener('click', function(event) {
+            event.stopPropagation();
+            toggleTableDetails(this.dataset.index);
+        });
+    });
+    
+    // Select all in table
+    document.getElementById('selectAllTable').addEventListener('change', function() {
+        const isChecked = this.checked;
+        document.querySelectorAll('#tableView tbody input[type="checkbox"]').forEach(checkbox => {
+            checkbox.checked = isChecked;
+            const row = checkbox.closest('tr');
+            if (isChecked) {
+                row.classList.add('selected');
+            } else {
+                row.classList.remove('selected');
+            }
+            
+            // Sync with card view
+            const index = checkbox.id.replace('crossTable', '');
+            const cardCheckbox = document.getElementById('cross' + index);
+            if (cardCheckbox) {
+                cardCheckbox.checked = isChecked;
+                const card = document.getElementById('item-' + index);
+                if (isChecked) {
+                    card.classList.add('checked');
+                } else {
+                    card.classList.remove('checked');
+                }
+            }
+        });
+    });
 });
 
 document.getElementById('emptyCartBtn').addEventListener('click', function() {
@@ -324,6 +710,18 @@ function toggleCheckbox(checkboxId, event) {
         card.classList.add('checked');
     } else {
         card.classList.remove('checked');
+    }
+    
+    // Sync with table view
+    const index = checkboxId.replace('cross', '');
+    const tableCheckbox = document.getElementById('crossTable' + index);
+    if (tableCheckbox) {
+        tableCheckbox.checked = checkbox.checked;
+        if (checkbox.checked) {
+            tableCheckbox.closest('tr').classList.add('selected');
+        } else {
+            tableCheckbox.closest('tr').classList.remove('selected');
+        }
     }
 }
 

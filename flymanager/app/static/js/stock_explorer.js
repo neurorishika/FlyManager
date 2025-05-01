@@ -1,7 +1,14 @@
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
+let currentView = localStorage.getItem('stockViewMode') || 'card';
+let currentSort = { column: '', direction: 'asc' };
 
 function saveCart() {
     localStorage.setItem('cart', JSON.stringify(cart));
+}
+
+// Save current view preference
+function saveViewPreference() {
+    localStorage.setItem('stockViewMode', currentView);
 }
 
 function updateCart() {
@@ -47,20 +54,264 @@ function getLocalDateTime() {
     return localTime.toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM
 }
 
-document.getElementById('selectAllBtn').addEventListener('click', function() {
-    document.querySelectorAll('.stock-item input[type="checkbox"]').forEach(function(checkbox) {
-        checkbox.checked = true;
-        const card = document.getElementById('item-' + checkbox.id.replace('stock', ''));
-        card.classList.add('checked');
+// Toggle between card and table views
+function toggleView(viewMode) {
+    const cardView = document.getElementById('cardView');
+    const tableView = document.getElementById('tableView');
+    const cardViewBtn = document.getElementById('cardViewBtn');
+    const tableViewBtn = document.getElementById('tableViewBtn');
+    
+    if (viewMode === 'card') {
+        cardView.style.display = 'grid';
+        tableView.style.display = 'none';
+        cardViewBtn.classList.add('active');
+        tableViewBtn.classList.remove('active');
+        currentView = 'card';
+    } else {
+        cardView.style.display = 'none';
+        tableView.style.display = 'block';
+        cardViewBtn.classList.remove('active');
+        tableViewBtn.classList.add('active');
+        currentView = 'table';
+    }
+    
+    saveViewPreference();
+}
+
+// Helper function for comparing tray values
+function compareTrayValues(a, b) {
+    // Handle empty/null/undefined values
+    const emptyA = !a || a.trim() === '';
+    const emptyB = !b || b.trim() === '';
+    
+    // If both are empty, they're equal
+    if (emptyA && emptyB) return 0;
+    
+    // Empty values should sort to the end
+    if (emptyA) return 1;  // a is empty, move it to end
+    if (emptyB) return -1; // b is empty, move it to end
+    
+    // Now we know both a and b are non-empty strings
+    const [aPrefix, aSuffix] = (a || '').split('-');
+    const [bPrefix, bSuffix] = (b || '').split('-');
+    
+    // Compare prefixes first (case-insensitive)
+    const prefixComparison = aPrefix.toLowerCase().localeCompare(bPrefix.toLowerCase());
+    if (prefixComparison !== 0) return prefixComparison;
+    
+    // If we get here, prefixes are equal, compare numeric suffixes
+    const aSuffixNum = aSuffix ? parseInt(aSuffix, 10) : NaN;
+    const bSuffixNum = bSuffix ? parseInt(bSuffix, 10) : NaN;
+    
+    // Handle cases where one or both suffixes are not valid numbers
+    if (isNaN(aSuffixNum) && isNaN(bSuffixNum)) return 0; // both invalid, consider equal
+    if (isNaN(aSuffixNum)) return 1; // a's suffix invalid, move to end
+    if (isNaN(bSuffixNum)) return -1; // b's suffix invalid, move to end
+    
+    // Both suffixes are valid numbers, compare them
+    return aSuffixNum - bSuffixNum;
+}
+
+// Sort table by column
+function sortTable(column) {
+    const table = document.querySelector('#tableView table');
+    const headers = table.querySelectorAll('th.sortable');
+    const rows = Array.from(table.querySelectorAll('tbody tr'));
+    
+    // Update sort direction
+    if (currentSort.column === column) {
+        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSort.column = column;
+        currentSort.direction = 'asc';
+    }
+    
+    // Update header classes
+    headers.forEach(header => {
+        header.classList.remove('asc', 'desc');
+        if (header.dataset.sort === column) {
+            header.classList.add(currentSort.direction);
+        }
     });
+    
+    // Get column index (+2 to account for checkbox and expand columns)
+    const columnIndex = Array.from(headers).findIndex(header => header.dataset.sort === column) + 2;
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        let aValue = a.querySelector(`td:nth-child(${columnIndex})`).textContent.trim();
+        let bValue = b.querySelector(`td:nth-child(${columnIndex})`).textContent.trim();
+
+        let comparison;
+        // Special case for tray column
+        if (column === 'tray') {
+            comparison = compareTrayValues(aValue, bValue);
+        } else if (column === 'flipin' || column === 'eclose') {
+            // Special sorting priority for time-based columns
+            const timeValues = {
+                'Overdue': 0,
+                'Today': 1,
+                'Tomorrow': 2,
+                'days': 3
+            };
+            
+            // Extract numeric values from "X days" format
+            const aNumDays = aValue.match(/(\d+) days?/);
+            const bNumDays = bValue.match(/(\d+) days?/);
+            
+            // Determine priorities based on time phrases
+            let aPriority = 999;
+            let bPriority = 999;
+            
+            // Check for priority keywords
+            for (const [key, value] of Object.entries(timeValues)) {
+                if (aValue.includes(key)) {
+                    if (key === 'days' && aNumDays) {
+                        aPriority = value + parseInt(aNumDays[1], 10);
+                    } else {
+                        aPriority = value;
+                    }
+                }
+                if (bValue.includes(key)) {
+                    if (key === 'days' && bNumDays) {
+                        bPriority = value + parseInt(bNumDays[1], 10);
+                    } else {
+                        bPriority = value;
+                    }
+                }
+            }
+            
+            // Compare based on priority
+            if (aPriority !== bPriority) {
+                comparison = aPriority - bPriority;
+            } else if (aNumDays && bNumDays) {
+                // If same priority type but with numbers, sort by the number
+                comparison = parseInt(aNumDays[1], 10) - parseInt(bNumDays[1], 10);
+            } else {
+                comparison = aValue.localeCompare(bValue, undefined, { numeric: true });
+            }
+        } else {
+            // Regular string comparison for other cases
+            comparison = aValue.localeCompare(bValue, undefined, { numeric: true });
+        }
+        
+        // Apply sort direction
+        return currentSort.direction === 'asc' ? comparison : -comparison;
+    });
+    
+    // Reorder rows
+    const tbody = table.querySelector('tbody');
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Toggle row checkbox in table view
+function toggleTableCheckbox(checkboxId, event) {
+    event.stopPropagation();
+    const checkbox = document.getElementById(checkboxId);
+    const row = checkbox.closest('tr');
+    
+    if (checkbox.checked) {
+        row.classList.add('selected');
+    } else {
+        row.classList.remove('selected');
+    }
+    
+    // Sync with card view if same item
+    const index = checkboxId.replace('stockTable', '');
+    const cardCheckbox = document.getElementById('stock' + index);
+    if (cardCheckbox) {
+        cardCheckbox.checked = checkbox.checked;
+        const card = document.getElementById('item-' + index);
+        if (checkbox.checked) {
+            card.classList.add('checked');
+        } else {
+            card.classList.remove('checked');
+        }
+    }
+}
+
+// Toggle row selection when clicking on row
+function toggleRowSelection(row, event) {
+    if (event.target.tagName !== 'INPUT' && event.target.tagName !== 'BUTTON' && !event.target.closest('button')) {
+        const checkbox = row.querySelector('input[type="checkbox"]');
+        checkbox.checked = !checkbox.checked;
+        if (checkbox.checked) {
+            row.classList.add('selected');
+        } else {
+            row.classList.remove('selected');
+        }
+        
+        // Sync with card view
+        const index = checkbox.id.replace('stockTable', '');
+        const cardCheckbox = document.getElementById('stock' + index);
+        if (cardCheckbox) {
+            cardCheckbox.checked = checkbox.checked;
+            const card = document.getElementById('item-' + index);
+            if (checkbox.checked) {
+                card.classList.add('checked');
+            } else {
+                card.classList.remove('checked');
+            }
+        }
+    }
+}
+
+// Toggle details in table view
+function toggleTableDetails(index) {
+    const details = document.getElementById('tableDetails-' + index);
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+    } else {
+        details.style.display = 'none';
+    }
+}
+
+document.getElementById('selectAllBtn').addEventListener('click', function() {
+    if (currentView === 'card') {
+        document.querySelectorAll('.stock-item input[type="checkbox"]').forEach(function(checkbox) {
+            checkbox.checked = true;
+            const card = document.getElementById('item-' + checkbox.id.replace('stock', ''));
+            card.classList.add('checked');
+        });
+    } else {
+        document.getElementById('selectAllTable').checked = true;
+        document.querySelectorAll('#tableView tbody input[type="checkbox"]').forEach(function(checkbox) {
+            checkbox.checked = true;
+            checkbox.closest('tr').classList.add('selected');
+            
+            // Sync with card view
+            const index = checkbox.id.replace('stockTable', '');
+            const cardCheckbox = document.getElementById('stock' + index);
+            if (cardCheckbox) {
+                cardCheckbox.checked = true;
+                document.getElementById('item-' + index).classList.add('checked');
+            }
+        });
+    }
 });
 
 document.getElementById('deselectAllBtn').addEventListener('click', function() {
-    document.querySelectorAll('.stock-item input[type="checkbox"]').forEach(function(checkbox) {
-        checkbox.checked = false;
-        const card = document.getElementById('item-' + checkbox.id.replace('stock', ''));
-        card.classList.remove('checked');
-    });
+    if (currentView === 'card') {
+        document.querySelectorAll('.stock-item input[type="checkbox"]').forEach(function(checkbox) {
+            checkbox.checked = false;
+            const card = document.getElementById('item-' + checkbox.id.replace('stock', ''));
+            card.classList.remove('checked');
+        });
+    } else {
+        document.getElementById('selectAllTable').checked = false;
+        document.querySelectorAll('#tableView tbody input[type="checkbox"]').forEach(function(checkbox) {
+            checkbox.checked = false;
+            checkbox.closest('tr').classList.remove('selected');
+            
+            // Sync with card view
+            const index = checkbox.id.replace('stockTable', '');
+            const cardCheckbox = document.getElementById('stock' + index);
+            if (cardCheckbox) {
+                cardCheckbox.checked = false;
+                document.getElementById('item-' + index).classList.remove('checked');
+            }
+        });
+    }
 });
 
 document.querySelectorAll('.stock-item input[type="checkbox"]').forEach(function(checkbox) {
@@ -69,6 +320,18 @@ document.querySelectorAll('.stock-item input[type="checkbox"]').forEach(function
             document.getElementById('item-' + checkbox.id.replace('stock', '')).classList.add('selected');
         } else {
             document.getElementById('item-' + checkbox.id.replace('stock', '')).classList.remove('selected');
+        }
+        
+        // Sync with table view
+        const index = checkbox.id.replace('stock', '');
+        const tableCheckbox = document.getElementById('stockTable' + index);
+        if (tableCheckbox) {
+            tableCheckbox.checked = checkbox.checked;
+            if (checkbox.checked) {
+                tableCheckbox.closest('tr').classList.add('selected');
+            } else {
+                tableCheckbox.closest('tr').classList.remove('selected');
+            }
         }
     });
 });
@@ -80,27 +343,65 @@ document.querySelector('button[name="clear_filters"]').addEventListener('click',
 });
 
 document.getElementById('addToCartBtn').addEventListener('click', function() {
-    document.querySelectorAll('.stock-item input[type="checkbox"]:checked').forEach(function(checkbox) {
-        let index = checkbox.id.replace('stock', '');
-        let stockItem = document.getElementById('item-' + index);
-        let identifier = stockItem.querySelector('h5').textContent.split('|')[0].trim();
-        let name = stockItem.querySelector('h5').textContent.split('|')[1].trim();
-        let uid = stockItem.querySelector('p i').textContent.trim();
-        let item = {
-            id: index,
-            quantity: 1,
-            identifier: identifier,
-            name: name,
-            uid: uid
-        };
+    let checkedItems;
+    
+    if (currentView === 'card') {
+        checkedItems = document.querySelectorAll('.stock-item input[type="checkbox"]:checked');
+        checkedItems.forEach(function(checkbox) {
+            let index = checkbox.id.replace('stock', '');
+            let stockItem = document.getElementById('item-' + index);
+            let identifier = stockItem.querySelector('h5').textContent.split('|')[0].trim();
+            let name = stockItem.querySelector('h5').textContent.split('|')[1].trim();
+            let uid = stockItem.querySelector('p i').textContent.trim();
+            let item = {
+                id: index,
+                quantity: 1,
+                identifier: identifier,
+                name: name,
+                uid: uid
+            };
 
-        let existingItem = cart.find(cartItem => cartItem.uid === item.uid);
-        if (existingItem) {
-            existingItem.quantity++;
-        } else {
-            cart.push(item);
-        }
-    });
+            let existingItem = cart.find(cartItem => cartItem.uid === item.uid);
+            if (existingItem) {
+                existingItem.quantity++;
+            } else {
+                cart.push(item);
+            }
+        });
+    } else {
+        checkedItems = document.querySelectorAll('#tableView tbody input[type="checkbox"]:checked');
+        checkedItems.forEach(function(checkbox) {
+            let row = checkbox.closest('tr');
+            let index = checkbox.id.replace('stockTable', '');
+            let identifier = row.querySelector('.tray-cell').textContent.trim();
+            let seriesId = row.querySelector('td:nth-child(3)').textContent.trim();
+            let name = row.querySelector('td:nth-child(4)').textContent.trim();
+            let uid = row.querySelector('.row-details strong:contains("Unique ID:")').nextSibling.textContent.trim();
+            
+            // If the details aren't visible, get the uid from the card view
+            if (!uid) {
+                let stockItem = document.getElementById('item-' + index);
+                if (stockItem) {
+                    uid = stockItem.querySelector('p i').textContent.trim();
+                }
+            }
+            
+            let item = {
+                id: index,
+                quantity: 1,
+                identifier: identifier || (seriesId + " / No tray"),
+                name: name,
+                uid: uid
+            };
+
+            let existingItem = cart.find(cartItem => cartItem.uid === item.uid);
+            if (existingItem) {
+                existingItem.quantity++;
+            } else {
+                cart.push(item);
+            }
+        });
+    }
 
     updateCart();
     clearSelection();
@@ -111,6 +412,13 @@ function clearSelection() {
         checkbox.checked = false;
         document.getElementById('item-' + checkbox.id.replace('stock', '')).classList.remove('selected');
     });
+    
+    document.querySelectorAll('#tableView tbody input[type="checkbox"]').forEach(function(checkbox) {
+        checkbox.checked = false;
+        checkbox.closest('tr').classList.remove('selected');
+    });
+    
+    document.getElementById('selectAllTable').checked = false;
 }
 
 document.getElementById('generateLabelsBtn').addEventListener('click', function() {
@@ -303,6 +611,66 @@ function duplicateStock(uniqueId) {
 
 document.addEventListener('DOMContentLoaded', function() {
     updateCart();
+    
+    // Initialize view mode from saved preference
+    toggleView(currentView);
+    
+    // View toggle button event listeners
+    document.getElementById('cardViewBtn').addEventListener('click', function() {
+        toggleView('card');
+    });
+    
+    document.getElementById('tableViewBtn').addEventListener('click', function() {
+        toggleView('table');
+    });
+    
+    // Table sorting
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.addEventListener('click', function() {
+            sortTable(this.dataset.sort);
+        });
+    });
+    
+    // Table row selection and toggle details
+    document.querySelectorAll('#tableView tbody tr').forEach(row => {
+        row.addEventListener('click', function(event) {
+            toggleRowSelection(this, event);
+        });
+    });
+    
+    document.querySelectorAll('.show-details-btn').forEach(btn => {
+        btn.addEventListener('click', function(event) {
+            event.stopPropagation();
+            toggleTableDetails(this.dataset.index);
+        });
+    });
+    
+    // Select all in table
+    document.getElementById('selectAllTable').addEventListener('change', function() {
+        const isChecked = this.checked;
+        document.querySelectorAll('#tableView tbody input[type="checkbox"]').forEach(checkbox => {
+            checkbox.checked = isChecked;
+            const row = checkbox.closest('tr');
+            if (isChecked) {
+                row.classList.add('selected');
+            } else {
+                row.classList.remove('selected');
+            }
+            
+            // Sync with card view
+            const index = checkbox.id.replace('stockTable', '');
+            const cardCheckbox = document.getElementById('stock' + index);
+            if (cardCheckbox) {
+                cardCheckbox.checked = isChecked;
+                const card = document.getElementById('item-' + index);
+                if (isChecked) {
+                    card.classList.add('checked');
+                } else {
+                    card.classList.remove('checked');
+                }
+            }
+        });
+    });
 });
 
 document.getElementById('emptyCartBtn').addEventListener('click', function() {
@@ -321,6 +689,18 @@ function toggleCheckbox(checkboxId, event) {
         card.classList.add('checked');
     } else {
         card.classList.remove('checked');
+    }
+    
+    // Sync with table view
+    const index = checkboxId.replace('stock', '');
+    const tableCheckbox = document.getElementById('stockTable' + index);
+    if (tableCheckbox) {
+        tableCheckbox.checked = checkbox.checked;
+        if (checkbox.checked) {
+            tableCheckbox.closest('tr').classList.add('selected');
+        } else {
+            tableCheckbox.closest('tr').classList.remove('selected');
+        }
     }
 }
 
