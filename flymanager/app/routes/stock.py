@@ -86,7 +86,7 @@ def stock_explorer():
              }
              unique_values = unique_values_filtered # Overwrite unique values based on filtered results
 
-        return render_template("stock_explorer.html", username=username, stocks=filtered_stocks, unique_values=unique_values, filter_state=filter_state)
+        return render_template("stock/stock_explorer.html", username=username, stocks=filtered_stocks, unique_values=unique_values, filter_state=filter_state)
 
     elif request.method == 'POST':
         if 'clear_filters' in request.form:
@@ -114,7 +114,7 @@ def stock_explorer():
              'Provenance': sorted(list(set(str(s.get('Provenance', '')).split('/')[0] for s in filtered_stocks if s.get('Provenance'))))
         }
 
-        return render_template("stock_explorer.html", username=username, stocks=filtered_stocks, unique_values=unique_values_filtered, filter_state=filter_state)
+        return render_template("stock/stock_explorer.html", username=username, stocks=filtered_stocks, unique_values=unique_values_filtered, filter_state=filter_state)
 
 
 def _apply_stock_filters(stocks, filters):
@@ -313,7 +313,7 @@ def add_stock(source_stock_id=None):
             traceback.print_exc()
 
     # Render template for GET or failed POST
-    return render_template('add_stock.html',
+    return render_template('stock/add_stock.html',
                            username=username,
                            types=types, food_types=food_types, provenances=provenances,
                            genesX=genesX, genes2=genes2, genes3=genes3, genes4=genes4,
@@ -456,7 +456,7 @@ def view_stock(unique_id):
             if not changed_fields:
                  flash("No changes detected.", "info")
                  # Re-render view page, no redirect needed
-                 return render_template('view_stock.html', username=username, types=types, food_types=food_types,
+                 return render_template('stock/view_stock.html', username=username, types=types, food_types=food_types,
                                        provenances=provenances, genesX=genesX, genes2=genes2,
                                        genes3=genes3, genes4=genes4, stock_data=stock_data, error=error_message)
 
@@ -499,7 +499,7 @@ def view_stock(unique_id):
 
 
     # Render template for GET or failed POST
-    return render_template('view_stock.html', username=username, types=types, food_types=food_types,
+    return render_template('stock/view_stock.html', username=username, types=types, food_types=food_types,
                            provenances=provenances, genesX=genesX, genes2=genes2,
                            genes3=genes3, genes4=genes4, stock_data=stock_data, error=error_message)
 

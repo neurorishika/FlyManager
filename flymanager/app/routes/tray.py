@@ -34,7 +34,7 @@ def tray_management():
     
     # Render the tray management page
     return render_template(
-        'tray_management.html', 
+        'tray/tray_management.html', 
         trays=trays,
         stocks=stocks,
         crosses=crosses,
@@ -76,7 +76,7 @@ def view_tray(tray_id):
         cross["required_vials"] = calculate_required_vials(cross)
     
     return render_template(
-        'view_tray.html',
+        'tray/view_tray.html',
         tray=tray,
         occupancy=occupancy,
         stocks=stocks,
@@ -124,7 +124,7 @@ def add_tray_route():
             return redirect(url_for('tray.tray_management'))
     
     # GET request, show the add tray form
-    return render_template('add_tray.html', page_title="Add New Tray", username=session.get('username'))
+    return render_template('tray/add_tray.html', page_title="Add New Tray", username=session.get('username'))
 
 @bp.route('/edit_tray/<tray_id>', methods=['GET', 'POST'])
 @login_required
@@ -168,7 +168,7 @@ def edit_tray_route(tray_id):
             flash(f"Failed to update tray", "error")
     
     # For GET or failed POST, show edit form with current values
-    return render_template('edit_tray.html', tray=tray, page_title=f"Edit Tray {tray_id}", username=user)
+    return render_template('tray/edit_tray.html', tray=tray, page_title=f"Edit Tray {tray_id}", username=user)
 
 @bp.route('/delete_tray/<tray_id>', methods=['POST'])
 @login_required

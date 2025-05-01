@@ -60,7 +60,7 @@ def cross_explorer():
         filter_state = session.get('filter_state', {})
         # remove the 'No longer maintained' crosses from the list
         crosses = [cross for cross in crosses if str(cross['Status']) != 'No longer maintained']
-        return render_template("cross_explorer.html", username=username, crosses=crosses, unique_values=unique_values, filter_state=filter_state)
+        return render_template("cross/cross_explorer.html", username=username, crosses=crosses, unique_values=unique_values, filter_state=filter_state)
     elif request.method == 'POST':
         if 'clear_filters' in request.form:
             session.pop('filter_state', None)
@@ -127,7 +127,7 @@ def cross_explorer():
             'FoodType': sorted(set(str(cross['FoodType']) for cross in filtered_crosses))
         }
 
-        return render_template("cross_explorer.html", username=username, crosses=filtered_crosses, unique_values=unique_values, filter_state=filter_state)
+        return render_template("cross/cross_explorer.html", username=username, crosses=filtered_crosses, unique_values=unique_values, filter_state=filter_state)
 
 @bp.route('/add_cross', methods=['GET', 'POST'])
 @bp.route('/add_cross/<unique_id>', methods=['GET', 'POST'])
@@ -203,10 +203,10 @@ def add_cross(unique_id=None):
             return redirect(url_for('cross.cross_explorer'))
         else:
             # Handle error (e.g., QC failure)
-            return render_template('add_cross.html', error=uid_or_message, username=username,
+            return render_template('cross/add_cross.html', error=uid_or_message, username=username,
                                    food_types=food_types, genotypes=genotypes, ports=ports, cross_data=cross_data)
 
-    return render_template('add_cross.html', username=username,
+    return render_template('cross/add_cross.html', username=username,
                            food_types=food_types, genotypes=genotypes, ports=ports, cross_data=cross_data)
 
 @bp.route('/view_cross/<unique_id>', methods=['GET', 'POST'])
@@ -296,9 +296,9 @@ def view_cross(unique_id):
             return redirect(url_for('cross.cross_explorer'))
         else:
             # Handle error (e.g., QC failure)
-            return render_template('cross_explorer.html', error="Failed to update cross", username=username)
+            return render_template('cross/cross_explorer.html', error="Failed to update cross", username=username)
 
-    return render_template('view_cross.html', username=username, food_types=food_types, 
+    return render_template('cross/view_cross.html', username=username, food_types=food_types, 
                            genotypes=genotypes, cross_data=cross_data, predicted_offspring=predicted_offspring)
 
 @bp.route('/generate_cross_labels', methods=['POST'])

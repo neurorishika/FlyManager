@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}Cross Explorer{% endblock %}
+{% block title %}Stock Explorer{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/cross_explorer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stock_explorer.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -12,62 +12,64 @@
     <div class="alert alert-info" role="alert">
         <strong>Note:</strong> Stocks/Crosses with the status "No longer maintained" are excluded by default. To view them, please filter by the "No longer maintained" status.
     </div>
-    {% include 'filter_cross.html' %}
+    {% include 'stock/filter_stock.html' %}
 </div>
 <div class="mb-3">
-    <a href="{{ url_for('cross.add_cross') }}"><button class="btn btn-success">Add New Cross</button></a>
-
+    <a href="{{ url_for('stock.add_stock') }}"><button class="btn btn-success">Add New Stock</button></a>
 </div>
-<div class="cross-container">
-    <div class="cross-items-grid">
-        {% for cross in crosses %}
-        <div class="cross-item" data-status="{{ cross.Status }}" id="item-{{ loop.index }}" onclick="toggleCheckbox('cross{{ loop.index }}', event)">
+<div class="stock-container">
+    <div class="stock-items-grid">
+        {% for stock in stocks %}
+        <div class="stock-item" data-status="{{ stock.Status }}" id="item-{{ loop.index }}" onclick="toggleCheckbox('stock{{ loop.index }}', event)">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div class="checkbox-and-badges">
-                    <input type="checkbox" id="cross{{ loop.index }}" onclick="toggleCheckbox('cross{{ loop.index }}', event)">
+                    <input type="checkbox" id="stock{{ loop.index }}" onclick="toggleCheckbox('stock{{ loop.index }}', event)">
                     <div class="badges">
-                        <span class="badge badge-info">{{ cross.FoodType }}</span>
-                        <span class="badge badge-secondary">{{ cross.Status }}</span>
-                        <span class="badge badge-flip" style="background-color:{{ cross.FlipInColor }}">{{ cross.FlipIn }}</span>
-                        <span class="badge badge-eclose">Ecloses in {{ cross.EclosesIn }}</span>
+                        <span class="badge badge-info">{{ stock.FoodType }}</span>
+                        <span class="badge badge-secondary">{{ stock.Type }}</span>
+                        <span class="badge badge-flip" style="background-color:{{ stock.FlipInColor }}">{{ stock.FlipIn }}</span>
+                        <span class="badge badge-eclose">Ecloses in {{ stock.EclosesIn }}</span>
                     </div>
                 </div>
                 <div style="display: flex; align-items: center;">
                     <button class="btn btn-link btn-sm expand-btn" onclick="event.stopPropagation(); toggleDetails({{ loop.index }})">
                         <i class="fas fa-chevron-down"></i>
                     </button>
-                    <button class="btn btn-link btn-sm duplicate-cross-btn" onclick="event.stopPropagation(); duplicateCross('{{ cross.UniqueID }}')">
+                    <button class="btn btn-link btn-sm duplicate-stock-btn" onclick="event.stopPropagation(); duplicateStock('{{ stock.UniqueID }}')">
                         <i class="fas fa-clone"></i>
                     </button>
-                    <button class="btn btn-link btn-sm view-details-btn" onclick="event.stopPropagation(); viewDetails('{{ cross.UniqueID }}')">
+                    <button class="btn btn-link btn-sm view-details-btn" onclick="event.stopPropagation(); viewDetails('{{ stock.UniqueID }}')">
                         <i class="fas fa-external-link-alt"></i>
                     </button>
                 </div>
             </div>
             <div style="flex-grow: 1; padding-top: 10px;">
                 <h5>
-                    {% if cross.TrayID and cross.TrayPosition %}
-                        {{ cross.TrayID }}-{{ cross.TrayPosition }}
+                    {% if stock.TrayID and stock.TrayPosition %}
+                        {{ stock.TrayID }}-{{ stock.TrayPosition }}
                     {% endif %}
-                    | <small class="text-muted">{{ cross.Name }}</small>
+                    <small class="text-muted">{{ stock.SeriesID }}{{ stock.ReplicateID }}</small>
+                    | {{ stock.Name }}
+                    {% if stock.AltReference %}
+                        <span class="text-muted">({{ stock.AltReference }})</span>
+                    {% endif %}
                 </h5>
                 <p>
-                    <strong>Male Genotype:</strong> {{ cross.MaleGenotype }}<br>
-                    <strong>Female Genotype:</strong> {{ cross.FemaleGenotype }}<br>
-                    <strong>Unique Identifier:</strong> <i>{{ cross.UniqueID }}</i>
+                    <strong>Genotype:</strong> {{ stock.Genotype }}<br>
+                    <strong>Provenance:</strong> {{ stock.Provenance }}<br>
+                    <strong>Unique Identifier:</strong> <i>{{ stock.UniqueID }}</i>
                 </p>
             </div>
             <div class="details" id="details-{{ loop.index }}" style="display: none; width: 100%;">
                 <div style="display: flex; flex-wrap: wrap;">
                     <div style="flex: 1;">
-                        <p><strong>Male Unique ID:</strong> {{ cross.MaleUniqueID }}</p>
-                        <p><strong>Female Unique ID:</strong> {{ cross.FemaleUniqueID }}</p>
-                        <p><strong>Comments:</strong> {{ cross.Comments }}</p>
-                        <p><strong>Creation Date:</strong> {{ cross.CreationDate }}</p>
+                        <p><strong>Source ID:</strong> {{ stock.SourceID }}</p>
+                        <p><strong>Comments:</strong> {{ stock.Comments }}</p>
+                        <p><strong>Creation Date:</strong> {{ stock.CreationDate }}</p>
                     </div>
                     <div style="flex: 1;">
-                        <p><strong>Last Flip Date:</strong> {{ cross.LastFlipDate }}</p>
-                        <p><strong>Data Modified Date:</strong> {{ cross.DataModifiedDate }}</p>
+                        <p><strong>Last Flip Date:</strong> {{ stock.LastFlipDate }}</p>
+                        <p><strong>Data Modified Date:</strong> {{ stock.DataModifiedDate }}</p>
                     </div>
                 </div>
             </div>
@@ -119,7 +121,7 @@
     </div>
 </div>
 
-<form id="generateLabelsForm" method="post" action="{{ url_for('cross.generate_cross_labels') }}" target="_blank">
+<form id="generateLabelsForm" method="post" action="{{ url_for('stock.generate_stock_labels') }}" target="_blank">
     <input type="hidden" name="selected_uids" id="selectedUids">
     <input type="hidden" name="blank_spaces" id="blankSpaces">
     <input type="hidden" name="quantities" id="quantities">
@@ -130,7 +132,7 @@
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="bulkFlipModalLabel">Bulk Flip Crosses</h5>
+                <h5 class="modal-title" id="bulkFlipModalLabel">Bulk Flip Stocks/Crosses</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
@@ -169,17 +171,18 @@
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
     // Define URLs for JavaScript using url_for
-    const viewCrossUrlBase = "{{ url_for('cross.view_cross', unique_id='UNIQUE_ID_PLACEHOLDER') }}";
-    const addCrossUrlBase = "{{ url_for('cross.add_cross', unique_id='UNIQUE_ID_PLACEHOLDER') }}";
+    const viewStockUrlBase = "{{ url_for('stock.view_stock', unique_id='UNIQUE_ID_PLACEHOLDER') }}";
+    const addStockUrlBase = "{{ url_for('stock.add_stock', unique_id='UNIQUE_ID_PLACEHOLDER') }}";
     const bulkFlipUrl = "{{ url_for('flip.bulk_flip_route') }}";
     const bulkStatusUrl = "{{ url_for('flip.bulk_status_change_route') }}";
     const bulkRemoveFromTrayUrl = "{{ url_for('tray.bulk_remove_from_tray') }}";
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
-<script src="{{ url_for('static', filename='js/cross_explorer.js') }}"></script>
+<script src="{{ url_for('static', filename='js/stock_explorer.js') }}"></script>
 {% endblock %}
