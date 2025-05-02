@@ -19,7 +19,7 @@ def get_metadata(metadata_type, db):
         A list of dictionaries representing the metadata.
     """
     assert metadata_type in ["types", "food_types", "provenances", "genesX", "genes2nd", 
-                             "genes3rd", "genes4th"], "Invalid metadata type"
+                             "genes3rd", "genes4th", "species"], "Invalid metadata type"
     metadata_collection = db[metadata_type]
     metadata = list(metadata_collection.find())
     values = [m["Value"] for m in metadata]
@@ -43,7 +43,7 @@ def add_metadata(metadata_type, metadata_value, db):
         True if the metadata was added, False otherwise.
     """
     assert metadata_type in ["types", "food_types", "provenances", "genesX", "genes2nd",
-                             "genes3rd", "genes4th"], "Invalid metadata type"
+                             "genes3rd", "genes4th", "species"], "Invalid metadata type"
     
     # Define the metadata collection
     metadata_collection = db[metadata_type]
@@ -79,7 +79,7 @@ def delete_metadata(metadata_type, metadata_value, db):
         True if the metadata was deleted, False otherwise.
     """
     assert metadata_type in ["types", "food_types", "provenances", "genesX", "genes2nd",
-                             "genes3rd", "genes4th"], "Invalid metadata type"
+                             "genes3rd", "genes4th", "species"], "Invalid metadata type"
     
     # Define the metadata collection
     metadata_collection = db[metadata_type]
@@ -113,7 +113,7 @@ def edit_metadata(metadata_type, old_value, new_value, db):
         True if the metadata was updated, False otherwise.
     """
     assert metadata_type in ["types", "food_types", "provenances", "genesX", "genes2nd",
-                             "genes3rd", "genes4th"], "Invalid metadata type"
+                             "genes3rd", "genes4th", "species"], "Invalid metadata type"
     
     # Define the metadata collection
     metadata_collection = db[metadata_type]

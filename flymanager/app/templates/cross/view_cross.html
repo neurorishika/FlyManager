@@ -11,6 +11,27 @@
     {% endif %}
 
     <form method="POST" action="{{ url_for('cross.view_cross', unique_id=cross_data.uniqueID) }}">
+        <!-- Species Information -->
+        <div class="form-row mb-3">
+            <div class="col-12">
+                <div class="species-display p-2 rounded">
+                    <strong>Species:</strong>
+                    <span id="speciesDisplay">
+                        {% if cross_data.maleSpecies == cross_data.femaleSpecies %}
+                            {{ cross_data.maleSpecies|default("D. melanogaster", true) }}
+                        {% else %}
+                            ♂ {{ cross_data.maleSpecies|default("D. melanogaster", true) }} × ♀ {{ cross_data.femaleSpecies|default("D. melanogaster", true) }}
+                        {% endif %}
+                    </span>
+                </div>
+                {% if cross_data.maleSpecies != cross_data.femaleSpecies and cross_data.maleSpecies and cross_data.femaleSpecies %}
+                <div class="alert alert-warning mt-2">
+                    <strong>Warning:</strong> This is a cross-species cross, which may not be viable.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Row 1: Male Unique ID and Genotype -->
         <div class="form-row">
             <div class="form-group col-md-3">
@@ -33,6 +54,9 @@
             </div>
         </div>
 
+        <!-- Hidden Male Species Field -->
+        <input type="hidden" id="maleSpecies" name="maleSpecies" value="{{ cross_data.maleSpecies|default('D. melanogaster', true) }}">
+
         <!-- Row 2: Female Unique ID and Genotype -->
         <div class="form-row">
             <div class="form-group col-md-3">
@@ -54,6 +78,9 @@
                 </div>
             </div>
         </div>
+
+        <!-- Hidden Female Species Field -->
+        <input type="hidden" id="femaleSpecies" name="femaleSpecies" value="{{ cross_data.femaleSpecies|default('D. melanogaster', true) }}">
 
         <!-- Row 3: Status -->
         <div class="form-row">
@@ -292,6 +319,38 @@
         // Populate food type
         tagifyFoodType.removeAllTags();
         tagifyFoodType.addTags([crossData.foodType]);
+        
+        // Set species values (with default fallback)
+        document.getElementById('maleSpecies').value = crossData.maleSpecies || "D. melanogaster";
+        document.getElementById('femaleSpecies').value = crossData.femaleSpecies || "D. melanogaster";
+        
+        // Update offspring table if data is available
+        if (crossData.predictedOffspring && crossData.predictedOffspring.length > 0) {
+            const offspringTable = document.getElementById('offspringTable');
+            offspringTable.innerHTML = '';
+            
+            crossData.predictedOffspring.forEach(offspring => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${offspring.genotype}</td>
+                    <td>${offspring.probability}%</td>
+                `;
+                offspringTable.appendChild(row);
+            });
+        }
+    }
+
+    // Function to update species display and warning
+    function updateSpeciesDisplay() {
+        const maleSpecies = document.getElementById('maleSpecies').value;
+        const femaleSpecies = document.getElementById('femaleSpecies').value;
+        const speciesDisplay = document.getElementById('speciesDisplay');
+        
+        if (maleSpecies === femaleSpecies) {
+            speciesDisplay.textContent = maleSpecies;
+        } else {
+            speciesDisplay.textContent = `♂ ${maleSpecies} × ♀ ${femaleSpecies}`;
+        }
     }
 
     // Make fields editable when "Edit" button is clicked
@@ -301,24 +360,30 @@
             const inputField = this.closest('.input-group').querySelector('input, textarea, select');
 
             if (inputField && inputField.classList.contains('tag-input')) {
-                inputField.disabled = false;  // Enable Tagify input fields
+        
                 if (inputField.id === 'maleGenotype') {
+                    inputField.disabled = false;
+                    // Re-create Tagify with edit enabled
                     tagifyMaleGenotype.destroy();
                     tagifyMaleGenotype = new Tagify(inputField, {
                         whitelist: {{ genotypes | tojson }},
                         maxTags: 1,
-                        readonly: false
+                        readonly: false,
+                        delimiters: null
                     });
-                    
                 } else if (inputField.id === 'femaleGenotype') {
+                    inputField.disabled = false;
+                    // Re-create Tagify with edit enabled
                     tagifyFemaleGenotype.destroy();
                     tagifyFemaleGenotype = new Tagify(inputField, {
                         whitelist: {{ genotypes | tojson }},
                         maxTags: 1,
-                        readonly: false
+                        readonly: false,
+                        delimiters: null
                     });
-                    
                 } else if (inputField.id === 'foodType') {
+                    inputField.disabled = false;
+                    // Re-create Tagify with edit enabled
                     tagifyFoodType.destroy();
                     tagifyFoodType = new Tagify(inputField, {
                         whitelist: {{ food_types | tojson }},
@@ -326,7 +391,7 @@
                         readonly: false
                     });
                 }
-        
+
             } else {
                 inputField.disabled = false;  // Enable normal input fields
             }
@@ -346,6 +411,21 @@
             });
         }
     });
+    
+    // Add CSS for species display
+    const style = document.createElement('style');
+    style.textContent = `
+        .species-display {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+        }
+        .badge-species {
+            background-color: #6610f2;
+            color: white;
+        }
+    `;
+    document.head.appendChild(style);
 });
 </script>
 {% endblock %}

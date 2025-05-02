@@ -104,9 +104,9 @@
             </div>
         </div>
 
-        <!-- Row 4: Type, Food Type, and Status -->
+        <!-- Row 4: Type, Food Type, Species, and Status -->
         <div class="form-row">
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
                 <label for="type">Type:</label>
                 <div class="input-group">
                     <input type="text" id="type" name="type" class="form-control tag-input">
@@ -115,7 +115,7 @@
                     </div>
                 </div>
             </div>
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
                 <label for="foodType">Food Type:</label>
                 <div class="input-group">
                     <input type="text" id="foodType" name="foodType" class="form-control tag-input">
@@ -124,7 +124,16 @@
                     </div>
                 </div>
             </div>
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
+                <label for="species">Species:</label>
+                <div class="input-group">
+                    <input type="text" id="species" name="species" class="form-control tag-input">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group col-md-3">
                 <label for="status">Status:</label>
                 <div class="input-group">
                     <select class="form-control" id="status" name="status" required>
@@ -318,6 +327,12 @@
         readonly: true
     });
 
+    let tagifySpecies = new Tagify(document.querySelector('#species'), {
+        whitelist: {{ species_list | tojson }},
+        maxTags: 1,
+        readonly: true
+    });
+
     let tagifyProvenance = new Tagify(document.querySelector('#provenance'), {
         whitelist: {{ provenances | tojson }},
         delimiters: null,
@@ -381,6 +396,10 @@
 
         tagifyFoodType.removeAllTags();
         tagifyFoodType.addTags(stockData.foodType);
+        
+        // Add species if available, default to D. melanogaster
+        tagifySpecies.removeAllTags();
+        tagifySpecies.addTags([stockData.species || "D. melanogaster"]);
     }
 
     // Make fields editable when "Edit" button is clicked
@@ -464,7 +483,16 @@
                         maxTags: 1,
                         readonly: false
                     });
-
+                    
+                } else if (inputField.id === 'species') {
+                    // destroy the tagify instance and recreates it
+                    let previousValue = inputField.value;
+                    tagifySpecies.destroy();
+                    tagifySpecies = new Tagify(inputField, {
+                        whitelist: {{ species_list | tojson }},
+                        maxTags: 1,
+                        readonly: false
+                    });
                 }
         
             } else {

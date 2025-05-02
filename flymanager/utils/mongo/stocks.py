@@ -3,6 +3,7 @@ import math
 from hashlib import shake_256
 from flymanager.utils.genetics import qc_genotype
 from flymanager.utils.utils import clean_log_entry
+from flymanager.app.settings import BASE_STOCK_PROPERTIES, REQUIRED_STOCK_PROPERTIES, DEFAULT_STOCK_PROPERTY_VALUES, OPTIONAL_STOCK_PROPERTIES
 
 def add_to_stock(user, properties, db):
     """
@@ -14,22 +15,7 @@ def add_to_stock(user, properties, db):
     properties: dict
         The properties of the stock.
         Properties:
-            SourceID (required)
-            Genotype (required)
-            Name (required)
-            AltReference (optional)
-            Type (required)
-            SeriesID (required)
-            ReplicateID (required)
-            VialLifetime (required)
-            FlipFrequency (required)
-            DevelopmentalTime (required)
-            TrayID (optional)
-            TrayPosition (optional)
-            Status (required)
-            FoodType (optional)
-            Provenance (optional)
-            Comments (optional)
+            SEE REQUIRED_STOCK_PROPERTIES and OPTIONAL_STOCK_PROPERTIES
     db: pymongo.database.Database
         The MongoDB database instance.
     
@@ -40,16 +26,9 @@ def add_to_stock(user, properties, db):
         The unique identifier of the stock.
     """
 
-    assert "SourceID" in properties, "SourceID is required"
-    assert "Genotype" in properties, "Genotype is required"
-    assert "Name" in properties, "Name is required"
-    assert "Type" in properties, "Type is required"
-    assert "SeriesID" in properties, "SeriesID is required"
-    assert "ReplicateID" in properties, "ReplicateID is required"
-    assert "Status" in properties, "Status is required"
-    assert "VialLifetime" in properties, "VialLifetime is required"
-    assert "FlipFrequency" in properties, "FlipFrequency is required"
-    assert "DevelopmentalTime" in properties, "DevelopmentalTime is required"
+    for prop in REQUIRED_STOCK_PROPERTIES + BASE_STOCK_PROPERTIES:
+        if prop not in properties:
+            raise ValueError(f"{prop} is required")
 
     # make sure genotype meets the qc
     qc, genotype = qc_genotype(properties["Genotype"])
@@ -76,28 +55,22 @@ def add_to_stock(user, properties, db):
     stock_document = {
         "UniqueID": uid,
         "User": user,
-        "SourceID": properties["SourceID"],
         "Genotype": genotype,
         "Name": properties["Name"],
-        "AltReference": properties.get("AltReference", ""),
-        "Type": properties["Type"],
-        "SeriesID": properties["SeriesID"],
-        "ReplicateID": properties["ReplicateID"],
-        "TrayID": properties.get("TrayID", ""),
-        "TrayPosition": properties.get("TrayPosition", ""),
-        "VialLifetime": properties["VialLifetime"],
-        "FlipFrequency": properties["FlipFrequency"],
-        "DevelopmentalTime": properties["DevelopmentalTime"],
-        "Status": properties["Status"],
-        "FoodType": properties.get("FoodType", ""),
-        "Provenance": properties.get("Provenance", ""),
-        "Comments": properties.get("Comments", ""),
+        "TrayID": "",
+        "TrayPosition": "",
         "CreationDate": timestamp,
         "LastFlipDate": timestamp,
         "FlipLog": timestamp,
         "DataModifiedDate": timestamp,
         "ModificationLog": f"{timestamp} : Stock created"
     }
+
+    for prop in REQUIRED_STOCK_PROPERTIES:
+        stock_document[prop] = properties[prop]
+    
+    for prop in OPTIONAL_STOCK_PROPERTIES:
+        stock_document[prop] = properties.get(prop, "")
 
     # insert the document into the MongoDB collection
     stocks_collection = db["stocks"]
@@ -331,6 +304,25 @@ def update_stock_vials(stock, username, db):
         True if the stock was updated successfully, False otherwise.
     """
     uid = stock["UniqueID"]
+
+    try:
+        for prop in REQUIRED_STOCK_PROPERTIES:
+            if prop not in stock:
+                raise ValueError(f"{prop} is required")
+    except ValueError as e:
+        # fill in the missing properties with default values
+        update_properties = {}
+        for prop in REQUIRED_STOCK_PROPERTIES:
+            if prop not in stock: 
+                if prop in DEFAULT_STOCK_PROPERTY_VALUES:
+                 update_properties[prop] = DEFAULT_STOCK_PROPERTY_VALUES[prop]
+                else:
+                    raise ValueError(f"{prop} is required")
+        # edit the stock
+        success = edit_stock(username, uid, db, update_properties, log_activity=False)
+        if not success:
+            print(f"Failed to update stock {uid} with default values")
+            return False
 
     # check if the stock doesnt have the key "CurrentlyAliveVials"
     if "CurrentlyAliveVials" not in stock:

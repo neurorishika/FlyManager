@@ -37,6 +37,11 @@
                     <div class="badges">
                         <span class="badge badge-info">{{ cross.FoodType }}</span>
                         <span class="badge badge-secondary">{{ cross.Status }}</span>
+                        {% if cross.MaleSpecies == cross.FemaleSpecies %}
+                        <span class="badge badge-species">{{ cross.MaleSpecies|default('D. melanogaster') }}</span>
+                        {% else %}
+                        <span class="badge badge-species">♂ {{ cross.MaleSpecies|default('D. melanogaster') }} × ♀ {{ cross.FemaleSpecies|default('D. melanogaster') }}</span>
+                        {% endif %}
                         <span class="badge badge-flip" style="background-color:{{ cross.FlipInColor }}">{{ cross.FlipIn }}</span>
                         <span class="badge badge-eclose">Ecloses in {{ cross.EclosesIn }}</span>
                     </div>
@@ -93,6 +98,7 @@
                     <th class="sortable" data-sort="name">Name<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="male">Male Genotype<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="female">Female Genotype<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="species">Species<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="food">Food Type<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="status">Status<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="flipin">Flip In<i class="fas fa-sort ml-1"></i></th>
@@ -114,6 +120,14 @@
                     <td>{{ cross.Name }}</td>
                     <td>{{ cross.MaleGenotype }}</td>
                     <td>{{ cross.FemaleGenotype }}</td>
+                    <td>
+                        {% if cross.MaleSpecies == cross.FemaleSpecies %}
+                            {{ cross.MaleSpecies|default('D. melanogaster') }}
+                        {% else %}
+                            ♂ {{ cross.MaleSpecies|default('D. melanogaster') }} × 
+                            ♀ {{ cross.FemaleSpecies|default('D. melanogaster') }}
+                        {% endif %}
+                    </td>
                     <td>{{ cross.FoodType }}</td>
                     <td>
                         <span class="badge badge-pill 

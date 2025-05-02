@@ -17,14 +17,14 @@
                 <label for="sourceType">Source Type:</label>
                 <select id="sourceType" name="sourceType" class="form-control">
                     <option value="BDSC">BDSC</option>
-                    <option value="JRC">JRC</option>
                     <option value="INTERNAL">INTERNAL</option>
+                    <option value="JRC">JRC</option>
                     <option value="OTHER" selected>OTHER</option>
                 </select>
             </div>
             <div class="form-group col-md-6">
                 <label for="sourceID">Source ID:</label>
-                <input type="text" class="form-control" id="sourceID" name="sourceID">
+                <input type="text" class="form-control" id="sourceID" name="sourceID" required>
             </div>
             <div class="form-group col-md-3">
                 <button type="button" id="autopopulateBtn" class="btn btn-primary mt-4 btn-block" disabled>Autopopulate</button>
@@ -77,17 +77,21 @@
             </div>
         </div>
 
-        <!-- Row 4: Type, Food Type, and Status -->
+        <!-- Row 4: Type, Food Type, Species, and Status -->
         <div class="form-row">
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
                 <label for="type">Type:</label>
-                <input type="text" id="type" name="type" class="form-control tag-input">
+                <input type="text" id="type" name="type" class="form-control tag-input" required>
             </div>
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
                 <label for="foodType">Food Type:</label>
-                <input type="text" id="foodType" name="foodType" class="form-control tag-input" value="Molasses">
+                <input type="text" id="foodType" name="foodType" class="form-control tag-input" value="Molasses" required>
             </div>
-            <div class="form-group col-md-4">
+            <div class="form-group col-md-3">
+                <label for="species">Species:</label>
+                <input type="text" id="species" name="species" class="form-control tag-input" value="D. melanogaster" required>
+            </div>
+            <div class="form-group col-md-3">
                 <label for="status">Status:</label>
                 <select class="form-control" id="status" name="status" required>
                     <option value="Healthy" data-color="green">Healthy</option>
@@ -101,8 +105,8 @@
 
         <!-- Row 5: Provenance -->
         <div class="form-group">
-            <label for="provenance">Provenance (optional):</label>
-            <input type="text" id="provenance" name="provenance" class="form-control tag-input">
+            <label for="provenance">Provenance:</label>
+            <input type="text" id="provenance" name="provenance" class="form-control tag-input" required>
         </div>
 
         <!-- Row 6: Series ID, Replicate ID, Vial Lifetime, Flip Frequency and Developmental Time-->
@@ -122,15 +126,15 @@
             </div>
             <div class="form-group col-md-2">
                 <label for="vialLifetime">Vial Lifetime (days):</label>
-                <input type="number" class="form-control" id="vialLifetime" name="vialLifetime" value="14">
+                <input type="number" class="form-control" id="vialLifetime" name="vialLifetime" required>
             </div>
             <div class="form-group col-md-2">
                 <label for="flipFrequency">Flip Frequency (days):</label>
-                <input type="number" class="form-control" id="flipFrequency" name="flipFrequency" value="7">
+                <input type="number" class="form-control" id="flipFrequency" name="flipFrequency" required>
             </div>
             <div class="form-group col-md-2">
                 <label for="developmentalTime">Mating->Virgin Adult (days):</label>
-                <input type="number" class="form-control" id="developmentalTime" name="developmentalTime" value="7">
+                <input type="number" class="form-control" id="developmentalTime" name="developmentalTime" required>
             </div>
         </div>
 
@@ -195,11 +199,18 @@
         });
         
         let tagifyType = new Tagify(document.querySelector('#type'), {
+            maxTags: 1,
             whitelist: {{ types | tojson }}
         });
 
         let tagifyFoodType = new Tagify(document.querySelector('#foodType'), {
+            maxTags: 1,
             whitelist: {{ food_types | tojson }}
+        });
+
+        let tagifySpecies = new Tagify(document.querySelector('#species'), {
+            maxTags: 1,
+            whitelist: {{ species_list | tojson }}
         });
 
         let tagifyProvenance = new Tagify(document.querySelector('#provenance'), {
@@ -280,6 +291,11 @@
                         document.getElementById('altReference').value = data.altReference;
                         document.getElementById('type').value = data.type;
                         document.getElementById('foodType').value = data.foodType;
+                        
+                        // Populate species if available
+                        tagifySpecies.removeAllTags();
+                        tagifySpecies.addTags([data.species]);
+                        
                         // Set status dropdown
                         const statusSelect = document.getElementById('status');
                         for (let i = 0; i < statusSelect.options.length; i++) {
@@ -323,6 +339,7 @@
             }
 
             // Split the genotype by ';' and add to tagify one by one
+            console.log(stockData.genotype);
             const genes = stockData.genotype.split('; ');
             tagifyX.removeAllTags();
             tagify2.removeAllTags();
@@ -344,6 +361,10 @@
 
             tagifyFoodType.removeAllTags();
             tagifyFoodType.addTags(stockData.foodType);
+            
+            // Set species if available
+            tagifySpecies.removeAllTags();
+            tagifySpecies.addTags(stockData.species);
         }
         
     });

@@ -39,6 +39,9 @@
             </div>
         </div>
 
+        <!-- Male Species (hidden, will be filled automatically) -->
+        <input type="hidden" id="maleSpecies" name="maleSpecies" value="D. melanogaster">
+
         <!-- Row 2: Female Unique ID and Genotype -->
         <div class="form-row">
             <div class="form-group col-md-3">
@@ -53,6 +56,21 @@
                 <label for="femaleGenotype">Female Genotype:</label>
                 <input type="text" id="femaleGenotype" name="femaleGenotype" class="form-control tag-input">
                 <div id="femaleUIDOptions" class="mt-2"></div> <!-- Placeholder for UID buttons -->
+            </div>
+        </div>
+
+        <!-- Female Species (hidden, will be filled automatically) -->
+        <input type="hidden" id="femaleSpecies" name="femaleSpecies" value="D. melanogaster">
+
+        <!-- Species Display and Warning -->
+        <div class="form-row mb-3">
+            <div class="col-12">
+                <div class="species-display p-2 rounded">
+                    <strong>Species: </strong><span id="speciesDisplay">D. melanogaster</span>
+                </div>
+                <div id="speciesWarning" class="alert alert-warning mt-2" style="display: none;">
+                    <strong>Warning:</strong> Male and female species are different. Cross-species crosses may not be viable.
+                </div>
             </div>
         </div>
 
@@ -126,6 +144,22 @@
             path: '/socket.io'
         });
         let currentThreadId = null;
+
+        // Function to update species display and warning
+        function updateSpeciesDisplay() {
+            const maleSpecies = document.getElementById('maleSpecies').value;
+            const femaleSpecies = document.getElementById('femaleSpecies').value;
+            const speciesDisplay = document.getElementById('speciesDisplay');
+            const speciesWarning = document.getElementById('speciesWarning');
+            
+            if (maleSpecies === femaleSpecies) {
+                speciesDisplay.textContent = maleSpecies;
+                speciesWarning.style.display = 'none';
+            } else {
+                speciesDisplay.textContent = `♂ ${maleSpecies} × ♀ ${femaleSpecies}`;
+                speciesWarning.style.display = 'block';
+            }
+        }
 
         // Function to start scanning
         function startScanning(gender) {
@@ -249,6 +283,8 @@
                                 document.querySelectorAll('.m-uid-button').forEach(button => {
                                     button.style.display = 'none';
                                 });
+                                // Trigger input event to fetch species
+                                document.getElementById('maleUniqueID').dispatchEvent(new Event('input'));
                             };
                             maleUIDOptions.appendChild(button);
                         });
@@ -278,6 +314,8 @@
                                 document.querySelectorAll('.f-uid-button').forEach(button => {
                                     button.style.display = 'none';
                                 });
+                                // Trigger input event to fetch species
+                                document.getElementById('femaleUniqueID').dispatchEvent(new Event('input'));
                             };
                             femaleUIDOptions.appendChild(button);
                         });
@@ -285,12 +323,12 @@
             }
         });
 
-        // Fetch genotype when Male Unique ID is entered or scanned
+        // Fetch genotype and species when Male Unique ID is entered or scanned
         document.getElementById('maleUniqueID').addEventListener('input', function() {
             const maleUID = this.value;
             if (maleUID) {
                 // Construct URL using url_for and replace placeholder
-                const url = "{{ url_for('stock.get_genotype_for_uid', unique_id='UID_PLACEHOLDER') }}".replace('UID_PLACEHOLDER', maleUID);
+                const url = "{{ url_for('stock.get_stock_data_for_uid', unique_id='UID_PLACEHOLDER') }}".replace('UID_PLACEHOLDER', maleUID);
                 fetch(url)
                     .then(response => response.json())
                     .then(data => {
@@ -299,15 +337,20 @@
                             tagifyMaleGenotype.removeAllTags();
                             tagifyMaleGenotype.addTags([data.genotype]);
                         }
+                        // Set the species
+                        document.getElementById('maleSpecies').value = data.species || "D. melanogaster";
+                        // Update species display
+                        updateSpeciesDisplay();
                     });
             }
         });
 
+        // Fetch genotype and species when Female Unique ID is entered or scanned
         document.getElementById('femaleUniqueID').addEventListener('input', function() {
             const femaleUID = this.value;
             if (femaleUID) {
                 // Construct URL using url_for and replace placeholder
-                const url = "{{ url_for('stock.get_genotype_for_uid', unique_id='UID_PLACEHOLDER') }}".replace('UID_PLACEHOLDER', femaleUID);
+                const url = "{{ url_for('stock.get_stock_data_for_uid', unique_id='UID_PLACEHOLDER') }}".replace('UID_PLACEHOLDER', femaleUID);
                 fetch(url)
                     .then(response => response.json())
                     .then(data => {
@@ -316,6 +359,10 @@
                             tagifyFemaleGenotype.removeAllTags();
                             tagifyFemaleGenotype.addTags([data.genotype]);
                         }
+                        // Set the species
+                        document.getElementById('femaleSpecies').value = data.species || "D. melanogaster";
+                        // Update species display
+                        updateSpeciesDisplay();
                     });
             }
         });
@@ -340,6 +387,11 @@
             tagifyMaleGenotype.addTags([crossData.maleGenotype]);
             tagifyFemaleGenotype.removeAllTags();
             tagifyFemaleGenotype.addTags([crossData.femaleGenotype]);
+            
+            // Set species information
+            document.getElementById('maleSpecies').value = crossData.maleSpecies || "D. melanogaster";
+            document.getElementById('femaleSpecies').value = crossData.femaleSpecies || "D. melanogaster";
+            updateSpeciesDisplay();
 
             // set the status dropdown
             const statusDropdown = document.getElementById('status');
@@ -357,6 +409,21 @@
             document.getElementById('name').value = crossData.name;
             document.getElementById('comments').value = crossData.comments;
         }
+        
+        // Add CSS for species display
+        const style = document.createElement('style');
+        style.textContent = `
+            .species-display {
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 0.25rem;
+            }
+            .badge-species {
+                background-color: #6610f2;
+                color: white;
+            }
+        `;
+        document.head.appendChild(style);
     });
 </script>
 {% endblock %}

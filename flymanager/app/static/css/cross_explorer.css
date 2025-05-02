@@ -57,24 +57,29 @@
     color: white;
 }
 
+.badge-species {
+    background-color: #6610f2;
+    color: white;
+}
+
 .cross-item[data-status="Healthy"] {
-    border-color: green;
+    border-left: 5px solid #28a745;
 }
 
 .cross-item[data-status="Showing Issues"] {
-    border-color: rgb(96, 32, 32);
+    border-left: 5px solid #ffc107;
 }
 
 .cross-item[data-status="Needs refresh"] {
-    border-color: red;
+    border-left: 5px solid #dc3545;
 }
 
 .cross-item[data-status="Ordered"] {
-    border-color: blue;
+    border-left: 5px solid #17a2b8;
 }
 
 .cross-item[data-status="No longer maintained"] {
-    border-color: pink;
+    border-left: 5px solid #6c757d;
 }
 
 .cross-item h5 {

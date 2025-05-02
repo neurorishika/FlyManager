@@ -45,18 +45,14 @@ def reset_database(db):
         db.drop_collection(collection)
     
     # Create the necessary collections
-    db.create_collection("users")
-    db.create_collection("activity")
-    db.create_collection("stocks")
-    db.create_collection("crosses")
-    db.create_collection("types")
-    db.create_collection("food_types")
-    db.create_collection("provenances")
-    db.create_collection("genesX")
-    db.create_collection("genes2nd")
-    db.create_collection("genes3rd")
-    db.create_collection("genes4th")
-    db.create_collection("settings")
+    collections = [
+        "users", "activity", "stocks", "crosses", "types", 
+        "food_types", "provenances", "genesX", "genes2nd",
+        "genes3rd", "genes4th", "species", "settings"
+    ]
+    
+    for collection in collections:
+        db.create_collection(collection)
 
 def uid_exists(uid, db):
     """

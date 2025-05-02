@@ -7,7 +7,7 @@
 /* Two-column layout with multiple rows */
 .stock-items-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); /* Adjust columns dynamically */
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); /* Adjust columns dynamically */
     gap: 15px; /* Space between items */
     padding: 10px;
 }
@@ -58,23 +58,23 @@
 }
 
 .stock-item[data-status="Healthy"] {
-    border-color: green;
+    border-left: 5px solid #28a745;
 }
 
 .stock-item[data-status="Showing Issues"] {
-    border-color: rgb(96, 32, 32);
+    border-left: 5px solid #ffc107;
 }
 
 .stock-item[data-status="Needs refresh"] {
-    border-color: red;
+    border-left: 5px solid #dc3545;
 }
 
 .stock-item[data-status="Ordered"] {
-    border-color: blue;
+    border-left: 5px solid #17a2b8;
 }
 
 .stock-item[data-status="No longer maintained"] {
-    border-color: pink;
+    border-left: 5px solid #6c757d;
 }
 
 .stock-item h5 {
@@ -93,10 +93,44 @@
     background-color: var(--highlighted-card-bg);
 }
 
+/* Badge colors */
+.badge-info {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.badge-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.badge-flip {
+    color: white;
+}
+
+.badge-eclose {
+    background-color: #e83e8c;
+    color: white;
+}
+
+.badge-species {
+    background-color: #6610f2;
+    color: white;
+}
+
 .details {
     padding-top: 10px;
     width: 100%;
     border-top: 1px solid var(--border-color);
+}
+
+.expand-btn, .view-details-btn, .duplicate-stock-btn {
+    color: #6c757d;
+    padding: 2px 5px;
+}
+
+.expand-btn:hover, .view-details-btn:hover, .duplicate-stock-btn:hover {
+    color: #495057;
 }
 
 .btn-link.btn-sm {
@@ -230,6 +264,8 @@
     font-size: 0.85rem;
 }
 
+/* View toggle */
 .view-toggle-container {
+    margin-right: 20px;
     margin-bottom: 10px;
 }

@@ -376,9 +376,23 @@ document.getElementById('addToCartBtn').addEventListener('click', function() {
             let identifier = row.querySelector('.tray-cell').textContent.trim();
             let seriesId = row.querySelector('td:nth-child(3)').textContent.trim();
             let name = row.querySelector('td:nth-child(4)').textContent.trim();
-            let uid = row.querySelector('.row-details strong:contains("Unique ID:")').nextSibling.textContent.trim();
             
-            // If the details aren't visible, get the uid from the card view
+            // Get the UID - first check if the details panel is already open
+            let uid = '';
+            let detailsPanel = document.getElementById('tableDetails-' + index);
+            
+            if (detailsPanel && detailsPanel.style.display !== 'none') {
+                // Try to find UID in the displayed details panel
+                let uidElements = detailsPanel.querySelectorAll('p strong');
+                for (let el of uidElements) {
+                    if (el.textContent === 'Unique ID:') {
+                        uid = el.nextSibling.textContent.trim();
+                        break;
+                    }
+                }
+            }
+            
+            // If UID not found in details panel, get it from the card view
             if (!uid) {
                 let stockItem = document.getElementById('item-' + index);
                 if (stockItem) {
@@ -410,7 +424,9 @@ document.getElementById('addToCartBtn').addEventListener('click', function() {
 function clearSelection() {
     document.querySelectorAll('.stock-item input[type="checkbox"]').forEach(function(checkbox) {
         checkbox.checked = false;
-        document.getElementById('item-' + checkbox.id.replace('stock', '')).classList.remove('selected');
+        const card = document.getElementById('item-' + checkbox.id.replace('stock', ''));
+        card.classList.remove('selected');
+        card.classList.remove('checked');
     });
     
     document.querySelectorAll('#tableView tbody input[type="checkbox"]').forEach(function(checkbox) {

@@ -16,6 +16,8 @@ from flymanager.utils.labels import generate_label_pdf
 from flymanager.app.routes.auth import login_required
 from datetime import datetime
 
+from flymanager.app.settings import DEFAULT_STOCK_PROPERTY_VALUES
+
 bp = Blueprint('stock', __name__) # url_prefix is defined in app/__init__
 
 @bp.route('/explorer', methods=['GET', 'POST'])
@@ -168,7 +170,20 @@ def _apply_stock_filters(stocks, filters):
 def add_stock(source_stock_id=None):
     username = session.get("username")
     error_message = None
-    stock_data = {} # For pre-filling form
+    stock_data = {
+        'altReference': DEFAULT_STOCK_PROPERTY_VALUES['AltReference'],
+        'type': DEFAULT_STOCK_PROPERTY_VALUES['Type'],
+        'foodType': DEFAULT_STOCK_PROPERTY_VALUES['FoodType'],
+        'status': DEFAULT_STOCK_PROPERTY_VALUES['Status'],
+        'seriesID': DEFAULT_STOCK_PROPERTY_VALUES['SeriesID'],
+        'replicateID': DEFAULT_STOCK_PROPERTY_VALUES['ReplicateID'],
+        'vialLifetime': DEFAULT_STOCK_PROPERTY_VALUES['VialLifetime'],
+        'flipFrequency': DEFAULT_STOCK_PROPERTY_VALUES['FlipFrequency'],
+        'developmentalTime': DEFAULT_STOCK_PROPERTY_VALUES['DevelopmentalTime'],
+        'comments': DEFAULT_STOCK_PROPERTY_VALUES['Comments'],
+        'provenance': DEFAULT_STOCK_PROPERTY_VALUES['Provenance'],
+        'species': DEFAULT_STOCK_PROPERTY_VALUES['Species'],
+    }
 
     # Get metadata for dropdowns/tagify
     try:
@@ -179,36 +194,36 @@ def add_stock(source_stock_id=None):
         genes2 = get_metadata('genes2nd', db)
         genes3 = get_metadata('genes3rd', db)
         genes4 = get_metadata('genes4th', db)
+        species_list = get_metadata('species', db)
     except Exception as e:
          print(f"Error fetching metadata: {e}")
-         # Handle error appropriately, maybe flash message and redirect
          return "Error fetching metadata", 500
 
     # If source_stock_id is provided, fetch data to pre-fill the form
     if source_stock_id and request.method == 'GET':
+        print(f"Pre-filling form with source stock ID: {source_stock_id}")
         try:
             stock = db['stocks'].find_one({"UniqueID": source_stock_id, "User": username}) # Ensure user owns source stock
             if stock:
                 # Prepare data for form pre-filling, increment replicate ID
                 stock_data = {
                     'sourceType': 'INTERNAL', # Indicate source is internal
-                    'sourceID': stock.get('UniqueID', ''),
-                    'genotype': stock.get('Genotype', ''), # Let JS split this? Or split here?
-                    'name': stock.get('Name', ''),
-                    'altReference': stock.get('AltReference', ''),
-                    'type': stock.get('Type', ''),
-                    'foodType': stock.get('FoodType', 'Molasses'),
-                    'status': stock.get('Status', 'Active'), # Default to Active?
-                    'seriesID': stock.get('SeriesID', ''),
-                    'replicateID': increment_replicate_id(stock.get('ReplicateID', '')), # Increment rep ID
-                    'vialLifetime': stock.get('VialLifetime', 14),
-                    'flipFrequency': stock.get('FlipFrequency', 7),
-                    'developmentalTime': stock.get('DevelopmentalTime', 10),
-                    'comments': stock.get('Comments', ''),
-                    'provenance': stock.get('Provenance', '')
-                    # TrayID and TrayPosition usually not copied
+                    'sourceID': stock['UniqueID'],
+                    'genotype': stock['Genotype'],
+                    'name': stock['Name'],
+                    'altReference': stock.get('AltReference', DEFAULT_STOCK_PROPERTY_VALUES['AltReference']),
+                    'type': stock.get('Type', DEFAULT_STOCK_PROPERTY_VALUES['Type']),
+                    'foodType': stock.get('FoodType', DEFAULT_STOCK_PROPERTY_VALUES['FoodType']),
+                    'status': stock.get('Status', DEFAULT_STOCK_PROPERTY_VALUES['Status']),
+                    'seriesID': stock.get('SeriesID', DEFAULT_STOCK_PROPERTY_VALUES['SeriesID']),
+                    'replicateID': increment_replicate_id(stock.get('ReplicateID', DEFAULT_STOCK_PROPERTY_VALUES['ReplicateID'])),
+                    'vialLifetime': stock.get('VialLifetime', DEFAULT_STOCK_PROPERTY_VALUES['VialLifetime']),
+                    'flipFrequency': stock.get('FlipFrequency', DEFAULT_STOCK_PROPERTY_VALUES['FlipFrequency']),
+                    'developmentalTime': stock.get('DevelopmentalTime', DEFAULT_STOCK_PROPERTY_VALUES['DevelopmentalTime']),
+                    'comments': stock.get('Comments', DEFAULT_STOCK_PROPERTY_VALUES['Comments']),
+                    'provenance': stock.get('Provenance', DEFAULT_STOCK_PROPERTY_VALUES['Provenance']),
+                    'species': stock.get('Species', DEFAULT_STOCK_PROPERTY_VALUES['Species']),
                 }
-                # Split genotype for tagify inputs (assuming JS handles this based on 'genotype' field)
             else:
                  flash(f"Source stock with ID {source_stock_id} not found.", "warning")
         except Exception as e:
@@ -257,23 +272,26 @@ def add_stock(source_stock_id=None):
                 if prov not in provenances: add_metadata('provenances', prov, db)
             provenance_str = "/".join(provenance_input)
 
+            species_input = request.form.get('species')
+            if species_input not in species_list: add_metadata('species', species_input, db)
 
             # --- Collect Form Data ---
             new_stock_data = {
-                'SourceID': request.form.get('sourceID','UNK'), # Default 'UNK'
+                'SourceID': request.form.get('sourceID'),
                 'Genotype': final_genotype,
                 'Name': request.form.get('name'),
                 'AltReference': request.form.get('altReference'),
                 'Type': type_input,
                 'SeriesID': request.form.get('seriesID'),
                 'ReplicateID': request.form.get('replicateID'),
-                'Status': request.form.get('status', 'Active'), # Default 'Active'
+                'Status': request.form.get('status'),
                 'FoodType': food_type_input,
                 'Provenance': provenance_str,
-                'VialLifetime': request.form.get('vialLifetime', 14, type=int), # Default 14
-                'FlipFrequency': request.form.get('flipFrequency', 7, type=int), # Default 7
-                'DevelopmentalTime': request.form.get('developmentalTime', 10, type=int), # Default 10
-                'Comments': request.form.get('comments')
+                'VialLifetime': request.form.get('vialLifetime', type=int),
+                'FlipFrequency': request.form.get('flipFrequency', type=int), 
+                'DevelopmentalTime': request.form.get('developmentalTime', type=int), 
+                'Comments': request.form.get('comments', DEFAULT_STOCK_PROPERTY_VALUES['Comments']),
+                'Species': species_input
             }
 
             # Remove empty/None fields before saving? Original code did this.
@@ -317,6 +335,7 @@ def add_stock(source_stock_id=None):
                            username=username,
                            types=types, food_types=food_types, provenances=provenances,
                            genesX=genesX, genes2=genes2, genes3=genes3, genes4=genes4,
+                           species_list=species_list,
                            stock_data=stock_data, # Pre-fill data
                            error=error_message)
 
@@ -337,6 +356,7 @@ def view_stock(unique_id):
         genes2 = get_metadata('genes2nd', db)
         genes3 = get_metadata('genes3rd', db)
         genes4 = get_metadata('genes4th', db)
+        species_list = get_metadata('species', db)
     except Exception as e:
          print(f"Error fetching metadata: {e}")
          return "Error fetching metadata", 500
@@ -363,6 +383,7 @@ def view_stock(unique_id):
             'vialLifetime': stock.get('VialLifetime', ''),
             'flipFrequency': stock.get('FlipFrequency', ''),
             'developmentalTime': stock.get('DevelopmentalTime', ''),
+            'species': stock.get('Species', ''),
             'comments': stock.get('Comments', ''),
             'provenance': stock.get('Provenance', ''),
             'trayID': stock.get('TrayID', ''),
@@ -377,7 +398,6 @@ def view_stock(unique_id):
             'dataModifiedDate': stock.get('DataModifiedDate', ''),
             'modificationLog': str(stock.get('ModificationLog', '')).replace('; ', '\n'),
         }
-         # Split genotype for tagify inputs (assuming JS handles this based on 'genotype' field)
 
     except Exception as e:
         print(f"Error fetching stock {unique_id} for view: {e}")
@@ -425,11 +445,15 @@ def view_stock(unique_id):
                 if prov not in provenances: add_metadata('provenances', prov, db)
             provenance_str = "/".join(provenance_input)
 
+            species_input = clean_tagify_data(request.form.get('species'))[0]
+            if species_input not in species_list: add_metadata('species', species_input, db)
+
             # --- Collect Form Data for Update ---
             updated_stock_data = {
                 'SourceID': request.form.get('sourceID'),
                 'Genotype': final_genotype,
                 'Name': request.form.get('name'),
+                'Species': species_input,
                 'AltReference': request.form.get('altReference'),
                 'Type': type_input,
                 'SeriesID': request.form.get('seriesID'),
@@ -458,7 +482,7 @@ def view_stock(unique_id):
                  # Re-render view page, no redirect needed
                  return render_template('stock/view_stock.html', username=username, types=types, food_types=food_types,
                                        provenances=provenances, genesX=genesX, genes2=genes2,
-                                       genes3=genes3, genes4=genes4, stock_data=stock_data, error=error_message)
+                                       genes3=genes3, genes4=genes4, species_list=species_list, stock_data=stock_data, error=error_message)
 
 
             # --- Edit Stock in Database ---
@@ -501,7 +525,7 @@ def view_stock(unique_id):
     # Render template for GET or failed POST
     return render_template('stock/view_stock.html', username=username, types=types, food_types=food_types,
                            provenances=provenances, genesX=genesX, genes2=genes2,
-                           genes3=genes3, genes4=genes4, stock_data=stock_data, error=error_message)
+                           genes3=genes3, genes4=genes4, species_list=species_list, stock_data=stock_data, error=error_message)
 
 
 @bp.route('/get_internal/<internal_stock_id>', methods=['GET'])
@@ -802,3 +826,45 @@ def get_uids_for_genotype(genotype_str):
     except Exception as e:
         print(f"Error in get_uids_for_genotype for '{decoded_genotype}': {e}")
         return jsonify({'uids': [], 'error': 'Internal server error'}), 500
+
+
+@bp.route('/get_stock_data_for_uid/<unique_id>')
+def get_stock_data_for_uid(unique_id):
+    """ Route to fetch stock data (including species) based on a stock's Unique ID. """
+    if not session.get("username"):
+        return jsonify({'error': 'Authentication required'}), 401
+
+    username = session.get("username")
+
+    try:
+        # Find stock by UniqueID
+        stock = db['stocks'].find_one({"UniqueID": unique_id, "User": username})
+
+        if stock:
+            stock_data = {
+                'uniqueID': stock.get('UniqueID', ''),
+                'genotype': stock.get('Genotype', ''),
+                'name': stock.get('Name', ''),
+                'type': stock.get('Type', ''),
+                'status': stock.get('Status', ''),
+                'species': stock.get('Species', 'D. melanogaster')  # Include species with default
+            }
+            return jsonify(stock_data)
+        else:
+            # Try finding admin stock
+            admin_stock = db['stocks'].find_one({"UniqueID": unique_id, "User": "admin"})
+            if admin_stock:
+                stock_data = {
+                    'uniqueID': admin_stock.get('UniqueID', ''),
+                    'genotype': admin_stock.get('Genotype', ''),
+                    'name': admin_stock.get('Name', ''),
+                    'type': admin_stock.get('Type', ''),
+                    'status': admin_stock.get('Status', ''),
+                    'species': admin_stock.get('Species', 'D. melanogaster')  # Include species with default
+                }
+                return jsonify(stock_data)
+            
+            return jsonify({'error': 'Stock not found'}), 404
+    except Exception as e:
+        print(f"Error in get_stock_data_for_uid for {unique_id}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500

@@ -1,7 +1,9 @@
 import datetime
 import math
 from hashlib import shake_256
+from flymanager.utils.genetics import qc_genotype
 from flymanager.utils.utils import clean_log_entry
+from flymanager.app.settings import BASE_CROSS_PROPERTIES, REQUIRED_CROSS_PROPERTIES, OPTIONAL_CROSS_PROPERTIES, DEFAULT_CROSS_PROPERTY_VALUES
 
 def add_to_cross(user, properties, db):
     """
@@ -13,19 +15,7 @@ def add_to_cross(user, properties, db):
     properties: dict
         The properties of the cross.
         Properties:
-            MaleUniqueID (required)
-            FemaleUniqueID (required)
-            MaleGenotype (required)
-            FemaleGenotype (required)
-            Name (required)
-            FoodType (required)
-            VialLifetime (required)
-            FlipFrequency (required)
-            DevelopmentalTime (required)
-            TrayID (optional)
-            TrayPosition (optional)
-            Status (required)
-            Comments (optional)
+            SEE REQUIRED_CROSS_PROPERTIES and OPTIONAL_CROSS_PROPERTIES 
     db: pymongo.database.Database
         The MongoDB database instance.
 
@@ -37,17 +27,9 @@ def add_to_cross(user, properties, db):
     """
 
     # Check for required fields
-    assert "MaleUniqueID" in properties, "MaleUniqueID is required"
-    assert "FemaleUniqueID" in properties, "FemaleUniqueID is required"
-    assert "MaleGenotype" in properties, "MaleGenotype is required"
-    assert "FemaleGenotype" in properties, "FemaleGenotype is required"
-    assert "Name" in properties, "Name is required"
-    assert "Status" in properties, "Status is required"
-    assert "FoodType" in properties, "FoodType is required"
-    assert "VialLifetime" in properties, "VialLifetime is required"
-    assert "FlipFrequency" in properties, "FlipFrequency is required"
-    assert "DevelopmentalTime" in properties, "DevelopmentalTime is required"
-    assert "MaxCrossLifetime" in properties, "MaxCrossLifetime is required"
+    for prop in REQUIRED_CROSS_PROPERTIES + BASE_CROSS_PROPERTIES:
+        if prop not in properties:
+            raise ValueError(f"{prop} is required")
 
     # Create a UniqueID for the cross based on Male and Female UniqueID + User + Name
     uid = str(user) + str(properties["MaleUniqueID"]) + str(properties["FemaleUniqueID"]) + str(properties["Name"])
@@ -66,30 +48,38 @@ def add_to_cross(user, properties, db):
     # Get the current timestamp
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
+    # make sure genotype meets the qc
+    qc, male_genotype = qc_genotype(properties["MaleGenotype"])
+    if not qc:
+        return False, male_genotype
+
+    qc, female_genotype = qc_genotype(properties["FemaleGenotype"])
+    if not qc:
+        return False, female_genotype
+
     # Create the document to insert
     cross_document = {
         "UniqueID": uid,
         "User": user,
         "MaleUniqueID": properties["MaleUniqueID"],
         "FemaleUniqueID": properties["FemaleUniqueID"],
-        "MaleGenotype": properties["MaleGenotype"],
-        "FemaleGenotype": properties["FemaleGenotype"],
+        "MaleGenotype": male_genotype,
+        "FemaleGenotype": female_genotype,
         "Name": properties["Name"],
-        "FoodType": properties["FoodType"],
-        "TrayID": properties.get("TrayID", ""),
-        "TrayPosition": properties.get("TrayPosition", ""),
-        "VialLifetime": properties["VialLifetime"],
-        "FlipFrequency": properties["FlipFrequency"],
-        "DevelopmentalTime": properties["DevelopmentalTime"],
-        "MaxCrossLifetime": properties["MaxCrossLifetime"],
-        "Status": properties["Status"],
-        "Comments": properties.get("Comments", ""),
+        "TrayID": "",
+        "TrayPosition": "",
         "CreationDate": timestamp,
         "DataModifiedDate": timestamp,
         "ModificationLog": f"{timestamp} : Cross created",
         "LastFlipDate": timestamp,
         "FlipLog": timestamp,
     }
+
+    for prop in REQUIRED_CROSS_PROPERTIES:
+        cross_document[prop] = properties[prop]
+
+    for prop in OPTIONAL_CROSS_PROPERTIES:
+        cross_document[prop] = properties.get(prop, "")
 
     # Insert the document into the MongoDB collection
     crosses_collection = db["crosses"]
@@ -315,11 +305,24 @@ def update_cross_vials(cross, username, db):
     """
     uid = cross["UniqueID"]
 
-    assert "MaxCrossLifetime" in cross, "MaxCrossLifetime is required"
-    assert "FlipLog" in cross, "FlipLog is required"
-    assert "VialLifetime" in cross, "VialLifetime is required"
-    assert "FlipFrequency" in cross, "FlipFrequency is required"
-    assert "DevelopmentalTime" in cross, "DevelopmentalTime is required"
+    try:
+        for prop in REQUIRED_CROSS_PROPERTIES:
+            if prop not in cross:
+                raise ValueError(f"{prop} is required")
+    except ValueError as e:
+        # fill in the missing properties with default values
+        update_properties = {}
+        for prop in REQUIRED_CROSS_PROPERTIES:
+            if prop not in cross: 
+                if prop in DEFAULT_CROSS_PROPERTY_VALUES:
+                    update_properties[prop] = DEFAULT_CROSS_PROPERTY_VALUES[prop]
+                else:
+                    raise ValueError(f"{prop} is required")
+        # edit the cross
+        success = edit_cross(username, uid, db, update_properties, log_activity=False)
+        if not success:
+            print(f"Failed to update cross {uid} with default values")
+            return False
     
     # check if the cross doesnt have the key "CurrentlyAliveVials"
     if "CurrentlyAliveVials" not in cross:

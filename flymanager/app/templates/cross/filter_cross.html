@@ -8,6 +8,14 @@
             {% include 'filter_field.html' %}
         {% endwith %}
         
+        {% with filter_name="Male Species", options=unique_values.MaleSpecies, selected=filter_state.filterMaleSpecies %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
+        {% with filter_name="Female Species", options=unique_values.FemaleSpecies, selected=filter_state.filterFemaleSpecies %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
         {% with filter_name="Status", options=unique_values.Status, selected=filter_state.filterStatus %}
             {% include 'filter_field.html' %}
         {% endwith %}

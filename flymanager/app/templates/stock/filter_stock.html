@@ -16,6 +16,10 @@
             {% include 'filter_field.html' %}
         {% endwith %}
         
+        {% with filter_name="Species", options=unique_values.Species, selected=filter_state.filterSpecies %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+        
         {% with filter_name="Provenance", options=unique_values.Provenance, selected=filter_state.filterProvenance %}
             {% include 'filter_field.html' %}
         {% endwith %}

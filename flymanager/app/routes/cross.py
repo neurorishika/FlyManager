@@ -50,6 +50,8 @@ def cross_explorer():
     unique_values = {
         'MaleGenotype': sorted(set(str(cross['MaleGenotype']) for cross in crosses)),
         'FemaleGenotype': sorted(set(str(cross['FemaleGenotype']) for cross in crosses)),
+        'MaleSpecies': sorted(set(str(cross.get('MaleSpecies', 'D. melanogaster')) for cross in crosses)),
+        'FemaleSpecies': sorted(set(str(cross.get('FemaleSpecies', 'D. melanogaster')) for cross in crosses)),
         'TrayID': sorted(set(str(cross['TrayID']) for cross in crosses)),
         'Status': sorted(set(str(cross['Status']) for cross in crosses)),
         'FoodType': sorted(set(str(cross['FoodType']) for cross in crosses)),
@@ -69,6 +71,8 @@ def cross_explorer():
         # Get filter values from request
         filter_MaleGenotype = str(request.form.get('filterMaleGenotype'))
         filter_FemaleGenotype = str(request.form.get('filterFemaleGenotype'))
+        filter_MaleSpecies = str(request.form.get('filterMaleSpecies'))
+        filter_FemaleSpecies = str(request.form.get('filterFemaleSpecies'))
         filter_tray_id = str(request.form.get('filterTrayID'))
         filter_status = str(request.form.get('filterStatus'))
         filter_food_type = str(request.form.get('filterFoodType'))
@@ -78,6 +82,8 @@ def cross_explorer():
         filter_state = {
             'filterMaleGenotype': filter_MaleGenotype,
             'filterFemaleGenotype': filter_FemaleGenotype,
+            'filterMaleSpecies': filter_MaleSpecies,
+            'filterFemaleSpecies': filter_FemaleSpecies,
             'filterTrayID': filter_tray_id,
             'filterStatus': filter_status,
             'filterFoodType': filter_food_type,
@@ -91,6 +97,10 @@ def cross_explorer():
             filtered_crosses = [cross for cross in filtered_crosses if str(cross['MaleGenotype']) == filter_MaleGenotype]
         if filter_FemaleGenotype:
             filtered_crosses = [cross for cross in filtered_crosses if str(cross['FemaleGenotype']) == filter_FemaleGenotype]
+        if filter_MaleSpecies:
+            filtered_crosses = [cross for cross in filtered_crosses if str(cross.get('MaleSpecies', 'D. melanogaster')) == filter_MaleSpecies]
+        if filter_FemaleSpecies:
+            filtered_crosses = [cross for cross in filtered_crosses if str(cross.get('FemaleSpecies', 'D. melanogaster')) == filter_FemaleSpecies]
         if filter_tray_id:
             filtered_crosses = [cross for cross in filtered_crosses if str(cross['TrayID']) == filter_tray_id]
         if filter_status:
@@ -122,6 +132,8 @@ def cross_explorer():
         unique_values = {
             'MaleGenotype': sorted(set(str(cross['MaleGenotype']) for cross in filtered_crosses)),
             'FemaleGenotype': sorted(set(str(cross['FemaleGenotype']) for cross in filtered_crosses)),
+            'MaleSpecies': sorted(set(str(cross.get('MaleSpecies', 'D. melanogaster')) for cross in filtered_crosses)),
+            'FemaleSpecies': sorted(set(str(cross.get('FemaleSpecies', 'D. melanogaster')) for cross in filtered_crosses)),
             'TrayID': sorted(set(str(cross['TrayID']) for cross in filtered_crosses)),
             'Status': sorted(set(str(cross['Status']) for cross in filtered_crosses)),
             'FoodType': sorted(set(str(cross['FoodType']) for cross in filtered_crosses))
@@ -177,6 +189,8 @@ def add_cross(unique_id=None):
             'FemaleUniqueID': request.form.get('femaleUniqueID'),
             'MaleGenotype': male_genotype_input,
             'FemaleGenotype': female_genotype_input,
+            'MaleSpecies': request.form.get('maleSpecies', 'D. melanogaster'),
+            'FemaleSpecies': request.form.get('femaleSpecies', 'D. melanogaster'),
             'Status': request.form.get('status'),
             'FoodType': food_type_input,
             'Name': request.form.get('name'),
@@ -227,6 +241,8 @@ def view_cross(unique_id):
             'femaleUniqueID': cross['FemaleUniqueID'],
             'maleGenotype': cross['MaleGenotype'],
             'femaleGenotype': cross['FemaleGenotype'],
+            'maleSpecies': cross.get('MaleSpecies', 'D. melanogaster'),
+            'femaleSpecies': cross.get('FemaleSpecies', 'D. melanogaster'),
             'trayID': cross.get('TrayID', ''),
             'trayPosition': cross.get('TrayPosition', ''),
             'status': cross['Status'],
@@ -267,6 +283,8 @@ def view_cross(unique_id):
             'FemaleUniqueID': request.form.get('femaleUniqueID'),
             'MaleGenotype': male_genotype_input,
             'FemaleGenotype': female_genotype_input,
+            'MaleSpecies': request.form.get('maleSpecies', 'D. melanogaster'),
+            'FemaleSpecies': request.form.get('femaleSpecies', 'D. melanogaster'),
             'Status': request.form.get('status'),
             'FoodType': food_type_input,
             'Name': request.form.get('name'),

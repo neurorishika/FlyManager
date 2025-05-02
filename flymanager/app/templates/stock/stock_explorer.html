@@ -37,6 +37,7 @@
                     <div class="badges">
                         <span class="badge badge-info">{{ stock.FoodType }}</span>
                         <span class="badge badge-secondary">{{ stock.Type }}</span>
+                        <span class="badge badge-species">{{ stock.Species }}</span>
                         <span class="badge badge-flip" style="background-color:{{ stock.FlipInColor }}">{{ stock.FlipIn }}</span>
                         <span class="badge badge-eclose">Ecloses in {{ stock.EclosesIn }}</span>
                     </div>
@@ -98,6 +99,7 @@
                     <th class="sortable" data-sort="genotype">Genotype<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="type">Type<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="food">Food Type<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="species">Species<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="status">Status<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="flipin">Flip In<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="eclose">Ecloses In<i class="fas fa-sort ml-1"></i></th>
@@ -125,6 +127,7 @@
                     <td>{{ stock.Genotype }}</td>
                     <td>{{ stock.Type }}</td>
                     <td>{{ stock.FoodType }}</td>
+                    <td>{{ stock.Species }}</td>
                     <td>
                         <span class="badge badge-pill 
                         {% if stock.Status == 'Healthy' %}badge-success
@@ -269,7 +272,7 @@
 <script>
     // Define URLs for JavaScript using url_for
     const viewStockUrlBase = "{{ url_for('stock.view_stock', unique_id='UNIQUE_ID_PLACEHOLDER') }}";
-    const addStockUrlBase = "{{ url_for('stock.add_stock', unique_id='UNIQUE_ID_PLACEHOLDER') }}";
+    const addStockUrlBase = "{{ url_for('stock.add_stock', source_stock_id='UNIQUE_ID_PLACEHOLDER') }}";
     const bulkFlipUrl = "{{ url_for('flip.bulk_flip_route') }}";
     const bulkStatusUrl = "{{ url_for('flip.bulk_status_change_route') }}";
     const bulkRemoveFromTrayUrl = "{{ url_for('tray.bulk_remove_from_tray') }}";
