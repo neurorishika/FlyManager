@@ -137,7 +137,7 @@
     font-size: 12px;
     padding: 2px 5px;
     margin-left: 10px;
-    color: #007bff;
+    color: {{ settings.theme.accent_color }};
 }
 
 .btn-link.btn-sm i {

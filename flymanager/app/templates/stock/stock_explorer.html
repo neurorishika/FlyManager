@@ -211,6 +211,9 @@
                 </div>
             </div>
             <button type="button" id="removeFromTrayBtn" class="btn btn-warning">Remove from Tray</button>
+            {% if filter_state.filterStatus == "No longer maintained" %}
+            <button type="button" id="deletePermanentlyBtn" class="btn btn-danger">Delete Permanently</button>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -266,6 +269,42 @@
     </div>
 </div>
 
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" role="dialog" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">Permanently Delete Stocks</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <strong>Warning!</strong> You are about to permanently delete <span id="deleteItemCount">0</span> items. 
+                    This action CANNOT be undone and all data will be lost forever.
+                </div>
+                
+                <p>Only items with status "No longer maintained" can be deleted. All others will be skipped.</p>
+                
+                <div class="mb-3">
+                    <label for="deleteConfirmText" class="form-label">To confirm deletion, type the word "DELETE" below:</label>
+                    <input type="text" id="deleteConfirmText" class="form-control" required>
+                </div>
+                
+                <div id="deleteItemList" class="mb-3">
+                    <p><strong>Items to be deleted:</strong></p>
+                    <ul class="list-group"></ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="confirmDeleteBtn" class="btn btn-danger" disabled>Permanently Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -276,6 +315,8 @@
     const bulkFlipUrl = "{{ url_for('flip.bulk_flip_route') }}";
     const bulkStatusUrl = "{{ url_for('flip.bulk_status_change_route') }}";
     const bulkRemoveFromTrayUrl = "{{ url_for('tray.bulk_remove_from_tray') }}";
+    const deleteStockUrl = "{{ url_for('stock.delete_stock_permanently') }}";
+    const filterStatus = "{{ filter_state.filterStatus }}";
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
 <script src="{{ url_for('static', filename='js/stock_explorer.js') }}"></script>

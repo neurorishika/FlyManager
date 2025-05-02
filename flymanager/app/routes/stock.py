@@ -8,7 +8,7 @@ from urllib.parse import unquote
 from flymanager.app import db
 from flymanager.utils.mongo import (
     get_user_stocks, get_metadata, add_metadata, add_to_stock, edit_stock,
-    get_user_initials, write_activity, update_stock_vials, get_flip_in, get_eclosion_in
+    get_user_initials, write_activity, update_stock_vials, get_flip_in, get_eclosion_in, delete_stock
 )
 from flymanager.utils.genetics import qc_genotype, get_stock_genotype
 from flymanager.utils.utils import clean_tagify_data, increment_replicate_id, parse_flip_day
@@ -875,3 +875,59 @@ def get_stock_data_for_uid(unique_id):
     except Exception as e:
         print(f"Error in get_stock_data_for_uid for {unique_id}: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+
+@bp.route('/delete_permanently', methods=['POST'])
+@login_required
+def delete_stock_permanently():
+    """
+    Permanently delete stocks that have the 'No longer maintained' status.
+    Only stocks with this status will be deleted, all others will be skipped.
+    
+    Expected JSON payload:
+    {
+        "uniqueIDs": ["uid1", "uid2", ...]
+    }
+    
+    Returns:
+    JSON response with success status, count of deleted items, and count of skipped items.
+    """
+    username = session.get("username")
+    data = request.json
+    
+    if not data or 'uniqueIDs' not in data or not data['uniqueIDs']:
+        return jsonify({
+            'success': False,
+            'message': 'No stock IDs provided for deletion'
+        }), 400
+    
+    unique_ids = data['uniqueIDs']
+    deleted_count = 0
+    skipped_count = 0
+    
+    for uid in unique_ids:
+        # Get the stock and check its status
+        stock = db['stocks'].find_one({"UniqueID": uid, "User": username})
+        
+        if not stock:
+            skipped_count += 1
+            continue
+        
+        # Only delete stocks with 'No longer maintained' status
+        if stock.get('Status') == 'No longer maintained':
+            success = delete_stock(username, uid, db)
+            if success:
+                # Log the deletion activity
+                write_activity(username, f'Permanently deleted stock {uid}', db)
+                deleted_count += 1
+            else:
+                skipped_count += 1
+        else:
+            skipped_count += 1
+    
+    return jsonify({
+        'success': True,
+        'deleted': deleted_count,
+        'skipped': skipped_count,
+        'message': f'Successfully deleted {deleted_count} stocks with status "No longer maintained". Skipped {skipped_count} stocks.'
+    })

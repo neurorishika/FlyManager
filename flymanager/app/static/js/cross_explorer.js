@@ -397,8 +397,23 @@ document.getElementById('addToCartBtn').addEventListener('click', function() {
             let index = checkbox.id.replace('crossTable', '');
             let identifier = row.querySelector('.tray-cell').textContent.trim();
             let name = row.querySelector('td:nth-child(3)').textContent.trim();
-            let uid = row.querySelector('.row-details strong:contains("Unique ID:")').nextSibling.textContent.trim();
-            // If the details aren't visible, get the uid from the card view
+            
+            // Get the UID - first check if the details panel is already open
+            let uid = '';
+            let detailsPanel = document.getElementById('tableDetails-' + index);
+            
+            if (detailsPanel && detailsPanel.style.display !== 'none') {
+                // Try to find UID in the displayed details panel
+                let uidElements = detailsPanel.querySelectorAll('p');
+                for (let el of uidElements) {
+                    if (el.textContent.includes('Unique ID:')) {
+                        uid = el.textContent.split('Unique ID:')[1].trim();
+                        break;
+                    }
+                }
+            }
+            
+            // If UID not found in details panel, get it from the card view
             if (!uid) {
                 let crossItem = document.getElementById('item-' + index);
                 if (crossItem) {
@@ -604,17 +619,129 @@ document.getElementById('removeFromTrayBtn').addEventListener('click', function(
     }
 });
 
+// Delete Permanently Button
+document.addEventListener('DOMContentLoaded', function() {
+    const deletePermanentlyBtn = document.getElementById('deletePermanentlyBtn');
+    
+    if (deletePermanentlyBtn) {
+        deletePermanentlyBtn.addEventListener('click', function() {
+            if (cart.length === 0) {
+                alert('Your cart is empty. Please add items to delete.');
+                return;
+            }
+            
+            // Prepare the delete confirmation modal
+            const deleteItemCount = document.getElementById('deleteItemCount');
+            deleteItemCount.textContent = cart.length;
+            
+            // Clear previous items and populate the list of items to be deleted
+            const deleteItemList = document.getElementById('deleteItemList').querySelector('ul');
+            deleteItemList.innerHTML = '';
+            
+            cart.forEach(function(item) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.innerHTML = `<strong>${item.identifier}</strong> - ${item.name} <span class="text-muted">(${item.uid})</span>`;
+                deleteItemList.appendChild(li);
+            });
+            
+            // Reset the confirmation input
+            document.getElementById('deleteConfirmText').value = '';
+            document.getElementById('confirmDeleteBtn').disabled = true;
+            
+            // Show the modal
+            $('#deleteConfirmModal').modal('show');
+        });
+    }
+    
+    // Handle the confirmation text input
+    const deleteConfirmText = document.getElementById('deleteConfirmText');
+    if (deleteConfirmText) {
+        deleteConfirmText.addEventListener('input', function() {
+            const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+            if (deleteConfirmText.value.toUpperCase() === 'DELETE') {
+                confirmDeleteBtn.disabled = false;
+            } else {
+                confirmDeleteBtn.disabled = true;
+            }
+        });
+    }
+    
+    // Handle the final delete confirmation button
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', function() {
+            if (deleteConfirmText.value.toUpperCase() !== 'DELETE') {
+                alert('Please type "DELETE" to confirm.');
+                return;
+            }
+            
+            const uniqueIDs = cart.map(item => item.uid);
+            
+            // Send deletion request to server
+            fetch(deleteCrossUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    uniqueIDs: uniqueIDs
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Close the modal
+                $('#deleteConfirmModal').modal('hide');
+                
+                // Show result
+                if (data.success) {
+                    let message = `Successfully deleted ${data.deleted} cross(es).`;
+                    if (data.skipped > 0) {
+                        message += ` Skipped ${data.skipped} cross(es) that were not eligible for deletion.`;
+                    }
+                    alert(message);
+                    
+                    // Clear cart
+                    emptyCart();
+                    
+                    // Refresh the page to reflect changes
+                    window.location.reload();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error during cross deletion:', error);
+                alert('An error occurred during the deletion process.');
+            });
+        });
+    }
+});
+
 function toggleDetails(index) {
     var details = document.getElementById('details-' + index);
-    var icon = document.querySelector('#item-' + index + ' .expand-btn i');
+    
+    // Add null check to prevent errors
+    if (!details) {
+        console.warn('Details element not found:', 'details-' + index);
+        return;
+    }
+    
+    // Get the icon element by using the button's selector first, then find the i element inside it
+    var icon = document.getElementById('expand-icon-' + index);
+    
     if (details.style.display === 'none') {
         details.style.display = 'block';
-        icon.classList.remove('fa-chevron-down');
-        icon.classList.add('fa-chevron-up');
+        if (icon) {
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+        }
     } else {
         details.style.display = 'none';
-        icon.classList.remove('fa-chevron-up');
-        icon.classList.add('fa-chevron-down');
+        if (icon) {
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+        }
     }
 }
 
@@ -727,13 +854,23 @@ function toggleCheckbox(checkboxId, event) {
 
 function toggleCart() {
     const cartContainer = document.querySelector('.floating-cart-container');
+    if (!cartContainer) {
+        console.warn('Cart container element not found');
+        return;
+    }
+    
     cartContainer.classList.toggle('expanded');
-    const icon = cartContainer.querySelector('.toggle-cart-btn i');
-    if (cartContainer.classList.contains('expanded')) {
-        icon.classList.remove('fa-chevron-up');
-        icon.classList.add('fa-chevron-down');
-    } else {
-        icon.classList.remove('fa-chevron-down');
-        icon.classList.add('fa-chevron-up');
+    
+    // Find the icon by its ID
+    const icon = document.getElementById('cartToggleIcon');
+    
+    if (icon) {
+        if (cartContainer.classList.contains('expanded')) {
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+        } else {
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+        }
     }
 }

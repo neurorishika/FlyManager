@@ -357,3 +357,59 @@ def generate_cross_labels():
     write_activity(username, 'Generated labels for {} crosses'.format(len(selected_crosses)), db)
     
     return redirect(pdf_file_path)
+
+@bp.route('/delete_cross_permanently', methods=['POST'])
+@login_required
+def delete_cross_permanently():
+    """
+    Permanently delete crosses that have the 'No longer maintained' status.
+    Only crosses with this status will be deleted, all others will be skipped.
+    
+    Expected JSON payload:
+    {
+        "uniqueIDs": ["uid1", "uid2", ...]
+    }
+    
+    Returns:
+    JSON response with success status, count of deleted items, and count of skipped items.
+    """
+    username = session.get("username")
+    data = request.json
+    
+    if not data or 'uniqueIDs' not in data or not data['uniqueIDs']:
+        return jsonify({
+            'success': False,
+            'message': 'No cross IDs provided for deletion'
+        }), 400
+    
+    unique_ids = data['uniqueIDs']
+    deleted_count = 0
+    skipped_count = 0
+    
+    for uid in unique_ids:
+        # Get the cross and check its status
+        cross = db['crosses'].find_one({"UniqueID": uid, "User": username})
+        
+        if not cross:
+            skipped_count += 1
+            continue
+        
+        # Only delete crosses with 'No longer maintained' status
+        if cross.get('Status') == 'No longer maintained':
+            from flymanager.utils.mongo import delete_cross
+            success = delete_cross(username, uid, db)
+            if success:
+                # Log the deletion activity
+                write_activity(username, f'Permanently deleted cross {uid}', db)
+                deleted_count += 1
+            else:
+                skipped_count += 1
+        else:
+            skipped_count += 1
+    
+    return jsonify({
+        'success': True,
+        'deleted': deleted_count,
+        'skipped': skipped_count,
+        'message': f'Successfully deleted {deleted_count} crosses with status "No longer maintained". Skipped {skipped_count} crosses.'
+    })

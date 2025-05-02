@@ -7,7 +7,7 @@
 /* Two-column layout with multiple rows */
 .cross-items-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); /* Adjust columns dynamically */
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); /* Adjust columns dynamically */
     gap: 15px; /* Space between items */
     padding: 10px;
 }
@@ -108,7 +108,7 @@
     font-size: 12px;
     padding: 2px 5px;
     margin-left: 10px;
-    color: #007bff;
+    color: {{ settings.theme.accent_color }}
 }
 
 .btn-link.btn-sm i {

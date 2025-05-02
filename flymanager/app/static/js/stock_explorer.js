@@ -599,6 +599,105 @@ document.getElementById('removeFromTrayBtn').addEventListener('click', function(
     }
 });
 
+// Delete Permanently Button
+document.addEventListener('DOMContentLoaded', function() {
+    const deletePermanentlyBtn = document.getElementById('deletePermanentlyBtn');
+    
+    if (deletePermanentlyBtn) {
+        deletePermanentlyBtn.addEventListener('click', function() {
+            if (cart.length === 0) {
+                alert('Your cart is empty. Please add items to delete.');
+                return;
+            }
+            
+            // Prepare the delete confirmation modal
+            const deleteItemCount = document.getElementById('deleteItemCount');
+            deleteItemCount.textContent = cart.length;
+            
+            // Clear previous items and populate the list of items to be deleted
+            const deleteItemList = document.getElementById('deleteItemList').querySelector('ul');
+            deleteItemList.innerHTML = '';
+            
+            cart.forEach(function(item) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.innerHTML = `<strong>${item.identifier}</strong> - ${item.name} <span class="text-muted">(${item.uid})</span>`;
+                deleteItemList.appendChild(li);
+            });
+            
+            // Reset the confirmation input
+            document.getElementById('deleteConfirmText').value = '';
+            document.getElementById('confirmDeleteBtn').disabled = true;
+            
+            // Show the modal
+            $('#deleteConfirmModal').modal('show');
+        });
+    }
+    
+    // Handle the confirmation text input
+    const deleteConfirmText = document.getElementById('deleteConfirmText');
+    if (deleteConfirmText) {
+        deleteConfirmText.addEventListener('input', function() {
+            const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+            if (deleteConfirmText.value.toUpperCase() === 'DELETE') {
+                confirmDeleteBtn.disabled = false;
+            } else {
+                confirmDeleteBtn.disabled = true;
+            }
+        });
+    }
+    
+    // Handle the final delete confirmation button
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', function() {
+            if (deleteConfirmText.value.toUpperCase() !== 'DELETE') {
+                alert('Please type "DELETE" to confirm.');
+                return;
+            }
+            
+            const uniqueIDs = cart.map(item => item.uid);
+            
+            // Send deletion request to server
+            fetch(deleteStockUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    uniqueIDs: uniqueIDs
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Close the modal
+                $('#deleteConfirmModal').modal('hide');
+                
+                // Show result
+                if (data.success) {
+                    let message = `Successfully deleted ${data.deleted} item(s).`;
+                    if (data.skipped > 0) {
+                        message += ` Skipped ${data.skipped} item(s) that were not eligible for deletion.`;
+                    }
+                    alert(message);
+                    
+                    // Clear cart
+                    emptyCart();
+                    
+                    // Refresh the page to reflect changes
+                    window.location.reload();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error during stock deletion:', error);
+                alert('An error occurred during the deletion process.');
+            });
+        });
+    }
+});
+
 function toggleDetails(index) {
     var details = document.getElementById('details-' + index);
     
@@ -610,8 +709,6 @@ function toggleDetails(index) {
     
     // Get the icon element by using the button's selector first, then find the i element inside it
     var icon = document.getElementById('expand-icon-' + index);
-
-    console.log(icon);
     
     if (details.style.display === 'none') {
         details.style.display = 'block';
