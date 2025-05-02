@@ -33,6 +33,14 @@
             <input type="text" id="searchQuery" name="searchQuery" class="form-control" value="{{ filter_state.searchQuery }}">
         </div>
     </div>
-    <button type="submit" class="btn btn-primary mt-3">Apply Filters</button>
-    <button type="submit" name="clear_filters" class="btn btn-secondary mt-3">Clear Filters</button>
+    {% if filter_state and (filter_state.filterMaleGenotype or filter_state.filterFemaleGenotype or filter_state.filterMaleSpecies or filter_state.filterFemaleSpecies or filter_state.filterStatus or filter_state.filterFoodType or filter_state.filterTrayID or filter_state.searchQuery) %}
+        <div class="alert alert-info mt-2">
+            <i class="fas fa-info-circle"></i> Filters are currently applied. Please clear filters before applying new ones.
+        </div>
+        <button type="submit" class="btn btn-primary mt-3" disabled>Apply Filters</button>
+        <button type="submit" name="clear_filters" class="btn btn-secondary mt-3">Clear Filters</button>
+    {% else %}
+        <button type="submit" class="btn btn-primary mt-3">Apply Filters</button>
+        <button type="submit" name="clear_filters" class="btn btn-secondary mt-3">Clear Filters</button>
+    {% endif %}
 </form>

@@ -1,16 +1,20 @@
 import datetime
+
+from flask import (Blueprint, current_app, jsonify, redirect, render_template,
+                   request, session, url_for)
 from fuzzywuzzy import fuzz
-from flask import Blueprint, render_template, request, redirect, session, jsonify, current_app, url_for
-from flymanager.utils.mongo import (
-    get_user_crosses, get_metadata, get_user_initials, get_all_genotypes, add_metadata, 
-    add_to_cross, edit_cross, update_cross_vials, write_activity, get_flip_in, get_eclosion_in
-)
+
 from flymanager.app import db
-from flymanager.utils.labels import generate_label_pdf
-from flymanager.utils.scanner import get_available_ports
-from flymanager.utils.genetics import cross_genotypes, qc_genotype
-from flymanager.utils.utils import clean_tagify_data
 from flymanager.app.routes.auth import login_required
+from flymanager.utils.genetics import cross_genotypes, qc_genotype
+from flymanager.utils.labels import generate_label_pdf
+from flymanager.utils.mongo import (add_metadata, add_to_cross, edit_cross,
+                                    get_all_genotypes, get_eclosion_in,
+                                    get_flip_in, get_metadata,
+                                    get_user_crosses, get_user_initials,
+                                    update_cross_vials, write_activity)
+from flymanager.utils.scanner import get_available_ports
+from flymanager.utils.utils import clean_tagify_data
 
 bp = Blueprint('cross', __name__) # url_prefix defined in app/__init__
 
@@ -46,87 +50,61 @@ def cross_explorer():
 
         cross['EclosesIn'] = get_eclosion_in(cross)
 
-    # Extract unique values for filtering
+    # Extract unique values for filtering from all crosses (unfiltered)
+    all_crosses_for_filters = get_user_crosses(username, db)
     unique_values = {
-        'MaleGenotype': sorted(set(str(cross['MaleGenotype']) for cross in crosses)),
-        'FemaleGenotype': sorted(set(str(cross['FemaleGenotype']) for cross in crosses)),
-        'MaleSpecies': sorted(set(str(cross.get('MaleSpecies', 'D. melanogaster')) for cross in crosses)),
-        'FemaleSpecies': sorted(set(str(cross.get('FemaleSpecies', 'D. melanogaster')) for cross in crosses)),
-        'TrayID': sorted(set(str(cross['TrayID']) for cross in crosses)),
-        'Status': sorted(set(str(cross['Status']) for cross in crosses)),
-        'FoodType': sorted(set(str(cross['FoodType']) for cross in crosses)),
+        'MaleGenotype': sorted(set(str(cross['MaleGenotype']) for cross in all_crosses_for_filters)),
+        'FemaleGenotype': sorted(set(str(cross['FemaleGenotype']) for cross in all_crosses_for_filters)),
+        'MaleSpecies': sorted(set(str(cross.get('MaleSpecies', 'D. melanogaster')) for cross in all_crosses_for_filters)),
+        'FemaleSpecies': sorted(set(str(cross.get('FemaleSpecies', 'D. melanogaster')) for cross in all_crosses_for_filters)),
+        'TrayID': sorted(set(str(cross['TrayID']) for cross in all_crosses_for_filters)),
+        'Status': sorted(set(str(cross['Status']) for cross in all_crosses_for_filters)),
+        'FoodType': sorted(set(str(cross['FoodType']) for cross in all_crosses_for_filters)),
     }
 
     if request.method == 'GET':
         # Check if there are filters stored in session
         filter_state = session.get('filter_state', {})
-        # remove the 'No longer maintained' crosses from the list
-        crosses = [cross for cross in crosses if str(cross['Status']) != 'No longer maintained']
-        return render_template("cross/cross_explorer.html", username=username, crosses=crosses, unique_values=unique_values, filter_state=filter_state)
+        
+        # Apply filters if state exists or default to excluding 'No longer maintained'
+        if filter_state:
+            filtered_crosses = _apply_cross_filters(crosses, filter_state)
+            # Recalculate unique values based on filtered crosses
+            unique_values_filtered = {
+                'MaleGenotype': sorted(set(str(cross['MaleGenotype']) for cross in filtered_crosses)),
+                'FemaleGenotype': sorted(set(str(cross['FemaleGenotype']) for cross in filtered_crosses)),
+                'MaleSpecies': sorted(set(str(cross.get('MaleSpecies', 'D. melanogaster')) for cross in filtered_crosses)),
+                'FemaleSpecies': sorted(set(str(cross.get('FemaleSpecies', 'D. melanogaster')) for cross in filtered_crosses)),
+                'TrayID': sorted(set(str(cross['TrayID']) for cross in filtered_crosses)),
+                'Status': sorted(set(str(cross['Status']) for cross in filtered_crosses)),
+                'FoodType': sorted(set(str(cross['FoodType']) for cross in filtered_crosses)),
+            }
+            unique_values = unique_values_filtered
+        else:
+            # No filters applied yet, use default behavior to exclude 'No longer maintained'
+            filtered_crosses = [cross for cross in crosses if str(cross['Status']) != 'No longer maintained']
+            
+        return render_template("cross/cross_explorer.html", username=username, crosses=filtered_crosses, unique_values=unique_values, filter_state=filter_state)
     elif request.method == 'POST':
         if 'clear_filters' in request.form:
             session.pop('filter_state', None)
             return redirect(url_for('cross.cross_explorer'))
 
         # Get filter values from request
-        filter_MaleGenotype = str(request.form.get('filterMaleGenotype'))
-        filter_FemaleGenotype = str(request.form.get('filterFemaleGenotype'))
-        filter_MaleSpecies = str(request.form.get('filterMaleSpecies'))
-        filter_FemaleSpecies = str(request.form.get('filterFemaleSpecies'))
-        filter_tray_id = str(request.form.get('filterTrayID'))
-        filter_status = str(request.form.get('filterStatus'))
-        filter_food_type = str(request.form.get('filterFoodType'))
-        search_query = request.form.get('searchQuery')
-
-        # Store filter state in session
         filter_state = {
-            'filterMaleGenotype': filter_MaleGenotype,
-            'filterFemaleGenotype': filter_FemaleGenotype,
-            'filterMaleSpecies': filter_MaleSpecies,
-            'filterFemaleSpecies': filter_FemaleSpecies,
-            'filterTrayID': filter_tray_id,
-            'filterStatus': filter_status,
-            'filterFoodType': filter_food_type,
-            'searchQuery': search_query
+            'filterMaleGenotype': str(request.form.get('filterMaleGenotype', '')),
+            'filterFemaleGenotype': str(request.form.get('filterFemaleGenotype', '')),
+            'filterMaleSpecies': str(request.form.get('filterMaleSpecies', '')),
+            'filterFemaleSpecies': str(request.form.get('filterFemaleSpecies', '')),
+            'filterTrayID': str(request.form.get('filterTrayID', '')),
+            'filterStatus': str(request.form.get('filterStatus', '')),
+            'filterFoodType': str(request.form.get('filterFoodType', '')),
+            'searchQuery': request.form.get('searchQuery', '')
         }
         session['filter_state'] = filter_state
 
         # Apply filters
-        filtered_crosses = crosses
-        if filter_MaleGenotype:
-            filtered_crosses = [cross for cross in filtered_crosses if str(cross['MaleGenotype']) == filter_MaleGenotype]
-        if filter_FemaleGenotype:
-            filtered_crosses = [cross for cross in filtered_crosses if str(cross['FemaleGenotype']) == filter_FemaleGenotype]
-        if filter_MaleSpecies:
-            filtered_crosses = [cross for cross in filtered_crosses if str(cross.get('MaleSpecies', 'D. melanogaster')) == filter_MaleSpecies]
-        if filter_FemaleSpecies:
-            filtered_crosses = [cross for cross in filtered_crosses if str(cross.get('FemaleSpecies', 'D. melanogaster')) == filter_FemaleSpecies]
-        if filter_tray_id:
-            filtered_crosses = [cross for cross in filtered_crosses if str(cross['TrayID']) == filter_tray_id]
-        if filter_status:
-            filtered_crosses = [cross for cross in filtered_crosses if str(cross['Status']) == filter_status]
-        else:
-            filtered_crosses = [cross for cross in filtered_crosses if str(cross['Status']) != 'No longer maintained']
-        if filter_food_type:
-            filtered_crosses = [cross for cross in filtered_crosses if str(cross['FoodType']) == filter_food_type]
-        
-        # Apply search
-        if search_query:
-            def match(cross):
-                search_fields = [
-                    cross['Name'],
-                    cross['MaleGenotype'],
-                    cross['FemaleGenotype'],
-                    cross['TrayID'],
-                    cross['TrayPosition'],
-                    cross['Comments']
-                ]
-                # combine all fields into a single string
-                search_string = ' '.join(str(field) for field in search_fields)
-                # find if the search query is a substring of the search string
-                return fuzz.partial_ratio(search_string, search_query) > 80
-            
-            filtered_crosses = [cross for cross in filtered_crosses if match(cross)]
+        filtered_crosses = _apply_cross_filters(crosses, filter_state)
 
         # Recalculate unique values
         unique_values = {
@@ -140,6 +118,67 @@ def cross_explorer():
         }
 
         return render_template("cross/cross_explorer.html", username=username, crosses=filtered_crosses, unique_values=unique_values, filter_state=filter_state)
+
+def _apply_cross_filters(crosses, filters):
+    """Helper function to apply filters to a list of crosses."""
+    filtered_crosses = list(crosses)  # Make a copy
+    
+    filter_male_genotype = filters.get('filterMaleGenotype')
+    filter_female_genotype = filters.get('filterFemaleGenotype')
+    filter_male_species = filters.get('filterMaleSpecies')
+    filter_female_species = filters.get('filterFemaleSpecies')
+    filter_tray_id = filters.get('filterTrayID')
+    filter_status = filters.get('filterStatus')
+    filter_food_type = filters.get('filterFoodType')
+    search_query = filters.get('searchQuery')
+    
+    if filter_male_genotype:
+        filtered_crosses = [cross for cross in filtered_crosses if str(cross['MaleGenotype']) == filter_male_genotype]
+    if filter_female_genotype:
+        filtered_crosses = [cross for cross in filtered_crosses if str(cross['FemaleGenotype']) == filter_female_genotype]
+    if filter_male_species:
+        filtered_crosses = [cross for cross in filtered_crosses if str(cross.get('MaleSpecies', 'D. melanogaster')) == filter_male_species]
+    if filter_female_species:
+        filtered_crosses = [cross for cross in filtered_crosses if str(cross.get('FemaleSpecies', 'D. melanogaster')) == filter_female_species]
+    if filter_tray_id:
+        filtered_crosses = [cross for cross in filtered_crosses if str(cross['TrayID']) == filter_tray_id]
+        
+    # Special handling for status: default is exclude 'No longer maintained'
+    # Check if the filter has been explicitly set to empty in the form vs not being in the filter_state at all
+    if 'filterStatus' in filters:
+        if filter_status:
+            # Specific status filter selected
+            filtered_crosses = [cross for cross in filtered_crosses if str(cross['Status']) == filter_status]
+        else:
+            # "All" option was selected (empty filter_status but key exists in filters dict)
+            # Include all statuses, including "No longer maintained"
+            pass
+    else:
+        # No filter state exists yet - default to excluding "No longer maintained"
+        filtered_crosses = [cross for cross in filtered_crosses if str(cross['Status']) != 'No longer maintained']
+    
+    if filter_food_type:
+        filtered_crosses = [cross for cross in filtered_crosses if str(cross['FoodType']) == filter_food_type]
+    
+    # Apply search
+    if search_query:
+        def match(cross):
+            search_fields = [
+                cross['Name'],
+                cross['MaleGenotype'],
+                cross['FemaleGenotype'],
+                cross['TrayID'],
+                cross['TrayPosition'],
+                cross['Comments']
+            ]
+            # combine all fields into a single string
+            search_string = ' '.join(str(field) for field in search_fields)
+            # find if the search query is a substring of the search string
+            return fuzz.partial_ratio(search_string, search_query) > 80
+        
+        filtered_crosses = [cross for cross in filtered_crosses if match(cross)]
+    
+    return filtered_crosses
 
 @bp.route('/add_cross', methods=['GET', 'POST'])
 @bp.route('/add_cross/<unique_id>', methods=['GET', 'POST'])

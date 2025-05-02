@@ -1,22 +1,25 @@
 # flymanager/app/routes/stock.py
 import os
 import traceback
-from flask import Blueprint, render_template, request, redirect, session, jsonify, url_for, current_app, flash
-from fuzzywuzzy import fuzz
+from datetime import datetime
 from urllib.parse import unquote
 
-from flymanager.app import db
-from flymanager.utils.mongo import (
-    get_user_stocks, get_metadata, add_metadata, add_to_stock, edit_stock,
-    get_user_initials, write_activity, update_stock_vials, get_flip_in, get_eclosion_in, delete_stock
-)
-from flymanager.utils.genetics import qc_genotype, get_stock_genotype
-from flymanager.utils.utils import clean_tagify_data, increment_replicate_id, parse_flip_day
-from flymanager.utils.labels import generate_label_pdf
-from flymanager.app.routes.auth import login_required
-from datetime import datetime
+from flask import (Blueprint, current_app, flash, jsonify, redirect,
+                   render_template, request, session, url_for)
+from fuzzywuzzy import fuzz
 
+from flymanager.app import db
+from flymanager.app.routes.auth import login_required
 from flymanager.app.settings import DEFAULT_STOCK_PROPERTY_VALUES
+from flymanager.utils.genetics import get_stock_genotype, qc_genotype
+from flymanager.utils.labels import generate_label_pdf
+from flymanager.utils.mongo import (add_metadata, add_to_stock, delete_stock,
+                                    edit_stock, get_eclosion_in, get_flip_in,
+                                    get_metadata, get_user_initials,
+                                    get_user_stocks, update_stock_vials,
+                                    write_activity)
+from flymanager.utils.utils import (clean_tagify_data, increment_replicate_id,
+                                    parse_flip_day)
 
 bp = Blueprint('stock', __name__) # url_prefix is defined in app/__init__
 
@@ -141,9 +144,17 @@ def _apply_stock_filters(stocks, filters):
         filtered_stocks = [s for s in filtered_stocks if str(s.get('TrayID', '')) == filter_tray_id]
 
     # Special handling for status: default is exclude 'No longer maintained'
-    if filter_status:
-        filtered_stocks = [s for s in filtered_stocks if str(s.get('Status', '')) == filter_status]
+    # Check if the filter has been explicitly set to empty in the form vs not being in the filter_state at all
+    if 'filterStatus' in filters:
+        if filter_status:
+            # Specific status filter selected
+            filtered_stocks = [s for s in filtered_stocks if str(s.get('Status', '')) == filter_status]
+        else:
+            # "All" option was selected (empty filter_status but key exists in filters dict)
+            # Include all statuses, including "No longer maintained"
+            pass
     else:
+        # No filter state exists yet - default to excluding "No longer maintained"
         filtered_stocks = [s for s in filtered_stocks if str(s.get('Status', '')) != 'No longer maintained']
 
     if filter_food_type:
