@@ -44,7 +44,7 @@
                 </div>
                 <div style="display: flex; align-items: center;">
                     <button class="btn btn-link btn-sm expand-btn" onclick="event.stopPropagation(); toggleDetails({{ loop.index }})">
-                        <i class="fas fa-chevron-down"></i>
+                        <i class="fas fa-chevron-down" id="expand-icon-{{ loop.index }}"></i>
                     </button>
                     <button class="btn btn-link btn-sm duplicate-stock-btn" onclick="event.stopPropagation(); duplicateStock('{{ stock.UniqueID }}')">
                         <i class="fas fa-clone"></i>
@@ -189,7 +189,7 @@
                 <i class="fas fa-trash"></i>
             </button>
             <button class="toggle-cart-btn">
-                <i class="fas fa-chevron-up"></i>
+                <i class="fas fa-chevron-up" id="cartToggleIcon"></i>
             </button>
         </div>
     </div>

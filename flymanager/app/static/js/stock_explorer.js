@@ -601,15 +601,30 @@ document.getElementById('removeFromTrayBtn').addEventListener('click', function(
 
 function toggleDetails(index) {
     var details = document.getElementById('details-' + index);
-    var icon = document.querySelector('#item-' + index + ' .expand-btn i');
+    
+    // Add null check to prevent errors
+    if (!details) {
+        console.warn('Details element not found:', 'details-' + index);
+        return;
+    }
+    
+    // Get the icon element by using the button's selector first, then find the i element inside it
+    var icon = document.getElementById('expand-icon-' + index);
+
+    console.log(icon);
+    
     if (details.style.display === 'none') {
         details.style.display = 'block';
-        icon.classList.remove('fa-chevron-down');
-        icon.classList.add('fa-chevron-up');
+        if (icon) {
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+        }
     } else {
         details.style.display = 'none';
-        icon.classList.remove('fa-chevron-up');
-        icon.classList.add('fa-chevron-down');
+        if (icon) {
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+        }
     }
 }
 
@@ -722,13 +737,23 @@ function toggleCheckbox(checkboxId, event) {
 
 function toggleCart() {
     const cartContainer = document.querySelector('.floating-cart-container');
+    if (!cartContainer) {
+        console.warn('Cart container element not found');
+        return;
+    }
+    
     cartContainer.classList.toggle('expanded');
-    const icon = cartContainer.querySelector('.toggle-cart-btn i');
-    if (cartContainer.classList.contains('expanded')) {
-        icon.classList.remove('fa-chevron-up');
-        icon.classList.add('fa-chevron-down');
-    } else {
-        icon.classList.remove('fa-chevron-down');
-        icon.classList.add('fa-chevron-up');
+    
+    // Find the icon by its ID
+    const icon = document.getElementById('cartToggleIcon');
+    
+    if (icon) {
+        if (cartContainer.classList.contains('expanded')) {
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+        } else {
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+        }
     }
 }

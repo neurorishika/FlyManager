@@ -58,13 +58,14 @@ def stock_explorer():
             'TrayID': sorted(list(set(str(s.get('TrayID', '')) for s in all_stocks_for_filters if s.get('TrayID')))),
             'Status': sorted(list(set(str(s.get('Status', '')) for s in all_stocks_for_filters if s.get('Status')))),
             'FoodType': sorted(list(set(str(s.get('FoodType', '')) for s in all_stocks_for_filters if s.get('FoodType')))),
-            'Provenance': sorted(list(set(str(s.get('Provenance', '')).split('/')[0] for s in all_stocks_for_filters if s.get('Provenance'))))
+            'Provenance': sorted(list(set(str(s.get('Provenance', '')).split('/')[0] for s in all_stocks_for_filters if s.get('Provenance')))),
+            'Species': sorted(list(set(str(s.get('Species', '')) for s in all_stocks_for_filters if s.get('Species'))))
         }
 
     except Exception as e:
         print(f"Error fetching stocks for explorer: {e}")
         stocks = []
-        unique_values = {k: [] for k in ['Type', 'TrayID', 'Status', 'FoodType', 'Provenance']}
+        unique_values = {k: [] for k in ['Type', 'TrayID', 'Status', 'FoodType', 'Provenance', 'Species']}
 
 
     if request.method == 'GET':
@@ -84,7 +85,8 @@ def stock_explorer():
                  'TrayID': sorted(list(set(str(s.get('TrayID', '')) for s in filtered_stocks if s.get('TrayID')))),
                  'Status': sorted(list(set(str(s.get('Status', '')) for s in filtered_stocks if s.get('Status')))),
                  'FoodType': sorted(list(set(str(s.get('FoodType', '')) for s in filtered_stocks if s.get('FoodType')))),
-                 'Provenance': sorted(list(set(str(s.get('Provenance', '')).split('/')[0] for s in filtered_stocks if s.get('Provenance'))))
+                 'Provenance': sorted(list(set(str(s.get('Provenance', '')).split('/')[0] for s in filtered_stocks if s.get('Provenance')))),
+                 'Species': sorted(list(set(str(s.get('Species', '')) for s in filtered_stocks if s.get('Species'))))
              }
              unique_values = unique_values_filtered # Overwrite unique values based on filtered results
 
@@ -101,6 +103,7 @@ def stock_explorer():
             'filterStatus': request.form.get('filterStatus', ''),
             'filterFoodType': request.form.get('filterFoodType', ''),
             'filterProvenance': request.form.get('filterProvenance', ''),
+            'filterSpecies': request.form.get('filterSpecies', ''),
             'searchQuery': request.form.get('searchQuery', '')
         }
         session['stock_filter_state'] = filter_state
@@ -113,7 +116,8 @@ def stock_explorer():
              'TrayID': sorted(list(set(str(s.get('TrayID', '')) for s in filtered_stocks if s.get('TrayID')))),
              'Status': sorted(list(set(str(s.get('Status', '')) for s in filtered_stocks if s.get('Status')))),
              'FoodType': sorted(list(set(str(s.get('FoodType', '')) for s in filtered_stocks if s.get('FoodType')))),
-             'Provenance': sorted(list(set(str(s.get('Provenance', '')).split('/')[0] for s in filtered_stocks if s.get('Provenance'))))
+             'Provenance': sorted(list(set(str(s.get('Provenance', '')).split('/')[0] for s in filtered_stocks if s.get('Provenance')))),
+             'Species': sorted(list(set(str(s.get('Species', '')) for s in filtered_stocks if s.get('Species'))))
         }
 
         return render_template("stock/stock_explorer.html", username=username, stocks=filtered_stocks, unique_values=unique_values_filtered, filter_state=filter_state)
@@ -128,6 +132,7 @@ def _apply_stock_filters(stocks, filters):
     filter_status = filters.get('filterStatus')
     filter_food_type = filters.get('filterFoodType')
     filter_provenance = filters.get('filterProvenance')
+    filter_species = filters.get('filterSpecies')
     search_query = filters.get('searchQuery')
 
     if filter_type:
@@ -145,6 +150,8 @@ def _apply_stock_filters(stocks, filters):
         filtered_stocks = [s for s in filtered_stocks if str(s.get('FoodType', '')) == filter_food_type]
     if filter_provenance:
         filtered_stocks = [s for s in filtered_stocks if str(s.get('Provenance', '')).split('/')[0] == filter_provenance]
+    if filter_species:
+        filtered_stocks = [s for s in filtered_stocks if str(s.get('Species', '')) == filter_species]
 
     if search_query:
         sq_lower = search_query.lower()
