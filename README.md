@@ -1,6 +1,7 @@
-# FlyManager
+# *D. manager* -  a fruit fly manager for the lab
 
-FlyManager is a comprehensive tool for managing genetic stocks, crosses, and trays in a laboratory setting. It provides features like tracking vial lifetimes, generating labels, and sending reminders.
+
+*D. manager* (short for "*Drosophila manager*") is a comprehensive tool for managing genetic stocks, crosses, and trays in a laboratory setting. It provides features like tracking vial lifetimes, generating labels, and sending reminders.
 
 ## Features
 - Manage genetic stocks and crosses

@@ -1,8 +1,11 @@
-from flask_mail import Message
 from datetime import datetime
+
+from flask_mail import Message
+
 # Import app context variables and mongo utils
-from flymanager.app import mail, db
-from flymanager.utils.mongo import get_user_email, get_flip_schedule
+from flymanager.app import db, mail
+from flymanager.utils.mongo import get_flip_schedule, get_user_email
+
 
 def send_flip_reminder_email(username):
     """
@@ -38,12 +41,12 @@ def send_flip_reminder_email(username):
         elif today_schedule:
              email_subject = f"Daily Flip Reminder for {today}"
         else:
-             email_subject = f"FlyManager Update: No Flips Due Today ({today})"
+             email_subject = f"<em>D. manager</em> Update: No Flips Due Today ({today})"
 
 
         # Start composing the email body with HTML
         email_body = f"<html><body>"
-        email_body += f"<h2>FlyManager Reminders for {username} - {today}</h2>"
+        email_body += f"<h2><em>D. manager</em> Daily Flip Reminders for {username} - {today}</h2>"
 
         # Add overdue flips
         if overdue_flips:
@@ -64,7 +67,7 @@ def send_flip_reminder_email(username):
         else:
             email_body += "<p>No flips scheduled for today.</p>"
 
-        email_body += "<br><p><small>This is an automated message from FlyManager.</small></p>"
+        email_body += "<br><p><small>This is an automated message from <em>D. manager</em>.</small></p>"
         email_body += "</body></html>"
 
         # Send the email using the 'mail' object from the app context

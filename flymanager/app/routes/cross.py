@@ -6,6 +6,7 @@ from fuzzywuzzy import fuzz
 
 from flymanager.app import db
 from flymanager.app.routes.auth import login_required
+from flymanager.app.settings import DEFAULT_CROSS_PROPERTY_VALUES
 from flymanager.utils.genetics import cross_genotypes, qc_genotype
 from flymanager.utils.labels import generate_label_pdf
 from flymanager.utils.mongo import (add_metadata, add_to_cross, edit_cross,
@@ -186,177 +187,278 @@ def _apply_cross_filters(crosses, filters):
 def add_cross(unique_id=None):
     username = session.get("username")
     ports = get_available_ports()
-
-    # get metadata lists
-    food_types = get_metadata('food_types', db)
+    error_message = None
     
-    genotypes = get_all_genotypes(username, db)
+    # Initialize cross_data with default values from settings
+    cross_data = {
+        'maleSpecies': DEFAULT_CROSS_PROPERTY_VALUES['MaleSpecies'],
+        'femaleSpecies': DEFAULT_CROSS_PROPERTY_VALUES['FemaleSpecies'],
+        'status': DEFAULT_CROSS_PROPERTY_VALUES['Status'],
+        'foodType': DEFAULT_CROSS_PROPERTY_VALUES['FoodType'],
+        'vialLifetime': DEFAULT_CROSS_PROPERTY_VALUES['VialLifetime'],
+        'flipFrequency': DEFAULT_CROSS_PROPERTY_VALUES['FlipFrequency'],
+        'developmentalTime': DEFAULT_CROSS_PROPERTY_VALUES['DevelopmentalTime'],
+        'maxCrossLifetime': DEFAULT_CROSS_PROPERTY_VALUES['MaxCrossLifetime'],
+        'comments': DEFAULT_CROSS_PROPERTY_VALUES['Comments'],
+    }
 
-    # If a unique_id is provided, fetch the cross data
-    cross_data = {}
-    if unique_id:
-        cross = db['crosses'].find_one({"UniqueID": unique_id})
-        if cross:
-            cross_data = {
-                'maleUniqueID': cross['MaleUniqueID'],
-                'femaleUniqueID': cross['FemaleUniqueID'],
-                'maleGenotype': cross['MaleGenotype'],
-                'femaleGenotype': cross['FemaleGenotype'],
-                'status': cross['Status'],
-                'foodType': cross['FoodType'],
-                'name': cross['Name'],
-                'vialLifetime': cross.get('VialLifetime'),
-                'flipFrequency': cross.get('FlipFrequency'),
-                'developmentalTime': cross.get('DevelopmentalTime'),
-                'maxCrossLifetime': cross.get('MaxCrossLifetime'),
-                'comments': cross['Comments']
-            }
-        else:
-            return jsonify({"error": "Cross not found."}), 404
+    # Get metadata lists
+    try:
+        food_types = get_metadata('food_types', db)
+        genotypes = get_all_genotypes(username, db)
+    except Exception as e:
+         print(f"Error fetching metadata: {e}")
+         return "Error fetching metadata", 500
+
+    # If a unique_id is provided, fetch the cross data to duplicate it
+    if unique_id and request.method == 'GET':
+        try:
+            cross = db['crosses'].find_one({"UniqueID": unique_id})
+            if cross:
+                cross_data = {
+                    'maleUniqueID': cross['MaleUniqueID'],
+                    'femaleUniqueID': cross['FemaleUniqueID'],
+                    'maleGenotype': cross['MaleGenotype'],
+                    'femaleGenotype': cross['FemaleGenotype'],
+                    'maleSpecies': cross.get('MaleSpecies', DEFAULT_CROSS_PROPERTY_VALUES['MaleSpecies']),
+                    'femaleSpecies': cross.get('FemaleSpecies', DEFAULT_CROSS_PROPERTY_VALUES['FemaleSpecies']),
+                    'status': cross.get('Status', DEFAULT_CROSS_PROPERTY_VALUES['Status']),
+                    'foodType': cross.get('FoodType', DEFAULT_CROSS_PROPERTY_VALUES['FoodType']),
+                    'name': cross['Name'],
+                    'vialLifetime': cross.get('VialLifetime', DEFAULT_CROSS_PROPERTY_VALUES['VialLifetime']),
+                    'flipFrequency': cross.get('FlipFrequency', DEFAULT_CROSS_PROPERTY_VALUES['FlipFrequency']),
+                    'developmentalTime': cross.get('DevelopmentalTime', DEFAULT_CROSS_PROPERTY_VALUES['DevelopmentalTime']),
+                    'maxCrossLifetime': cross.get('MaxCrossLifetime', DEFAULT_CROSS_PROPERTY_VALUES['MaxCrossLifetime']),
+                    'comments': cross.get('Comments', DEFAULT_CROSS_PROPERTY_VALUES['Comments'])
+                }
+            else:
+                return jsonify({"error": "Cross not found."}), 404
+        except Exception as e:
+            print(f"Error fetching source cross {unique_id}: {e}")
+            return jsonify({"error": "Error fetching cross data."}), 500
 
     if request.method == 'POST':
-        # Collect form data
-        male_genotype_input = clean_tagify_data(request.form.get('maleGenotype'))[0]
-        female_genotype_input = clean_tagify_data(request.form.get('femaleGenotype'))[0]
-        
-        food_type_input = clean_tagify_data(request.form.get('foodType'))[0]
-        if food_type_input not in food_types:
-            add_metadata('food_types', food_type_input, db)
+        try:
+            # Process input data
+            male_genotype_input = clean_tagify_data(request.form.get('maleGenotype'))[0]
+            female_genotype_input = clean_tagify_data(request.form.get('femaleGenotype'))[0]
+            
+            food_type_input = clean_tagify_data(request.form.get('foodType'))[0]
+            if food_type_input not in food_types:
+                add_metadata('food_types', food_type_input, db)
 
-        new_cross_data = {
-            'MaleUniqueID': request.form.get('maleUniqueID'),
-            'FemaleUniqueID': request.form.get('femaleUniqueID'),
-            'MaleGenotype': male_genotype_input,
-            'FemaleGenotype': female_genotype_input,
-            'MaleSpecies': request.form.get('maleSpecies', 'D. melanogaster'),
-            'FemaleSpecies': request.form.get('femaleSpecies', 'D. melanogaster'),
-            'Status': request.form.get('status'),
-            'FoodType': food_type_input,
-            'Name': request.form.get('name'),
-            'VialLifetime': request.form.get('vialLifetime', 12),
-            'FlipFrequency': request.form.get('flipFrequency', 2),
-            'DevelopmentalTime': request.form.get('developmentalTime', 10),
-            'MaxCrossLifetime': request.form.get('maxCrossLifetime',10),
-            'Comments': request.form.get('comments')
-        }
+            new_cross_data = {
+                'MaleUniqueID': request.form.get('maleUniqueID'),
+                'FemaleUniqueID': request.form.get('femaleUniqueID'),
+                'MaleGenotype': male_genotype_input,
+                'FemaleGenotype': female_genotype_input,
+                'MaleSpecies': request.form.get('maleSpecies', DEFAULT_CROSS_PROPERTY_VALUES['MaleSpecies']),
+                'FemaleSpecies': request.form.get('femaleSpecies', DEFAULT_CROSS_PROPERTY_VALUES['FemaleSpecies']),
+                'Status': request.form.get('status', DEFAULT_CROSS_PROPERTY_VALUES['Status']),
+                'FoodType': food_type_input,
+                'Name': request.form.get('name'),
+                'VialLifetime': request.form.get('vialLifetime', DEFAULT_CROSS_PROPERTY_VALUES['VialLifetime']),
+                'FlipFrequency': request.form.get('flipFrequency', DEFAULT_CROSS_PROPERTY_VALUES['FlipFrequency']),
+                'DevelopmentalTime': request.form.get('developmentalTime', DEFAULT_CROSS_PROPERTY_VALUES['DevelopmentalTime']),
+                'MaxCrossLifetime': request.form.get('maxCrossLifetime', DEFAULT_CROSS_PROPERTY_VALUES['MaxCrossLifetime']),
+                'Comments': request.form.get('comments', DEFAULT_CROSS_PROPERTY_VALUES['Comments'])
+            }
 
-        # remove empty fields
-        new_cross_data = {k: v for k, v in new_cross_data.items() if v}
+            # Remove empty/None fields before saving
+            new_cross_data = {k: v for k, v in new_cross_data.items() if v is not None and v != ''}
 
-        # Add cross to the user's sheet
-        success, uid_or_message = add_to_cross(username, new_cross_data, db)
+            # Add cross to the user's collection
+            success, uid_or_message = add_to_cross(username, new_cross_data, db)
 
-        # get the cross data
-        cross = db['crosses'].find_one({"UniqueID": uid_or_message})
+            if success:
+                # Get the cross data and update vials
+                cross = db['crosses'].find_one({"UniqueID": uid_or_message})
+                if cross:
+                    update_cross_vials(cross, username, db)
+                    print(f"Vials updated for new cross {uid_or_message}.")
+                
+                # Log activity
+                write_activity(username, f'Added cross {uid_or_message}', db)
+                return redirect(url_for('cross.cross_explorer'))
+            else:
+                # Handle error (e.g., QC failure)
+                error_message = uid_or_message
+                cross_data = new_cross_data # Keep submitted data in form
 
-        # update the cross vials
-        update_cross_vials(cross, username, db)
+        except ValueError as ve:
+             error_message = str(ve)
+             cross_data = request.form.to_dict() # Keep submitted data
+        except Exception as e:
+            print(f"Error adding cross for {username}: {e}")
+            error_message = f"An unexpected error occurred: {e}"
+            cross_data = request.form.to_dict() # Keep submitted data
 
-        if success:
-            return redirect(url_for('cross.cross_explorer'))
-        else:
-            # Handle error (e.g., QC failure)
-            return render_template('cross/add_cross.html', error=uid_or_message, username=username,
-                                   food_types=food_types, genotypes=genotypes, ports=ports, cross_data=cross_data)
-
-    return render_template('cross/add_cross.html', username=username,
-                           food_types=food_types, genotypes=genotypes, ports=ports, cross_data=cross_data)
+    # Render template for GET or failed POST
+    return render_template('cross/add_cross.html', 
+                           username=username,
+                           food_types=food_types, 
+                           genotypes=genotypes, 
+                           ports=ports, 
+                           cross_data=cross_data,
+                           error=error_message)
 
 @bp.route('/view_cross/<unique_id>', methods=['GET', 'POST'])
 @login_required
 def view_cross(unique_id):
     username = session.get("username")
+    error_message = None
 
     # Get metadata lists
-    food_types = get_metadata('food_types', db)
-    genotypes = get_all_genotypes(username, db)
+    try:
+        food_types = get_metadata('food_types', db)
+        genotypes = get_all_genotypes(username, db)
+    except Exception as e:
+         print(f"Error fetching metadata: {e}")
+         return "Error fetching metadata", 500
 
-    # If a unique_id is provided, fetch the cross data
-    cross = db['crosses'].find_one({"UniqueID": unique_id})
-    if cross:
+    # Fetch cross data
+    try:
+        cross = db['crosses'].find_one({"UniqueID": unique_id, "User": username})
+        if not cross:
+            return jsonify({"error": "Cross not found."}), 404
+
+        # Prepare data for template display
         cross_data = {
             'uniqueID': cross['UniqueID'],
             'maleUniqueID': cross['MaleUniqueID'],
             'femaleUniqueID': cross['FemaleUniqueID'],
             'maleGenotype': cross['MaleGenotype'],
             'femaleGenotype': cross['FemaleGenotype'],
-            'maleSpecies': cross.get('MaleSpecies', 'D. melanogaster'),
-            'femaleSpecies': cross.get('FemaleSpecies', 'D. melanogaster'),
+            'maleSpecies': cross.get('MaleSpecies', DEFAULT_CROSS_PROPERTY_VALUES['MaleSpecies']),
+            'femaleSpecies': cross.get('FemaleSpecies', DEFAULT_CROSS_PROPERTY_VALUES['FemaleSpecies']),
             'trayID': cross.get('TrayID', ''),
             'trayPosition': cross.get('TrayPosition', ''),
-            'status': cross['Status'],
-            'foodType': cross.get('FoodType', 'Molasses'),
+            'status': cross.get('Status', DEFAULT_CROSS_PROPERTY_VALUES['Status']),
+            'foodType': cross.get('FoodType', DEFAULT_CROSS_PROPERTY_VALUES['FoodType']),
             'name': cross['Name'],
-            'comments': cross['Comments'],
-            'vialLifetime': cross.get('VialLifetime'),
-            'flipFrequency': cross.get('FlipFrequency'),
-            'developmentalTime': cross.get('DevelopmentalTime'),
-            'maxCrossLifetime': cross.get('MaxCrossLifetime'),
+            'comments': cross.get('Comments', DEFAULT_CROSS_PROPERTY_VALUES['Comments']),
+            'vialLifetime': cross.get('VialLifetime', DEFAULT_CROSS_PROPERTY_VALUES['VialLifetime']),
+            'flipFrequency': cross.get('FlipFrequency', DEFAULT_CROSS_PROPERTY_VALUES['FlipFrequency']),
+            'developmentalTime': cross.get('DevelopmentalTime', DEFAULT_CROSS_PROPERTY_VALUES['DevelopmentalTime']),
+            'maxCrossLifetime': cross.get('MaxCrossLifetime', DEFAULT_CROSS_PROPERTY_VALUES['MaxCrossLifetime']),
             'creationDate': cross.get('CreationDate', ''),
             'lastFlipDate': cross.get('LastFlipDate', ''),
             'currentlyAliveVials': cross.get('CurrentlyAliveVials', ''),
-            'flipLog': cross.get('FlipLog', '').replace('; ', '\n'),
-            'nextFlipDates': cross.get('NextFlipDates', '').replace('; ', '\n'),
-            'nextEclosionDates': cross.get('NextEclosionDates', '').replace('; ', '\n'),
+            'flipLog': str(cross.get('FlipLog', '')).replace('; ', '\n'),
+            'nextFlipDates': str(cross.get('NextFlipDates', '')).replace('; ', '\n'),
+            'nextEclosionDates': str(cross.get('NextEclosionDates', '')).replace('; ', '\n'),
             'dataModifiedDate': cross.get('DataModifiedDate', ''),
-            'modificationLog': cross.get('ModificationLog', '').replace('; ', '\n'),
+            'modificationLog': str(cross.get('ModificationLog', '')).replace('; ', '\n'),
         }
-    else:
-        return jsonify({"error": "Cross not found."}), 404
+    except Exception as e:
+        print(f"Error fetching cross {unique_id} for view: {e}")
+        return jsonify({"error": "Error fetching cross data."}), 500
 
     # Predict offspring genotypes
     predicted_offspring = cross_genotypes(cross_data['maleGenotype'], cross_data['femaleGenotype'])
 
     if request.method == 'POST':
-        # Handle form data
-        male_genotype_input = clean_tagify_data(request.form.get('maleGenotype'))[0]
-        female_genotype_input = clean_tagify_data(request.form.get('femaleGenotype'))[0]
+        try:
+            # Process input data
+            male_genotype_input = clean_tagify_data(request.form.get('maleGenotype'))[0]
+            female_genotype_input = clean_tagify_data(request.form.get('femaleGenotype'))[0]
 
-        food_type_input = clean_tagify_data(request.form.get('foodType'))[0]
-        if food_type_input not in food_types:
-            add_metadata('food_types', food_type_input, db)
-            
-        # Collect form data
-        updated_cross_data = {
-            'MaleUniqueID': request.form.get('maleUniqueID'),
-            'FemaleUniqueID': request.form.get('femaleUniqueID'),
-            'MaleGenotype': male_genotype_input,
-            'FemaleGenotype': female_genotype_input,
-            'MaleSpecies': request.form.get('maleSpecies', 'D. melanogaster'),
-            'FemaleSpecies': request.form.get('femaleSpecies', 'D. melanogaster'),
-            'Status': request.form.get('status'),
-            'FoodType': food_type_input,
-            'Name': request.form.get('name'),
-            'Comments': request.form.get('comments'),
-            'VialLifetime': request.form.get('vialLifetime', 14),
-            'FlipFrequency': request.form.get('flipFrequency', 7),
-            'DevelopmentalTime': request.form.get('developmentalTime', 10),
-            'MaxCrossLifetime': request.form.get('maxCrossLifetime',18),
-        }
+            # Validate genotypes using QC (similar to add_to_cross)
+            qc, male_genotype = qc_genotype(male_genotype_input)
+            if not qc:
+                raise ValueError(f"Male genotype QC failed: {male_genotype}")
+                
+            qc, female_genotype = qc_genotype(female_genotype_input)
+            if not qc:
+                raise ValueError(f"Female genotype QC failed: {female_genotype}")
 
-        # Remove empty fields
-        updated_cross_data = {k: v for k, v in updated_cross_data.items() if v}
+            food_type_input = clean_tagify_data(request.form.get('foodType'))[0]
+            if food_type_input not in food_types:
+                add_metadata('food_types', food_type_input, db)
+                
+            # Collect form data
+            updated_cross_data = {
+                'MaleUniqueID': request.form.get('maleUniqueID'),
+                'FemaleUniqueID': request.form.get('femaleUniqueID'),
+                'MaleGenotype': male_genotype,
+                'FemaleGenotype': female_genotype,
+                'MaleSpecies': request.form.get('maleSpecies', DEFAULT_CROSS_PROPERTY_VALUES['MaleSpecies']),
+                'FemaleSpecies': request.form.get('femaleSpecies', DEFAULT_CROSS_PROPERTY_VALUES['FemaleSpecies']),
+                'Status': request.form.get('status', DEFAULT_CROSS_PROPERTY_VALUES['Status']),
+                'FoodType': food_type_input,
+                'Name': request.form.get('name'),
+                'Comments': request.form.get('comments', DEFAULT_CROSS_PROPERTY_VALUES['Comments']),
+                'VialLifetime': request.form.get('vialLifetime', DEFAULT_CROSS_PROPERTY_VALUES['VialLifetime']),
+                'FlipFrequency': request.form.get('flipFrequency', DEFAULT_CROSS_PROPERTY_VALUES['FlipFrequency']),
+                'DevelopmentalTime': request.form.get('developmentalTime', DEFAULT_CROSS_PROPERTY_VALUES['DevelopmentalTime']),
+                'MaxCrossLifetime': request.form.get('maxCrossLifetime', DEFAULT_CROSS_PROPERTY_VALUES['MaxCrossLifetime']),
+            }
 
-        # Check if the cross data has changed and only keep the changed fields
-        changed_fields = {k: v for k, v in updated_cross_data.items() if v != cross.get(k, '')}
+            # Remove empty/None fields
+            updated_cross_data = {k: v for k, v in updated_cross_data.items() if v is not None and v != ''}
 
-        # Edit cross in the user's collection
-        success = edit_cross(username, unique_id, db, changed_fields)
+            # Calculate changed fields by comparing with the original cross data
+            changed_fields = {
+                k: v for k, v in updated_cross_data.items()
+                if str(v) != str(cross.get(k, ''))  # Compare as strings for consistency
+            }
 
-        # Get the updated cross data
-        cross = db['crosses'].find_one({"UniqueID": unique_id})
+            if not changed_fields:
+                # No changes detected
+                return render_template('cross/view_cross.html', 
+                                      username=username, 
+                                      food_types=food_types,
+                                      genotypes=genotypes, 
+                                      cross_data=cross_data, 
+                                      predicted_offspring=predicted_offspring,
+                                      error=error_message,
+                                      message="No changes detected.")
 
-        # Update the cross vials
-        update_cross_vials(cross, username, db)
+            # Edit cross in the user's collection
+            success = edit_cross(username, unique_id, db, changed_fields)
 
-        if success:
-            return redirect(url_for('cross.cross_explorer'))
-        else:
-            # Handle error (e.g., QC failure)
-            return render_template('cross/cross_explorer.html', error="Failed to update cross", username=username)
+            if success:
+                # Get the updated cross data
+                try:
+                    edited_cross = db['crosses'].find_one({"UniqueID": unique_id, "User": username})
+                    if edited_cross:
+                        # Update the cross vials
+                        update_cross_vials(edited_cross, username, db)
+                        print(f"Vials updated for edited cross {unique_id}.")
+                    else:
+                        print(f"Warning: Could not find edited cross {unique_id} to update vials.")
+                except Exception as vial_e:
+                    print(f"Error updating vials for edited cross {unique_id}: {vial_e}")
 
-    return render_template('cross/view_cross.html', username=username, food_types=food_types, 
-                           genotypes=genotypes, cross_data=cross_data, predicted_offspring=predicted_offspring)
+                # Log activity with changed fields
+                changed_keys = ", ".join(changed_fields.keys())
+                write_activity(username, f'Edited cross {unique_id} (Fields: {changed_keys})', db)
+                
+                return redirect(url_for('cross.cross_explorer'))
+            else:
+                # Error updating cross
+                error_message = "Failed to update cross. Please check data and try again."
+                # Keep submitted data in form for correction
+                cross_data.update({k.lower(): v for k, v in updated_cross_data.items()})
+
+        except ValueError as ve:
+            error_message = str(ve)
+            # Keep submitted data for form
+            cross_data.update({k.lower(): v for k, v in request.form.items()})
+        except Exception as e:
+            print(f"Error editing cross {unique_id}: {e}")
+            error_message = f"An unexpected error occurred: {e}"
+            # Keep submitted data for form
+            cross_data.update({k.lower(): v for k, v in request.form.items()})
+
+    # Render template for GET or failed POST
+    return render_template('cross/view_cross.html', 
+                          username=username, 
+                          food_types=food_types,
+                          genotypes=genotypes, 
+                          cross_data=cross_data, 
+                          predicted_offspring=predicted_offspring,
+                          error=error_message)
 
 @bp.route('/generate_cross_labels', methods=['POST'])
 @login_required

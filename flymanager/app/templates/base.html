@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ settings.lab_info.lab_name }} - FlyManager</title>
+    <title>D. manager @ {{ settings.lab_info.lab_name }}</title>
     <!-- Prevent flash by setting theme immediately -->
     <script>
         // Get theme from localStorage or session, default to light
@@ -229,6 +229,12 @@
         .breadcrumb {
             background-color: var(--card-bg);
             color: var(--text-color);
+        }
+
+        .species-display {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.25rem;
         }
     </style>
 </head>
