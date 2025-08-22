@@ -167,4 +167,7 @@ directory.path
 **/.DS_Store
 
 # generated labels
-flymanager/static/generated_labels/*
+flymanager/app/static/generated_labels/*
+
+# .old directories
+**/.old

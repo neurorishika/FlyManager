@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block head %}
+<style>
+    .auth-container {
+        background-color: var(--card-bg);
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+    .auth-container h2 {
+        margin-bottom: 25px;
+        text-align: center;
+        font-weight: 700;
+        color: var(--header-bg);
+    }
+    .auth-container label {
+        font-weight: 500;
+    }
+    .auth-container .form-control {
+        border-radius: 25px;
+    }
+    .auth-container .btn {
+        border-radius: 25px;
+        font-weight: 700;
+    }
+    .error-message {
+        color: red;
+        text-align: center;
+        margin-bottom: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <h2><em>D. manager</em> @ {{ settings.lab_info.lab_name }} 🪰</h2>
+    {% if message %}
+        <p class="error-message">{{ message }}</p>
+    {% endif %}
+    <form action="{{ url_for('auth.login') }}" method="POST">
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <select id="username" name="username" class="form-control" required onchange="showPasswordField()">
+                <option value="">Select your username</option>
+                {% for user in users %}
+                    <option value="{{ user }}">{{ user }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" id="password-field" style="display: none;">
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Login</button>
+        <button type="button" class="btn btn-secondary btn-block" onclick="location.href='{{ url_for('auth.register') }}'">Register</button>
+        <button type="button" class="btn btn-link" onclick="location.href='{{ url_for('auth.forgot_password') }}'">Forgot Password?</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function showPasswordField() {
+        var username = document.getElementById("username").value;
+        var passwordField = document.getElementById("password-field");
+        if (username) {
+            passwordField.style.display = "block";
+        } else {
+            passwordField.style.display = "none";
+        }
+    }
+</script>
+{% endblock %}

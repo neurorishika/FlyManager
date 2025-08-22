@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Explorer{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stock_explorer.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="filters">
+    <h3>Filters</h3>
+    <div class="alert alert-info" role="alert">
+        <strong>Note:</strong> Stocks/Crosses with the status "No longer maintained" are excluded by default. To view them, please filter by the "No longer maintained" status.
+    </div>
+    {% include 'stock/filter_stock.html' %}
+</div>
+<div class="mb-3 d-flex justify-content-between">
+    <a href="{{ url_for('stock.add_stock') }}"><button class="btn btn-success">Add New Stock</button></a>
+    <div class="view-toggle-container">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-outline-secondary active" id="cardViewBtn">
+                <i class="fas fa-th-large"></i> Card View
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="tableViewBtn">
+                <i class="fas fa-table"></i> Table View
+            </button>
+        </div>
+    </div>
+</div>
+<div class="stock-container">
+    <div class="stock-items-grid" id="cardView">
+        {% for stock in stocks %}
+        <div class="stock-item" data-status="{{ stock.Status }}" id="item-{{ loop.index }}" onclick="toggleCheckbox('stock{{ loop.index }}', event)">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="checkbox-and-badges">
+                    <input type="checkbox" id="stock{{ loop.index }}" onclick="toggleCheckbox('stock{{ loop.index }}', event)">
+                    <div class="badges">
+                        <span class="badge badge-info">{{ stock.FoodType }}</span>
+                        <span class="badge badge-secondary">{{ stock.Type }}</span>
+                        <span class="badge badge-species">{{ stock.Species }}</span>
+                        <span class="badge badge-flip" style="background-color:{{ stock.FlipInColor }}">{{ stock.FlipIn }}</span>
+                        <span class="badge badge-eclose">Ecloses in {{ stock.EclosesIn }}</span>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <button class="btn btn-link btn-sm expand-btn" onclick="event.stopPropagation(); toggleDetails({{ loop.index }})">
+                        <i class="fas fa-chevron-down" id="expand-icon-{{ loop.index }}"></i>
+                    </button>
+                    <button class="btn btn-link btn-sm duplicate-stock-btn" onclick="event.stopPropagation(); duplicateStock('{{ stock.UniqueID }}')">
+                        <i class="fas fa-clone"></i>
+                    </button>
+                    <button class="btn btn-link btn-sm view-details-btn" onclick="event.stopPropagation(); viewDetails('{{ stock.UniqueID }}')">
+                        <i class="fas fa-external-link-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div style="flex-grow: 1; padding-top: 10px;">
+                <h5>
+                    {% if stock.TrayID and stock.TrayPosition %}
+                        {{ stock.TrayID }}-{{ stock.TrayPosition }}
+                    {% endif %}
+                    <small class="text-muted">{{ stock.SeriesID }}{{ stock.ReplicateID }}</small>
+                    | {{ stock.Name }}
+                    {% if stock.AltReference %}
+                        <span class="text-muted">({{ stock.AltReference }})</span>
+                    {% endif %}
+                </h5>
+                <p>
+                    <strong>Genotype:</strong> {{ stock.Genotype }}<br>
+                    <strong>Provenance:</strong> {{ stock.Provenance }}<br>
+                    <strong>Unique Identifier:</strong> <i>{{ stock.UniqueID }}</i>
+                </p>
+            </div>
+            <div class="details" id="details-{{ loop.index }}" style="display: none; width: 100%;">
+                <div style="display: flex; flex-wrap: wrap;">
+                    <div style="flex: 1;">
+                        <p><strong>Source ID:</strong> {{ stock.SourceID }}</p>
+                        <p><strong>Comments:</strong> {{ stock.Comments }}</p>
+                        <p><strong>Creation Date:</strong> {{ stock.CreationDate }}</p>
+                    </div>
+                    <div style="flex: 1;">
+                        <p><strong>Last Flip Date:</strong> {{ stock.LastFlipDate }}</p>
+                        <p><strong>Data Modified Date:</strong> {{ stock.DataModifiedDate }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div id="tableView" class="table-responsive" style="display: none;">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th width="30"><input type="checkbox" id="selectAllTable"></th>
+                    <th class="sortable" data-sort="tray">Tray<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="series">Series<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="name">Name<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="genotype">Genotype<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="type">Type<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="food">Food Type<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="species">Species<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="status">Status<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="flipin">Flip In<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="eclose">Ecloses In<i class="fas fa-sort ml-1"></i></th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stock in stocks %}
+                <tr class="stock-row" data-status="{{ stock.Status }}" data-index="{{ loop.index }}">
+                    <td>
+                        <input type="checkbox" id="stockTable{{ loop.index }}" onclick="toggleTableCheckbox('stockTable{{ loop.index }}', event)">
+                    </td>
+                    <td class="tray-cell">
+                        {% if stock.TrayID and stock.TrayPosition %}
+                            {{ stock.TrayID }}-{{ stock.TrayPosition }}
+                        {% endif %}
+                    </td>
+                    <td>{{ stock.SeriesID }}{{ stock.ReplicateID }}</td>
+                    <td>
+                        {{ stock.Name }}
+                        {% if stock.AltReference %}
+                            <small class="text-muted">({{ stock.AltReference }})</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ stock.Genotype }}</td>
+                    <td>{{ stock.Type }}</td>
+                    <td>{{ stock.FoodType }}</td>
+                    <td>{{ stock.Species }}</td>
+                    <td>
+                        <span class="badge badge-pill 
+                        {% if stock.Status == 'Healthy' %}badge-success
+                        {% elif stock.Status == 'Showing Issues' %}badge-warning
+                        {% elif stock.Status == 'Needs refresh' %}badge-danger
+                        {% elif stock.Status == 'Ordered' %}badge-info
+                        {% elif stock.Status == 'No longer maintained' %}badge-secondary
+                        {% endif %}">
+                            {{ stock.Status }}
+                        </span>
+                    </td>
+                    <td><span style="color:{{ stock.FlipInColor }}; font-weight: bold;">{{ stock.FlipIn }}</span></td>
+                    <td>{{ stock.EclosesIn }}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary btn-sm" onclick="viewDetails('{{ stock.UniqueID }}')" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="duplicateStock('{{ stock.UniqueID }}')" title="Duplicate Stock">
+                                <i class="fas fa-clone"></i>
+                            </button>
+                            <button class="btn btn-outline-info btn-sm show-details-btn" data-index="{{ loop.index }}" title="Show Details">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="row-details" id="tableDetails-{{ loop.index }}" style="display: none;">
+                            <div class="mt-2 p-2 border rounded">
+                                <p><strong>Unique ID:</strong> {{ stock.UniqueID }}</p>
+                                <p><strong>Source ID:</strong> {{ stock.SourceID }}</p>
+                                <p><strong>Provenance:</strong> {{ stock.Provenance }}</p>
+                                <p><strong>Comments:</strong> {{ stock.Comments }}</p>
+                                <p><strong>Creation Date:</strong> {{ stock.CreationDate }}</p>
+                                <p><strong>Last Flip Date:</strong> {{ stock.LastFlipDate }}</p>
+                                <p><strong>Data Modified Date:</strong> {{ stock.DataModifiedDate }}</p>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="floating-cart-container">
+    <div class="cart-header" onclick="toggleCart()">
+        <h3>Cart (<span id="cartCount">0</span> items)</h3>
+        <div class="cart-header-actions">
+            <button type="button" id="addToCartBtn" class="btn btn-link" title="Add to Cart" onclick="event.stopPropagation();">
+                <i class="fas fa-cart-plus"></i>
+            </button>
+            <button type="button" id="selectAllBtn" class="btn btn-link" title="Select All" onclick="event.stopPropagation();">
+                <i class="fas fa-check-square"></i>
+            </button>
+            <button type="button" id="deselectAllBtn" class="btn btn-link" title="Deselect All" onclick="event.stopPropagation();">
+                <i class="fas fa-square"></i>
+            </button>
+            <button type="button" id="emptyCartBtn" class="btn btn-link" title="Empty Cart" onclick="event.stopPropagation();">
+                <i class="fas fa-trash"></i>
+            </button>
+            <button class="toggle-cart-btn">
+                <i class="fas fa-chevron-up" id="cartToggleIcon"></i>
+            </button>
+        </div>
+    </div>
+    <div class="cart-content">
+        <div id="cartItems"></div>
+        <div class="cart-actions">
+            <button type="button" id="generateLabelsBtn" class="btn btn-primary">Generate Labels</button>
+            <button type="button" id="bulkFlipBtn" class="btn btn-success">Bulk Flip</button>
+            <div class="dropdown d-inline-block">
+                <button class="btn btn-secondary dropdown-toggle" type="button" id="bulkStatusBtn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    Change Status
+                </button>
+                <div class="dropdown-menu" aria-labelledby="bulkStatusBtn">
+                    <a class="dropdown-item bulk-status-item" href="#" data-status="Healthy">Healthy</a>
+                    <a class="dropdown-item bulk-status-item" href="#" data-status="Showing Issues">Showing Issues</a>
+                    <a class="dropdown-item bulk-status-item" href="#" data-status="Needs refresh">Needs refresh</a>
+                    <a class="dropdown-item bulk-status-item" href="#" data-status="Ordered">Ordered</a>
+                    <a class="dropdown-item bulk-status-item" href="#" data-status="No longer maintained">No longer maintained</a>
+                </div>
+            </div>
+            <button type="button" id="removeFromTrayBtn" class="btn btn-warning">Remove from Tray</button>
+            {% if filter_state.filterStatus == "No longer maintained" %}
+            <button type="button" id="deletePermanentlyBtn" class="btn btn-danger">Delete Permanently</button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<form id="generateLabelsForm" method="post" action="{{ url_for('stock.generate_stock_labels') }}" target="_blank">
+    <input type="hidden" name="selected_uids" id="selectedUids">
+    <input type="hidden" name="blank_spaces" id="blankSpaces">
+    <input type="hidden" name="quantities" id="quantities">
+</form>
+
+<!-- Bulk Flip Modal -->
+<div class="modal fade" id="bulkFlipModal" tabindex="-1" role="dialog" aria-labelledby="bulkFlipModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkFlipModalLabel">Bulk Flip Stocks/Crosses</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>You are about to flip <span id="bulkFlipCount">0</span> items. This action cannot be undone.</p>
+                
+                <div class="mb-3">
+                    <label for="bulkFlipTime" class="form-label">Flip Time:</label>
+                    <input type="datetime-local" id="bulkFlipTime" class="form-control" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="bulkFlipComment" class="form-label">Comment (optional):</label>
+                    <textarea id="bulkFlipComment" class="form-control" rows="3"></textarea>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">New Status (optional):</label>
+                    <div>
+                        <select id="bulkFlipStatus" class="form-control">
+                            <option value="">Keep current status</option>
+                            <option value="Healthy">Healthy</option>
+                            <option value="Showing Issues">Showing Issues</option>
+                            <option value="Needs refresh">Needs refresh</option>
+                            <option value="Ordered">Ordered</option>
+                            <option value="No longer maintained">No longer maintained</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="confirmBulkFlipBtn" class="btn btn-success">Confirm Flip</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" role="dialog" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">Permanently Delete Stocks</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <strong>Warning!</strong> You are about to permanently delete <span id="deleteItemCount">0</span> items. 
+                    This action CANNOT be undone and all data will be lost forever.
+                </div>
+                
+                <p>Only items with status "No longer maintained" can be deleted. All others will be skipped.</p>
+                
+                <div class="mb-3">
+                    <label for="deleteConfirmText" class="form-label">To confirm deletion, type the word "DELETE" below:</label>
+                    <input type="text" id="deleteConfirmText" class="form-control" required>
+                </div>
+                
+                <div id="deleteItemList" class="mb-3">
+                    <p><strong>Items to be deleted:</strong></p>
+                    <ul class="list-group"></ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="confirmDeleteBtn" class="btn btn-danger" disabled>Permanently Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Define URLs for JavaScript using url_for
+    const viewStockUrlBase = "{{ url_for('stock.view_stock', unique_id='UNIQUE_ID_PLACEHOLDER') }}";
+    const addStockUrlBase = "{{ url_for('stock.add_stock', source_stock_id='UNIQUE_ID_PLACEHOLDER') }}";
+    const bulkFlipUrl = "{{ url_for('flip.bulk_flip_route') }}";
+    const bulkStatusUrl = "{{ url_for('flip.bulk_status_change_route') }}";
+    const bulkRemoveFromTrayUrl = "{{ url_for('tray.bulk_remove_from_tray') }}";
+    const deleteStockUrl = "{{ url_for('stock.delete_stock_permanently') }}";
+    const filterStatus = "{{ filter_state.filterStatus }}";
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
+<script src="{{ url_for('static', filename='js/stock_explorer.js') }}"></script>
+{% endblock %}
