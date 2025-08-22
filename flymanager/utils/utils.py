@@ -1,6 +1,7 @@
 # Description: Utility functions for the FlyManager application
 import datetime
 
+
 # take an console input from the user and validate it against a list of valid options
 def validated_input(prompt, valid_options, default=None, show_options=True):
     """
@@ -32,6 +33,7 @@ def hex_to_rgb(hex):
 def clean_tagify_data(form_data):
     if form_data == '':
         return form_data
+    print("form_data", form_data)
     form_data_elements = form_data.split('"')[1::2]
     # remove all elements that are "value"
     form_data_elements = [element for element in form_data_elements if element != 'value']

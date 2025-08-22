@@ -279,10 +279,10 @@ def add_stock(source_stock_id=None):
                  raise ValueError(f"Genotype QC failed: {final_genotype}") # Raise error to be caught below
 
             # --- Process Other Tagify Inputs ---
-            type_input = clean_tagify_data(request.form.get('type')) # Expect single value
+            type_input = clean_tagify_data(request.form.get('type'))[0] # Expect single value
             if type_input not in types: add_metadata('types', type_input, db)
 
-            food_type_input = clean_tagify_data(request.form.get('foodType')) # Expect single value
+            food_type_input = clean_tagify_data(request.form.get('foodType'))[0] # Expect single value
             if food_type_input not in food_types: add_metadata('food_types', food_type_input, db)
 
             provenance_input = clean_tagify_data(request.form.get('provenance'))
@@ -290,7 +290,7 @@ def add_stock(source_stock_id=None):
                 if prov not in provenances: add_metadata('provenances', prov, db)
             provenance_str = "/".join(provenance_input)
 
-            species_input = request.form.get('species')
+            species_input = clean_tagify_data(request.form.get('species'))[0] # Expect single value
             if species_input not in species_list: add_metadata('species', species_input, db)
 
             # --- Collect Form Data ---

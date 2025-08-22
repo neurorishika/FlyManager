@@ -1,5 +1,7 @@
 import datetime
+
 from flask import url_for
+
 from flymanager.utils.utils import day_str_to_num
 
 # Metadata Management
@@ -141,7 +143,7 @@ def get_flip_schedule(user, db):
     """
     # Import locally to avoid circular imports
     from .user_data import get_user_flip_days
-    
+
     # Retrieve user's stocks and crosses
     stocks = db['stocks'].find({"User": user})
     crosses = db['crosses'].find({"User": user})
@@ -181,7 +183,8 @@ def get_flip_schedule(user, db):
             if closest_flip_day:
                 flip_date_str = closest_flip_day.strftime('%Y-%m-%d')
                 tray_info = f"{cross['TrayID']} - {cross['TrayPosition']}"
-                link = f"<a href='/view_cross/{cross['UniqueID']}'>{cross['Name']}</a>"
+                uid_url = url_for('cross.view_cross', unique_id=cross['UniqueID'])
+                link = f"<a href='{uid_url}'>{cross['Name']}</a>"
                 schedule.setdefault(flip_date_str, []).append(f"Cross: {link} (ID: {cross['UniqueID']}, {tray_info})")
 
     # Sort the schedule by date

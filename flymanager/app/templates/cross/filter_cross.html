@@ -1,13 +1,5 @@
 <form method="post" action="{{ url_for('cross.cross_explorer') }}">
     <div class="filter-row">
-        {% with filter_name="Male Genotype", options=unique_values.MaleGenotype, selected=filter_state.filterMaleGenotype %}
-            {% include 'filter_field.html' %}
-        {% endwith %}
-        
-        {% with filter_name="Female Genotype", options=unique_values.FemaleGenotype, selected=filter_state.filterFemaleGenotype %}
-            {% include 'filter_field.html' %}
-        {% endwith %}
-        
         {% with filter_name="Male Species", options=unique_values.MaleSpecies, selected=filter_state.filterMaleSpecies %}
             {% include 'filter_field.html' %}
         {% endwith %}
@@ -33,7 +25,7 @@
             <input type="text" id="searchQuery" name="searchQuery" class="form-control" value="{{ filter_state.searchQuery }}">
         </div>
     </div>
-    {% if filter_state and (filter_state.filterMaleGenotype or filter_state.filterFemaleGenotype or filter_state.filterMaleSpecies or filter_state.filterFemaleSpecies or filter_state.filterStatus or filter_state.filterFoodType or filter_state.filterTrayID or filter_state.searchQuery) %}
+    {% if filter_state and (filter_state.filterMaleSpecies or filter_state.filterFemaleSpecies or filter_state.filterStatus or filter_state.filterFoodType or filter_state.filterTrayID or filter_state.searchQuery) %}
         <div class="alert alert-info mt-2">
             <i class="fas fa-info-circle"></i> Filters are currently applied. Please clear filters before applying new ones.
         </div>
