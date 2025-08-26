@@ -1,14 +1,13 @@
 # flymanager/app/services/scheduler.py
-from flask import current_app
 from flymanager.app import scheduler, db, get_all_users
 from .email import send_flip_reminder_email
 
-def schedule_daily_flip_reminders():
+
+def schedule_daily_flip_reminders(app):
     """
     Scheduled task function to send flip reminders to all users.
     Needs to run within an app context.
     """
-    app = current_app._get_current_object() # Get the current app instance
     with app.app_context():
         print("Running daily flip reminder task...")
         try:
@@ -27,5 +26,6 @@ def schedule_daily_flip_reminders():
 
         except Exception as e:
             print(f"Error during scheduled flip reminder task: {e}")
+
 
 # The job addition and starting is handled in app/__init__.py

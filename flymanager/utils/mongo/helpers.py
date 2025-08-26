@@ -6,22 +6,31 @@ from flymanager.utils.utils import day_str_to_num
 
 # Metadata Management
 
+
 def get_metadata(metadata_type, db):
     """
     Get the metadata for a specific type from the MongoDB database.
-    
+
     Parameters:
     metadata_type: str
         The type of metadata to retrieve.
     db: pymongo.database.Database
         The MongoDB database instance.
-    
+
     Returns:
     metadata: list
         A list of dictionaries representing the metadata.
     """
-    assert metadata_type in ["types", "food_types", "provenances", "genesX", "genes2nd", 
-                             "genes3rd", "genes4th", "species"], "Invalid metadata type"
+    assert metadata_type in [
+        "types",
+        "food_types",
+        "provenances",
+        "genesX",
+        "genes2nd",
+        "genes3rd",
+        "genes4th",
+        "species",
+    ], "Invalid metadata type"
     metadata_collection = db[metadata_type]
     metadata = list(metadata_collection.find())
     values = [m["Value"] for m in metadata]
@@ -31,7 +40,7 @@ def get_metadata(metadata_type, db):
 def add_metadata(metadata_type, metadata_value, db):
     """
     Add metadata to the MongoDB database.
-    
+
     Parameters:
     metadata_type: str
         The type of metadata to add.
@@ -39,25 +48,31 @@ def add_metadata(metadata_type, metadata_value, db):
         The value of the metadata to add.
     db: pymongo.database.Database
         The MongoDB database instance.
-    
+
     Returns:
     bool
         True if the metadata was added, False otherwise.
     """
-    assert metadata_type in ["types", "food_types", "provenances", "genesX", "genes2nd",
-                             "genes3rd", "genes4th", "species"], "Invalid metadata type"
-    
+    assert metadata_type in [
+        "types",
+        "food_types",
+        "provenances",
+        "genesX",
+        "genes2nd",
+        "genes3rd",
+        "genes4th",
+        "species",
+    ], "Invalid metadata type"
+
     # Define the metadata collection
     metadata_collection = db[metadata_type]
 
     # Check if the metadata already exists
     if metadata_collection.find_one({"Value": metadata_value}):
         return False
-    
+
     # Add the metadata document to the collection
-    metadata_document = {
-        "Value": metadata_value
-    }
+    metadata_document = {"Value": metadata_value}
 
     metadata_collection.insert_one(metadata_document)
 
@@ -67,7 +82,7 @@ def add_metadata(metadata_type, metadata_value, db):
 def delete_metadata(metadata_type, metadata_value, db):
     """
     Delete metadata from the MongoDB database.
-    
+
     Parameters:
     metadata_type: str
         The type of metadata to delete.
@@ -75,14 +90,22 @@ def delete_metadata(metadata_type, metadata_value, db):
         The value of the metadata to delete.
     db: pymongo.database.Database
         The MongoDB database instance.
-    
+
     Returns:
     bool
         True if the metadata was deleted, False otherwise.
     """
-    assert metadata_type in ["types", "food_types", "provenances", "genesX", "genes2nd",
-                             "genes3rd", "genes4th", "species"], "Invalid metadata type"
-    
+    assert metadata_type in [
+        "types",
+        "food_types",
+        "provenances",
+        "genesX",
+        "genes2nd",
+        "genes3rd",
+        "genes4th",
+        "species",
+    ], "Invalid metadata type"
+
     # Define the metadata collection
     metadata_collection = db[metadata_type]
 
@@ -94,12 +117,12 @@ def delete_metadata(metadata_type, metadata_value, db):
         return True
     else:
         return False
-    
+
 
 def edit_metadata(metadata_type, old_value, new_value, db):
     """
     Edit metadata in the MongoDB database.
-    
+
     Parameters:
     metadata_type: str
         The type of metadata to edit.
@@ -114,21 +137,30 @@ def edit_metadata(metadata_type, old_value, new_value, db):
     bool
         True if the metadata was updated, False otherwise.
     """
-    assert metadata_type in ["types", "food_types", "provenances", "genesX", "genes2nd",
-                             "genes3rd", "genes4th", "species"], "Invalid metadata type"
-    
+    assert metadata_type in [
+        "types",
+        "food_types",
+        "provenances",
+        "genesX",
+        "genes2nd",
+        "genes3rd",
+        "genes4th",
+        "species",
+    ], "Invalid metadata type"
+
     # Define the metadata collection
     metadata_collection = db[metadata_type]
 
     # Attempt to update the metadata
     result = metadata_collection.update_one(
-        {"Value": old_value},
-        {"$set": {"Value": new_value}}
+        {"Value": old_value}, {"$set": {"Value": new_value}}
     )
 
     return result.matched_count > 0
 
+
 # Flip Schedule Utilities
+
 
 def get_flip_schedule(user, db):
     """
@@ -145,16 +177,28 @@ def get_flip_schedule(user, db):
     from .user_data import get_user_flip_days
 
     # Retrieve user's stocks and crosses
-    stocks = db['stocks'].find({"User": user})
-    crosses = db['crosses'].find({"User": user})
+    stocks = db["stocks"].find({"User": user})
+    crosses = db["crosses"].find({"User": user})
 
     # Remove ones with Status = "No longer maintained"
     stocks = [stock for stock in stocks if stock["Status"] != "No longer maintained"]
     crosses = [cross for cross in crosses if cross["Status"] != "No longer maintained"]
 
     # Sort stocks and crosses by TrayID and TrayPosition
-    stocks = sorted(stocks, key=lambda x: (x["TrayID"], int(x["TrayPosition"]) if x["TrayPosition"]!='' else 0))
-    crosses = sorted(crosses, key=lambda x: (x["TrayID"], int(x["TrayPosition"]) if x["TrayPosition"]!='' else 0))
+    stocks = sorted(
+        stocks,
+        key=lambda x: (
+            x["TrayID"],
+            int(x["TrayPosition"]) if x["TrayPosition"] != "" else 0,
+        ),
+    )
+    crosses = sorted(
+        crosses,
+        key=lambda x: (
+            x["TrayID"],
+            int(x["TrayPosition"]) if x["TrayPosition"] != "" else 0,
+        ),
+    )
 
     # Get user's preferred flip days
     flip_days = get_user_flip_days(user, db)
@@ -164,28 +208,44 @@ def get_flip_schedule(user, db):
 
     # Process stocks
     for stock in stocks:
-        next_flip_dates = stock['NextFlipDates'].split(', ')
+        next_flip_dates = stock["NextFlipDates"].split(", ")
         for next_flip_date in next_flip_dates:
             closest_flip_day = find_closest_flip_day(next_flip_date, flip_days)
             if closest_flip_day:
-                flip_date_str = closest_flip_day.strftime('%Y-%m-%d')
+                flip_date_str = closest_flip_day.strftime("%Y-%m-%d")
                 tray_info = f"{stock['TrayID']} - {stock['TrayPosition']}"
-                link = f"<a href='{url_for('stock.view_stock', unique_id=stock['UniqueID'])}'>{stock['Name']}</a>"
-                schedule.setdefault(flip_date_str, []).append(f"Stock: {link} (ID: {stock['UniqueID']}, {tray_info})")
+                try:
+                    # Try to generate URL - this will fail outside of request context
+                    link = f"<a href='{url_for('stock.view_stock', unique_id=stock['UniqueID'])}'>{stock['Name']}</a>"
+                except RuntimeError:
+                    # Fallback for scheduled tasks - just show the name without link
+                    link = stock["Name"]
+                schedule.setdefault(flip_date_str, []).append(
+                    f"Stock: {link} (ID: {stock['UniqueID']}, {tray_info})"
+                )
             else:
-                print(f"No valid flip day found for stock {stock['UniqueID']} on {next_flip_date}")
-    
+                print(
+                    f"No valid flip day found for stock {stock['UniqueID']} on {next_flip_date}"
+                )
+
     # Process crosses
     for cross in crosses:
-        next_flip_dates = cross['NextFlipDates'].split(', ')
+        next_flip_dates = cross["NextFlipDates"].split(", ")
         for next_flip_date in next_flip_dates:
             closest_flip_day = find_closest_flip_day(next_flip_date, flip_days)
             if closest_flip_day:
-                flip_date_str = closest_flip_day.strftime('%Y-%m-%d')
+                flip_date_str = closest_flip_day.strftime("%Y-%m-%d")
                 tray_info = f"{cross['TrayID']} - {cross['TrayPosition']}"
-                uid_url = url_for('cross.view_cross', unique_id=cross['UniqueID'])
-                link = f"<a href='{uid_url}'>{cross['Name']}</a>"
-                schedule.setdefault(flip_date_str, []).append(f"Cross: {link} (ID: {cross['UniqueID']}, {tray_info})")
+                try:
+                    # Try to generate URL - this will fail outside of request context
+                    uid_url = url_for("cross.view_cross", unique_id=cross["UniqueID"])
+                    link = f"<a href='{uid_url}'>{cross['Name']}</a>"
+                except RuntimeError:
+                    # Fallback for scheduled tasks - just show the name without link
+                    link = cross["Name"]
+                schedule.setdefault(flip_date_str, []).append(
+                    f"Cross: {link} (ID: {cross['UniqueID']}, {tray_info})"
+                )
 
     # Sort the schedule by date
     sorted_schedule = dict(sorted(schedule.items()))
@@ -196,11 +256,11 @@ def get_flip_schedule(user, db):
 def get_flip_in(item):
     """
     Get the flip in for a stock or cross.
-    
+
     Parameters:
     item: dict
         The stock or cross document.
-        
+
     Returns:
     str
         A string representing the days until the next flip.
@@ -208,8 +268,12 @@ def get_flip_in(item):
     vals = []
     for val in item["NextFlipDates"].split(", "):
         try:
-            next_time = datetime.datetime.strptime(val, "%Y-%m-%d").replace(hour=0, minute=0, second=0, microsecond=0)
-            now = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            next_time = datetime.datetime.strptime(val, "%Y-%m-%d").replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            now = datetime.datetime.now().replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
             vals.append(round((next_time - now).days))
         except:
             vals.append("N/A")
@@ -219,11 +283,11 @@ def get_flip_in(item):
 def get_eclosion_in(item):
     """
     Get the eclosion in for a stock or cross.
-    
+
     Parameters:
     item: dict
         The stock or cross document.
-        
+
     Returns:
     str
         A string representing the days until the next eclosion.
@@ -231,8 +295,12 @@ def get_eclosion_in(item):
     vals = []
     for val in item["NextEclosionDates"].split(", "):
         try:
-            next_time = datetime.datetime.strptime(val, "%Y-%m-%d").replace(hour=0, minute=0, second=0, microsecond=0)
-            now = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            next_time = datetime.datetime.strptime(val, "%Y-%m-%d").replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            now = datetime.datetime.now().replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
             vals.append(round((next_time - now).days))
         except:
             vals.append("N/A")
@@ -261,8 +329,10 @@ def find_closest_flip_day(next_flip_date, flip_days, debug=False):
 
     # Convert next flip date to datetime if it's a string
     next_flip_date = datetime.datetime.strptime(next_flip_date, "%Y-%m-%d")
-    
-    assert isinstance(next_flip_date, datetime.datetime), "next_flip_date must be a datetime object"
+
+    assert isinstance(
+        next_flip_date, datetime.datetime
+    ), "next_flip_date must be a datetime object"
 
     # Get the day of the week for the next flip date (0 = Monday, ..., 6 = Sunday)
     next_flip_day = next_flip_date.weekday()
@@ -275,20 +345,28 @@ def find_closest_flip_day(next_flip_date, flip_days, debug=False):
     preferred_days = sorted(preferred_days, key=lambda x: (x - next_flip_day) % 7)
 
     if debug:
-        print(f"Next flip date: {next_flip_date}, Next flip day: {next_flip_day}, Preferred days: {preferred_days}")
+        print(
+            f"Next flip date: {next_flip_date}, Next flip day: {next_flip_day}, Preferred days: {preferred_days}"
+        )
 
     # Initialize variables for the closest day
     closest_day = None
-    min_diff = float('inf')
+    min_diff = float("inf")
 
     # Check preferred flip days to find the closest valid one
     for preferred_day in preferred_days:
         # Calculate the difference in days (can only be one day before or up to two days after)
-        diff_forward = (preferred_day - next_flip_day + 7) % 7  # Days after the next flip date
-        diff_backward = (next_flip_day - preferred_day + 7) % 7  # Days before the next flip date
+        diff_forward = (
+            preferred_day - next_flip_day + 7
+        ) % 7  # Days after the next flip date
+        diff_backward = (
+            next_flip_day - preferred_day + 7
+        ) % 7  # Days before the next flip date
 
         if debug:
-            print(f"Preferred day: {preferred_day}, Forward diff: {diff_forward}, Backward diff: {diff_backward}")
+            print(
+                f"Preferred day: {preferred_day}, Forward diff: {diff_forward}, Backward diff: {diff_backward}"
+            )
 
         if diff_forward <= 2:  # Check for days up to two days after
             if diff_forward < min_diff:
