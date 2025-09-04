@@ -127,7 +127,7 @@ __all__ = [
     "get_eclosion_in",
     "find_closest_flip_day",
     # Activity functions
-    "write_activity"
+    "write_activity",
     # Settings functions
     "get_settings",
     "update_settings",
