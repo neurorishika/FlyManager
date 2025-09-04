@@ -112,7 +112,16 @@ def create_app():
 
     with app.app_context():
         # --- Import and Register Blueprints ---
-        from .routes import main, auth, stock, cross, flip, data, tray, settings
+        from flymanager.app.routes import (
+            main,
+            auth,
+            stock,
+            cross,
+            flip,
+            data,
+            tray,
+            settings,
+        )
 
         app.register_blueprint(main.bp)
         app.register_blueprint(auth.bp)
@@ -124,9 +133,10 @@ def create_app():
         app.register_blueprint(settings.bp)
 
         # --- Import Services (to ensure they are loaded) ---
-        from .services import email as email_service
-        from .services import scheduler as scheduler_service
-        from .services import scanner as scanner_service
+        from flymanager.app.services import email as email_service
+        from flymanager.app.services import scheduler as scheduler_service
+        from flymanager.app.services import scanner as scanner_service
+        from flymanager.app.services import bloomington as bloomington_service
 
         # --- Initialize Scheduler ---
         if not scheduler.running:
@@ -138,6 +148,18 @@ def create_app():
                 hour=8,
                 minute=0,
                 args=[app],  # Pass the app instance to the scheduled function
+                replace_existing=True,
+            )
+            # Add monthly Bloomington stock update job (1st day of each month at 2 AM)
+            scheduler.add_job(
+                id="monthly_bloomington_update_job",
+                func=bloomington_service.update_bloomington_stock_data,
+                trigger="cron",
+                day=1,
+                hour=2,
+                minute=0,
+                args=[app],
+                replace_existing=True,
             )
             scheduler.start()
             print("Scheduler started.")

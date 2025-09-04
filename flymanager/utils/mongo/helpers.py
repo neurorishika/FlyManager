@@ -174,7 +174,7 @@ def get_flip_schedule(user, db):
     dict: A dictionary where the keys are dates and the values are lists of stocks/crosses to flip on those dates.
     """
     # Import locally to avoid circular imports
-    from .user_data import get_user_flip_days
+    from flymanager.utils.mongo.user_data import get_user_flip_days
 
     # Retrieve user's stocks and crosses
     stocks = db["stocks"].find({"User": user})

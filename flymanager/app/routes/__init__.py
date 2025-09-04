@@ -2,15 +2,6 @@
 # This file can be empty or used to import blueprints if needed elsewhere,
 # but registration is handled in app factory (app/__init__.py)
 
-from . import main, auth, stock, cross, flip, data, tray, settings
+from flymanager.app.routes import main, auth, stock, cross, flip, data, tray, settings
 
-__all__ = [
-    'main',
-    'auth',
-    'stock',
-    'cross',
-    'flip',
-    'data',
-    'tray',
-    'settings'
-]
+__all__ = ["main", "auth", "stock", "cross", "flip", "data", "tray", "settings"]
