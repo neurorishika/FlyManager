@@ -48,6 +48,46 @@
                         </div>
                     </form>
                 </div>
+
+                 <div class="card-header">
+                    <h5>Stock Data Management</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Bloomington Stock Data</h6>
+                            <p class="text-muted">Update Bloomington stock data from the official source.</p>
+                            <form method="POST" action="{{ url_for('settings.update_bloomington_stock') }}" 
+                                onsubmit="return confirm('This will backup the current data, download the latest version, and update gene metadata. Continue?')">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-download"></i> Update Stock Data & Genes
+                                </button>
+                            </form>
+                            <small class="text-muted">
+                                Downloads new data and automatically updates gene metadata.
+                            </small>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Gene Metadata Only</h6>
+                            <p class="text-muted">Update gene metadata from existing Bloomington data.</p>
+                            <form method="POST" action="{{ url_for('settings.update_gene_metadata') }}" 
+                                onsubmit="return confirm('This will update gene metadata from the current Bloomington data. Continue?')">
+                                <button type="submit" class="btn btn-secondary">
+                                    <i class="fas fa-dna"></i> Update Genes Only
+                                </button>
+                            </form>
+                            <small class="text-muted">
+                                Uses existing bloomington.csv to update gene collections.
+                            </small>
+                        </div>
+                    </div>
+                    <hr>
+                    <small class="text-muted">
+                        <strong>Automatic updates:</strong> 1st of each month at 2:00 AM<br>
+                        <strong>Backups:</strong> Stored in data/backup/ and cleaned up after 12 months<br>
+                        <strong>Gene collections:</strong> X chromosome, 2nd, 3rd, and 4th chromosome genes
+                    </small>
+                </div>
             </div>
         </div>
     </div>

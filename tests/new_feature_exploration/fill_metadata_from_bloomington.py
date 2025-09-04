@@ -1,9 +1,8 @@
 from flymanager.utils.mongo import create_mongo_client, get_database, reset_database
-from flymanager.utils.converter import xls_to_mongo
-from flymanager.utils.genetics import qc_genotype, get_genetic_components
 
 # setup dotenv
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # setup the mongo db
@@ -16,13 +15,18 @@ import re
 
 # custom print function that writes to a file
 import builtins
+
 # remove the output file if it exists
 import os
+
 if os.path.exists("output.txt"):
     os.remove("output.txt")
+
+
 def print(*args, **kwargs):
     with open("output.txt", "a") as f:
         builtins.print(*args, file=f, **kwargs)
+
 
 # Read the CSV file
 df = pd.read_csv("data/bloomington.csv")
@@ -36,19 +40,14 @@ df = df[~df["Ch # all"].str.contains("f")]
 
 
 # Define the chromosome components dictionary
-all_components = {
-    0: [],
-    1: [],
-    2: [],
-    3: []
-}
+all_components = {0: [], 1: [], 2: [], 3: []}
 
 # Iterate over the rows in the dataframe
 for index, row in df.iterrows():
     ch_all = row["Ch # all"]
     genotype = row["Genotype"]
     stock = row["Stk #"]
-    
+
     # If "Ch # all" is "wt", handle wild type cases
     if ch_all == "wt":
         genotype = "[" + genotype + "]"
@@ -60,15 +59,15 @@ for index, row in df.iterrows():
         # Skip if duplications or other complex constructs are present
         if any(x in genotype for x in ["Dp(", "Df(", "T(", "C(", "In(", "Tp(", "l("]):
             continue
-        
+
         ch_components = ch_all.split(";")
         genotype_components = genotype.split(";")
-        
+
         # Check if the number of chromosome components matches genotype components
         if len(ch_components) != len(genotype_components):
             print(stock, genotype, ch_all)
             continue
-        
+
         # Assign each genotype component to the corresponding chromosome
         for ch, gen in zip(ch_components, genotype_components):
             try:
@@ -76,7 +75,7 @@ for index, row in df.iterrows():
                 # split by / and add each component to the corresponding chromosome
                 compos = gen.strip().split("/")
                 for comp in compos:
-                    all_components[ch_num-1].append(comp.strip())
+                    all_components[ch_num - 1].append(comp.strip())
             except ValueError:
                 print(f"Error: Unable to parse chromosome number '{ch}' in row {index}")
             except IndexError:
@@ -87,7 +86,7 @@ all_components_db = {
     0: [x["Value"] for x in db.genesX.find()],
     1: [x["Value"] for x in db.genes2nd.find()],
     2: [x["Value"] for x in db.genes3rd.find()],
-    3: [x["Value"] for x in db.genes4th.find()]
+    3: [x["Value"] for x in db.genes4th.find()],
 }
 
 for n in range(4):
@@ -101,7 +100,7 @@ for n in range(4):
 for n, chr in all_components.items():
     all_components[n] = list(set(chr))
     print(f"Unique components for chromosome {n+1}: {len(all_components[n])}")
-    
+
 # Drop the existing components
 db.genesX.drop()
 db.genes2nd.drop()
