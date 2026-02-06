@@ -27,11 +27,11 @@ def get_user_initials(user, db):
     initials: str
         the initials of the user
     """
-    users_collection = db['users']
-    
+    users_collection = db["users"]
+
     # Find the user document by username
     user_document = users_collection.find_one({"Username": user})
-    
+
     if user_document:
         return user_document.get("Initials")
     else:
@@ -50,9 +50,10 @@ def get_user_flip_days(user, db):
     list
         A list of the preferred flip days of the user
     """
-    users_collection = db['users']
+    users_collection = db["users"]
     user_document = users_collection.find_one({"Username": user})
-    return user_document.get("FlipDays").split(',') if user_document else []
+    flip_days = user_document.get("FlipDays") if user_document else None
+    return flip_days.split(",") if flip_days else []
 
 
 def get_user_email(user, db):
@@ -67,11 +68,11 @@ def get_user_email(user, db):
     email: str
         the email of the user
     """
-    users_collection = db['users']
-    
+    users_collection = db["users"]
+
     # Find the user document by username
     user_document = users_collection.find_one({"Username": user})
-    
+
     if user_document:
         return user_document.get("Email")
     else:
@@ -98,29 +99,29 @@ def get_user_crosses(user, db):
 def get_user_activities(user, db):
     """
     Retrieve the user's activities from the MongoDB database.
-    
+
     Parameters:
     user: str
         The username of the user.
     db: pymongo.database.Database
         The MongoDB database instance.
-    
+
     Returns:
     list
         A list of dictionaries representing the user's activities.
     """
     activities_collection = db["activity"]
-    
+
     # Find all activities where the 'username' field matches the given user
     user_activities = list(activities_collection.find({"user": user}))
-    
+
     return user_activities
 
 
 def get_all_genotypes(user, db):
     """
     Get all the genotypes of the user's stocks.
-    
+
     Parameters:
     user: str
         The username of the user.
@@ -132,14 +133,14 @@ def get_all_genotypes(user, db):
         A list of all the unique genotypes.
     """
     stocks_collection = db["stocks"]
-    
+
     # Find all the stocks and crosses of the user
     user_stocks = stocks_collection.find({"User": user})
-    
+
     # Extract the genotypes from the stocks and crosses
     stock_genotypes = [stock["Genotype"] for stock in user_stocks]
-    
+
     # Remove duplicates and sort the genotypes
     genotypes = list(set(stock_genotypes))
-    
+
     return genotypes

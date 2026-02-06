@@ -189,14 +189,14 @@ def get_flip_schedule(user, db):
         stocks,
         key=lambda x: (
             x["TrayID"],
-            int(x["TrayPosition"]) if x["TrayPosition"] != "" else 0,
+            int(float(x["TrayPosition"])) if x["TrayPosition"] != "" else 0,
         ),
     )
     crosses = sorted(
         crosses,
         key=lambda x: (
             x["TrayID"],
-            int(x["TrayPosition"]) if x["TrayPosition"] != "" else 0,
+            int(float(x["TrayPosition"])) if x["TrayPosition"] != "" else 0,
         ),
     )
 
