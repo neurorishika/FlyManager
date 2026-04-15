@@ -218,14 +218,15 @@ def get_tray_occupancy(user, tray_id, db):
         if position and stock["Status"] != "No longer maintained":
             # Calculate required vials for blocking
             required_vials = calculate_required_vials(stock)
-            position_int = int(position)
+            position_int = int(float(position))
 
             # Calculate row and column for horizontal blocking
             row = ((position_int - 1) % 10) + 1
             column = ((position_int - 1) // 10) + 1
 
             # Add the main position
-            occupancy[position] = {
+            position_str = str(position_int)
+            occupancy[position_str] = {
                 "type": "stock",
                 "id": stock["UniqueID"],
                 "name": stock["Name"],
@@ -242,7 +243,7 @@ def get_tray_occupancy(user, tray_id, db):
                 blocked_pos = str(((next_column - 1) * 10) + row)
                 occupancy[blocked_pos] = {
                     "type": "blocked",
-                    "blocked_by": position,
+                    "blocked_by": position_str,
                     "blocked_by_type": "stock",
                     "blocked_by_name": f"{stock['Name']} ({stock['UniqueID']})",
                 }
@@ -253,11 +254,14 @@ def get_tray_occupancy(user, tray_id, db):
         if position and cross["Status"] != "No longer maintained":
             # Calculate required vials for blocking
             required_vials = calculate_required_vials(cross)
-            position_int = int(position)
+            position_int = int(float(position))
 
             # Calculate row and column for horizontal blocking
             row = ((position_int - 1) % 10) + 1
             column = ((position_int - 1) // 10) + 1
+
+            # Convert position to integer string for consistent lookup
+            position_str = str(position_int)
 
             # Get the stock IDs for male and female
             male_stock = stocks_collection.find_one(
@@ -271,7 +275,7 @@ def get_tray_occupancy(user, tray_id, db):
             female_id = female_stock["UniqueID"] if female_stock else "Unknown"
 
             # Add the main position
-            occupancy[position] = {
+            occupancy[position_str] = {
                 "type": "cross",
                 "id": cross["UniqueID"],
                 "name": cross["Name"],
@@ -291,7 +295,7 @@ def get_tray_occupancy(user, tray_id, db):
                 blocked_pos = str(((next_column - 1) * 10) + row)
                 occupancy[blocked_pos] = {
                     "type": "blocked",
-                    "blocked_by": position,
+                    "blocked_by": position_str,
                     "blocked_by_type": "cross",
                     "blocked_by_name": f"{cross['Name']} ({cross['UniqueID']})",
                 }
@@ -377,7 +381,7 @@ def move_item_to_tray(user, item_type, item_id, tray_id, position, db):
 
     # Check if position is within tray bounds
     try:
-        position_int = int(position)
+        position_int = int(float(position))
         if position_int <= 0 or position_int > (tray["Rows"] * tray["Columns"]):
             return False
 
