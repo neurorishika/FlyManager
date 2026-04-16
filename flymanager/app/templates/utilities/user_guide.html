@@ -56,152 +56,130 @@
 
     .guide-nav .nav-link.active {
         color: var(--accent-color);
-        font-weight: bold;
+        font-weight: 700;
         border-color: color-mix(in srgb, var(--accent-color) 30%, var(--border-color) 70%);
         background: color-mix(in srgb, var(--accent-color) 12%, var(--card-bg) 88%);
     }
 
     .guide-content {
-        font-size: 1.05rem;
+        display: grid;
+        gap: 28px;
+        font-size: 1.03rem;
     }
 
     .guide-section {
-        padding-top: 10px;
-        margin-bottom: 34px;
+        scroll-margin-top: 96px;
     }
 
     .guide-section h2 {
-        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 14px;
         padding-bottom: 12px;
-        margin-bottom: 20px;
+        border-bottom: 1px solid var(--border-color);
         font-size: clamp(1.45rem, 1.2rem + 0.7vw, 1.9rem);
     }
 
     .guide-section h3 {
-        margin-top: 24px;
-        margin-bottom: 14px;
-        font-size: clamp(1.1rem, 1rem + 0.3vw, 1.35rem);
-    }
-
-    .guide-section h4,
-    .guide-section h5 {
-        margin-top: 18px;
+        margin-top: 20px;
         margin-bottom: 10px;
+        font-size: clamp(1.08rem, 1rem + 0.3vw, 1.3rem);
     }
 
-    .guide-section img {
-        max-width: 100%;
-        border: 1px solid var(--border-color);
-        border-radius: 10px;
-        margin: 10px 0;
+    .guide-section p:last-child,
+    .guide-section ul:last-child,
+    .guide-section ol:last-child {
+        margin-bottom: 0;
     }
 
-    .step-box {
-        background: color-mix(in srgb, var(--bg-color) 80%, var(--card-bg) 20%);
+    .guide-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    .guide-card {
         border: 1px solid var(--border-color);
-        border-radius: 14px;
+        border-radius: 16px;
         padding: 16px;
-        margin-bottom: 14px;
+        background: color-mix(in srgb, var(--bg-color) 82%, var(--card-bg) 18%);
         box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
     }
 
-    .step-number {
+    .guide-card h3,
+    .guide-card h4 {
+        margin-top: 0;
+    }
+
+    .guide-callout {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        margin-top: 14px;
+    }
+
+    .guide-callout strong {
+        display: block;
+        margin-bottom: 6px;
+    }
+
+    .guide-callout.info {
+        background: color-mix(in srgb, var(--accent-color) 10%, var(--card-bg) 90%);
+        border-color: color-mix(in srgb, var(--accent-color) 26%, var(--border-color) 74%);
+    }
+
+    .guide-callout.warn {
+        background: rgba(255, 193, 7, 0.08);
+        border-color: rgba(255, 193, 7, 0.35);
+    }
+
+    .guide-callout.danger {
+        background: rgba(220, 53, 69, 0.08);
+        border-color: rgba(220, 53, 69, 0.28);
+    }
+
+    .guide-checklist,
+    .guide-section ul,
+    .guide-section ol {
+        padding-left: 1.25rem;
+    }
+
+    .guide-checklist li + li,
+    .guide-section li + li {
+        margin-top: 0.38rem;
+    }
+
+    .guide-inline-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+    }
+
+    .guide-pill {
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        width: 28px;
-        height: 28px;
-        background-color: var(--accent-color);
-        color: white;
-        border-radius: 50%;
-        margin-right: 8px;
-        font-size: 0.9rem;
-        font-weight: 700;
-    }
-
-    .faq-item {
-        margin-bottom: 15px;
-    }
-
-    .faq-question {
-        font-weight: bold;
-        cursor: pointer;
-        margin-bottom: 5px;
-    }
-
-    .faq-answer {
-        margin-left: 20px;
-        display: none;
-    }
-    
-    .faq-answer.show {
-        display: block;
-    }
-
-    .card-guide {
-        margin-bottom: 15px;
+        gap: 8px;
+        padding: 0.5rem 0.8rem;
+        border-radius: 999px;
         border: 1px solid var(--border-color);
-        border-radius: 14px;
-        overflow: hidden;
         background: color-mix(in srgb, var(--bg-color) 84%, var(--card-bg) 16%);
+        color: var(--text-color);
+        text-decoration: none;
     }
 
-    .card-header-guide {
-        background: color-mix(in srgb, var(--header-bg) 18%, var(--card-bg) 82%);
-        padding: 14px 16px;
-        cursor: pointer;
-        border-bottom: 1px solid var(--border-color);
-        font-weight: 600;
-    }
-
-    .card-body-guide {
-        padding: 16px;
-        display: none;
-    }
-
-    .card-body-guide.show {
-        display: block;
-    }
-
-    .highlight-box {
-        background-color: rgba(var(--accent-color-rgb), 0.1);
-        border-left: 4px solid var(--accent-color);
-        padding: 16px;
-        margin: 15px 0;
-        border-radius: 0 14px 14px 0;
-    }
-
-    .warning-box {
-        background-color: rgba(255, 193, 7, 0.1);
-        border-left: 4px solid #ffc107;
-        padding: 16px;
-        margin: 15px 0;
-        border-radius: 0 14px 14px 0;
-    }
-
-    .guide-content-shell dl {
+    .guide-kv {
         display: grid;
         grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
         gap: 8px 16px;
         margin: 0;
     }
 
-    .guide-content-shell dt {
+    .guide-kv dt {
         font-weight: 700;
     }
 
-    .guide-content-shell dd {
+    .guide-kv dd {
         margin: 0;
         color: var(--muted-text);
-    }
-
-    .guide-content-shell ul,
-    .guide-content-shell ol {
-        padding-left: 1.3rem;
-    }
-
-    .guide-content-shell li + li {
-        margin-top: 0.35rem;
     }
 
     .status-chip {
@@ -266,11 +244,11 @@
     }
 
     @media (max-width: 767px) {
-        .guide-content {
-            font-size: 1rem;
+        .guide-grid {
+            grid-template-columns: 1fr;
         }
 
-        .guide-content-shell dl {
+        .guide-kv {
             grid-template-columns: 1fr;
             gap: 4px;
         }
@@ -288,789 +266,403 @@
         <div>
             <p class="app-kicker">Documentation</p>
             <h1 class="app-page-title"><em>D. manager</em> User Guide</h1>
-            <p class="app-page-subtitle">A reference manual for daily stock maintenance, tray organization, schedules, data workflows, and operator support.</p>
+            <p class="app-page-subtitle">Deployment-ready operator guidance for first-run setup, daily maintenance, tray organization, labels, scanner workflows, and admin handoff.</p>
         </div>
         <div class="app-chip-row">
-            <span class="app-chip"><i class="fas fa-book"></i> 14 sections</span>
-            <span class="app-chip"><i class="fas fa-life-ring"></i> Lab workflow reference</span>
+            <span class="app-chip"><i class="fas fa-book"></i> Operator reference</span>
+            <span class="app-chip"><i class="fas fa-rocket"></i> Launch checklist included</span>
         </div>
     </div>
 
     <div class="guide-layout">
         <aside class="app-panel guide-nav-shell guide-nav">
-            <h2 class="guide-nav-title">User Guide Contents</h2>
+            <h2 class="guide-nav-title">Contents</h2>
             <nav class="nav flex-column">
-                <a class="nav-link" href="#getting-started">Getting Started</a>
-                <a class="nav-link" href="#authentication">Authentication</a>
-                <a class="nav-link" href="#dashboard">Dashboard</a>
-                <a class="nav-link" href="#stock-management">Stock Management</a>
-                <a class="nav-link" href="#cross-management">Cross Management</a>
-                <a class="nav-link" href="#tray-management">Tray Management</a>
-                <a class="nav-link" href="#flip-schedule">Flip Schedule</a>
-                <a class="nav-link" href="#bulk-operations">Bulk Operations</a>
-                <a class="nav-link" href="#data-import-export">Data Import/Export</a>
-                <a class="nav-link" href="#label-generation">Label Generation</a>
-                <a class="nav-link" href="#scanner">Scanner Usage</a>
-                <a class="nav-link" href="#admin-settings">Admin Settings</a>
-                <a class="nav-link" href="#faq">FAQ</a>
-                <a class="nav-link" href="#glossary">Glossary</a>
+                <a class="nav-link" href="#overview">Overview</a>
+                <a class="nav-link" href="#setup">Deployment-Ready Setup</a>
+                <a class="nav-link" href="#access">Access And Accounts</a>
+                <a class="nav-link" href="#daily-loop">Daily Operating Loop</a>
+                <a class="nav-link" href="#stocks">Stocks</a>
+                <a class="nav-link" href="#crosses">Crosses</a>
+                <a class="nav-link" href="#trays">Trays</a>
+                <a class="nav-link" href="#flipper">Flipper And Schedule</a>
+                <a class="nav-link" href="#labels">Labels And Scanners</a>
+                <a class="nav-link" href="#workbooks">Workbooks</a>
+                <a class="nav-link" href="#admin">Admin Operations</a>
+                <a class="nav-link" href="#troubleshooting">Troubleshooting</a>
             </nav>
         </aside>
 
         <div class="app-panel guide-content-shell">
-        <div class="guide-content">
+            <div class="guide-content">
+                <section id="overview" class="guide-section">
+                    <h2>Overview</h2>
+                    <p>D. manager is the working surface for Drosophila lab stock operations. It keeps stocks, crosses, trays, flip timing, labels, and workbook-based administration in one application so the physical bench workflow stays synchronized with the record system.</p>
+                    <div class="guide-grid">
+                        <article class="guide-card">
+                            <h3>Use It For</h3>
+                            <ul>
+                                <li>tracking active stocks and active crosses</li>
+                                <li>organizing tray layouts and occupied positions</li>
+                                <li>recording flips with status and comments</li>
+                                <li>printing QR-backed labels</li>
+                                <li>exporting and importing workbooks as admin</li>
+                            </ul>
+                        </article>
+                        <article class="guide-card">
+                            <h3>Main Navigation</h3>
+                            <ul>
+                                <li><strong>Home</strong> for the dashboard and attention queue</li>
+                                <li><strong>Flipper</strong> for rapid maintenance entry</li>
+                                <li><strong>Schedule</strong> for upcoming daily work</li>
+                                <li><strong>Stocks</strong>, <strong>Crosses</strong>, and <strong>Trays</strong> for record maintenance</li>
+                                <li><strong>Tools</strong> for user guide, logout, and admin-only controls</li>
+                            </ul>
+                        </article>
+                    </div>
+                    <div class="guide-inline-links">
+                        <a class="guide-pill" href="https://neurorishika.github.io/FlyManager/user-guide/" target="_blank" rel="noopener noreferrer"><i class="fas fa-external-link-alt"></i> Docs Site Guide</a>
+                        <a class="guide-pill" href="https://github.com/neurorishika/FlyManager/blob/main/DEPLOYMENT.md" target="_blank" rel="noopener noreferrer"><i class="fas fa-server"></i> Deployment Guide</a>
+                        <a class="guide-pill" href="https://github.com/neurorishika/FlyManager/blob/main/BACKUP_AND_RECOVERY.md" target="_blank" rel="noopener noreferrer"><i class="fas fa-life-ring"></i> Backup And Recovery</a>
+                    </div>
+                </section>
 
-            <!-- Getting Started -->
-            <div id="getting-started" class="guide-section">
-                <h2>Getting Started</h2>
-                <p>Welcome to <em>D. manager</em>! This system helps you efficiently manage your Drosophila stock collection. 
-                   This guide will help you navigate and use the application effectively.</p>
+                <section id="setup" class="guide-section">
+                    <h2>Deployment-Ready Setup</h2>
+                    <p>Use this checklist after the application is deployed and reachable. It is written to help an admin turn a running instance into a lab-ready system.</p>
+                    <ol class="guide-checklist">
+                        <li>Confirm that login, registration, and the main shell load without layout or session issues.</li>
+                        <li>Create or bootstrap an administrator account.</li>
+                        <li>Open <strong>Application Settings</strong> as admin and fill in lab name, administrator name, and administrator email.</li>
+                        <li>Create tray definitions that match the physical trays used in the lab.</li>
+                        <li>Decide whether to import a workbook or start with manual stock and cross entry.</li>
+                        <li>Assign recovery emails to users who need password reset support.</li>
+                        <li>Configure SMTP if reminder emails and reset emails should be delivered.</li>
+                        <li>Verify that exactly one running app instance has the scheduler enabled.</li>
+                        <li>Run a workbook export and keep it as the first known-good snapshot.</li>
+                    </ol>
+                    <div class="guide-callout warn">
+                        <strong>Scheduler rule</strong>
+                        The reminder scheduler is intended to run on a single active app instance. Do not enable it on multiple live instances unless the coordination model is changed.
+                    </div>
+                    <div class="guide-callout info">
+                        <strong>Health checks</strong>
+                        Production deployments expose <code>/health</code> and <code>/health/ready</code>. Use them during rollout and after upgrades.
+                    </div>
+                </section>
 
-                <div class="highlight-box">
-                    <h5>System Overview</h5>
-                    <p><em>D. manager</em> is designed to help research labs maintain organized records of:</p>
+                <section id="access" class="guide-section">
+                    <h2>Access And Accounts</h2>
+                    <p>The app uses username and password authentication. Operators work inside their own data scope, while administrative controls remain restricted to the <code>admin</code> account.</p>
+                    <div class="guide-grid">
+                        <article class="guide-card">
+                            <h3>Login</h3>
+                            <ul>
+                                <li>Enter a username and password on the login form.</li>
+                                <li>Successful login refreshes user state and returns you to Home.</li>
+                                <li>Sessions are permanent and rotation is handled when auth state changes.</li>
+                            </ul>
+                        </article>
+                        <article class="guide-card">
+                            <h3>Registration And Reset</h3>
+                            <ul>
+                                <li>Registration is available from the login page.</li>
+                                <li>Recovery email is optional at registration time but strongly recommended.</li>
+                                <li>Password reset uses a recovery email link when mail delivery is configured.</li>
+                            </ul>
+                        </article>
+                    </div>
+                    <div class="guide-callout danger">
+                        <strong>Important correction</strong>
+                        Password reset does not use a shared master password. It depends on the user having a recovery email and the deployment having working outbound mail.
+                    </div>
+                </section>
+
+                <section id="daily-loop" class="guide-section">
+                    <h2>Daily Operating Loop</h2>
+                    <p>Most operators can think about the app in one repeatable sequence: review the queue, do physical maintenance, record flips, then clean up placements and labels.</p>
+                    <ol class="guide-checklist">
+                        <li>Open <strong>Home</strong> and review overdue items, due-today items, and queue suggestions.</li>
+                        <li>Open <strong>Schedule</strong> to see which days and trays will drive the next bench session.</li>
+                        <li>Use <strong>Flipper</strong> while doing the actual vial work.</li>
+                        <li>Use <strong>Stocks</strong>, <strong>Crosses</strong>, and <strong>Trays</strong> to update the record side after the bench work is complete.</li>
+                        <li>Generate labels before returning new or relabeled vials to storage.</li>
+                    </ol>
+                    <h3>How Attention Works</h3>
+                    <p>Home treats these as high-attention states:</p>
                     <ul>
-                        <li>Genetic stocks with detailed genotype information</li>
-                        <li>Crosses between stocks</li>
-                        <li>Physical tray organization for your flies</li>
-                        <li>Flipping schedules and reminders</li>
+                        <li>items due today</li>
+                        <li>items overdue</li>
+                        <li>items marked <span class="status-chip warning">Showing Issues</span></li>
+                        <li>items marked <span class="status-chip danger">Needs refresh</span></li>
                     </ul>
-                </div>
+                    <p>Archived records with <span class="status-chip muted">No longer maintained</span> are removed from the standard active views unless you explicitly filter for them.</p>
+                </section>
 
-                <h3>System Requirements</h3>
-                <p><em>D. manager</em> is a web-based application that works with most modern web browsers. For the best experience, we recommend:</p>
-                <ul>
-                    <li>Chrome (version 88 or newer)</li>
-                    <li>Firefox (version 85 or newer)</li>
-                    <li>Safari (version 14 or newer)</li>
-                    <li>Edge (version 88 or newer)</li>
-                </ul>
+                <section id="stocks" class="guide-section">
+                    <h2>Stocks</h2>
+                    <p>Stock Explorer is the primary working list for fly lines.</p>
+                    <div class="guide-grid">
+                        <article class="guide-card">
+                            <h3>Explorer Capabilities</h3>
+                            <ul>
+                                <li>filter by type, tray, status, food type, provenance, and species</li>
+                                <li>fuzzy search across IDs, genotype text, name, location, and comments</li>
+                                <li>bulk selection for labels, flip, status change, and tray removal</li>
+                                <li>default exclusion of archived records</li>
+                            </ul>
+                        </article>
+                        <article class="guide-card">
+                            <h3>Creating A Stock</h3>
+                            <ul>
+                                <li>enter manually</li>
+                                <li>prefill from an internal stock to carry forward line details</li>
+                                <li>prefill from Bloomington data when a valid stock identifier is available</li>
+                            </ul>
+                        </article>
+                    </div>
+                    <h3>Recommended Fields To Review</h3>
+                    <dl class="guide-kv">
+                        <dt>Source ID</dt>
+                        <dd>External reference such as a Bloomington stock number.</dd>
+                        <dt>Genotype</dt>
+                        <dd>The core genetic description used for search, labeling, and planning.</dd>
+                        <dt>Tray placement</dt>
+                        <dd>Only set once the physical vial has a confirmed position.</dd>
+                        <dt>Maintenance values</dt>
+                        <dd>Vial lifetime, flip frequency, and developmental time drive scheduling behavior.</dd>
+                    </dl>
+                    <div class="guide-callout info">
+                        <strong>Archiving vs deletion</strong>
+                        Mark a line <code>No longer maintained</code> when you want to stop active maintenance while preserving history. Permanent deletion is meant to happen only after archival.
+                    </div>
+                </section>
 
-                <h3>Initial Setup</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> <strong>Admin Account Setup</strong>: The first time you run <em>D. manager</em>, you'll need to create an admin account.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> <strong>Configure Lab Settings</strong>: As an admin, navigate to Settings to configure your lab information.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> <strong>Create User Accounts</strong>: Add accounts for lab members who will use the system.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> <strong>Set Up Trays</strong>: Create virtual trays that match your physical lab organization.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">5</span> <strong>Import Initial Data</strong>: If you have existing stock records, use the data import feature to populate the system.</p>
-                </div>
-            </div>
+                <section id="crosses" class="guide-section">
+                    <h2>Crosses</h2>
+                    <p>Cross management parallels stock management but starts from existing parent stocks and predicted offspring information.</p>
+                    <div class="guide-grid">
+                        <article class="guide-card">
+                            <h3>Cross Explorer</h3>
+                            <ul>
+                                <li>filter by male species, female species, tray, status, and food type</li>
+                                <li>search across name, tray data, and comments</li>
+                                <li>run the same bulk workflows used in stock explorer</li>
+                            </ul>
+                        </article>
+                        <article class="guide-card">
+                            <h3>Create A Cross</h3>
+                            <ul>
+                                <li>choose male and female parent stocks</li>
+                                <li>set maintenance values and optional tray placement</li>
+                                <li>review the predicted offspring genotype before saving</li>
+                                <li>use scanner-assisted parent lookup when supported hardware is available</li>
+                            </ul>
+                        </article>
+                    </div>
+                    <div class="guide-callout warn">
+                        <strong>Do not assume unavailable features</strong>
+                        The current app supports cross creation, maintenance, labeling, and exploration. It does not expose a dedicated in-app "convert this cross into a stock" workflow in the current route set.
+                    </div>
+                </section>
 
-            <!-- Authentication -->
-            <div id="authentication" class="guide-section">
-                <h2>Authentication</h2>
-                <p><em>D. manager</em> uses a robust authentication system to ensure your data remains secure.</p>
-
-                <h3>Login Process</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Navigate to the <em>D. manager</em> login page.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Select your username from the dropdown menu.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Enter your password and click "Login".</p>
-                </div>
-
-                <h3>Forgot Password</h3>
-                <p>If you forget your password:</p>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Click the "Forgot Password" link on the login page.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Select your username from the dropdown menu.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Enter the master password (available from your lab admin).</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Create a new password and confirm it.</p>
-                </div>
-
-                <h3>User Registration (if enabled)</h3>
-                <p>If self-registration is enabled:</p>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Click the "Register" link on the login page.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Fill out the registration form with your details.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Submit the form to create your account.</p>
-                </div>
-            </div>
-
-            <!-- Dashboard -->
-            <div id="dashboard" class="guide-section">
-                <h2>Dashboard</h2>
-                <p>After logging in, you'll be directed to the homepage dashboard, which provides an overview of your fly management system.</p>
-
-                <h3>Dashboard Sections</h3>
-                <h4>Quick Actions</h4>
-                <p>The top section contains buttons for common actions:</p>
-                <ul>
-                    <li><strong>Add New Stock</strong> - Create a new genetic stock record</li>
-                    <li><strong>Create Cross</strong> - Create a new cross between existing stocks</li>
-                    <li><strong>View Schedule</strong> - See your upcoming flip schedule</li>
-                    <li><strong>Add Tray</strong> - Create a new tray for organizing stocks</li>
-                </ul>
-
-                <h4>Overview Statistics</h4>
-                <p>This section shows key metrics about your fly management system:</p>
-                <ul>
-                    <li><strong>Total Stocks</strong> - Number of active genetic stocks</li>
-                    <li><strong>Total Crosses</strong> - Number of active crosses</li>
-                    <li><strong>Need Attention</strong> - Stocks/crosses requiring action</li>
-                    <li><strong>Tray Usage</strong> - Percentage of tray space currently utilized</li>
-                </ul>
-
-                <h4>Vial Statistics</h4>
-                <p>Track your current vial counts:</p>
-                <ul>
-                    <li><strong>Stock Vials</strong> - Total number of actively maintained stock vials</li>
-                    <li><strong>Cross Vials</strong> - Total number of actively maintained cross vials</li>
-                    <li><strong>Total Vials</strong> - Combined total of all vials</li>
-                </ul>
-
-                <h4>Urgent Items</h4>
-                <p>This section highlights stocks and crosses that need immediate attention:</p>
-                <ul>
-                    <li><strong>Overdue Items</strong> - Stocks/crosses past their scheduled flip date</li>
-                    <li><strong>Due Today</strong> - Stocks/crosses scheduled for flipping today</li>
-                </ul>
-
-                <h4>Today's Schedule</h4>
-                <p>Shows the specific stocks and crosses that need to be flipped today.</p>
-
-                <h4>Upcoming Schedule</h4>
-                <p>Provides a preview of flips scheduled for the next 7 days.</p>
-
-                <h4>Recent Activity</h4>
-                <p>Lists recent actions performed in the system, such as flips, edits, or new additions.</p>
-            </div>
-
-            <!-- Stock Management -->
-            <div id="stock-management" class="guide-section">
-                <h2>Stock Management</h2>
-                <p>The Stock Management system helps you catalog, organize, and maintain your genetic stocks.</p>
-
-                <h3>Stock Explorer</h3>
-                <p>The Stock Explorer provides a comprehensive view of all your stocks with powerful filtering options.</p>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Access the Stock Explorer from the main menu or by clicking "Stock Explorer" in the dropdown.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Use the filters at the top to narrow down stocks by type, tray, status, etc.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Click the search box to find stocks by name, genotype, or other attributes.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Select stocks by clicking the checkbox in each stock card.</p>
-                </div>
-
-                <h3>Adding a New Stock</h3>
-                <p>To add a new genetic stock to your collection:</p>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Click "Add New Stock" from the dashboard or Stock Explorer.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Fill out the stock details form, including:</p>
+                <section id="trays" class="guide-section">
+                    <h2>Trays</h2>
+                    <p>Tray records represent real physical storage surfaces. Use them to keep bench reality and application reality aligned.</p>
+                    <div class="guide-grid">
+                        <article class="guide-card">
+                            <h3>Tray Setup</h3>
+                            <ul>
+                                <li>define a unique tray ID</li>
+                                <li>name the tray in a way operators recognize immediately</li>
+                                <li>set the row and column count to match the physical layout</li>
+                                <li>add a short description when a tray has a special role</li>
+                            </ul>
+                        </article>
+                        <article class="guide-card">
+                            <h3>Tray Occupancy</h3>
+                            <ul>
+                                <li>occupied positions show live items</li>
+                                <li>blocked positions show space reserved by multi-vial requirements</li>
+                                <li>empty positions are available for placement</li>
+                            </ul>
+                        </article>
+                    </div>
+                    <h3>Moving Items</h3>
                     <ul>
-                        <li><strong>Source ID</strong>: External reference number (e.g., Bloomington Stock Center number)</li>
-                        <li><strong>Name</strong>: A descriptive name for the stock</li>
-                        <li><strong>Genotype</strong>: The genetic composition, split by chromosome</li>
-                        <li><strong>Type</strong>: The type of stock (e.g., wildtype, mutant)</li>
-                        <li><strong>Tray Location</strong>: Where the stock is physically stored</li>
-                        <li><strong>Maintenance Parameters</strong>: Vial lifetime, flip frequency, etc.</li>
+                        <li>place a stock or cross into a tray position</li>
+                        <li>move the item when its physical home changes</li>
+                        <li>remove the item from tray placement if it no longer has a fixed location</li>
                     </ul>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Click "Add Stock" to save the new entry.</p>
-                </div>
+                    <div class="guide-callout info">
+                        <strong>Why placement can fail</strong>
+                        A placement can be rejected because the target is occupied, blocked, too small for the required vial footprint, or because the item is already archived.
+                    </div>
+                </section>
 
-                <div class="highlight-box">
-                    <h5>Tip: Auto-population</h5>
-                    <p>If adding a stock from Bloomington, enter the BDSC number in the Source ID field and click the "Fetch" button to automatically populate genotype information.</p>
-                </div>
-
-                <h3>Viewing and Editing Stock Details</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> From the Stock Explorer, click the External Link icon on any stock.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> The stock details page shows all information about the stock.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Click the "Edit" button to modify any stock details.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> After making changes, click "Save Changes" to update the stock.</p>
-                </div>
-
-                <h3>Flipping Stocks</h3>
-                <p>Regular flipping (transferring flies to fresh food) is essential for maintaining healthy stocks.</p>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Access the Flipper interface from the main menu.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Scan the vial barcode or enter the stock ID manually.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Update the status if needed (Healthy, Showing Issues, Needs Refresh).</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Add any relevant comments about the flip.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">5</span> Click "Flip" to record the flip and update the schedule.</p>
-                </div>
-            </div>
-
-            <!-- Cross Management -->
-            <div id="cross-management" class="guide-section">
-                <h2>Cross Management</h2>
-                <p>The Cross Management system helps you track genetic crosses between your stocks.</p>
-
-                <h3>Cross Explorer</h3>
-                <p>Similar to the Stock Explorer, the Cross Explorer provides a view of all your crosses with filtering options.</p>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Access the Cross Explorer from the main menu.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Use filters to find crosses by male/female genotype, tray, or status.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Select crosses using the checkboxes for bulk operations.</p>
-                </div>
-
-                <h3>Creating a New Cross</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Click "Create Cross" from the dashboard or Cross Explorer.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Select the male and female stocks from your existing stocks.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Fill out cross details like name, tray location, and maintenance parameters.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Review the predicted offspring genotype (automatically calculated).</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">5</span> Click "Create Cross" to save the new cross.</p>
-                </div>
-
-                <div class="highlight-box">
-                    <h5>Tip: Genotype Prediction</h5>
-                    <p>The system will automatically predict the offspring genotype based on the male and female stocks. You can review and edit this prediction before saving.</p>
-                </div>
-
-                <h3>Managing Crosses</h3>
-                <p>The lifecycle of a cross typically involves:</p>
-                <ol>
-                    <li>Creating the cross between male and female stocks</li>
-                    <li>Regular flipping to maintain the cross</li>
-                    <li>Collecting virgin females when needed</li>
-                    <li>Potentially converting successful crosses into new stocks</li>
-                </ol>
-
-                <h3>Converting a Cross to a Stock</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> View the cross details from the Cross Explorer.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Click the "Convert to Stock" button.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Review and confirm the new stock details.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Click "Create Stock" to create a new stock from this cross.</p>
-                </div>
-            </div>
-
-            <!-- Tray Management -->
-            <div id="tray-management" class="guide-section">
-                <h2>Tray Management</h2>
-                <p>The Tray Management system helps you organize your physical fly storage efficiently.</p>
-
-                <h3>Viewing Trays</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Access the Tray Management module from the main menu.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> View a list of all your current trays.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Click on any tray to view its detailed layout.</p>
-                </div>
-
-                <h3>Adding a New Tray</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Click "Add Tray" from the dashboard or Tray Management page.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Enter a unique Tray ID.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Specify the number of rows and columns in the tray.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Add any notes about the tray.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">5</span> Click "Create Tray" to add it to the system.</p>
-                </div>
-
-                <h3>Tray Visualization</h3>
-                <p>When viewing a tray, you'll see a grid representation of the physical tray:</p>
-                <ul>
-                    <li>Empty positions are shown in a neutral color</li>
-                    <li>Occupied positions show the stock/cross name and ID</li>
-                    <li>Blocked positions (due to multi-vial stocks/crosses) are indicated</li>
-                </ul>
-
-                <h3>Managing Items in Trays</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> To add a stock or cross to a tray, open the tray view.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Click the "Add Item" button.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Select a stock or cross from the list.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Drag and drop the item to the desired position in the tray.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">5</span> Click "Save" to confirm the placement.</p>
-                </div>
-
-                <div class="highlight-box">
-                    <h5>Understanding Tray Blocking</h5>
-                    <p>Some stocks or crosses require multiple vial positions. When you place such an item in a tray, the system will automatically block the appropriate number of adjacent positions.</p>
-                </div>
-
-                <h3>Rearranging Tray Items</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> In tray view, drag a stock/cross to a new location.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> The system will check if the new location has sufficient space.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Release to place the item in the new position.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Click "Save Changes" to update the tray arrangement.</p>
-                </div>
-            </div>
-
-            <!-- Flip Schedule -->
-            <div id="flip-schedule" class="guide-section">
-                <h2>Flip Schedule</h2>
-                <p>The Flip Schedule helps you maintain your stocks and crosses on a regular basis.</p>
-
-                <h3>Viewing the Schedule</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Access the Flip Schedule from the main menu.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> View a calendar-style display of upcoming flips.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Each day shows the stocks and crosses that need attention.</p>
-                </div>
-
-                <h3>Flip Interface</h3>
-                <p>The Flip Interface is used to record when you've flipped a stock or cross:</p>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Access the Flipper from the main menu.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Enter a stock/cross ID or scan the barcode.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Update the status and add any comments.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Click "Flip" to record the maintenance action.</p>
-                </div>
-
-                <div class="highlight-box">
-                    <h5>Understanding Flip Parameters</h5>
-                    <p>Each stock and cross has specific maintenance parameters:</p>
+                <section id="flipper" class="guide-section">
+                    <h2>Flipper And Schedule</h2>
+                    <p>The Flipper is the fastest path for recording maintenance, while Schedule is the planning surface for the next work block.</p>
+                    <div class="guide-grid">
+                        <article class="guide-card">
+                            <h3>Flipper</h3>
+                            <ul>
+                                <li>accepts manual UID entry</li>
+                                <li>supports scanner-driven lookup</li>
+                                <li>records status changes and comments during the flip</li>
+                                <li>prevents accidental rapid re-flips using last-flip checks</li>
+                            </ul>
+                        </article>
+                        <article class="guide-card">
+                            <h3>Schedule</h3>
+                            <ul>
+                                <li>groups work by day</li>
+                                <li>lists items due for that day</li>
+                                <li>shows trays needed for the work block when available</li>
+                                <li>can generate labels for a specific scheduled day</li>
+                            </ul>
+                        </article>
+                    </div>
+                    <h3>Status Reference</h3>
                     <ul>
-                        <li><strong>Vial Lifetime</strong>: How long a vial can be used (in days)</li>
-                        <li><strong>Flip Frequency</strong>: How often the stock should be flipped (in days)</li>
-                        <li><strong>Developmental Time</strong>: Time from egg to eclosion (in days)</li>
+                        <li><span class="status-chip healthy">Healthy</span> for lines that are in normal shape</li>
+                        <li><span class="status-chip warning">Showing Issues</span> for lines that need closer review</li>
+                        <li><span class="status-chip danger">Needs refresh</span> for lines that need immediate intervention</li>
+                        <li><span class="status-chip info">Ordered</span> for lines tracked before they are fully active</li>
+                        <li><span class="status-chip muted">No longer maintained</span> for archived lines</li>
                     </ul>
-                    <p>These parameters determine when items appear on your flip schedule.</p>
-                </div>
+                    <div class="guide-callout info">
+                        <strong>Email reminders</strong>
+                        Reminder delivery is optional. If SMTP is configured and a user has an email on file, the scheduler can send daily flip reminders. If mail is not configured, the scheduler skips delivery cleanly.
+                    </div>
+                </section>
 
-                <h3>Email Reminders</h3>
-                <p>If configured, the system can send email reminders about upcoming flips:</p>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Daily emails summarize items that need flipping that day.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Click links in the email to view details in <em>D. manager</em>.</p>
-                </div>
+                <section id="labels" class="guide-section">
+                    <h2>Labels And Scanners</h2>
+                    <p>Label generation and scanner input are designed to reduce transcription work during repetitive maintenance sessions.</p>
+                    <div class="guide-grid">
+                        <article class="guide-card">
+                            <h3>Where Labels Come From</h3>
+                            <ul>
+                                <li>selected items in Stock Explorer</li>
+                                <li>selected items in Cross Explorer</li>
+                                <li>a single scheduled day in Schedule</li>
+                            </ul>
+                        </article>
+                        <article class="guide-card">
+                            <h3>Scanner Flow</h3>
+                            <ol>
+                                <li>connect the scanner</li>
+                                <li>choose the available port in the scanner-enabled screen</li>
+                                <li>start scanning</li>
+                                <li>scan the QR code</li>
+                                <li>review the resolved record and complete the action</li>
+                            </ol>
+                        </article>
+                    </div>
+                    <div class="guide-callout warn">
+                        <strong>Blank spaces</strong>
+                        Label generation supports adding blank spaces so partially used sheets can still be aligned correctly during printing.
+                    </div>
+                </section>
+
+                <section id="workbooks" class="guide-section">
+                    <h2>Workbooks</h2>
+                    <p>Workbook import and export are administrative workflows. Treat them as controlled data operations, not routine operator actions.</p>
+                    <div class="guide-grid">
+                        <article class="guide-card">
+                            <h3>Export</h3>
+                            <ul>
+                                <li>download a current workbook snapshot</li>
+                                <li>use the export as the safest template for future imports</li>
+                                <li>capture a structured checkpoint before large admin changes</li>
+                            </ul>
+                        </article>
+                        <article class="guide-card">
+                            <h3>Import</h3>
+                            <ul>
+                                <li>upload only <code>.xlsx</code> files</li>
+                                <li>start from a fresh export whenever possible</li>
+                                <li>validate sheet structure and IDs before upload</li>
+                                <li>run imports in a controlled admin session</li>
+                            </ul>
+                        </article>
+                    </div>
+                    <div class="guide-callout danger">
+                        <strong>Import caution</strong>
+                        Import changes data in bulk. Export first, keep the source workbook, and do not treat import as an undo-friendly action.
+                    </div>
+                </section>
+
+                <section id="admin" class="guide-section">
+                    <h2>Admin Operations</h2>
+                    <p>Administrative tools live under the Tools menu and settings page.</p>
+                    <dl class="guide-kv">
+                        <dt>Theme Settings</dt>
+                        <dd>Set dark mode preference and the interface accent color.</dd>
+                        <dt>Lab Information</dt>
+                        <dd>Control the displayed lab name, administrator name, and administrator email.</dd>
+                        <dt>Bloomington Update</dt>
+                        <dd>Run a manual stock-data refresh that also updates gene metadata.</dd>
+                        <dt>Gene Metadata Only</dt>
+                        <dd>Refresh gene collections using existing Bloomington data without a full stock-data download.</dd>
+                    </dl>
+                    <div class="guide-callout info">
+                        <strong>Operational recommendation</strong>
+                        Before a major data refresh, run a workbook export and confirm the backup policy from the deployment runbooks is active.
+                    </div>
+                    <h3>Go-Live Checks</h3>
+                    <ol class="guide-checklist">
+                        <li>Login works for at least one operator and one admin.</li>
+                        <li>Home renders live metrics without missing tray or queue data.</li>
+                        <li>One stock, one cross, and one tray can be created successfully.</li>
+                        <li>Flipper accepts manual UID entry.</li>
+                        <li>Schedule renders upcoming items.</li>
+                        <li>Label generation produces a PDF.</li>
+                        <li>Admin export succeeds.</li>
+                        <li>Backup and restore ownership is clear before launch.</li>
+                    </ol>
+                </section>
+
+                <section id="troubleshooting" class="guide-section">
+                    <h2>Troubleshooting</h2>
+                    <div class="guide-grid">
+                        <article class="guide-card">
+                            <h3>A UID Does Not Resolve</h3>
+                            <ul>
+                                <li>confirm the item belongs to the logged-in user</li>
+                                <li>confirm the scanned or typed UID matches the saved record</li>
+                                <li>confirm the item was not permanently deleted</li>
+                            </ul>
+                        </article>
+                        <article class="guide-card">
+                            <h3>Reset Emails Never Arrive</h3>
+                            <ul>
+                                <li>confirm the user has a recovery email</li>
+                                <li>confirm SMTP is configured</li>
+                                <li>confirm the deployment can actually send outbound mail</li>
+                            </ul>
+                        </article>
+                        <article class="guide-card">
+                            <h3>Reminder Emails Never Arrive</h3>
+                            <ul>
+                                <li>confirm the scheduler is enabled on exactly one instance</li>
+                                <li>confirm SMTP is configured</li>
+                                <li>confirm the user has an email on file</li>
+                            </ul>
+                        </article>
+                        <article class="guide-card">
+                            <h3>Tray Placement Fails</h3>
+                            <ul>
+                                <li>the target may already be occupied</li>
+                                <li>the target may be blocked by a multi-vial footprint</li>
+                                <li>the item may need more contiguous space than is available</li>
+                                <li>the item may already be archived</li>
+                            </ul>
+                        </article>
+                    </div>
+                </section>
             </div>
-
-            <!-- Bulk Operations -->
-            <div id="bulk-operations" class="guide-section">
-                <h2>Bulk Operations</h2>
-                <p><em>D. manager</em> allows you to perform actions on multiple stocks or crosses simultaneously.</p>
-
-                <h3>Using the Cart System</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> In Stock or Cross Explorer, select items using checkboxes.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Click "Add to Cart" to add selected items to your cart.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> The cart icon shows how many items are currently selected.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Click the cart to show/hide the cart panel.</p>
-                </div>
-
-                <h3>Bulk Flipping</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Add stocks/crosses to your cart.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Click "Bulk Flip" in the cart panel.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Set the status and add any comments that apply to all items.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Click "Confirm Flip" to process all items at once.</p>
-                </div>
-
-                <h3>Bulk Status Changes</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Add stocks/crosses to your cart.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Click "Change Status" and select the new status.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Confirm the change to update all selected items.</p>
-                </div>
-
-                <h3>Bulk Tray Operations</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Add stocks/crosses to your cart.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Click "Remove from Tray" to clear tray positions for all selected items.</p>
-                </div>
-            </div>
-
-            <!-- Data Import/Export -->
-            <div id="data-import-export" class="guide-section">
-                <h2>Data Import/Export</h2>
-                <p><em>D. manager</em> allows you to import and export data in bulk for easier management.</p>
-
-                <h3>Exporting Data</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> From the main menu, select "Download Data".</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Your browser will download an Excel file containing all your data.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> The file includes separate sheets for stocks, crosses, and trays.</p>
-                </div>
-
-                <h3>Importing Data</h3>
-                <p>To import data from an Excel file:</p>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> From the main menu, select "Upload Data".</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Click "Choose File" and select your Excel file.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Select the import options (update existing records, add new records).</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Click "Upload" to process the file.</p>
-                </div>
-
-                <div class="warning-box">
-                    <h5>Important Note on Data Import</h5>
-                    <p>When importing data:</p>
-                    <ul>
-                        <li>The Excel file must follow the correct format. Download a current export first as a template.</li>
-                        <li>Be careful when updating existing records, as this will overwrite current data.</li>
-                        <li>UniqueID fields must match exactly for updates to work correctly.</li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Label Generation -->
-            <div id="label-generation" class="guide-section">
-                <h2>Label Generation</h2>
-                <p><em>D. manager</em> can generate printable labels for your vials.</p>
-
-                <h3>Generating Individual Labels</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Add stocks/crosses to your cart in the Explorer.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Click "Generate Labels" in the cart panel.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Specify how many blank spaces to include (if any).</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> The system will generate a PDF file with labels.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">5</span> Print the PDF on label paper.</p>
-                </div>
-
-                <h3>Generating Labels from Schedule</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Go to the Flip Schedule.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> For any day, click the "Generate Labels" button.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Specify blank spaces as needed.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> The system generates labels for all items scheduled for that day.</p>
-                </div>
-
-                <div class="highlight-box">
-                    <h5>Label Format</h5>
-                    <p>Labels include:</p>
-                    <ul>
-                        <li>Stock/Cross name</li>
-                        <li>Unique ID</li>
-                        <li>Genotype or cross information</li>
-                        <li>Date flipped</li>
-                        <li>User initials</li>
-                        <li>QR code for scanning</li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Scanner Usage -->
-            <div id="scanner" class="guide-section">
-                <h2>Scanner Usage</h2>
-                <p><em>D. manager</em> supports barcode/QR code scanners to streamline the flip process.</p>
-
-                <h3>Setting Up a Scanner</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Connect your barcode scanner to your computer via USB.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Go to the Flip Interface.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Select your scanner from the dropdown menu.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Click "Start Scanning" to begin the scanning session.</p>
-                </div>
-
-                <h3>Scanning Process</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> With scanning active, scan the QR code on a vial label.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> The system will automatically load the stock/cross details.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">3</span> Update the status and add any comments.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">4</span> Click "Flip" or scan another vial to continue.</p>
-                </div>
-            </div>
-
-            <!-- Admin Settings -->
-            <div id="admin-settings" class="guide-section">
-                <h2>Admin Settings</h2>
-                <p>Admin settings are available only to users with administrator privileges.</p>
-
-                <h3>Accessing Admin Settings</h3>
-                <div class="step-box">
-                    <p><span class="step-number">1</span> Log in with an admin account.</p>
-                </div>
-                <div class="step-box">
-                    <p><span class="step-number">2</span> Click on the menu and select "Settings".</p>
-                </div>
-
-                <h3>Lab Information</h3>
-                <p>Configure basic information about your lab:</p>
-                <ul>
-                    <li><strong>Lab Name</strong>: The name displayed throughout the application</li>
-                    <li><strong>Admin Name</strong>: Contact person for system issues</li>
-                    <li><strong>Admin Email</strong>: Contact email for support</li>
-                </ul>
-
-                <h3>System Appearance</h3>
-                <p>Customize the look of the application:</p>
-                <ul>
-                    <li><strong>Dark/Light Mode</strong>: Set the default theme</li>
-                    <li><strong>Accent Color</strong>: Choose the primary color for the interface</li>
-                </ul>
-            </div>
-
-            <!-- FAQ Section -->
-            <div id="faq" class="guide-section">
-                <h2>Frequently Asked Questions</h2>
-
-                <div class="card-guide">
-                    <div class="card-header-guide" data-toggle="collapse" data-target="#faq1">
-                        <i class="fas fa-question-circle"></i> How do I determine how many vials a stock needs?
-                    </div>
-                    <div class="card-body-guide" id="faq1">
-                        <p>The number of vials a stock needs is calculated based on its maintenance parameters:</p>
-                        <p>For a given stock, the system calculates: <code>Vial Lifetime / Flip Frequency (rounded up)</code></p>
-                        <p>This ensures you always have enough vials to maintain the stock across its entire lifecycle.</p>
-                    </div>
-                </div>
-
-                <div class="card-guide">
-                    <div class="card-header-guide" data-toggle="collapse" data-target="#faq2">
-                        <i class="fas fa-question-circle"></i> What do the different status colors mean?
-                    </div>
-                    <div class="card-body-guide" id="faq2">
-                        <p>The color indicators represent different status levels:</p>
-                        <ul>
-                            <li><span class="status-chip healthy">Green (Healthy)</span>: Stock/cross is doing well</li>
-                            <li><span class="status-chip warning">Yellow (Showing Issues)</span>: Minor issues observed</li>
-                            <li><span class="status-chip danger">Red (Needs Refresh)</span>: Immediate attention required</li>
-                            <li><span class="status-chip info">Blue (Ordered)</span>: Stock has been ordered but not received</li>
-                            <li><span class="status-chip muted">Grey (No longer maintained)</span>: Stock is archived</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="card-guide">
-                    <div class="card-header-guide" data-toggle="collapse" data-target="#faq3">
-                        <i class="fas fa-question-circle"></i> Why can't I place a stock in my tray?
-                    </div>
-                    <div class="card-body-guide" id="faq3">
-                        <p>There are several potential reasons:</p>
-                        <ol>
-                            <li>The position is already occupied by another stock or cross</li>
-                            <li>The position is blocked by adjacent multi-vial items</li>
-                            <li>There isn't enough contiguous space for the vials required</li>
-                            <li>The stock has status "No longer maintained"</li>
-                        </ol>
-                        <p>Try choosing a different position with adequate space.</p>
-                    </div>
-                </div>
-
-                <div class="card-guide">
-                    <div class="card-header-guide" data-toggle="collapse" data-target="#faq4">
-                        <i class="fas fa-question-circle"></i> How is tray usage percentage calculated?
-                    </div>
-                    <div class="card-body-guide" id="faq4">
-                        <p>Tray usage is calculated as:</p>
-                        <p><code>(Occupied Positions / Total Tray Positions) × 100%</code></p>
-                        <p>Occupied positions include both positions with items and positions blocked by multi-vial items.</p>
-                    </div>
-                </div>
-
-                <div class="card-guide">
-                    <div class="card-header-guide" data-toggle="collapse" data-target="#faq5">
-                        <i class="fas fa-question-circle"></i> How do I recover a deleted stock or cross?
-                    </div>
-                    <div class="card-body-guide" id="faq5">
-                        <p>Instead of deleting stocks or crosses, it's recommended to change their status to "No longer maintained" to preserve historical data.</p>
-                        <p>If you accidentally deleted a stock or cross:</p>
-                        <ol>
-                            <li>Check if you have a recent data export containing the item</li>
-                            <li>If available, use the data import feature to restore it</li>
-                            <li>If not, you'll need to recreate the stock/cross manually</li>
-                        </ol>
-                    </div>
-                </div>
-
-                <div class="card-guide">
-                    <div class="card-header-guide" data-toggle="collapse" data-target="#faq6">
-                        <i class="fas fa-question-circle"></i> What's the difference between vial lifetime and flip frequency?
-                    </div>
-                    <div class="card-body-guide" id="faq6">
-                        <p><strong>Vial Lifetime</strong> is how long a single vial remains viable before it should be discarded (typically 14-21 days).</p>
-                        <p><strong>Flip Frequency</strong> is how often you should transfer flies to new food (typically 7 days).</p>
-                        <p>For example, with a vial lifetime of 14 days and a flip frequency of 7 days, you would:</p>
-                        <ul>
-                            <li>Day 0: Start vial 1</li>
-                            <li>Day 7: Flip to vial 2</li>
-                            <li>Day 14: Flip to vial 1 (after discarding the old vial 1)</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Glossary -->
-            <div id="glossary" class="guide-section">
-                <h2>Glossary</h2>
-                <dl>
-                    <dt>Stock</dt>
-                    <dd>A genetically stable fly line maintained in the lab.</dd>
-
-                    <dt>Cross</dt>
-                    <dd>A mating between two different stocks to produce offspring with a specific genotype.</dd>
-
-                    <dt>Flip</dt>
-                    <dd>The process of transferring flies to fresh food to maintain a healthy population.</dd>
-
-                    <dt>Tray</dt>
-                    <dd>A physical container holding multiple vials of flies.</dd>
-
-                    <dt>Vial</dt>
-                    <dd>A single container of flies with food medium.</dd>
-
-                    <dt>Vial Lifetime</dt>
-                    <dd>The time period a vial can be used before it should be discarded.</dd>
-
-                    <dt>Flip Frequency</dt>
-                    <dd>How often flies should be transferred to fresh food.</dd>
-
-                    <dt>Developmental Time</dt>
-                    <dd>The time required for development from egg to adult fly.</dd>
-
-                    <dt>Virgin Collection</dt>
-                    <dd>The process of collecting newly emerged, unmated female flies.</dd>
-
-                    <dt>Genotype</dt>
-                    <dd>The genetic makeup of a fly, often described by chromosome.</dd>
-
-                    <dt>UniqueID</dt>
-                    <dd>A system-generated identifier for each stock or cross.</dd>
-
-                    <dt>Source ID</dt>
-                    <dd>An external reference number, such as a Bloomington Stock Center number.</dd>
-
-                    <dt>BDSC</dt>
-                    <dd>Bloomington Drosophila Stock Center, a common source for fly stocks.</dd>
-                </dl>
-            </div>
-        </div>
         </div>
     </div>
 </div>
@@ -1078,78 +670,64 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
-    // Make sidebar links smooth scroll to sections
     document.addEventListener('DOMContentLoaded', function() {
         const navLinks = document.querySelectorAll('.guide-nav .nav-link');
-        
+        const sections = document.querySelectorAll('.guide-section');
+
+        function setActiveLink(id) {
+            navLinks.forEach(link => {
+                link.classList.toggle('active', link.getAttribute('href') === `#${id}`);
+            });
+        }
+
         navLinks.forEach(link => {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                
+            link.addEventListener('click', function(event) {
+                event.preventDefault();
                 const targetId = this.getAttribute('href').substring(1);
-                const targetElement = document.getElementById(targetId);
-                
+                const target = document.getElementById(targetId);
+
+                if (!target) {
+                    return;
+                }
+
                 window.scrollTo({
-                    top: targetElement.offsetTop - 80,
+                    top: target.offsetTop - 80,
                     behavior: 'smooth'
                 });
-                
-                // Update URL without scrolling
-                history.pushState(null, null, `#${targetId}`);
-                
-                // Add active class to current link
-                navLinks.forEach(l => l.classList.remove('active'));
-                this.classList.add('active');
+
+                history.pushState(null, '', `#${targetId}`);
+                setActiveLink(targetId);
             });
         });
-        
-        // Handle FAQ toggles
-        document.querySelectorAll('.card-header-guide').forEach(header => {
-            header.addEventListener('click', function() {
-                const body = this.parentElement.querySelector('.card-body-guide');
-                body.classList.toggle('show');
-            });
-        });
-        
-        // Highlight the current section in nav based on scroll position
-        window.addEventListener('scroll', function() {
-            const sections = document.querySelectorAll('.guide-section');
-            const scrollPosition = window.scrollY + 100;
-            
+
+        function syncActiveLinkOnScroll() {
+            const scrollPosition = window.scrollY + 110;
+
             sections.forEach(section => {
                 const sectionTop = section.offsetTop;
                 const sectionBottom = sectionTop + section.offsetHeight;
-                
+
                 if (scrollPosition >= sectionTop && scrollPosition < sectionBottom) {
-                    const currentId = section.getAttribute('id');
-                    navLinks.forEach(link => {
-                        link.classList.remove('active');
-                        if (link.getAttribute('href') === `#${currentId}`) {
-                            link.classList.add('active');
-                        }
-                    });
+                    setActiveLink(section.id);
                 }
             });
-        });
-        
-        // Check if URL has a hash and scroll to that section
+        }
+
+        window.addEventListener('scroll', syncActiveLinkOnScroll);
+
         if (window.location.hash) {
-            const targetId = window.location.hash.substring(1);
-            const targetElement = document.getElementById(targetId);
-            if (targetElement) {
-                setTimeout(() => {
+            const hashTarget = document.getElementById(window.location.hash.substring(1));
+            if (hashTarget) {
+                setTimeout(function() {
                     window.scrollTo({
-                        top: targetElement.offsetTop - 80,
+                        top: hashTarget.offsetTop - 80,
                         behavior: 'smooth'
                     });
-                    
-                    const targetLink = document.querySelector(`.guide-nav .nav-link[href="#${targetId}"]`);
-                    if (targetLink) {
-                        navLinks.forEach(l => l.classList.remove('active'));
-                        targetLink.classList.add('active');
-                    }
-                }, 300);
+                    setActiveLink(hashTarget.id);
+                }, 250);
             }
+        } else if (sections.length) {
+            setActiveLink(sections[0].id);
         }
     });
 </script>

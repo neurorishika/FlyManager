@@ -3,7 +3,6 @@ document.addEventListener("DOMContentLoaded", function() {
     const socket = io.connect(window.location.origin, {
         path: '/socket.io'
     });
-    const activeScannerFeatures = window.scannerFeatures || { client_serial_enabled: false, camera_enabled: false };
     const scanSource = document.getElementById('scanSource');
     const startScanBtn = document.getElementById('startScanBtn');
     const stopScanBtn = document.getElementById('stopScanBtn');
@@ -77,9 +76,9 @@ document.addEventListener("DOMContentLoaded", function() {
             summary: 'Connect a serial scanner directly to the user workstation instead of the server, then scan locally through WebSerial.',
             runsOn: 'Client browser tab',
             bestFor: 'Dedicated workstation scanners connected to the operator computer instead of the server host.',
-            requirements: 'Feature enabled on this deployment, secure session, and Chrome or Edge on the client machine.',
+            requirements: 'Secure session, a compatible serial scanner, and Chrome or Edge on the client machine.',
             browserScope: 'Chrome or Edge only',
-            sourceHint: 'WebSerial appears here only when enabled for this deployment, and it still requires secure Chrome or Edge on the client machine.'
+            sourceHint: 'WebSerial requires a secure Chrome or Edge session on the client machine.'
         }
     };
 
@@ -124,25 +123,17 @@ document.addEventListener("DOMContentLoaded", function() {
         setSupportBadge(serverSupportBadge, 'Available', 'is-supported');
         setSupportBadge(keyboardSupportBadge, 'Available', 'is-supported');
 
-        if (activeScannerFeatures.camera_enabled) {
-            setSupportBadge(
-                cameraSupportBadge,
-                cameraSupported ? 'Supported Here' : 'Not In This Browser',
-                cameraSupported ? 'is-supported' : 'is-unavailable'
-            );
-        } else {
-            setSupportBadge(cameraSupportBadge, 'Disabled Here', 'is-limited');
-        }
+        setSupportBadge(
+            cameraSupportBadge,
+            cameraSupported ? 'Supported Here' : 'Not In This Browser',
+            cameraSupported ? 'is-supported' : 'is-unavailable'
+        );
 
-        if (activeScannerFeatures.client_serial_enabled) {
-            setSupportBadge(
-                webserialSupportBadge,
-                webSerialSupported ? 'Supported Here' : 'Chrome/Edge Only',
-                webSerialSupported ? 'is-supported' : 'is-unavailable'
-            );
-        } else {
-            setSupportBadge(webserialSupportBadge, 'Disabled Here', 'is-limited');
-        }
+        setSupportBadge(
+            webserialSupportBadge,
+            webSerialSupported ? 'Supported Here' : 'Chrome/Edge Only',
+            webSerialSupported ? 'is-supported' : 'is-unavailable'
+        );
 
         if (source === 'server') {
             setCurrentCompatibilityCard(compatServer);
@@ -164,15 +155,9 @@ document.addEventListener("DOMContentLoaded", function() {
         scanModeRequirements.textContent = definition.requirements;
         scanModeBrowserScope.textContent = definition.browserScope;
         scanSourceHint.textContent = definition.sourceHint;
-
-        if (!activeScannerFeatures.client_serial_enabled) {
-            webserialExplainer.textContent = 'WebSerial is not enabled for this deployment, so the client serial option is hidden from the Scan Source menu. When enabled, it only works in secure Chrome or Edge sessions on the client machine.';
-            return;
-        }
-
         webserialExplainer.textContent = webSerialSupported
-            ? 'WebSerial is enabled for this deployment and supported by this browser session, so the client serial option is available in the Scan Source menu.'
-            : 'WebSerial is enabled for this deployment, but this browser session does not support it. Use secure Chrome or Edge on the client machine to make the option usable.';
+            ? 'WebSerial is supported by this browser session, so the client serial option is available in the Scan Source menu.'
+            : 'This browser session does not support WebSerial. Use secure Chrome or Edge on the client machine to make the option usable.';
 
         if (source === 'camera' && !cameraSupported) {
             scanModeRequirements.textContent = 'This browser cannot use camera QR scanning in the current session. Use the server scanner, keyboard wedge, or Chrome/Edge WebSerial instead.';
@@ -412,9 +397,9 @@ document.addEventListener("DOMContentLoaded", function() {
             if (cameraSupported) {
                 setScanStatus('Start the camera scanner and point the device camera at a QR code.');
             } else {
-                setScanStatus('Camera scanning requires a secure browser session with BarcodeDetector support.');
+                setScanStatus('Camera scanning requires a secure browser session with camera access and QR decoding support.');
             }
-        } else if (source === 'client-serial' && activeScannerFeatures.client_serial_enabled) {
+        } else if (source === 'client-serial') {
             clientSerialSupport.value = webSerialSupported
                 ? 'WebSerial is available in this secure Chrome or Edge session.'
                 : 'This browser session cannot use WebSerial. Switch to secure Chrome or Edge on the client machine.';

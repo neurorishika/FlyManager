@@ -392,12 +392,8 @@
                         <select class="form-control" id="scanSource">
                             <option value="server">Server Scanner</option>
                             <option value="client-input">Browser Input / Keyboard Scanner</option>
-                            {% if scanner_features.camera_enabled %}
                             <option value="camera">Camera Scanner</option>
-                            {% endif %}
-                            {% if scanner_features.client_serial_enabled %}
                             <option value="client-serial">Client Serial Scanner (Chrome or Edge)</option>
-                            {% endif %}
                         </select>
                         <p id="scanSourceHint" class="flip-scan-hint">Server mode works regardless of the user's browser because the reader stays attached to the server machine.</p>
                     </div>
@@ -422,7 +418,6 @@
                         <button id="lookupUidBtn" class="btn btn-primary" type="button">Focus Input</button>
                     </div>
 
-                    {% if scanner_features.camera_enabled %}
                     <div id="camera-scan-controls" class="flip-camera-shell is-hidden">
                         <video id="cameraPreview" class="flip-camera-preview is-hidden" muted playsinline></video>
                         <div class="flip-scan-controls">
@@ -430,9 +425,7 @@
                             <button id="stopCameraScanBtn" class="btn btn-secondary is-hidden" type="button">Stop Camera</button>
                         </div>
                     </div>
-                    {% endif %}
 
-                    {% if scanner_features.client_serial_enabled %}
                     <div id="client-serial-controls" class="flip-scan-controls is-hidden">
                         <div>
                             <label for="clientSerialSupport">Client Serial Support</label>
@@ -441,7 +434,6 @@
                         <button id="connectClientSerialBtn" class="btn btn-primary" type="button">Connect Client Scanner</button>
                         <button id="disconnectClientSerialBtn" class="btn btn-secondary is-hidden" type="button">Disconnect</button>
                     </div>
-                    {% endif %}
 
                     <p id="scanStatusMessage" class="flip-scan-status">Use the existing server-attached scanner or switch to a browser-side scan source.</p>
                 </div>
@@ -473,7 +465,7 @@
 
                 <div class="flip-browser-callout">
                     <strong>Where is WebSerial?</strong>
-                    <p id="webserialExplainer">The WebSerial option appears in Scan Source only when client serial scanning is enabled for this deployment. Even then, it only works in secure Chrome or Edge sessions on the client machine.</p>
+                    <p id="webserialExplainer">The WebSerial option appears when the current browser session supports it. It only works in secure Chrome or Edge sessions on the client machine.</p>
                 </div>
 
                 <div class="flip-compatibility-grid">
@@ -590,9 +582,9 @@
     const startScanUrl = "{{ url_for('flip.start_scan_route') }}";
     const stopScanUrl = "{{ url_for('flip.stop_scan_route') }}";
     const lookupUidUrl = "{{ url_for('flip.lookup_uid_route') }}";
-    const scannerFeatures = {{ scanner_features | tojson }};
 </script>
 <script nonce="{{ csp_nonce }}" src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/client_scanner.js') }}"></script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/fly_flipper.js') }}"></script>
 {% endblock %}

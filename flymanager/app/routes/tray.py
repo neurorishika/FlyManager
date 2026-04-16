@@ -64,6 +64,14 @@ def view_tray(tray_id):
         return redirect(url_for('tray.tray_management'))
     
     occupancy = get_tray_occupancy(user, tray_id, db)
+    occupied_positions = sorted(
+        (
+            (position, item)
+            for position, item in occupancy.items()
+            if item.get('type') != 'blocked'
+        ),
+        key=lambda entry: int(entry[0])
+    )
     
     # Get all stocks and crosses for this user (for moving items)
     stocks = get_user_stocks(user, db)
@@ -84,6 +92,7 @@ def view_tray(tray_id):
         'tray/view_tray.html',
         tray=tray,
         occupancy=occupancy,
+        occupied_positions=occupied_positions,
         stocks=stocks,
         crosses=crosses,
         page_title=f"Tray: {tray['TrayID']} - {tray['Name']}",

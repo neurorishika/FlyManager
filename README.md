@@ -16,6 +16,7 @@ D. manager is the public-facing product identity for the FlyManager codebase. It
 ## Documentation
 
 - Product site: [https://neurorishika.github.io/FlyManager/](https://neurorishika.github.io/FlyManager/)
+- User guide: [https://neurorishika.github.io/FlyManager/user-guide/](https://neurorishika.github.io/FlyManager/user-guide/)
 - Deployment guide: [DEPLOYMENT.md](DEPLOYMENT.md)
 - Platform runbooks: [PLATFORM_DEPLOYMENT.md](PLATFORM_DEPLOYMENT.md)
 - Backup and recovery: [BACKUP_AND_RECOVERY.md](BACKUP_AND_RECOVERY.md)
@@ -26,6 +27,7 @@ D. manager is the public-facing product identity for the FlyManager codebase. It
 - Flip scheduling, reminders, and printable label generation.
 - MongoDB-backed persistence with container-friendly deployment defaults.
 - Production HTTPS deployment with Caddy and GitHub Pages-hosted documentation.
+- An operator-facing user guide for first-run setup, daily use, and launch readiness.
 
 ## Quick Start
 

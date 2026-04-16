@@ -1,17 +1,8 @@
-.cross-item-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    flex-shrink: 0;
+.cross-item-genotype,
+.cross-item-submeta {
+    color: var(--muted-text);
 }
 
-.badge-eclose {
-    background-color: #0a4f02;
-    color: white;
-}
-
-@media (max-width: 767px) {
-    .cross-item-actions {
-        width: 100%;
-    }
+.cross-item-submeta {
+    margin-top: 8px;
 }

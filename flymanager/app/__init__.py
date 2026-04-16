@@ -5,6 +5,7 @@ Creates and configures the Flask application.
 """
 
 import os
+import re
 import secrets
 from datetime import timedelta
 
@@ -56,6 +57,39 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def abbreviate_species_name(value):
+    """Render common Drosophila species names in a compact table-friendly form."""
+    if value is None:
+        return ""
+
+    text = str(value).strip()
+    if not text:
+        return ""
+
+    explicit_map = {
+        "D. melanogaster": "D. mel",
+        "D. simulans": "D. sim",
+        "D. sechellia": "D. sec",
+        "D. yakuba": "D. yak",
+        "D. ananassae": "D. ana",
+        "D. virilis": "D. vir",
+        "D. erecta": "D. ere",
+        "D. mauritiana": "D. mau",
+        "D. pseudoobscura": "D. pse",
+    }
+    if text in explicit_map:
+        return explicit_map[text]
+
+    normalized = re.sub(r"\s+", " ", text)
+    parts = normalized.split(" ")
+    if len(parts) >= 2 and parts[0].lower() in {"d.", "drosophila"}:
+        species = re.sub(r"[^a-zA-Z-]", "", parts[1]).lower()
+        if species:
+            return f"D. {species[:3]}"
+
+    return text
+
+
 # --- Application Factory ---
 def create_app():
     """Create and configure the Flask application."""
@@ -66,6 +100,7 @@ def create_app():
         template_folder="templates",
         static_folder="static",
     )
+    app.add_template_filter(abbreviate_species_name, "species_abbrev")
 
     # --- Configuration ---
     session_lifetime_seconds = int(os.getenv("SESSION_LIFETIME_SECONDS", "3600"))
@@ -155,12 +190,6 @@ def create_app():
         return dict(
             settings=get_settings(db),
             csp_nonce=generate_csp_nonce(),
-            scanner_features={
-                "client_serial_enabled": app.config[
-                    "ENABLE_CLIENT_SERIAL_SCANNER"
-                ],
-                "camera_enabled": app.config["ENABLE_CAMERA_SCANNER"],
-            },
         )
 
     @app.before_request

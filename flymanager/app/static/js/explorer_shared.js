@@ -83,6 +83,85 @@
         let cart = JSON.parse(localStorage.getItem(config.cartStorageKey)) || [];
         let currentView = localStorage.getItem(config.viewStorageKey) || 'card';
         let currentSort = { column: '', direction: 'asc' };
+        const requiredTableColumns = config.requiredTableColumns || [];
+        let visibleTableColumns = loadVisibleTableColumns();
+
+        function getColumnStorageKey() {
+            return `${config.viewStorageKey}Columns`;
+        }
+
+        function normalizeVisibleTableColumns(columns) {
+            return Array.from(new Set(requiredTableColumns.concat(Array.isArray(columns) ? columns : [])));
+        }
+
+        function getDefaultVisibleTableColumns() {
+            const compactView = window.matchMedia('(max-width: 1440px)').matches;
+            const defaultColumns = compactView && Array.isArray(config.compactTableColumns)
+                ? config.compactTableColumns
+                : config.defaultTableColumns;
+
+            return normalizeVisibleTableColumns(defaultColumns || []);
+        }
+
+        function loadVisibleTableColumns() {
+            try {
+                const storedColumns = JSON.parse(localStorage.getItem(getColumnStorageKey()));
+                if (Array.isArray(storedColumns)) {
+                    return normalizeVisibleTableColumns(storedColumns);
+                }
+            } catch (error) {
+                console.warn('Unable to load explorer column preferences:', error);
+            }
+
+            return getDefaultVisibleTableColumns();
+        }
+
+        function saveVisibleTableColumns() {
+            localStorage.setItem(
+                getColumnStorageKey(),
+                JSON.stringify(visibleTableColumns.filter(function(columnKey) {
+                    return requiredTableColumns.indexOf(columnKey) === -1;
+                }))
+            );
+        }
+
+        function applyColumnVisibility() {
+            document.querySelectorAll('[data-column-key]').forEach(function(element) {
+                const columnKey = element.dataset.columnKey;
+                element.classList.toggle('is-column-hidden', visibleTableColumns.indexOf(columnKey) === -1);
+            });
+
+            document.querySelectorAll('[data-column-toggle]').forEach(function(input) {
+                const columnKey = input.dataset.columnToggle;
+                input.checked = visibleTableColumns.indexOf(columnKey) !== -1;
+                input.disabled = requiredTableColumns.indexOf(columnKey) !== -1;
+            });
+        }
+
+        function updateColumnVisibility(columnKey, shouldShow) {
+            if (requiredTableColumns.indexOf(columnKey) !== -1) {
+                return;
+            }
+
+            if (shouldShow && visibleTableColumns.indexOf(columnKey) === -1) {
+                visibleTableColumns.push(columnKey);
+            }
+
+            if (!shouldShow) {
+                visibleTableColumns = visibleTableColumns.filter(function(key) {
+                    return key !== columnKey;
+                });
+            }
+
+            saveVisibleTableColumns();
+            applyColumnVisibility();
+        }
+
+        function resetColumnVisibility() {
+            visibleTableColumns = getDefaultVisibleTableColumns();
+            saveVisibleTableColumns();
+            applyColumnVisibility();
+        }
 
         function saveCart() {
             localStorage.setItem(config.cartStorageKey, JSON.stringify(cart));
@@ -90,6 +169,22 @@
 
         function saveViewPreference() {
             localStorage.setItem(config.viewStorageKey, currentView);
+        }
+
+        function syncTableModeControls() {
+            const toolbarControls = document.querySelector('.explorer-toolbar-controls');
+            const columnSelector = document.querySelector('.column-selector');
+
+            if (toolbarControls) {
+                toolbarControls.classList.toggle('is-table-mode', currentView === 'table');
+            }
+
+            if (columnSelector) {
+                columnSelector.classList.toggle('is-hidden', currentView !== 'table');
+                if (currentView !== 'table') {
+                    columnSelector.removeAttribute('open');
+                }
+            }
         }
 
         function setCardState(card, isChecked) {
@@ -247,6 +342,7 @@
                 currentView = 'table';
             }
 
+            syncTableModeControls();
             saveViewPreference();
         }
 
@@ -257,7 +353,7 @@
             }
 
             const headers = table.querySelectorAll('th.sortable');
-            const rows = Array.from(table.querySelectorAll('tbody tr'));
+            const rows = Array.from(table.querySelectorAll('tbody tr.explorer-data-row'));
 
             if (currentSort.column === column) {
                 currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
@@ -325,6 +421,11 @@
             const tbody = table.querySelector('tbody');
             rows.forEach(function(row) {
                 tbody.appendChild(row);
+
+                const detailsRow = document.getElementById(`tableDetails-${row.dataset.index}`);
+                if (detailsRow) {
+                    tbody.appendChild(detailsRow);
+                }
             });
         }
 
@@ -369,12 +470,51 @@
 
         function toggleTableDetails(index) {
             const details = document.getElementById(`tableDetails-${index}`);
+            const trigger = document.querySelector(`.show-details-btn[data-index="${index}"]`);
 
             if (isHidden(details)) {
-                showElement(details, 'block');
+                showElement(details, 'table-row');
+                if (trigger) {
+                    trigger.classList.add('is-active');
+                    trigger.setAttribute('aria-expanded', 'true');
+                }
             } else {
                 hideElement(details);
+                if (trigger) {
+                    trigger.classList.remove('is-active');
+                    trigger.setAttribute('aria-expanded', 'false');
+                }
             }
+        }
+
+        function initializeColumnControls() {
+            const columnInputs = document.querySelectorAll('[data-column-toggle]');
+            if (columnInputs.length === 0) {
+                return;
+            }
+
+            columnInputs.forEach(function(input) {
+                input.addEventListener('change', function() {
+                    updateColumnVisibility(this.dataset.columnToggle, this.checked);
+                });
+            });
+
+            document.querySelectorAll('[data-column-reset]').forEach(function(button) {
+                button.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    resetColumnVisibility();
+                });
+            });
+
+            document.addEventListener('click', function(event) {
+                document.querySelectorAll('.column-selector[open]').forEach(function(selector) {
+                    if (!selector.contains(event.target)) {
+                        selector.removeAttribute('open');
+                    }
+                });
+            });
+
+            applyColumnVisibility();
         }
 
         function selectVisibleItems() {
@@ -713,7 +853,7 @@
                 });
             });
 
-            document.querySelectorAll('#tableView tbody tr').forEach(function(row) {
+            document.querySelectorAll('#tableView tbody tr.explorer-data-row').forEach(function(row) {
                 row.addEventListener('click', function(event) {
                     toggleRowSelection(this, event);
                 });
@@ -897,6 +1037,7 @@
 
         updateCart();
         toggleView(currentView);
+        initializeColumnControls();
         bindStaticEvents();
         syncSelectionSummary();
     }

@@ -62,14 +62,38 @@
         <a href="{{ url_for('stock.add_stock') }}" class="btn btn-success">Add New Stock</a>
         <span class="explorer-results-meta">{{ stocks|length }} stock{% if stocks|length != 1 %}s{% endif %} in view</span>
     </div>
-    <div class="view-toggle-container">
-        <div class="btn-group" role="group">
-            <button type="button" class="btn btn-outline-secondary active" id="cardViewBtn">
-                <i class="fas fa-th-large"></i> Card View
-            </button>
-            <button type="button" class="btn btn-outline-secondary" id="tableViewBtn">
-                <i class="fas fa-table"></i> Table View
-            </button>
+    <div class="explorer-toolbar-controls">
+        <details class="column-selector">
+            <summary class="btn btn-outline-secondary column-selector-toggle">
+                <i class="fas fa-columns"></i> Columns
+            </summary>
+            <div class="column-selector-panel">
+                <div class="column-selector-header">
+                    <div>
+                        <p class="column-selector-title">Optional Columns</p>
+                        <p class="column-selector-copy">Tray, stock, status, flip, and actions always stay visible.</p>
+                    </div>
+                    <button type="button" class="btn btn-link btn-sm column-selector-reset" data-column-reset>Reset</button>
+                </div>
+                <div class="column-selector-grid">
+                    <label class="column-selector-option"><input type="checkbox" data-column-toggle="series"> Series</label>
+                    <label class="column-selector-option"><input type="checkbox" data-column-toggle="genotype"> Genotype</label>
+                    <label class="column-selector-option"><input type="checkbox" data-column-toggle="type"> Type</label>
+                    <label class="column-selector-option"><input type="checkbox" data-column-toggle="food"> Food</label>
+                    <label class="column-selector-option"><input type="checkbox" data-column-toggle="species"> Species</label>
+                    <label class="column-selector-option"><input type="checkbox" data-column-toggle="eclose"> Eclose</label>
+                </div>
+            </div>
+        </details>
+        <div class="view-toggle-container">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-secondary active" id="cardViewBtn">
+                    <i class="fas fa-th-large"></i> Card View
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="tableViewBtn">
+                    <i class="fas fa-table"></i> Table View
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -145,21 +169,21 @@
     </div>
     
     <div id="tableView" class="table-responsive is-hidden">
-        <table class="table table-striped table-hover">
+        <table class="table explorer-table">
             <thead>
                 <tr>
-                    <th width="30"><input type="checkbox" id="selectAllTable"></th>
-                    <th class="sortable" data-sort="tray">Tray<i class="fas fa-sort ml-1"></i></th>
-                    <th class="sortable" data-sort="series">Series<i class="fas fa-sort ml-1"></i></th>
-                    <th class="sortable" data-sort="name">Name<i class="fas fa-sort ml-1"></i></th>
-                    <th class="sortable" data-sort="genotype">Genotype<i class="fas fa-sort ml-1"></i></th>
-                    <th class="sortable" data-sort="type">Type<i class="fas fa-sort ml-1"></i></th>
-                    <th class="sortable" data-sort="food">Food Type<i class="fas fa-sort ml-1"></i></th>
-                    <th class="sortable" data-sort="species">Species<i class="fas fa-sort ml-1"></i></th>
-                    <th class="sortable" data-sort="status">Status<i class="fas fa-sort ml-1"></i></th>
-                    <th class="sortable" data-sort="flipin">Flip In<i class="fas fa-sort ml-1"></i></th>
-                    <th class="sortable" data-sort="eclose">Ecloses In<i class="fas fa-sort ml-1"></i></th>
-                    <th>Actions</th>
+                    <th class="table-select-cell table-sticky-col table-sticky-select"><input type="checkbox" id="selectAllTable"></th>
+                    <th class="sortable table-sticky-col table-sticky-tray" data-sort="tray" data-column-key="tray">Tray<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="series" data-column-key="series">Series<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="name" data-column-key="name">Stock<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="genotype" data-column-key="genotype">Genotype<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="type" data-column-key="type">Type<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="food" data-column-key="food">Food<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="species" data-column-key="species">Species<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="status" data-column-key="status">Status<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="flipin" data-column-key="flipin">Flip<i class="fas fa-sort ml-1"></i></th>
+                    <th class="sortable" data-sort="eclose" data-column-key="eclose">Eclose<i class="fas fa-sort ml-1"></i></th>
+                    <th data-column-key="actions">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -171,27 +195,49 @@
                 </tr>
                 {% endif %}
                 {% for stock in stocks %}
-                <tr class="stock-row" data-status="{{ stock.Status }}" data-index="{{ loop.index }}">
-                    <td>
+                <tr class="stock-row explorer-data-row" data-status="{{ stock.Status }}" data-index="{{ loop.index }}">
+                    <td class="table-select-cell table-sticky-col table-sticky-select">
                         <input type="checkbox" id="stockTable{{ loop.index }}" class="stock-table-selection-checkbox">
                     </td>
-                    <td class="tray-cell">
-                        {% if stock.TrayID and stock.TrayPosition %}
-                            {{ stock.TrayID }}-{{ stock.TrayPosition }}
-                        {% endif %}
+                    <td class="tray-cell table-sticky-col table-sticky-tray" data-column-key="tray">
+                        <div class="table-location">
+                            {% if stock.TrayID and stock.TrayPosition %}
+                            <span class="table-location-code">{{ stock.TrayID }}-{{ stock.TrayPosition }}</span>
+                            <span class="table-secondary">Assigned tray slot</span>
+                            {% else %}
+                            <span class="table-location-code is-empty">Unassigned</span>
+                            <span class="table-secondary">No tray location</span>
+                            {% endif %}
+                        </div>
                     </td>
-                    <td>{{ stock.SeriesID }}{{ stock.ReplicateID }}</td>
-                    <td class="name-cell" title="{{ stock.Name }}{% if stock.AltReference %} ({{ stock.AltReference }}){% endif %}">
-                        {{ stock.Name }}
-                        {% if stock.AltReference %}
-                            <small class="text-muted">({{ stock.AltReference }})</small>
-                        {% endif %}
+                    <td data-column-key="series">
+                        <span class="table-chip">{{ stock.SeriesID }}{{ stock.ReplicateID }}</span>
                     </td>
-                    <td class="genotype-cell" title="{{ stock.Genotype }}">{{ stock.Genotype }}</td>
-                    <td>{{ stock.Type }}</td>
-                    <td>{{ stock.FoodType }}</td>
-                    <td>{{ stock.Species }}</td>
-                    <td>
+                    <td class="name-cell" data-column-key="name" title="{{ stock.Name }}{% if stock.AltReference %} ({{ stock.AltReference }}){% endif %}">
+                        <div class="table-name-wrap">
+                            <div class="table-primary table-clamp-2">{{ stock.Name }}</div>
+                            <div class="table-secondary table-clamp-2">
+                                {% if stock.AltReference %}
+                                {{ stock.AltReference }}
+                                {% else %}
+                                {{ stock.Provenance }}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="genotype-cell" data-column-key="genotype" title="{{ stock.Genotype }}">
+                        <div class="table-genotype-wrap">
+                            <div class="table-primary table-clamp-2">{{ stock.Genotype }}</div>
+                        </div>
+                    </td>
+                    <td data-column-key="type"><span class="table-chip table-chip-muted">{{ stock.Type }}</span></td>
+                    <td data-column-key="food"><span class="table-chip table-chip-muted">{{ stock.FoodType }}</span></td>
+                    <td data-column-key="species">
+                        <div class="table-name-wrap">
+                            <div class="table-primary table-clamp-2">{{ stock.Species|species_abbrev }}</div>
+                        </div>
+                    </td>
+                    <td data-column-key="status">
                         <span class="badge badge-pill 
                         {% if stock.Status == 'Healthy' %}badge-success
                         {% elif stock.Status == 'Showing Issues' %}badge-warning
@@ -202,9 +248,13 @@
                             {{ stock.Status }}
                         </span>
                     </td>
-                    <td><span class="flip-value {{ stock.FlipInClass }}">{{ stock.FlipIn }}</span></td>
-                    <td>{{ stock.EclosesIn }}</td>
-                    <td>
+                    <td data-column-key="flipin">
+                        <span class="table-timing flip-value {{ stock.FlipInClass }}">{{ stock.FlipIn }}</span>
+                    </td>
+                    <td data-column-key="eclose">
+                        <span class="table-secondary table-timing-secondary">{{ stock.EclosesIn }}</span>
+                    </td>
+                    <td data-column-key="actions">
                         <div class="btn-group btn-group-sm table-action-group">
                             <button type="button" class="btn btn-outline-primary btn-sm" data-action="view-stock" data-unique-id="{{ stock.UniqueID }}" title="View Details">
                                 <i class="fas fa-eye"></i>
@@ -216,15 +266,32 @@
                                 <i class="fas fa-info-circle"></i>
                             </button>
                         </div>
-                        <div class="row-details is-hidden" id="tableDetails-{{ loop.index }}">
-                            <div class="details-panel mt-2">
-                                <p><strong>Unique ID:</strong> {{ stock.UniqueID }}</p>
-                                <p><strong>Source ID:</strong> {{ stock.SourceID }}</p>
-                                <p><strong>Provenance:</strong> {{ stock.Provenance }}</p>
-                                <p><strong>Comments:</strong> {{ stock.Comments }}</p>
-                                <p><strong>Creation Date:</strong> {{ stock.CreationDate }}</p>
-                                <p><strong>Last Flip Date:</strong> {{ stock.LastFlipDate }}</p>
-                                <p><strong>Data Modified Date:</strong> {{ stock.DataModifiedDate }}</p>
+                    </td>
+                </tr>
+                <tr class="explorer-detail-row is-hidden" id="tableDetails-{{ loop.index }}" data-index="{{ loop.index }}">
+                    <td colspan="12">
+                        <div class="explorer-detail-card">
+                            <div class="explorer-detail-grid">
+                                <div class="explorer-detail-block">
+                                    <p class="explorer-detail-label">Identifiers</p>
+                                    <p><strong>Unique ID:</strong> {{ stock.UniqueID }}</p>
+                                    <p><strong>Source ID:</strong> {{ stock.SourceID }}</p>
+                                    <p><strong>Series:</strong> {{ stock.SeriesID }}{{ stock.ReplicateID }}</p>
+                                </div>
+                                <div class="explorer-detail-block">
+                                    <p class="explorer-detail-label">Collection</p>
+                                    <p><strong>Provenance:</strong> {{ stock.Provenance }}</p>
+                                    <p><strong>Type:</strong> {{ stock.Type }}</p>
+                                    <p><strong>Food:</strong> {{ stock.FoodType }}</p>
+                                    <p><strong>Species:</strong> {{ stock.Species }}</p>
+                                </div>
+                                <div class="explorer-detail-block explorer-detail-block-wide">
+                                    <p class="explorer-detail-label">Record Details</p>
+                                    <p><strong>Comments:</strong> {{ stock.Comments }}</p>
+                                    <p><strong>Creation Date:</strong> {{ stock.CreationDate }}</p>
+                                    <p><strong>Last Flip Date:</strong> {{ stock.LastFlipDate }}</p>
+                                    <p><strong>Data Modified Date:</strong> {{ stock.DataModifiedDate }}</p>
+                                </div>
                             </div>
                         </div>
                     </td>

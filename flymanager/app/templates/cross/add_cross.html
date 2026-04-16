@@ -32,12 +32,8 @@
                 <select class="form-control" id="scanSource">
                     <option value="server">Server Scanner</option>
                     <option value="client-input">Browser Input / Keyboard Scanner</option>
-                    {% if scanner_features.camera_enabled %}
                     <option value="camera">Camera Scanner</option>
-                    {% endif %}
-                    {% if scanner_features.client_serial_enabled %}
                     <option value="client-serial">Client Serial Scanner (Chrome or Edge)</option>
-                    {% endif %}
                 </select>
             </div>
             <div id="server-port-panel" class="form-group col-md-8">
@@ -48,7 +44,6 @@
                     {% endfor %}
                 </select>
             </div>
-            {% if scanner_features.camera_enabled %}
             <div id="camera-panel" class="form-group col-md-8 is-hidden">
                 <label for="cameraPreview">Camera Scanner:</label>
                 <video id="cameraPreview" class="form-control is-hidden" muted playsinline></video>
@@ -57,8 +52,6 @@
                     <button id="stopCameraScanBtn" class="btn btn-outline-secondary is-hidden" type="button">Stop Camera</button>
                 </div>
             </div>
-            {% endif %}
-            {% if scanner_features.client_serial_enabled %}
             <div id="client-serial-panel" class="form-group col-md-8 is-hidden">
                 <label for="clientSerialSupport">Client Serial Support:</label>
                 <div class="input-group">
@@ -67,7 +60,6 @@
                     <button id="disconnectClientSerialBtn" class="btn btn-outline-secondary is-hidden" type="button">Disconnect</button>
                 </div>
             </div>
-            {% endif %}
         </div>
         <p id="scanStatusMessage" class="text-muted mb-0">The server-attached scanner remains available while client-side scan modes are validated.</p>
     </div>
@@ -198,18 +190,17 @@
 <script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.polyfills.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.css" rel="stylesheet" type="text/css" />
 <script nonce="{{ csp_nonce }}" src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/client_scanner.js') }}"></script>
 <script nonce="{{ csp_nonce }}">
 
     const crossData = {{ cross_data | tojson }};
-    const scannerFeatures = {{ scanner_features | tojson }};
 
     document.addEventListener("DOMContentLoaded", function() {
         // Connect to Socket.IO using the current origin instead of hardcoded port 5000
         const socket = io.connect(window.location.origin, {
             path: '/socket.io'
         });
-        const activeScannerFeatures = window.scannerFeatures || { client_serial_enabled: false, camera_enabled: false };
         let currentThreadId = null;
         let currentServerTarget = null;
         let currentClientTarget = null;
@@ -442,7 +433,7 @@
                 }
                 setScanStatus(cameraSupported
                     ? 'Start the camera scanner, then arm the male or female UID field before scanning.'
-                    : 'Camera scanning requires a secure browser session with BarcodeDetector support.');
+                    : 'Camera scanning requires a secure browser session with camera access and QR decoding support.');
             } else {
                 clientSerialSupport.value = webSerialSupported
                     ? 'Client serial scanning is available in secure Chrome and Edge sessions.'
@@ -564,7 +555,7 @@
                 return;
             }
 
-            if (scanSource.value === 'client-serial' && activeScannerFeatures.client_serial_enabled) {
+            if (scanSource.value === 'client-serial') {
                 currentClientTarget = targetFieldId;
                 const scanner = ensureClientSerialScanner();
                 if (!scanner) {

@@ -7,6 +7,7 @@
     .dashboard-shell {
         display: grid;
         gap: 18px;
+        min-width: 0;
     }
 
     .dashboard-hero {
@@ -162,11 +163,13 @@
         grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr);
         gap: 18px;
         align-items: start;
+        min-width: 0;
     }
 
     .dashboard-column {
         display: grid;
         gap: 18px;
+        min-width: 0;
     }
 
     .dashboard-panel {
@@ -175,6 +178,7 @@
         border-radius: 22px;
         box-shadow: var(--surface-shadow);
         padding: clamp(18px, 2vw, 24px);
+        min-width: 0;
     }
 
     .panel-header {
@@ -448,27 +452,27 @@
         border: 1px solid rgba(0, 0, 0, 0.06);
     }
 
-    .tray-mini-cell.empty {
+    .tray-mini-cell.state-empty {
         background: color-mix(in srgb, var(--bg-color) 82%, var(--card-bg) 18%);
         color: transparent;
     }
 
-    .tray-mini-cell.stock {
+    .tray-mini-cell.state-stock {
         background: rgba(24, 151, 183, 0.14);
         color: #0f728a;
     }
 
-    .tray-mini-cell.cross {
+    .tray-mini-cell.state-cross {
         background: color-mix(in srgb, var(--header-bg) 16%, white 84%);
         color: var(--accent-color);
     }
 
-    .tray-mini-cell.blocked {
+    .tray-mini-cell.state-blocked {
         background: rgba(122, 127, 136, 0.18);
         color: #58606a;
     }
 
-    .tray-mini-cell.alert {
+    .tray-mini-cell.state-alert {
         background: rgba(201, 65, 65, 0.14);
         color: #b33434;
     }
@@ -497,6 +501,8 @@
         padding-bottom: 6px;
         scrollbar-width: thin;
         scroll-snap-type: x proximity;
+        min-width: 0;
+        max-width: 100%;
     }
 
     .queue-card {
@@ -505,6 +511,7 @@
         gap: 10px;
         scroll-snap-align: start;
         min-height: 0;
+        min-width: 0;
     }
 
     .queue-head {
@@ -571,12 +578,15 @@
         padding-bottom: 6px;
         scrollbar-width: thin;
         scroll-snap-type: x proximity;
+        min-width: 0;
+        max-width: 100%;
     }
 
     .tray-heatmap-card {
         padding: 13px;
         scroll-snap-align: start;
         min-height: 0;
+        min-width: 0;
     }
 
     .tray-heatmap-title {
@@ -614,23 +624,23 @@
         display: inline-block;
     }
 
-    .tray-legend-swatch.empty {
+    .tray-legend-swatch.state-empty {
         background: color-mix(in srgb, var(--bg-color) 82%, var(--card-bg) 18%);
     }
 
-    .tray-legend-swatch.stock {
+    .tray-legend-swatch.state-stock {
         background: rgba(24, 151, 183, 0.35);
     }
 
-    .tray-legend-swatch.cross {
+    .tray-legend-swatch.state-cross {
         background: color-mix(in srgb, var(--header-bg) 30%, white 70%);
     }
 
-    .tray-legend-swatch.blocked {
+    .tray-legend-swatch.state-blocked {
         background: rgba(122, 127, 136, 0.28);
     }
 
-    .tray-legend-swatch.alert {
+    .tray-legend-swatch.state-alert {
         background: rgba(201, 65, 65, 0.3);
     }
 
@@ -1573,7 +1583,7 @@
                     {% for row in tray.grid_rows %}
                     <div class="tray-mini-row tray-cols-{{ tray.columns }}">
                         {% for cell in row.cells %}
-                        <div class="tray-mini-cell {{ cell.state }}" title="{{ cell.position }} · {{ cell.detail }}">{{ cell.label }}</div>
+                        <div class="tray-mini-cell state-{{ cell.state }}" title="{{ cell.position }} · {{ cell.detail }}">{{ cell.label }}</div>
                         {% endfor %}
                     </div>
                     {% endfor %}
@@ -1582,11 +1592,11 @@
             {% endfor %}
         </div>
         <div class="tray-legend" aria-label="Tray heatmap legend">
-            <span class="tray-legend-item"><span class="tray-legend-swatch empty"></span> Empty</span>
-            <span class="tray-legend-item"><span class="tray-legend-swatch stock"></span> Stock</span>
-            <span class="tray-legend-item"><span class="tray-legend-swatch cross"></span> Cross</span>
-            <span class="tray-legend-item"><span class="tray-legend-swatch blocked"></span> Blocked</span>
-            <span class="tray-legend-item"><span class="tray-legend-swatch alert"></span> Flagged</span>
+            <span class="tray-legend-item"><span class="tray-legend-swatch state-empty"></span> Empty</span>
+            <span class="tray-legend-item"><span class="tray-legend-swatch state-stock"></span> Stock</span>
+            <span class="tray-legend-item"><span class="tray-legend-swatch state-cross"></span> Cross</span>
+            <span class="tray-legend-item"><span class="tray-legend-swatch state-blocked"></span> Blocked</span>
+            <span class="tray-legend-item"><span class="tray-legend-swatch state-alert"></span> Flagged</span>
         </div>
         {% else %}
         <p class="empty-copy">No tray layout data is available yet.</p>

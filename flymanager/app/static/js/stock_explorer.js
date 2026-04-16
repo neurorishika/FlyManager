@@ -1,28 +1,3 @@
-let cart = JSON.parse(localStorage.getItem('cart')) || [];
-let currentView = localStorage.getItem('stockViewMode') || 'card';
-let currentSort = { column: '', direction: 'asc' };
-
-function isHidden(element) {
-    return element.classList.contains('is-hidden');
-}
-
-function showElement(element, displayMode) {
-    element.classList.remove('is-hidden');
-    if (displayMode) {
-        element.dataset.displayMode = displayMode;
-    }
-}
-
-function hideElement(element) {
-    element.classList.add('is-hidden');
-}
-
-function buildCartItemElement(item, index) {
-    const container = document.createElement('div');
-    container.className = 'cart-item';
-
-    const label = document.createElement('span');
-    label.textContent = `${item.identifier} - ${item.name}`;
 function buildStockCardCartItem(index, card) {
     const metaPills = card.querySelectorAll('.stock-meta-pill');
 
@@ -62,6 +37,9 @@ window.initializeExplorer({
     viewUrlBase: viewStockUrlBase,
     duplicateUrlBase: addStockUrlBase,
     deleteUrl: deleteStockUrl,
+    requiredTableColumns: ['tray', 'name', 'status', 'flipin', 'actions'],
+    defaultTableColumns: ['series', 'genotype', 'type', 'food', 'species', 'eclose'],
+    compactTableColumns: ['series', 'genotype', 'type'],
     selectionMessage: function(count) {
         return count > 0
             ? `Ready to add ${count} selected stock${count === 1 ? '' : 's'} to the cart or continue selecting more.`
@@ -77,8 +55,3 @@ window.initializeExplorer({
         return message;
     },
 });
-            icon.classList.remove('fa-chevron-down');
-            icon.classList.add('fa-chevron-up');
-        }
-    }
-}

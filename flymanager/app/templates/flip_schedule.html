@@ -1,45 +1,306 @@
 {% extends 'base.html' %}
 
+{% block title %}Flip Schedule{% endblock %}
+
 {% block head %}
 <style nonce="{{ csp_nonce }}">
-    .schedule-page {
+    .schedule-shell {
         display: grid;
         gap: 18px;
     }
 
-    .schedule-list {
+    .schedule-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .schedule-summary-card {
+        padding: 18px;
+        border-radius: 18px;
+        border: 1px solid var(--border-color);
+        background: var(--panel-background);
+        box-shadow: var(--surface-shadow);
+    }
+
+    .schedule-summary-label {
+        margin: 0 0 8px;
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        color: var(--muted-text);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .schedule-summary-value {
+        margin: 0;
+        font-size: clamp(1.2rem, 1.05rem + 0.7vw, 1.75rem);
+        line-height: 1.05;
+        letter-spacing: -0.03em;
+    }
+
+    .schedule-summary-copy {
+        margin: 8px 0 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .schedule-callout {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .schedule-callout-note {
+        margin: 0;
+        max-width: 72ch;
+        color: var(--muted-text);
+    }
+
+    .schedule-board {
         display: grid;
         gap: 16px;
     }
 
-    .schedule-day {
+    .schedule-day-card {
         display: grid;
-        gap: 14px;
+        gap: 18px;
+        padding: clamp(18px, 2vw, 24px);
+        border-radius: 24px;
+        border: 1px solid var(--panel-border);
+        background:
+            radial-gradient(circle at top right, color-mix(in srgb, var(--accent-color) 10%, transparent 90%), transparent 34%),
+            var(--panel-background);
+        box-shadow: var(--surface-shadow);
     }
 
-    .schedule-day-header {
+    .schedule-day-top {
         display: flex;
-        justify-content: space-between;
         align-items: flex-start;
-        gap: 12px;
+        justify-content: space-between;
+        gap: 16px;
         flex-wrap: wrap;
     }
 
-    .schedule-items {
-        margin: 0;
-        padding-left: 1.1rem;
+    .schedule-day-heading {
         display: grid;
+        gap: 10px;
+    }
+
+    .schedule-day-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: fit-content;
+        padding: 0.38rem 0.72rem;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--accent-color) 12%, var(--card-bg) 88%);
+        border: 1px solid color-mix(in srgb, var(--accent-color) 24%, var(--border-color) 76%);
+        color: var(--text-color);
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+    }
+
+    .schedule-day-title-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .schedule-day-title {
+        margin: 0;
+        line-height: 1.1;
+    }
+
+    .schedule-day-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 32px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--bg-color) 68%, var(--card-bg) 32%);
+        border: 1px solid var(--border-color);
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .schedule-day-copy {
+        margin: 0;
+        color: var(--muted-text);
+        max-width: 64ch;
+    }
+
+    .schedule-day-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .schedule-day-actions .btn {
+        white-space: nowrap;
+    }
+
+    .schedule-tray-section {
+        display: grid;
+        gap: 10px;
+    }
+
+    .schedule-section-label {
+        margin: 0;
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted-text);
+    }
+
+    .schedule-tray-row {
+        display: flex;
+        flex-wrap: wrap;
         gap: 8px;
     }
 
-    .schedule-trays {
-        color: var(--muted-text);
+    .schedule-tray-chip,
+    .schedule-meta-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0.45rem 0.75rem;
+        border-radius: 999px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 68%, var(--card-bg) 32%);
+        font-size: var(--font-size-sm);
+        color: var(--text-color);
+    }
+
+    .schedule-tray-empty {
         margin: 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .schedule-item-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    .schedule-item-card {
+        display: grid;
+        gap: 12px;
+        min-width: 0;
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid color-mix(in srgb, var(--accent-color) 12%, var(--border-color) 88%);
+        background: color-mix(in srgb, var(--card-bg) 92%, var(--bg-color) 8%);
+        box-shadow: inset 0 1px 0 var(--surface-border-strong);
+    }
+
+    .schedule-item-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .schedule-item-badges,
+    .schedule-item-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .schedule-item-order,
+    .schedule-item-type {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .schedule-item-order {
+        background: color-mix(in srgb, var(--bg-color) 72%, var(--card-bg) 28%);
+        border: 1px solid var(--border-color);
+    }
+
+    .schedule-item-type {
+        border: 1px solid transparent;
+    }
+
+    .schedule-item-type.is-stock {
+        background: color-mix(in srgb, #2f9e44 14%, var(--card-bg) 86%);
+        border-color: color-mix(in srgb, #2f9e44 40%, var(--border-color) 60%);
+    }
+
+    .schedule-item-type.is-cross {
+        background: color-mix(in srgb, #1c7ed6 14%, var(--card-bg) 86%);
+        border-color: color-mix(in srgb, #1c7ed6 40%, var(--border-color) 60%);
+    }
+
+    .schedule-item-type.is-unknown {
+        background: color-mix(in srgb, #868e96 12%, var(--card-bg) 88%);
+        border-color: color-mix(in srgb, #868e96 34%, var(--border-color) 66%);
+    }
+
+    .schedule-item-body {
+        color: var(--text-color);
+        line-height: 1.5;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .schedule-item-body > *:last-child {
+        margin-bottom: 0;
+    }
+
+    .schedule-modal-summary {
+        margin-bottom: 16px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 74%, var(--card-bg) 26%);
+    }
+
+    .schedule-modal-summary strong,
+    .schedule-modal-summary span {
+        display: block;
+    }
+
+    .schedule-modal-summary span {
+        margin-top: 4px;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    @media (max-width: 1199px) {
+        .schedule-summary-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
     }
 
     @media (max-width: 767px) {
-        .schedule-day-header form,
-        .schedule-day-header .btn {
+        .schedule-summary-grid,
+        .schedule-item-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .schedule-day-actions,
+        .schedule-day-actions .btn {
             width: 100%;
         }
     }
@@ -47,64 +308,216 @@
 {% endblock %}
 
 {% block content %}
-<div class="schedule-page">
+{% set summary = namespace(total_items=0, tray_ids=[], next_date=None, next_day_name=None, peak_date=None, peak_day_name=None, peak_count=0) %}
+{% for date, data in schedule|dictsort %}
+    {% set item_count = data.flip_items|length %}
+    {% set summary.total_items = summary.total_items + item_count %}
+    {% if summary.next_date is none %}
+        {% set summary.next_date = date %}
+        {% set summary.next_day_name = data.day_of_week %}
+    {% endif %}
+    {% if item_count > summary.peak_count %}
+        {% set summary.peak_count = item_count %}
+        {% set summary.peak_date = date %}
+        {% set summary.peak_day_name = data.day_of_week %}
+    {% endif %}
+    {% for tray in data.trays %}
+        {% if tray not in summary.tray_ids %}
+            {% set summary.tray_ids = summary.tray_ids + [tray] %}
+        {% endif %}
+    {% endfor %}
+{% endfor %}
+
+<div class="schedule-shell">
     <div class="app-panel app-page-header">
         <div>
             <p class="app-kicker">Planning</p>
             <h1 class="app-page-title">Flip Schedule</h1>
-            <p class="app-page-subtitle">Review upcoming workload by day, see which trays are involved, and generate labels directly from the schedule.</p>
+            <p class="app-page-subtitle">Review the upcoming flip queue day by day, confirm which trays are involved, and generate label runs without leaving the schedule.</p>
         </div>
-        <div class="app-chip-row">
+        <div class="app-toolbar">
             <span class="app-chip"><i class="fas fa-calendar-alt"></i> {{ schedule|length }} scheduled day{% if schedule|length != 1 %}s{% endif %}</span>
+            <span class="app-chip"><i class="fas fa-tags"></i> {{ summary.total_items }} item{% if summary.total_items != 1 %}s{% endif %}</span>
         </div>
     </div>
 
-    <div class="schedule-list">
-        {% for date, data in schedule.items() %}
-            <div class="app-panel schedule-day">
-                <div class="schedule-day-header">
-                    <div>
-                        <h3 class="app-section-title mb-1">{{ date }} ({{ data.day_of_week }})</h3>
-                        <p class="schedule-trays"><strong>Trays Needed:</strong> {{ data.trays|join(', ') }}</p>
-                    </div>
-                    <form method="POST" action="{{ url_for('flip.generate_labels_for_day_route') }}">
-                            <input type="hidden" name="date" value="{{ date }}">
-                            <input type="hidden" name="blank_spaces" id="blankSpaces">
-                            <button type="submit" class="btn btn-primary submit-button">Generate Labels for {{ data.day_of_week }}</button>
-                    </form>
-                </div>
+    {% if error %}
+    <div class="alert alert-danger" role="alert">
+        {{ error }}
+    </div>
+    {% endif %}
 
-                <ul class="schedule-items">
-                        {% for item in data.flip_items %}
-                            <li>{{ item.display_string|safe }}</li>
-                        {% endfor %}
-                </ul>
+    <div class="schedule-summary-grid">
+        <div class="schedule-summary-card">
+            <p class="schedule-summary-label">Scheduled Days</p>
+            <p class="schedule-summary-value">{{ schedule|length }}</p>
+            <p class="schedule-summary-copy">Distinct dates with at least one scheduled flip.</p>
+        </div>
+        <div class="schedule-summary-card">
+            <p class="schedule-summary-label">Scheduled Items</p>
+            <p class="schedule-summary-value">{{ summary.total_items }}</p>
+            <p class="schedule-summary-copy">Total stocks and crosses currently in the queue.</p>
+        </div>
+        <div class="schedule-summary-card">
+            <p class="schedule-summary-label">Trays Involved</p>
+            <p class="schedule-summary-value">{{ summary.tray_ids|length }}</p>
+            <p class="schedule-summary-copy">Unique tray{% if summary.tray_ids|length != 1 %}s{% endif %} touched across the visible schedule.</p>
+        </div>
+        <div class="schedule-summary-card">
+            <p class="schedule-summary-label">Busiest Day</p>
+            <p class="schedule-summary-value">{% if summary.peak_date %}{{ summary.peak_count }}{% else %}0{% endif %}</p>
+            <p class="schedule-summary-copy">
+                {% if summary.peak_date %}
+                    {{ summary.peak_day_name }} · {{ summary.peak_date }}
+                {% else %}
+                    No upcoming workload.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="app-panel schedule-callout">
+        <div>
+            <h2 class="app-section-title mb-2">Plan Print Runs By Day</h2>
+            <p class="schedule-callout-note">Each day card groups the queue, trays, and label action together so you can verify the workload first and then generate the corresponding sheet with an optional blank-label offset.</p>
+        </div>
+        <div class="app-inline-note">
+            {% if summary.next_date %}
+                Next scheduled day: <strong>{{ summary.next_day_name }}</strong> on <strong>{{ summary.next_date }}</strong>
+            {% else %}
+                No scheduled flips pending.
+            {% endif %}
+        </div>
+    </div>
+
+    {% if schedule %}
+    <div class="schedule-board">
+        {% for date, data in schedule|dictsort %}
+        <section class="schedule-day-card">
+            <div class="schedule-day-top">
+                <div class="schedule-day-heading">
+                    <span class="schedule-day-kicker"><i class="fas fa-calendar-day"></i> {{ data.day_of_week }}</span>
+                    <div class="schedule-day-title-row">
+                        <h2 class="schedule-day-title">{{ date }}</h2>
+                        <span class="schedule-day-count">{{ data.flip_items|length }} scheduled item{% if data.flip_items|length != 1 %}s{% endif %}</span>
+                    </div>
+                    <p class="schedule-day-copy">Review tray coverage before generating labels so the print run matches the physical work queued for this day.</p>
+                </div>
+                <div class="schedule-day-actions">
+                    <button
+                        type="button"
+                        class="btn btn-primary schedule-label-trigger"
+                        data-toggle="modal"
+                        data-target="#labelOptionsModal"
+                        data-date="{{ date }}"
+                        data-day="{{ data.day_of_week }}"
+                        data-count="{{ data.flip_items|length }}"
+                    >
+                        <i class="fas fa-print"></i> Generate Labels
+                    </button>
+                </div>
             </div>
+
+            <div class="schedule-tray-section">
+                <p class="schedule-section-label">Trays Needed</p>
+                {% if data.trays %}
+                <div class="schedule-tray-row">
+                    {% for tray in data.trays %}
+                    <span class="schedule-tray-chip"><i class="fas fa-th-large"></i> {{ tray }}</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="schedule-tray-empty">No tray assignments were detected for this day yet.</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <p class="schedule-section-label mb-2">Scheduled Queue</p>
+                <div class="schedule-item-grid">
+                    {% for item in data.flip_items %}
+                    <article class="schedule-item-card">
+                        <div class="schedule-item-head">
+                            <div class="schedule-item-badges">
+                                <span class="schedule-item-order">#{{ loop.index }}</span>
+                                {% if item.type == 'stock' %}
+                                <span class="schedule-item-type is-stock">Stock</span>
+                                {% elif item.type == 'cross' %}
+                                <span class="schedule-item-type is-cross">Cross</span>
+                                {% else %}
+                                <span class="schedule-item-type is-unknown">Queued</span>
+                                {% endif %}
+                            </div>
+                            <div class="schedule-item-meta">
+                                {% if item.tray %}
+                                <span class="schedule-meta-chip"><i class="fas fa-th"></i> {{ item.tray }}</span>
+                                {% endif %}
+                                {% if item.uid %}
+                                <span class="schedule-meta-chip"><i class="fas fa-fingerprint"></i> {{ item.uid }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="schedule-item-body">{{ item.display_string|safe }}</div>
+                    </article>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
         {% endfor %}
+    </div>
+    {% else %}
+    <div class="app-panel app-empty-state">
+        <h3>No scheduled flips found</h3>
+        <p>There are no upcoming scheduled items right now. Once stocks or crosses land in the queue, they will appear here with tray grouping and label actions.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="modal fade" id="labelOptionsModal" tabindex="-1" role="dialog" aria-labelledby="labelOptionsModalTitle" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="labelOptionsModalTitle">Generate Daily Labels</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST" action="{{ url_for('flip.generate_labels_for_day_route') }}" id="labelOptionsForm">
+                <div class="modal-body">
+                    <div class="schedule-modal-summary">
+                        <strong id="labelModalDay">Select a scheduled day</strong>
+                        <span id="labelModalCount">Choose an optional blank-label offset before generating the sheet.</span>
+                    </div>
+                    <input type="hidden" name="date" id="labelDateInput">
+                    <div class="form-group mb-0">
+                        <label for="blankSpacesInput">Blank label spaces</label>
+                        <input type="number" class="form-control" id="blankSpacesInput" name="blank_spaces" value="0" min="0" max="200" step="1">
+                        <small class="form-text text-muted">Use this to leave unused labels at the top of the sheet before printing the scheduled batch.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="labelSubmitButton">Generate Labels</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
-    // Select all buttons with the class 'submit-button'
-    document.querySelectorAll('.submit-button').forEach(function(button) {
-        // Add a click event listener to each button
-        button.addEventListener('click', function(event) {
-            // Prevent the default form submission
-            event.preventDefault();
+    document.querySelectorAll('.schedule-label-trigger').forEach(function(button) {
+        button.addEventListener('click', function() {
+            var date = this.dataset.date || '';
+            var day = this.dataset.day || 'Scheduled day';
+            var count = Number(this.dataset.count || '0');
+            var itemLabel = count === 1 ? 'item' : 'items';
 
-            // Ask the user how many blank spaces they want to leave
-            var blankSpaces = prompt('How many blank spaces would you like to leave?');
-            
-            // Find the associated form of the clicked button
-            var form = this.closest('form');
-
-            // Set the value of the hidden input to the user's response
-            form.querySelector('#blankSpaces').value = blankSpaces;
-
-            // Submit the form
-            form.submit();
+            document.getElementById('labelDateInput').value = date;
+            document.getElementById('blankSpacesInput').value = '0';
+            document.getElementById('labelModalDay').textContent = day + ' · ' + date;
+            document.getElementById('labelModalCount').textContent = count + ' scheduled ' + itemLabel + ' will be included in this label run.';
+            document.getElementById('labelSubmitButton').textContent = 'Generate Labels for ' + day;
         });
     });
 </script>

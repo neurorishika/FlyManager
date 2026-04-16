@@ -5,6 +5,16 @@
     .tray-view-shell {
         display: grid;
         gap: 18px;
+        --tray-soft-surface: color-mix(in srgb, var(--card-bg) 88%, var(--bg-color) 12%);
+        --tray-soft-surface-strong: color-mix(in srgb, var(--card-bg) 94%, white 6%);
+        --tray-soft-surface-muted: color-mix(in srgb, var(--bg-color) 72%, var(--card-bg) 28%);
+        --tray-border-soft: color-mix(in srgb, var(--accent-color) 18%, var(--border-color) 82%);
+        --tray-border-strong: color-mix(in srgb, var(--accent-color) 26%, var(--border-color) 74%);
+        --tray-text-strong: color-mix(in srgb, var(--text-color) 92%, var(--card-bg) 8%);
+        --tray-text-muted: color-mix(in srgb, var(--text-color) 74%, transparent 26%);
+        --tray-chip-bg: color-mix(in srgb, var(--accent-color) 12%, var(--card-bg) 88%);
+        --tray-chip-text: color-mix(in srgb, var(--accent-color) 62%, var(--text-color) 38%);
+        --tray-shadow-soft: 0 14px 30px rgba(122, 100, 168, 0.08);
     }
 
     .tray-workspace-grid {
@@ -57,9 +67,9 @@
     .tray-stat-card {
         padding: 0.95rem 1rem;
         border-radius: 16px;
-        border: 1px solid rgba(124, 100, 173, 0.15);
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 244, 255, 0.92));
-        box-shadow: 0 14px 30px rgba(122, 100, 168, 0.08);
+        border: 1px solid var(--tray-border-soft);
+        background: linear-gradient(180deg, var(--tray-soft-surface-strong), var(--tray-soft-surface));
+        box-shadow: var(--tray-shadow-soft);
         display: grid;
         gap: 4px;
     }
@@ -69,17 +79,17 @@
         font-weight: 700;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: rgba(94, 74, 136, 0.72);
+        color: var(--tray-text-muted);
     }
 
     .tray-stat-card strong {
         font-size: 1.75rem;
         line-height: 1;
-        color: #403061;
+        color: var(--tray-text-strong);
     }
 
     .tray-stat-card small {
-        color: rgba(64, 48, 97, 0.74);
+        color: var(--tray-text-muted);
     }
 
     .tray-board-status {
@@ -87,8 +97,8 @@
         align-items: center;
         padding: 0.55rem 0.8rem;
         border-radius: 999px;
-        background: rgba(122, 100, 168, 0.08);
-        color: #5a467f;
+        background: var(--tray-chip-bg);
+        color: var(--tray-chip-text);
         font-size: 0.88rem;
         font-weight: 600;
     }
@@ -109,8 +119,8 @@
         gap: 14px;
         padding: 1rem 1.1rem;
         border-radius: 18px;
-        background: linear-gradient(135deg, rgba(119, 87, 177, 0.1), rgba(97, 196, 215, 0.1));
-        border: 1px solid rgba(124, 100, 173, 0.14);
+        background: linear-gradient(135deg, color-mix(in srgb, var(--accent-color) 14%, transparent 86%), color-mix(in srgb, #1897b7 12%, transparent 88%));
+        border: 1px solid var(--tray-border-soft);
         margin-bottom: 1rem;
     }
 
@@ -121,7 +131,7 @@
     .tray-guidance-list {
         margin: 0;
         padding-left: 1rem;
-        color: rgba(59, 50, 91, 0.88);
+        color: var(--tray-text-strong);
     }
 
     .tray-guidance-list li + li {
@@ -132,14 +142,14 @@
         margin-bottom: 1rem;
         padding: 0.85rem 1rem;
         border-radius: 14px;
-        border: 1px solid rgba(124, 100, 173, 0.14);
-        background: rgba(255, 255, 255, 0.88);
-        color: rgba(51, 40, 84, 0.88);
+        border: 1px solid var(--tray-border-soft);
+        background: var(--tray-soft-surface-strong);
+        color: var(--tray-text-strong);
     }
 
     .tray-sidebar-note {
         margin-top: 0.35rem;
-        color: rgba(62, 48, 97, 0.68);
+        color: var(--tray-text-muted);
         font-size: 0.88rem;
     }
 
@@ -150,8 +160,8 @@
         padding: 0.1rem 0.45rem;
         margin-left: 0.35rem;
         border-radius: 999px;
-        background: rgba(122, 100, 168, 0.1);
-        color: #5b487f;
+        background: var(--tray-chip-bg);
+        color: var(--tray-chip-text);
         font-size: 0.78rem;
         font-weight: 700;
     }
@@ -163,7 +173,7 @@
         font-weight: 700;
         letter-spacing: 0.05em;
         text-transform: uppercase;
-        color: rgba(88, 69, 128, 0.74);
+        color: var(--tray-text-muted);
     }
 
     .occupied-position-pill {
@@ -174,8 +184,8 @@
         padding: 0.2rem 0.45rem;
         border-radius: 999px;
         font-weight: 700;
-        background: rgba(122, 100, 168, 0.09);
-        color: #56417b;
+        background: var(--tray-chip-bg);
+        color: var(--tray-chip-text);
     }
 
     .occupied-type-badge {
@@ -188,12 +198,49 @@
 
     .occupied-type-stock {
         background: rgba(40, 167, 69, 0.12);
-        color: #1f7c36;
+        color: color-mix(in srgb, #2ca45c 70%, var(--text-color) 30%);
     }
 
     .occupied-type-cross {
         background: rgba(0, 123, 255, 0.12);
-        color: #0f5dbb;
+        color: color-mix(in srgb, #1897b7 72%, var(--text-color) 28%);
+    }
+
+    .occupied-list-scroll {
+        max-height: min(28rem, 55vh);
+        overflow: auto;
+        border: 1px solid var(--tray-border-soft);
+        border-radius: 16px;
+        background: var(--tray-soft-surface-muted);
+        scrollbar-width: thin;
+    }
+
+    .tray-occupied-table {
+        margin-bottom: 0;
+        color: var(--text-color);
+    }
+
+    .tray-occupied-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--tray-soft-surface-strong);
+        color: var(--tray-text-strong);
+        border-top: 0;
+        border-bottom-color: var(--tray-border-soft);
+    }
+
+    .tray-occupied-table td {
+        color: var(--text-color);
+        border-top-color: var(--tray-border-soft);
+    }
+
+    .tray-occupied-table.table-striped tbody tr:nth-of-type(odd) {
+        background-color: color-mix(in srgb, var(--bg-color) 58%, var(--card-bg) 42%);
+    }
+
+    .tray-occupied-table.table-striped tbody tr:nth-of-type(even) {
+        background-color: color-mix(in srgb, var(--card-bg) 88%, transparent 12%);
     }
 
     .tray-occupied-table td,
@@ -351,141 +398,142 @@
 
                 <div class="tray-side-column">
                     <div class="card tray-sidebar-card">
-                <div class="card-header">
-                    <div>
-                        <h3 class="app-section-title mb-0">Available Items</h3>
-                        <div class="tray-sidebar-note">Only orphaned items show by default so the drag list stays focused.</div>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="custom-control custom-switch">
-                            <input type="checkbox" class="custom-control-input" id="showAllItems">
-                            <label class="custom-control-label" for="showAllItems">Show all items</label>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <ul class="nav nav-tabs" id="itemTabs" role="tablist">
-                        <li class="nav-item">
-                            <a class="nav-link active" id="stock-tab" data-toggle="tab" href="#stock-content" role="tab">Stocks <span class="tray-tab-count" id="visibleStockCount">0</span></a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" id="cross-tab" data-toggle="tab" href="#cross-content" role="tab">Crosses <span class="tray-tab-count" id="visibleCrossCount">0</span></a>
-                        </li>
-                    </ul>
-                    
-                    <div class="tab-content mt-3" id="itemTabsContent">
-                        <!-- Stocks Tab -->
-                        <div class="tab-pane fade show active" id="stock-content" role="tabpanel">
-                            <div class="form-group">
-                                <label class="tray-search-label" for="stockSearch">Search Stocks</label>
-                                <input type="text" class="form-control" id="stockSearch" placeholder="Search stocks...">
+                        <div class="card-header">
+                            <div>
+                                <h3 class="app-section-title mb-0">Available Items</h3>
+                                <div class="tray-sidebar-note">Only orphaned items show by default so the drag list stays focused.</div>
                             </div>
-                            
-                            <div class="item-list" id="stocksList">
-                                {% for stock in stocks %}
-                                <div class="drag-item stock-item" draggable="true"
-                                     data-type="stock"
-                                     data-id="{{ stock.UniqueID }}"
-                                     data-name="{{ stock.Name }}"
-                                     data-genotype="{{ stock.Genotype }}"
-                                     data-vials="{{ stock.required_vials }}"
-                                     data-tray-id="{{ stock.TrayID }}"
-                                     data-tray-position="{{ stock.TrayPosition }}">
-                                    <div class="item-header">{{ stock.Name }} ({{ stock.UniqueID }})</div>
-                                    <div class="item-genotype">{{ stock.Genotype }}</div>
-                                    <div class="item-info">
-                                        <span class="badge badge-info">{{ stock.required_vials }} vials needed</span>
-                                        {% if stock.TrayID and stock.TrayPosition %}
-                                        <span class="badge badge-warning">Currently in {{ stock.TrayID }}-{{ stock.TrayPosition }}</span>
-                                        {% endif %}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" class="custom-control-input" id="showAllItems">
+                                    <label class="custom-control-label" for="showAllItems">Show all items</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <ul class="nav nav-tabs" id="itemTabs" role="tablist">
+                                <li class="nav-item">
+                                    <a class="nav-link active" id="stock-tab" data-toggle="tab" href="#stock-content" role="tab">Stocks <span class="tray-tab-count" id="visibleStockCount">0</span></a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" id="cross-tab" data-toggle="tab" href="#cross-content" role="tab">Crosses <span class="tray-tab-count" id="visibleCrossCount">0</span></a>
+                                </li>
+                            </ul>
+
+                            <div class="tab-content mt-3" id="itemTabsContent">
+                                <!-- Stocks Tab -->
+                                <div class="tab-pane fade show active" id="stock-content" role="tabpanel">
+                                    <div class="form-group">
+                                        <label class="tray-search-label" for="stockSearch">Search Stocks</label>
+                                        <input type="text" class="form-control" id="stockSearch" placeholder="Search stocks...">
+                                    </div>
+
+                                    <div class="item-list" id="stocksList">
+                                        {% for stock in stocks %}
+                                        <div class="drag-item stock-item" draggable="true"
+                                             data-type="stock"
+                                             data-id="{{ stock.UniqueID }}"
+                                             data-name="{{ stock.Name }}"
+                                             data-genotype="{{ stock.Genotype }}"
+                                             data-vials="{{ stock.required_vials }}"
+                                             data-tray-id="{{ stock.TrayID }}"
+                                             data-tray-position="{{ stock.TrayPosition }}">
+                                            <div class="item-header">{{ stock.Name }} ({{ stock.UniqueID }})</div>
+                                            <div class="item-genotype">{{ stock.Genotype }}</div>
+                                            <div class="item-info">
+                                                <span class="badge badge-info">{{ stock.required_vials }} vials needed</span>
+                                                {% if stock.TrayID and stock.TrayPosition %}
+                                                <span class="badge badge-warning">Currently in {{ stock.TrayID }}-{{ stock.TrayPosition }}</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <div class="alert alert-info">No stocks available</div>
+                                        {% endfor %}
                                     </div>
                                 </div>
-                                {% else %}
-                                <div class="alert alert-info">No stocks available</div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        
-                        <!-- Crosses Tab -->
-                        <div class="tab-pane fade" id="cross-content" role="tabpanel">
-                            <div class="form-group">
-                                <label class="tray-search-label" for="crossSearch">Search Crosses</label>
-                                <input type="text" class="form-control" id="crossSearch" placeholder="Search crosses...">
-                            </div>
-                            
-                            <div class="item-list" id="crossesList">
-                                {% for cross in crosses %}
-                                <div class="drag-item cross-item" draggable="true"
-                                     data-type="cross"
-                                     data-id="{{ cross.UniqueID }}"
-                                     data-name="{{ cross.Name }}"
-                                     data-male="{{ cross.MaleGenotype }}"
-                                     data-female="{{ cross.FemaleGenotype }}"
-                                     data-vials="{{ cross.required_vials }}"
-                                     data-tray-id="{{ cross.TrayID }}"
-                                     data-tray-position="{{ cross.TrayPosition }}">
-                                    <div class="item-header">{{ cross.Name }} ({{ cross.UniqueID }})</div>
-                                    <div class="item-genotype">Male: {{ cross.MaleGenotype }} ({{ cross.MaleUniqueID }})</div>
-                                    <div class="item-genotype">Female: {{ cross.FemaleGenotype }} ({{ cross.FemaleUniqueID }})</div>
-                                    <div class="item-info">
-                                        <span class="badge badge-info">{{ cross.required_vials }} vials needed</span>
-                                        {% if cross.TrayID and cross.TrayPosition %}
-                                        <span class="badge badge-warning">Currently in {{ cross.TrayID }}-{{ cross.TrayPosition }}</span>
-                                        {% endif %}
+
+                                <!-- Crosses Tab -->
+                                <div class="tab-pane fade" id="cross-content" role="tabpanel">
+                                    <div class="form-group">
+                                        <label class="tray-search-label" for="crossSearch">Search Crosses</label>
+                                        <input type="text" class="form-control" id="crossSearch" placeholder="Search crosses...">
+                                    </div>
+
+                                    <div class="item-list" id="crossesList">
+                                        {% for cross in crosses %}
+                                        <div class="drag-item cross-item" draggable="true"
+                                             data-type="cross"
+                                             data-id="{{ cross.UniqueID }}"
+                                             data-name="{{ cross.Name }}"
+                                             data-male="{{ cross.MaleGenotype }}"
+                                             data-female="{{ cross.FemaleGenotype }}"
+                                             data-vials="{{ cross.required_vials }}"
+                                             data-tray-id="{{ cross.TrayID }}"
+                                             data-tray-position="{{ cross.TrayPosition }}">
+                                            <div class="item-header">{{ cross.Name }} ({{ cross.UniqueID }})</div>
+                                            <div class="item-genotype">Male: {{ cross.MaleGenotype }} ({{ cross.MaleUniqueID }})</div>
+                                            <div class="item-genotype">Female: {{ cross.FemaleGenotype }} ({{ cross.FemaleUniqueID }})</div>
+                                            <div class="item-info">
+                                                <span class="badge badge-info">{{ cross.required_vials }} vials needed</span>
+                                                {% if cross.TrayID and cross.TrayPosition %}
+                                                <span class="badge badge-warning">Currently in {{ cross.TrayID }}-{{ cross.TrayPosition }}</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <div class="alert alert-info">No crosses available</div>
+                                        {% endfor %}
                                     </div>
                                 </div>
-                                {% else %}
-                                <div class="alert alert-info">No crosses available</div>
-                                {% endfor %}
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        
-            <div class="card tray-sidebar-card">
-                <div class="card-header">
-                    <div>
-                        <h3 class="app-section-title mb-0">Occupied Positions</h3>
-                        <div class="tray-sidebar-note">Use View for record details, or drag directly on the board to reposition an item.</div>
+
+                    <div class="card tray-sidebar-card">
+                    <div class="card-header">
+                        <div>
+                            <h3 class="app-section-title mb-0">Occupied Positions</h3>
+                            <div class="tray-sidebar-note">Use View for record details, or drag directly on the board to reposition an item.</div>
+                        </div>
                     </div>
-                </div>
-                <div class="card-body">
-                    <div id="occupiedList">
-                        {% if occupancy %}
-                            <table class="table table-striped mb-0 tray-occupied-table">
-                                <thead>
-                                    <tr>
-                                        <th>Position</th>
-                                        <th>Type</th>
-                                        <th>Name</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for pos, item in occupancy.items() %}
-                                    {% if item.type != 'blocked' %}
-                                    <tr>
-                                        <td><span class="occupied-position-pill">{{ pos }}</span></td>
-                                        <td><span class="occupied-type-badge occupied-type-{{ item.type }}">{{ item.type|capitalize }}</span></td>
-                                        <td>{{ item.display_name }}</td>
-                                        <td>
-                                            {% if item.type == 'stock' %}
-                                            <a href="{{ url_for('stock.view_stock', unique_id=item.id) }}" class="btn btn-sm btn-info">View</a>
-                                            {% else %}
-                                            <a href="{{ url_for('cross.view_cross', unique_id=item.id) }}" class="btn btn-sm btn-info">View</a>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endif %}
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        {% else %}
-                            <div class="alert alert-info">
-                                <i class="fas fa-info-circle"></i> No positions are currently occupied.
-                            </div>
-                        {% endif %}
+                    <div class="card-body">
+                        <div id="occupiedList">
+                            {% if occupied_positions %}
+                                <div class="occupied-list-scroll">
+                                <table class="table table-striped tray-occupied-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Position</th>
+                                            <th>Type</th>
+                                            <th>Name</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for pos, item in occupied_positions %}
+                                        <tr>
+                                            <td><span class="occupied-position-pill">{{ pos }}</span></td>
+                                            <td><span class="occupied-type-badge occupied-type-{{ item.type }}">{{ item.type|capitalize }}</span></td>
+                                            <td>{{ item.display_name }}</td>
+                                            <td>
+                                                {% if item.type == 'stock' %}
+                                                <a href="{{ url_for('stock.view_stock', unique_id=item.id) }}" class="btn btn-sm btn-info">View</a>
+                                                {% else %}
+                                                <a href="{{ url_for('cross.view_cross', unique_id=item.id) }}" class="btn btn-sm btn-info">View</a>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i> No positions are currently occupied.
+                                </div>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -599,17 +647,17 @@
         border: 1px solid rgba(124, 100, 173, 0.12);
         background-color: rgba(255, 255, 255, 0.94);
         color: var(--text-color);
-        padding: 18px 10px 10px;
-        min-height: 92px;
+        padding: 8px;
+        min-height: 62px;
         display: flex;
         flex-direction: column;
-        justify-content: flex-start;
-        align-items: stretch;
+        justify-content: center;
+        align-items: center;
         cursor: pointer;
         position: relative;
         border-radius: 16px;
         transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
-        overflow: hidden;
+        overflow: visible;
     }
     
     .tray-cell.empty {
@@ -638,55 +686,99 @@
         cursor: grab;
     }
 
+    .tray-cell:hover,
+    .tray-cell:focus-within {
+        z-index: 4;
+    }
+
     .tray-cell[data-type]:hover,
     .tray-cell.empty:hover {
         transform: translateY(-2px);
         box-shadow: 0 14px 24px rgba(90, 70, 127, 0.12);
     }
-    
-    .tray-cell .position {
-        position: absolute;
-        top: 6px;
-        left: 8px;
-        font-size: 0.68rem;
-        font-weight: 700;
-        color: rgba(69, 55, 103, 0.62);
-        opacity: 0.9;
-    }
-    
+
     .tray-cell .content {
-        text-align: left;
+        text-align: center;
         word-break: break-word;
         display: grid;
-        gap: 6px;
+        place-items: center;
+        gap: 0;
         height: 100%;
+        width: 100%;
     }
 
-    .tray-cell-title {
+    .tray-cell-code {
         font-weight: 700;
-        font-size: 0.9rem;
-        line-height: 1.2;
-        color: rgba(48, 40, 74, 0.94);
+        font-size: 0.8rem;
+        line-height: 1.1;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--tray-text-strong);
+        max-width: 100%;
+        overflow-wrap: anywhere;
     }
 
-    .tray-cell-meta,
-    .tray-cell-empty-label,
-    .tray-cell-grab,
-    .blocked-info {
-        font-size: 0.78rem;
-        line-height: 1.25;
-        color: rgba(66, 53, 101, 0.72);
+    .tray-cell-detail {
+        position: absolute;
+        left: 50%;
+        top: calc(100% + 10px);
+        transform: translateX(-50%) translateY(6px);
+        width: min(280px, calc(100vw - 32px));
+        padding: 0.8rem 0.9rem;
+        border-radius: 14px;
+        border: 1px solid var(--tray-border-strong);
+        background: color-mix(in srgb, var(--card-bg) 96%, var(--bg-color) 4%);
+        box-shadow: 0 18px 34px rgba(43, 31, 73, 0.18);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+        z-index: 8;
+        text-align: left;
     }
 
-    .tray-cell-grab {
-        margin-top: auto;
+    .tray-cell:hover .tray-cell-detail,
+    .tray-cell:focus-within .tray-cell-detail {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(0);
+    }
+
+    .tray-cell-detail-label {
+        display: inline-flex;
+        margin-bottom: 0.45rem;
+        padding: 0.18rem 0.5rem;
+        border-radius: 999px;
         font-weight: 700;
         letter-spacing: 0.03em;
         text-transform: uppercase;
+        font-size: 0.68rem;
+        background: var(--tray-chip-bg);
+        color: var(--tray-chip-text);
     }
 
-    .tray-cell-empty-label {
-        margin-top: auto;
+    .tray-cell-detail-title {
+        font-size: 0.86rem;
+        font-weight: 700;
+        line-height: 1.25;
+        color: var(--tray-text-strong);
+        margin-bottom: 0.45rem;
+        overflow-wrap: anywhere;
+    }
+
+    .tray-cell-detail-row {
+        font-size: 0.75rem;
+        line-height: 1.35;
+        color: var(--tray-text-muted);
+    }
+
+    .tray-cell-detail-row + .tray-cell-detail-row {
+        margin-top: 0.2rem;
+    }
+
+    .tray-cell-empty .tray-cell-code,
+    .tray-cell-blocked .tray-cell-code {
+        color: var(--tray-text-muted);
     }
 
     .tray-cell.drop-valid {
@@ -718,9 +810,9 @@
         display: flex;
         align-items: center;
         gap: 5px;
-        color: rgba(67, 53, 101, 0.82);
-        background: rgba(255, 255, 255, 0.74);
-        border: 1px solid rgba(124, 100, 173, 0.12);
+        color: var(--tray-text-strong);
+        background: color-mix(in srgb, var(--card-bg) 84%, transparent 16%);
+        border: 1px solid var(--tray-border-soft);
         padding: 0.45rem 0.7rem;
         border-radius: 999px;
     }
@@ -890,8 +982,16 @@
         }
 
         .tray-cell {
-            min-height: 78px;
-            padding: 16px 8px 8px;
+            min-height: 54px;
+            padding: 6px;
+        }
+
+        .tray-cell-code {
+            font-size: 0.72rem;
+        }
+
+        .tray-cell-detail {
+            width: min(240px, calc(100vw - 24px));
         }
 
         .item-list,
@@ -1019,6 +1119,64 @@
         };
     }
 
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function getTrayLocationCode(position) {
+        const trayId = document.getElementById('trayGrid').dataset.trayId;
+        return `${trayId}-${position}`;
+    }
+
+    function buildCellDetailMarkup(item, position) {
+        const locationCode = escapeHtml(getTrayLocationCode(position));
+
+        if (!item) {
+            return `
+                <div class="tray-cell-detail-label">Empty</div>
+                <div class="tray-cell-detail-title">${locationCode}</div>
+                <div class="tray-cell-detail-row">Available destination for a stock or cross.</div>
+                <div class="tray-cell-detail-row">Click to add an item here.</div>
+            `;
+        }
+
+        if (item.type === 'blocked') {
+            return `
+                <div class="tray-cell-detail-label">Blocked</div>
+                <div class="tray-cell-detail-title">${locationCode}</div>
+                <div class="tray-cell-detail-row">Reserved by ${escapeHtml(item.blocked_by_name || 'another item')}.</div>
+                <div class="tray-cell-detail-row">Start position: ${escapeHtml(item.blocked_by || '')}</div>
+            `;
+        }
+
+        const detailRows = [
+            `<div class="tray-cell-detail-label">${escapeHtml(item.type)}</div>`,
+            `<div class="tray-cell-detail-title">${escapeHtml(item.display_name)}</div>`,
+            `<div class="tray-cell-detail-row"><strong>Location:</strong> ${locationCode}</div>`,
+            `<div class="tray-cell-detail-row"><strong>Footprint:</strong> ${escapeHtml(item.required_vials)} vial${Number(item.required_vials) === 1 ? '' : 's'}</div>`,
+            `<div class="tray-cell-detail-row"><strong>Status:</strong> ${escapeHtml(item.status || 'Unknown')}</div>`,
+        ];
+
+        if (item.type === 'stock') {
+            detailRows.splice(3, 0, `<div class="tray-cell-detail-row"><strong>Genotype:</strong> ${escapeHtml(item.genotype || '')}</div>`);
+        } else if (item.type === 'cross') {
+            detailRows.splice(
+                3,
+                0,
+                `<div class="tray-cell-detail-row"><strong>Male:</strong> ${escapeHtml(item.male_genotype || '')}</div>`,
+                `<div class="tray-cell-detail-row"><strong>Female:</strong> ${escapeHtml(item.female_genotype || '')}</div>`
+            );
+        }
+
+        detailRows.push('<div class="tray-cell-detail-row">Click for actions or drag to move.</div>');
+        return detailRows.join('');
+    }
+
     function clearFootprintPreview() {
         previewedCells.forEach(cell => {
             cell.classList.remove('drop-valid', 'drop-invalid');
@@ -1089,16 +1247,12 @@
                 const cell = document.createElement('div');
                 cell.className = 'tray-cell empty';
                 cell.dataset.position = position;
-                
-                // Add position number
-                const positionLabel = document.createElement('span');
-                positionLabel.className = 'position';
-                positionLabel.textContent = position;
-                cell.appendChild(positionLabel);
+                cell.tabIndex = 0;
                 
                 // Add content container
                 const content = document.createElement('div');
                 content.className = 'content';
+                const locationCode = escapeHtml(getTrayLocationCode(position));
                 
                 // Check if this position is occupied or blocked
                 if (occupancy && occupancy[position]) {
@@ -1107,12 +1261,10 @@
                     cell.classList.add(item.type);
                     
                     if (item.type === 'blocked') {
+                        cell.classList.add('tray-cell-blocked');
                         content.innerHTML = `
-                            <div class="blocked-info">
-                                Reserved by ${item.blocked_by_type}<br>
-                                start ${item.blocked_by}<br>
-                                ${item.blocked_by_name}
-                            </div>
+                            <div class="tray-cell-code">${locationCode}</div>
+                            <div class="tray-cell-detail">${buildCellDetailMarkup(item, position)}</div>
                         `;
                     } else {
                         cell.dataset.type = item.type;
@@ -1122,22 +1274,30 @@
                         cell.dataset.trayId = document.getElementById('trayGrid').dataset.trayId;
                         cell.dataset.originPosition = position;
                         cell.draggable = true;
-                        cell.title = `Drag to move ${item.display_name}`;
+                        cell.title = `${getTrayLocationCode(position)}: ${item.display_name}`;
                         content.innerHTML = `
-                            <div class="tray-cell-title">${item.display_name}</div>
-                            <div class="tray-cell-meta">${item.required_vials} vial footprint</div>
-                            <div class="tray-cell-grab">Drag to move</div>
+                            <div class="tray-cell-code">${locationCode}</div>
+                            <div class="tray-cell-detail">${buildCellDetailMarkup(item, position)}</div>
                         `;
                         
                         // Set click handler for viewing item details
                         cell.addEventListener('click', function() {
                             showItemDetails(item, position);
                         });
+
+                        cell.addEventListener('keydown', function(event) {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                showItemDetails(item, position);
+                            }
+                        });
                     }
                 } else {
+                    cell.classList.add('tray-cell-empty');
+                    cell.title = `${getTrayLocationCode(position)}: empty position`;
                     content.innerHTML = `
-                        <div class="tray-cell-empty-label">Empty position</div>
-                        <div class="tray-cell-grab">Drop item here</div>
+                        <div class="tray-cell-code">${locationCode}</div>
+                        <div class="tray-cell-detail">${buildCellDetailMarkup(null, position)}</div>
                     `;
                 }
                 

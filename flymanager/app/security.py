@@ -67,10 +67,9 @@ def build_content_security_policy():
 
 
 def build_permissions_policy():
-    camera_policy = "(self)" if current_app.config.get("ENABLE_CAMERA_SCANNER") else "()"
     return ", ".join(
         [
-            f"camera={camera_policy}",
+            "camera=(self)",
             "geolocation=()",
             "microphone=()",
             "payment=()",
