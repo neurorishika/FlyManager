@@ -28,7 +28,7 @@ BASE_STOCK_PROPERTIES = [
     "Genotype", "Name", 
 ]
 REQUIRED_STOCK_PROPERTIES = [
-    "SourceID", "Species",
+    "SourceID", "StockSource", "Species",
     "SeriesID", "ReplicateID",
     "Type", "Status",
     "FoodType", "VialLifetime", "FlipFrequency",
@@ -36,10 +36,16 @@ REQUIRED_STOCK_PROPERTIES = [
 ]
 OPTIONAL_STOCK_PROPERTIES = [
     "Comments", 
-    "AltReference"
+    "AltReference",
+    "SourceCollection",
+    "FlyBaseStockID",
+    "ExternalRawGenotype",
+    "ExternalSupportStatus",
+    "ExternalSupportReason",
 ]
 DEFAULT_STOCK_PROPERTY_VALUES = {
     "SourceID": "UNK",
+    "StockSource": "OTHER",
     "Species": "D. melanogaster",
     "SeriesID": "",
     "ReplicateID": "",
@@ -51,5 +57,10 @@ DEFAULT_STOCK_PROPERTY_VALUES = {
     "DevelopmentalTime": "10",
     "Provenance": "Unknown",
     "AltReference": "",
+    "SourceCollection": "",
+    "FlyBaseStockID": "",
+    "ExternalRawGenotype": "",
+    "ExternalSupportStatus": "manual",
+    "ExternalSupportReason": "",
     "Comments": ""
 }

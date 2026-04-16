@@ -64,39 +64,53 @@
     <div class="app-panel">
         <div class="app-form-section">
             <div>
-                <h2 class="app-form-section-title">Stock Data Management</h2>
-                <p class="app-form-section-copy">Run manual maintenance jobs for Bloomington reference data and gene metadata.</p>
+                <h2 class="app-form-section-title">External Reference Data</h2>
+                <p class="app-form-section-copy">Run manual maintenance jobs for FlyBase-first stock metadata and the remaining legacy Bloomington compatibility data.</p>
             </div>
 
             <div class="app-action-card">
                 <div>
-                    <h6 class="mb-1">Bloomington Stock Data</h6>
-                    <p class="text-muted mb-0">Update Bloomington stock data from the official source.</p>
+                    <h6 class="mb-1">Legacy Bloomington CSV</h6>
+                    <p class="text-muted mb-0">Refresh the legacy Bloomington compatibility dataset used as a fallback during the BDSC migration.</p>
                 </div>
-                <form method="POST" action="{{ url_for('settings.update_bloomington_stock') }}" onsubmit="return confirm('This will backup the current data, download the latest version, and update gene metadata. Continue?')">
+                <form method="POST" action="{{ url_for('settings.update_bloomington_stock') }}" onsubmit="return confirm('This will back up the legacy Bloomington CSV, download the latest version, and update legacy gene metadata. Continue?')">
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-download"></i> Update Stock Data & Genes
+                        <i class="fas fa-download"></i> Refresh Legacy Bloomington CSV
                     </button>
                 </form>
-                <small class="text-muted">Downloads new data and automatically updates gene metadata.</small>
+                <small class="text-muted">Keeps the legacy BDSC compatibility fallback current until FlyBase fully replaces it.</small>
             </div>
 
             <div class="app-action-card">
                 <div>
-                    <h6 class="mb-1">Gene Metadata Only</h6>
-                    <p class="text-muted mb-0">Update gene metadata from existing Bloomington data.</p>
+                    <h6 class="mb-1">Legacy Bloomington Gene Metadata</h6>
+                    <p class="text-muted mb-0">Update autocomplete gene metadata from the existing legacy Bloomington CSV.</p>
                 </div>
-                <form method="POST" action="{{ url_for('settings.update_gene_metadata') }}" onsubmit="return confirm('This will update gene metadata from the current Bloomington data. Continue?')">
+                <form method="POST" action="{{ url_for('settings.update_gene_metadata') }}" onsubmit="return confirm('This will update gene metadata from the current legacy Bloomington CSV. Continue?')">
                     <button type="submit" class="btn btn-secondary">
-                        <i class="fas fa-dna"></i> Update Genes Only
+                        <i class="fas fa-dna"></i> Refresh Legacy Bloomington Genes
                     </button>
                 </form>
-                <small class="text-muted">Uses the current bloomington.csv file to update gene collections.</small>
+                <small class="text-muted">Uses the current legacy bloomington.csv file to update gene collections.</small>
+            </div>
+
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1">Primary FlyBase Gene Metadata</h6>
+                    <p class="text-muted mb-0">Update gene autocomplete metadata from compatible FlyBase stock records.</p>
+                </div>
+                <form method="POST" action="{{ url_for('settings.update_flybase_gene_metadata') }}" onsubmit="return confirm('This will scan the FlyBase stocks dump and add compatible chromosome fields to autocomplete metadata. Continue?')">
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="fas fa-dna"></i> Seed Genes from FlyBase
+                    </button>
+                </form>
+                <small class="text-muted">Uses compatible Dmel stock genotypes from the primary FlyBase catalog to expand the chromosome gene lists.</small>
             </div>
 
             <div class="app-inline-note">
-                <strong>Automatic updates:</strong> 1st of each month at 2:00 AM<br>
+                <strong>Automatic legacy refresh:</strong> 1st of each month at 2:00 AM<br>
                 <strong>Backups:</strong> Stored in data/backup/ and cleaned up after 12 months<br>
+                <strong>Primary stock catalog:</strong> FlyBase<br>
                 <strong>Gene collections:</strong> X chromosome, 2nd, 3rd, and 4th chromosome genes
             </div>
         </div>

@@ -228,7 +228,7 @@ def create_app():
                 args=[app],  # Pass the app instance to the scheduled function
                 replace_existing=True,
             )
-            # Add monthly Bloomington stock update job (1st day of each month at 2 AM)
+            # Add monthly legacy Bloomington compatibility refresh job (1st day of each month at 2 AM)
             scheduler.add_job(
                 id="monthly_bloomington_update_job",
                 func=bloomington_service.update_bloomington_stock_data,

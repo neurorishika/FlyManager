@@ -49,7 +49,13 @@ def add_to_stock(user, properties, db):
 
     # create UniqueID as a hash of the (User + Genotype + SeriesID + ReplicateID)
     uid = generate_unique_id(
-        [user, properties["Genotype"], properties["SeriesID"], properties["ReplicateID"]],
+        [
+            user,
+            properties["Genotype"],
+            properties.get("StockSource", DEFAULT_STOCK_PROPERTY_VALUES["StockSource"]),
+            properties["SeriesID"],
+            properties["ReplicateID"],
+        ],
         db,
     )
 

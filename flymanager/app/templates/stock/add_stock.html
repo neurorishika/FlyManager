@@ -21,7 +21,7 @@
     </div>
     {% endif %}
 
-    <form method="POST" action="{{ url_for('stock.add_stock') }}" class="app-form-shell">
+    <form method="POST" action="{{ url_for('stock.add_stock') }}" class="app-form-shell" id="addStockForm">
         <div class="app-form-section">
             <div>
                 <h2 class="app-form-section-title">Source</h2>
@@ -31,10 +31,11 @@
             <div class="form-group col-md-3">
                 <label for="sourceType">Source Type:</label>
                 <select id="sourceType" name="sourceType" class="form-control">
-                    <option value="BDSC">BDSC</option>
+                    {% for source_value, source_label in external_source_options %}
+                    <option value="{{ source_value }}">{{ source_label }}</option>
+                    {% endfor %}
                     <option value="INTERNAL">INTERNAL</option>
-                    <option value="JRC">JRC</option>
-                    <option value="OTHER" selected>OTHER</option>
+                    <option value="OTHER">OTHER</option>
                 </select>
             </div>
             <div class="form-group col-md-6">
@@ -45,6 +46,12 @@
                 <button type="button" id="autopopulateBtn" class="btn btn-primary mt-4 btn-block" disabled>Autopopulate</button>
             </div>
         </div>
+        <div id="externalSourceNotice" class="alert alert-info d-none" role="alert"></div>
+        <input type="hidden" id="sourceCollection" name="sourceCollection">
+        <input type="hidden" id="flyBaseStockID" name="flyBaseStockID">
+        <input type="hidden" id="externalRawGenotype" name="externalRawGenotype">
+        <input type="hidden" id="externalSupportStatus" name="externalSupportStatus">
+        <input type="hidden" id="externalSupportReason" name="externalSupportReason">
         </div>
 
         <div class="app-form-section">
@@ -174,6 +181,15 @@
             <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>
         </div>
 
+        <div class="app-inline-note">
+            <input type="hidden" id="creationConfirmation" name="creationConfirmation" value="">
+            <div class="custom-control custom-checkbox">
+                <input type="checkbox" class="custom-control-input" id="stockReviewConfirmation" required>
+                <label class="custom-control-label" for="stockReviewConfirmation">I reviewed this stock and want to add it to the collection.</label>
+            </div>
+            <small class="text-muted d-block mt-2">Submitting requires this checkbox and a final confirmation prompt.</small>
+        </div>
+
         <div class="app-button-row justify-content-end">
             <a href="{{ url_for('stock.stock_explorer') }}" class="btn btn-secondary">Cancel</a>
             <button type="submit" class="btn btn-success">Add Stock</button>
@@ -191,18 +207,97 @@
     document.addEventListener("DOMContentLoaded", function() {
 
         const stockData = {{ stock_data | tojson }};
+        const externalSourceOptions = {{ external_source_options | tojson }};
 
+        const stockForm = document.getElementById('addStockForm');
         const autopopulateBtn = document.getElementById('autopopulateBtn');
         const sourceTypeSelect = document.getElementById('sourceType');
         const autopopulateSeriesBtn = document.getElementById('autopopulateSeriesBtn');
         const genotypeFields = ['#genotypeX', '#genotype2', '#genotype3', '#genotype4'];
+        const externalSources = externalSourceOptions.map(option => option[0]);
+        const sourceNotice = document.getElementById('externalSourceNotice');
+        const creationConfirmationInput = document.getElementById('creationConfirmation');
+        const stockReviewConfirmation = document.getElementById('stockReviewConfirmation');
+
+        const hiddenSourceFields = {
+            sourceCollection: document.getElementById('sourceCollection'),
+            flyBaseStockID: document.getElementById('flyBaseStockID'),
+            externalRawGenotype: document.getElementById('externalRawGenotype'),
+            externalSupportStatus: document.getElementById('externalSupportStatus'),
+            externalSupportReason: document.getElementById('externalSupportReason'),
+        };
+
+        function updateAutopopulateAvailability() {
+            const sourceType = sourceTypeSelect.value;
+            autopopulateBtn.disabled = !(externalSources.includes(sourceType) || sourceType === 'INTERNAL');
+        }
+
+        function clearGenotypeTags() {
+            tagifyX.removeAllTags();
+            tagify2.removeAllTags();
+            tagify3.removeAllTags();
+            tagify4.removeAllTags();
+        }
+
+        function populateGenotypeFieldsFromParts(parts) {
+            const tagifyInputs = [tagifyX, tagify2, tagify3, tagify4];
+            clearGenotypeTags();
+            tagifyInputs.forEach((tagifyInput, index) => {
+                const chromosomeValue = (parts[index] || '').trim();
+                if (!chromosomeValue) {
+                    return;
+                }
+                tagifyInput.addTags(chromosomeValue.split('/').filter(Boolean));
+            });
+        }
+
+        function populateGenotypeFieldsFromString(genotype) {
+            if (!genotype) {
+                clearGenotypeTags();
+                return;
+            }
+            populateGenotypeFieldsFromParts(genotype.split('; '));
+        }
+
+        function resetExternalSourceMetadata() {
+            Object.values(hiddenSourceFields).forEach(field => {
+                field.value = '';
+            });
+        }
+
+        function showSourceNotice(message, level = 'info') {
+            sourceNotice.textContent = message;
+            sourceNotice.className = `alert alert-${level}`;
+            sourceNotice.classList.remove('d-none');
+        }
+
+        function hideSourceNotice() {
+            sourceNotice.textContent = '';
+            sourceNotice.className = 'alert alert-info d-none';
+        }
+
+        function applyExternalSourceMetadata(data) {
+            hiddenSourceFields.sourceCollection.value = data.sourceCollection || '';
+            hiddenSourceFields.flyBaseStockID.value = data.flyBaseStockID || '';
+            hiddenSourceFields.externalRawGenotype.value = data.rawGenotype || '';
+            hiddenSourceFields.externalSupportStatus.value = data.supportStatus || '';
+            hiddenSourceFields.externalSupportReason.value = data.supportReason || '';
+        }
+
+        function buildStockConfirmationMessage() {
+            const stockName = document.getElementById('name').value || 'this stock';
+            const sourceType = sourceTypeSelect.value || 'OTHER';
+            const sourceID = document.getElementById('sourceID').value || 'unspecified';
+            const seriesID = document.getElementById('seriesID').value || 'unspecified';
+            const replicateID = document.getElementById('replicateID').value || 'unspecified';
+            return `Create ${stockName} from ${sourceType} ${sourceID} as series ${seriesID}, replicate ${replicateID}?`;
+        }
 
         sourceTypeSelect.addEventListener('change', function() {
-            const sourceType = sourceTypeSelect.value;
-            if (sourceType === 'BDSC' || sourceType === 'INTERNAL') {
-                autopopulateBtn.disabled = false;
-            } else {
-                autopopulateBtn.disabled = true;
+            updateAutopopulateAvailability();
+            if (sourceTypeSelect.value === 'OTHER') {
+                resetExternalSourceMetadata();
+                hideSourceNotice();
             }
         });
 
@@ -279,46 +374,74 @@
             const sourceType = sourceTypeSelect.value;
             const sourceID = document.getElementById('sourceID').value;
 
-            if (sourceType === 'BDSC') {
-                // Construct URL using url_for and replace placeholder
-                const url = "{{ url_for('stock.get_bloomington_stock_data', bdsc_stock_id='SOURCE_ID_PLACEHOLDER') }}".replace('SOURCE_ID_PLACEHOLDER', sourceID);
+            if (!sourceID) {
+                showSourceNotice('Enter a source ID before requesting autopopulate.', 'warning');
+                return;
+            }
+
+            if (externalSources.includes(sourceType)) {
+                const url = "{{ url_for('stock.get_external_stock_data', source_type='SOURCE_TYPE_PLACEHOLDER', source_stock_id='SOURCE_ID_PLACEHOLDER') }}"
+                    .replace('SOURCE_TYPE_PLACEHOLDER', encodeURIComponent(sourceType))
+                    .replace('SOURCE_ID_PLACEHOLDER', encodeURIComponent(sourceID));
                 fetch(url)
                     .then(response => response.json())
                     .then(data => {
-                        if (data.genotype) {
-                            const genes = data.genotype.split('; ');
-                            //clear all tags
-                            tagifyX.removeAllTags();
-                            tagify2.removeAllTags();
-                            tagify3.removeAllTags();
-                            tagify4.removeAllTags();
-
-                            // split each gene using '/' and add to tagify one by one
-                            tagifyX.addTags(genes[0].split('/'));
-                            tagify2.addTags(genes[1].split('/'));
-                            tagify3.addTags(genes[2].split('/'));
-                            tagify4.addTags(genes[3].split('/'));
+                        if (data.error) {
+                            resetExternalSourceMetadata();
+                            showSourceNotice(data.error, 'danger');
+                            return;
                         }
+
+                        applyExternalSourceMetadata(data);
+
+                        if (data.genotype) {
+                            populateGenotypeFieldsFromString(data.genotype);
+                        } else {
+                            clearGenotypeTags();
+                        }
+
+                        if (data.name) {
+                            document.getElementById('name').value = data.name;
+                        }
+
+                        if (data.altReference) {
+                            document.getElementById('altReference').value = data.altReference;
+                        }
+
+                        tagifySpecies.removeAllTags();
+                        tagifySpecies.addTags([data.species || 'D. melanogaster']);
+
+                        tagifyProvenance.removeAllTags();
+                        tagifyProvenance.addTags([data.provenance || data.sourceCollection || sourceType]);
+
+                        if (data.supportStatus === 'supported') {
+                            showSourceNotice(`Loaded ${data.sourceCollection || sourceType} stock ${sourceID}.`, 'info');
+                            autopopulateSeriesBtn.click();
+                        } else {
+                            showSourceNotice(
+                                `Loaded ${data.sourceCollection || sourceType} stock ${sourceID}, but its genotype is not yet compatible with the current 4-field model. Raw genotype preserved for reference: ${data.rawGenotype || 'Unavailable'}.`,
+                                'warning'
+                            );
+                        }
+                    })
+                    .catch(() => {
+                        resetExternalSourceMetadata();
+                        showSourceNotice('Unable to fetch external stock data right now.', 'danger');
                     });
             } else if (sourceType === 'INTERNAL') {
+                resetExternalSourceMetadata();
                 // Construct URL using url_for and replace placeholder
                 const url = "{{ url_for('stock.get_internal_stock_data', internal_stock_id='UID_PLACEHOLDER') }}".replace('UID_PLACEHOLDER', sourceID);
                 fetch(url)
                     .then(response => response.json())
                     .then(data => {
-                        if (data.genotype) {
-                            const genes = data.genotype.split('; ');
-                            //clear all tags
-                            tagifyX.removeAllTags();
-                            tagify2.removeAllTags();
-                            tagify3.removeAllTags();
-                            tagify4.removeAllTags();
+                        if (data.error) {
+                            showSourceNotice(data.error, 'danger');
+                            return;
+                        }
 
-                            // split each gene using '/' and add to tagify one by one
-                            tagifyX.addTags(genes[0].split('/'));
-                            tagify2.addTags(genes[1].split('/'));
-                            tagify3.addTags(genes[2].split('/'));
-                            tagify4.addTags(genes[3].split('/'));
+                        if (data.genotype) {
+                            populateGenotypeFieldsFromString(data.genotype);
                         }
                         // Populate other fields from internal data
                         document.getElementById('name').value = data.name;
@@ -342,8 +465,13 @@
                         tagifyProvenance.removeAllTags();
                         tagifyProvenance.addTags(data.provenance.split('/'));
 
+                        hideSourceNotice();
+
                         // Trigger a click event to autopopulate Series and Replicate IDs
                         autopopulateSeriesBtn.click();
+                    })
+                    .catch(() => {
+                        showSourceNotice('Unable to fetch internal stock data right now.', 'danger');
                     });
             }
         });
@@ -352,8 +480,8 @@
         // check if stockData is not empty
         if (Object.keys(stockData).length > 0) {
             // Set the source type and source ID
-            document.getElementById('sourceType').value = stockData.sourceType;
-            document.getElementById('sourceID').value = stockData.sourceID;
+            document.getElementById('sourceType').value = stockData.sourceType || 'OTHER';
+            document.getElementById('sourceID').value = stockData.sourceID || '';
             document.getElementById('name').value = stockData.name;
             document.getElementById('altReference').value = stockData.altReference;
             document.getElementById('seriesID').value = stockData.seriesID;
@@ -362,6 +490,12 @@
             document.getElementById('flipFrequency').value = stockData.flipFrequency;
             document.getElementById('developmentalTime').value = stockData.developmentalTime;
             document.getElementById('comments').value = stockData.comments;
+
+            hiddenSourceFields.sourceCollection.value = stockData.sourceCollection || '';
+            hiddenSourceFields.flyBaseStockID.value = stockData.flyBaseStockID || '';
+            hiddenSourceFields.externalRawGenotype.value = stockData.externalRawGenotype || '';
+            hiddenSourceFields.externalSupportStatus.value = stockData.externalSupportStatus || '';
+            hiddenSourceFields.externalSupportReason.value = stockData.externalSupportReason || '';
 
             // Set the status dropdown value
             const statusSelect = document.getElementById('status');
@@ -373,21 +507,22 @@
             }
 
             // Split the genotype by ';' and add to tagify one by one
-            console.log(stockData.genotype);
-            const genes = stockData.genotype.split('; ');
-            tagifyX.removeAllTags();
-            tagify2.removeAllTags();
-            tagify3.removeAllTags();
-            tagify4.removeAllTags();
-
-            tagifyX.addTags(genes[0].split('/'));
-            tagify2.addTags(genes[1].split('/'));
-            tagify3.addTags(genes[2].split('/'));
-            tagify4.addTags(genes[3].split('/'));
+            if (stockData.genotype) {
+                populateGenotypeFieldsFromString(stockData.genotype);
+            } else {
+                populateGenotypeFieldsFromParts([
+                    stockData.genotypeX,
+                    stockData.genotype2,
+                    stockData.genotype3,
+                    stockData.genotype4,
+                ]);
+            }
 
             // Split provenance by / and add to tagify (if)
             tagifyProvenance.removeAllTags();
-            tagifyProvenance.addTags(stockData.provenance.split('/'));
+            if (stockData.provenance) {
+                tagifyProvenance.addTags(stockData.provenance.split('/'));
+            }
 
             // Remove and add type, foodType
             tagifyType.removeAllTags();
@@ -399,7 +534,38 @@
             // Set species if available
             tagifySpecies.removeAllTags();
             tagifySpecies.addTags(stockData.species);
+
+            if (stockData.externalSupportStatus === 'unsupported' && stockData.externalSupportReason) {
+                showSourceNotice(stockData.externalSupportReason, 'warning');
+            }
         }
+
+        stockForm.addEventListener('input', function(event) {
+            if (event.target.id !== 'creationConfirmation') {
+                creationConfirmationInput.value = '';
+            }
+        });
+
+        stockForm.addEventListener('submit', function(event) {
+            if (creationConfirmationInput.value === 'confirmed') {
+                return;
+            }
+
+            if (!stockReviewConfirmation.checked) {
+                stockReviewConfirmation.reportValidity();
+                event.preventDefault();
+                return;
+            }
+
+            if (!window.confirm(buildStockConfirmationMessage())) {
+                event.preventDefault();
+                return;
+            }
+
+            creationConfirmationInput.value = 'confirmed';
+        });
+
+        updateAutopopulateAvailability();
         
     });
 </script>

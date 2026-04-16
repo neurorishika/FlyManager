@@ -45,6 +45,45 @@ def _get_authenticated_csrf_token(client):
     return _extract_csrf_token(response.get_data(as_text=True))
 
 
+def _stock_metadata_lookup(metadata_type, _db):
+    metadata = {
+        "types": ["Balancer"],
+        "food_types": ["Molasses"],
+        "provenances": ["Internal"],
+        "genesX": [],
+        "genes2nd": [],
+        "genes3rd": [],
+        "genes4th": [],
+        "species": ["D. melanogaster"],
+    }
+    return metadata[metadata_type]
+
+
+def _get_stock_creation_csrf_token(client):
+    with patch(
+        "flymanager.app.routes.stock.get_metadata",
+        side_effect=_stock_metadata_lookup,
+    ):
+        response = client.get("/stock/add")
+    return _extract_csrf_token(response.get_data(as_text=True))
+
+
+def _cross_metadata_lookup(metadata_type, _db):
+    metadata = {
+        "food_types": ["Molasses"],
+    }
+    return metadata[metadata_type]
+
+
+def _get_cross_creation_csrf_token(client):
+    with patch("flymanager.app.routes.cross.get_available_ports", return_value=[]), patch(
+        "flymanager.app.routes.cross.get_metadata",
+        side_effect=_cross_metadata_lookup,
+    ), patch("flymanager.app.routes.cross.get_all_genotypes", return_value=[]):
+        response = client.get("/cross/add_cross")
+    return _extract_csrf_token(response.get_data(as_text=True))
+
+
 def test_login_requires_csrf(monkeypatch):
     app = _make_app(monkeypatch)
 
@@ -109,6 +148,54 @@ def test_update_theme_accepts_valid_csrf(monkeypatch):
 
     assert response.status_code == 200
     assert response.get_json() == {"status": "success"}
+
+
+def test_stock_creation_requires_explicit_confirmation(monkeypatch):
+    app = _make_app(monkeypatch)
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "admin"
+
+        csrf_token = _get_stock_creation_csrf_token(client)
+
+        with patch(
+            "flymanager.app.routes.stock.get_metadata",
+            side_effect=_stock_metadata_lookup,
+        ), patch("flymanager.app.routes.stock.add_to_stock") as add_to_stock:
+            response = client.post(
+                "/stock/add",
+                data={"csrf_token": csrf_token},
+            )
+
+    assert response.status_code == 200
+    assert b"Please confirm the stock creation before submitting." in response.data
+    add_to_stock.assert_not_called()
+
+
+def test_cross_creation_requires_explicit_confirmation(monkeypatch):
+    app = _make_app(monkeypatch)
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "admin"
+
+        csrf_token = _get_cross_creation_csrf_token(client)
+
+        with patch("flymanager.app.routes.cross.get_available_ports", return_value=[]), patch(
+            "flymanager.app.routes.cross.get_metadata",
+            side_effect=_cross_metadata_lookup,
+        ), patch("flymanager.app.routes.cross.get_all_genotypes", return_value=[]), patch(
+            "flymanager.app.routes.cross.add_to_cross"
+        ) as add_to_cross:
+            response = client.post(
+                "/cross/add_cross",
+                data={"csrf_token": csrf_token},
+            )
+
+    assert response.status_code == 200
+    assert b"Please confirm the cross creation before submitting." in response.data
+    add_to_cross.assert_not_called()
 
 
 def test_csp_header_uses_nonce_without_unsafe_inline_scripts(monkeypatch):

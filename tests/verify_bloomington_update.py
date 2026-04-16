@@ -1,11 +1,13 @@
-from flymanager.app import create_app
-from flymanager.app.services.stock_updater import manual_update_bloomington_stock
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+from flymanager.app import create_app
+from flymanager.app.services.stock_updater import \
+    manual_update_bloomington_stock
 
 app = create_app()
 
-print("Testing Bloomington stock data update...")
+print("Testing legacy Bloomington compatibility refresh...")
 manual_update_bloomington_stock(app)
 
 # Define paths
@@ -14,7 +16,7 @@ data_dir = base_dir / "data"
 backup_dir = data_dir / "backup"
 current_file = data_dir / "bloomington.csv"
 
-print("=== Bloomington Stock Data Status ===")
+print("=== Legacy Bloomington Compatibility Data Status ===")
 print(f"Data directory: {data_dir}")
 print(f"Backup directory: {backup_dir}")
 print()
@@ -43,5 +45,7 @@ if backup_dir.exists():
         print(f"    Created: {modified_time.strftime('%Y-%m-%d %H:%M:%S')}")
 else:
     print("Backup directory: NOT FOUND")
+
+print("Test completed!")
 
 print("Test completed!")

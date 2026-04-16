@@ -130,6 +130,13 @@ def normalize_optional_text(value, *, field_name, max_length):
     return text
 
 
+def require_confirmation(value, *, action_name):
+    normalized_value = str(value or "").strip().lower()
+    if normalized_value != "confirmed":
+        raise ValueError(f"Please confirm the {action_name} before submitting.")
+    return True
+
+
 def normalize_identifier_list(value, *, field_name, max_items=100, max_length=64):
     if not isinstance(value, list):
         raise ValueError(f"{field_name} must be a list.")

@@ -1,19 +1,20 @@
 import os
-import requests
 import shutil
-import pandas as pd
 from datetime import datetime
 from pathlib import Path
+
+import pandas as pd
+import requests
 
 
 def update_bloomington_stock_data(app):
     """
-    Monthly scheduled task to backup current Bloomington data, download the latest version,
-    and update gene metadata from the new data.
+    Monthly scheduled task to back up the legacy Bloomington compatibility data,
+    download the latest version, and update legacy gene metadata.
     """
     with app.app_context():
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{timestamp}] Starting Bloomington stock data update...")
+        print(f"[{timestamp}] Starting legacy Bloomington compatibility refresh...")
 
         try:
             # Define paths
@@ -56,7 +57,7 @@ def update_bloomington_stock_data(app):
             print(f"[{timestamp}] File size: {len(response.content)} bytes")
 
             # Update gene metadata from the new data
-            print(f"[{timestamp}] Updating gene metadata from new Bloomington data...")
+            print(f"[{timestamp}] Updating gene metadata from refreshed legacy Bloomington data...")
             update_gene_metadata_from_bloomington(current_file, app, timestamp)
 
             # Clean up old backups (keep only last 12 months)
@@ -65,12 +66,12 @@ def update_bloomington_stock_data(app):
         except requests.exceptions.RequestException as e:
             print(f"[{timestamp}] Error downloading file: {e}")
         except Exception as e:
-            print(f"[{timestamp}] Error during Bloomington stock update: {e}")
+            print(f"[{timestamp}] Error during legacy Bloomington compatibility refresh: {e}")
 
 
 def update_gene_metadata_from_bloomington(csv_file_path, app, timestamp):
     """
-    Parse the Bloomington CSV file and update gene metadata in the database.
+    Parse the legacy Bloomington CSV file and update gene metadata in the database.
     """
     try:
         from flymanager.app import db
@@ -85,7 +86,7 @@ def update_gene_metadata_from_bloomington(csv_file_path, app, timestamp):
         df = df[~df["Ch # all"].str.contains("U")]
         df = df[~df["Ch # all"].str.contains("f")]
 
-        print(f"[{timestamp}] Processing {len(df)} valid Bloomington entries...")
+        print(f"[{timestamp}] Processing {len(df)} valid legacy Bloomington entries...")
 
         # Define the chromosome components dictionary
         all_components = {0: [], 1: [], 2: [], 3: []}
@@ -252,18 +253,18 @@ def cleanup_old_backups(backup_dir, timestamp):
 
 def manual_update_bloomington_stock(app):
     """
-    Manual trigger for updating Bloomington stock data (for testing or manual updates).
+    Manual trigger for refreshing the legacy Bloomington compatibility data.
     """
     update_bloomington_stock_data(app)
 
 
 def manual_update_gene_metadata_only(app):
     """
-    Manual trigger for updating gene metadata from existing Bloomington data.
+    Manual trigger for updating gene metadata from the existing legacy Bloomington CSV.
     """
     with app.app_context():
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{timestamp}] Starting manual gene metadata update...")
+        print(f"[{timestamp}] Starting manual legacy Bloomington gene metadata update...")
 
         try:
             # Define paths
@@ -281,4 +282,5 @@ def manual_update_gene_metadata_only(app):
             update_gene_metadata_from_bloomington(current_file, app, timestamp)
 
         except Exception as e:
+            print(f"[{timestamp}] Error during manual gene metadata update: {e}")
             print(f"[{timestamp}] Error during manual gene metadata update: {e}")

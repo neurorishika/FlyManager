@@ -15,15 +15,18 @@ from flymanager.app.routes.explorer_utils import (collect_unique_values,
                                                   set_flip_display_fields)
 from flymanager.app.security import (get_json_payload, limiter,
                                      normalize_identifier_list,
-                                     normalize_optional_text, parse_int_value)
+                                     normalize_optional_text, parse_int_value,
+                                     require_confirmation)
 from flymanager.app.settings import DEFAULT_STOCK_PROPERTY_VALUES
-from flymanager.utils.genetics import get_stock_genotype, qc_genotype
+from flymanager.utils.genetics import qc_genotype
 from flymanager.utils.labels import generate_label_pdf
 from flymanager.utils.mongo import (add_metadata, add_to_stock, delete_stock,
                                     edit_stock, get_eclosion_in, get_flip_in,
                                     get_metadata, get_user_initials,
                                     get_user_stocks, update_stock_vials,
                                     write_activity)
+from flymanager.utils.stock_sources import (EXTERNAL_SOURCE_OPTIONS,
+                                            get_external_stock_record)
 from flymanager.utils.utils import clean_tagify_data, increment_replicate_id
 
 bp = Blueprint("stock", __name__)  # url_prefix is defined in app/__init__
@@ -213,6 +216,13 @@ def add_stock(source_stock_id=None):
     username = session.get("username")
     error_message = None
     stock_data = {
+        "sourceType": DEFAULT_STOCK_PROPERTY_VALUES["StockSource"],
+        "sourceID": DEFAULT_STOCK_PROPERTY_VALUES["SourceID"],
+        "sourceCollection": DEFAULT_STOCK_PROPERTY_VALUES["SourceCollection"],
+        "flyBaseStockID": DEFAULT_STOCK_PROPERTY_VALUES["FlyBaseStockID"],
+        "externalRawGenotype": DEFAULT_STOCK_PROPERTY_VALUES["ExternalRawGenotype"],
+        "externalSupportStatus": DEFAULT_STOCK_PROPERTY_VALUES["ExternalSupportStatus"],
+        "externalSupportReason": DEFAULT_STOCK_PROPERTY_VALUES["ExternalSupportReason"],
         "altReference": DEFAULT_STOCK_PROPERTY_VALUES["AltReference"],
         "type": DEFAULT_STOCK_PROPERTY_VALUES["Type"],
         "foodType": DEFAULT_STOCK_PROPERTY_VALUES["FoodType"],
@@ -253,6 +263,26 @@ def add_stock(source_stock_id=None):
                 stock_data = {
                     "sourceType": "INTERNAL",  # Indicate source is internal
                     "sourceID": stock["UniqueID"],
+                    "sourceCollection": stock.get(
+                        "SourceCollection",
+                        DEFAULT_STOCK_PROPERTY_VALUES["SourceCollection"],
+                    ),
+                    "flyBaseStockID": stock.get(
+                        "FlyBaseStockID",
+                        DEFAULT_STOCK_PROPERTY_VALUES["FlyBaseStockID"],
+                    ),
+                    "externalRawGenotype": stock.get(
+                        "ExternalRawGenotype",
+                        DEFAULT_STOCK_PROPERTY_VALUES["ExternalRawGenotype"],
+                    ),
+                    "externalSupportStatus": stock.get(
+                        "ExternalSupportStatus",
+                        DEFAULT_STOCK_PROPERTY_VALUES["ExternalSupportStatus"],
+                    ),
+                    "externalSupportReason": stock.get(
+                        "ExternalSupportReason",
+                        DEFAULT_STOCK_PROPERTY_VALUES["ExternalSupportReason"],
+                    ),
                     "genotype": stock["Genotype"],
                     "name": stock["Name"],
                     "altReference": stock.get(
@@ -301,6 +331,11 @@ def add_stock(source_stock_id=None):
 
     if request.method == "POST":
         try:
+            require_confirmation(
+                request.form.get("creationConfirmation"),
+                action_name="stock creation",
+            )
+
             # --- Process Genotype Inputs ---
             genesX_input = clean_tagify_data(request.form.get("genotypeX"))
             for gene in genesX_input:
@@ -364,6 +399,15 @@ def add_stock(source_stock_id=None):
             # --- Collect Form Data ---
             new_stock_data = {
                 "SourceID": request.form.get("sourceID"),
+                "StockSource": request.form.get(
+                    "sourceType",
+                    DEFAULT_STOCK_PROPERTY_VALUES["StockSource"],
+                ),
+                "SourceCollection": request.form.get("sourceCollection"),
+                "FlyBaseStockID": request.form.get("flyBaseStockID"),
+                "ExternalRawGenotype": request.form.get("externalRawGenotype"),
+                "ExternalSupportStatus": request.form.get("externalSupportStatus"),
+                "ExternalSupportReason": request.form.get("externalSupportReason"),
                 "Genotype": final_genotype,
                 "Name": request.form.get("name"),
                 "AltReference": request.form.get("altReference"),
@@ -414,7 +458,8 @@ def add_stock(source_stock_id=None):
                 return redirect(url_for("stock.stock_explorer"))
             else:
                 error_message = uid_or_message  # Error message from add_to_stock
-                stock_data = new_stock_data  # Keep submitted data in form
+                stock_data = request.form.to_dict()
+                stock_data["genotype"] = final_genotype
 
         except ValueError as ve:
             error_message = str(ve)
@@ -439,6 +484,7 @@ def add_stock(source_stock_id=None):
         genes4=genes4,
         species_list=species_list,
         stock_data=stock_data,  # Pre-fill data
+        external_source_options=EXTERNAL_SOURCE_OPTIONS,
         error=error_message,
     )
 
@@ -734,26 +780,39 @@ def get_bloomington_stock_data(bdsc_stock_id):
         return jsonify({"error": "User not logged in."}), 401
 
     try:
-        # Assuming get_stock_genotype handles fetching from BDSC data source (e.g., CSV)
-        genotype, error = get_stock_genotype(bdsc_stock_id)  # Pass db if needed by util
-
+        stock_data, error = get_external_stock_record("BDSC", bdsc_stock_id)
         if error:
-            return (
-                jsonify({"error": error}),
-                400,
-            )  # Use 400 for client-side errors like not found
+            return jsonify({"error": error}), 400
 
-        # QC Genotype?
-        # qc_passed, final_genotype = qc_genotype(genotype)
-        # genotype_to_return = final_genotype if qc_passed else genotype
-
-        return jsonify({"genotype": genotype}), 200  # Return original fetched genotype
+        return jsonify(stock_data), 200
 
     except Exception as e:
         current_app.logger.exception(
             "Error in get_bloomington_stock_data for %s: %s", bdsc_stock_id, e
         )
         return jsonify({"error": "An internal error occurred fetching BDSC data."}), 500
+
+
+@bp.route("/get_external/<source_type>/<path:source_stock_id>", methods=["GET"])
+@login_required
+def get_external_stock_data(source_type, source_stock_id):
+    """Endpoint to fetch stock metadata from external source catalogs."""
+    if not session.get("username"):
+        return jsonify({"error": "User not logged in."}), 401
+
+    try:
+        stock_data, error = get_external_stock_record(source_type, source_stock_id)
+        if error:
+            return jsonify({"error": error}), 400
+        return jsonify(stock_data), 200
+    except Exception as e:
+        current_app.logger.exception(
+            "Error in get_external_stock_data for %s/%s: %s",
+            source_type,
+            source_stock_id,
+            e,
+        )
+        return jsonify({"error": "An internal error occurred fetching external stock data."}), 500
 
 
 @bp.route("/autopopulate_ids", methods=["POST"])

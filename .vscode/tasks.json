@@ -67,6 +67,58 @@
 			"isBackground": false,
 			"problemMatcher": [],
 			"group": "test"
+		},
+		{
+			"label": "pytest stock source tests",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_stock_sources.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest stock source tests",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_stock_sources.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest stock source tests",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_stock_sources.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest stock source tests",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_stock_sources.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
 		}
 	]
 }

@@ -130,7 +130,7 @@ You can create a stock in multiple ways:
 
 - manual entry
 - prefilled from an internal stock
-- prefilled from Bloomington data when a valid stock ID is available
+- prefilled from external stock data when a valid source and source ID are available
 
 Typical fields include:
 
@@ -317,10 +317,11 @@ The admin settings page manages:
 
 - theme behavior and accent color
 - displayed lab information
-- manual Bloomington stock data refresh
-- manual gene metadata refresh
+- manual legacy Bloomington compatibility refresh
+- manual legacy Bloomington gene metadata refresh
+- manual FlyBase gene metadata refresh
 
-The Bloomington refresh workflow also updates gene metadata and stores backup material under the repository data area.
+FlyBase is the primary external stock catalog. The legacy Bloomington refresh workflow remains available as a compatibility fallback during the BDSC migration, and it stores backup material under the repository data area.
 
 ## Launch And Handoff Checklist
 

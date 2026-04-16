@@ -6,6 +6,7 @@ from flymanager.app.routes.auth import admin_required, login_required
 from flymanager.app.security import (get_json_payload, limiter,
                                      normalize_optional_text)
 from flymanager.app.services import bloomington as bloomington_service
+from flymanager.app.services import flybase as flybase_service
 from flymanager.utils.mongo import (get_settings, update_settings,
                                     write_activity)
 
@@ -81,14 +82,14 @@ def admin_settings():
 @admin_required
 @limiter.limit("2 per hour")
 def update_bloomington_stock():
-    """Manual trigger for updating Bloomington stock data."""
+    """Manual trigger for refreshing the legacy Bloomington compatibility dataset."""
     try:
         bloomington_service.manual_update_bloomington_stock(
             current_app._get_current_object()
         )
-        flash("Bloomington stock data update initiated successfully!", "success")
+        flash("Legacy Bloomington compatibility refresh initiated successfully!", "success")
     except Exception as e:
-        flash(f"Error updating Bloomington stock data: {str(e)}", "error")
+        flash(f"Error refreshing legacy Bloomington compatibility data: {str(e)}", "error")
 
     return redirect(url_for("settings.admin_settings"))
 
@@ -98,13 +99,30 @@ def update_bloomington_stock():
 @admin_required
 @limiter.limit("2 per hour")
 def update_gene_metadata():
-    """Manual trigger for updating gene metadata from existing Bloomington data."""
+    """Manual trigger for updating gene metadata from the legacy Bloomington CSV."""
     try:
         bloomington_service.manual_update_gene_metadata_only(
             current_app._get_current_object()
         )
-        flash("Gene metadata update initiated successfully!", "success")
+        flash("Legacy Bloomington gene metadata update initiated successfully!", "success")
     except Exception as e:
-        flash(f"Error updating gene metadata: {str(e)}", "error")
+        flash(f"Error updating legacy Bloomington gene metadata: {str(e)}", "error")
+
+    return redirect(url_for("settings.admin_settings"))
+
+
+@bp.route("/update-flybase-gene-metadata", methods=["POST"])
+@login_required
+@admin_required
+@limiter.limit("2 per hour")
+def update_flybase_gene_metadata():
+    """Manual trigger for updating gene metadata from compatible FlyBase stock records."""
+    try:
+        flybase_service.manual_update_flybase_gene_metadata_only(
+            current_app._get_current_object()
+        )
+        flash("FlyBase gene metadata update initiated successfully!", "success")
+    except Exception as e:
+        flash(f"Error updating FlyBase gene metadata: {str(e)}", "error")
 
     return redirect(url_for("settings.admin_settings"))

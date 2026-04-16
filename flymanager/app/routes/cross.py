@@ -11,7 +11,7 @@ from flymanager.app.routes.explorer_utils import (collect_unique_values,
                                                   set_flip_display_fields)
 from flymanager.app.security import (get_json_payload, limiter,
                                      normalize_identifier_list,
-                                     parse_int_value)
+                                     parse_int_value, require_confirmation)
 from flymanager.app.settings import DEFAULT_CROSS_PROPERTY_VALUES
 from flymanager.utils.genetics import cross_genotypes, qc_genotype
 from flymanager.utils.labels import generate_label_pdf
@@ -254,6 +254,11 @@ def add_cross(unique_id=None):
 
     if request.method == "POST":
         try:
+            require_confirmation(
+                request.form.get("creationConfirmation"),
+                action_name="cross creation",
+            )
+
             # Process input data
             male_genotype_input = clean_tagify_data(request.form.get("maleGenotype"))[0]
             female_genotype_input = clean_tagify_data(

@@ -64,7 +64,7 @@
         <p id="scanStatusMessage" class="text-muted mb-0">The server-attached scanner remains available while client-side scan modes are validated.</p>
     </div>
 
-    <form method="POST" action="{{ url_for('cross.add_cross') }}" class="app-form-shell">
+    <form method="POST" action="{{ url_for('cross.add_cross') }}" class="app-form-shell" id="addCrossForm">
         <div class="app-form-section">
             <div>
                 <h2 class="app-form-section-title">Parent Selection</h2>
@@ -175,6 +175,15 @@
             <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>
         </div>
 
+        <div class="app-inline-note">
+            <input type="hidden" id="creationConfirmation" name="creationConfirmation" value="">
+            <div class="custom-control custom-checkbox">
+                <input type="checkbox" class="custom-control-input" id="crossReviewConfirmation" required>
+                <label class="custom-control-label" for="crossReviewConfirmation">I reviewed this cross and want to add it to the collection.</label>
+            </div>
+            <small class="text-muted d-block mt-2">Submitting requires this checkbox and a final confirmation prompt.</small>
+        </div>
+
         <div class="app-button-row justify-content-end">
             <a href="{{ url_for('cross.cross_explorer') }}" class="btn btn-secondary">Cancel</a>
             <button type="submit" class="btn btn-success">Add Cross</button>
@@ -218,10 +227,20 @@
         const startCameraScanBtn = document.getElementById('startCameraScanBtn');
         const stopCameraScanBtn = document.getElementById('stopCameraScanBtn');
         const scanStatusMessage = document.getElementById('scanStatusMessage');
+        const addCrossForm = document.getElementById('addCrossForm');
+        const creationConfirmationInput = document.getElementById('creationConfirmation');
+        const crossReviewConfirmation = document.getElementById('crossReviewConfirmation');
         const maleUniqueIdInput = document.getElementById('maleUniqueID');
         const femaleUniqueIdInput = document.getElementById('femaleUniqueID');
         let maleAutonomousInput = null;
         let femaleAutonomousInput = null;
+
+        function buildCrossConfirmationMessage() {
+            const crossName = document.getElementById('name').value || 'this cross';
+            const maleReference = maleUniqueIdInput.value || document.getElementById('maleGenotype').value || 'unspecified male';
+            const femaleReference = femaleUniqueIdInput.value || document.getElementById('femaleGenotype').value || 'unspecified female';
+            return `Create ${crossName} using male ${maleReference} and female ${femaleReference}?`;
+        }
 
         function setScanStatus(message) {
             scanStatusMessage.textContent = message;
@@ -444,6 +463,31 @@
                     : 'Client serial scanning is not available in this browser session.');
             }
         }
+
+        addCrossForm.addEventListener('input', function(event) {
+            if (event.target.id !== 'creationConfirmation') {
+                creationConfirmationInput.value = '';
+            }
+        });
+
+        addCrossForm.addEventListener('submit', function(event) {
+            if (creationConfirmationInput.value === 'confirmed') {
+                return;
+            }
+
+            if (!crossReviewConfirmation.checked) {
+                crossReviewConfirmation.reportValidity();
+                event.preventDefault();
+                return;
+            }
+
+            if (!window.confirm(buildCrossConfirmationMessage())) {
+                event.preventDefault();
+                return;
+            }
+
+            creationConfirmationInput.value = 'confirmed';
+        });
 
         // Function to update species display and warning
         function updateSpeciesDisplay() {
