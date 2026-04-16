@@ -4,7 +4,6 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import MagicMock, patch
 
-
 MODULE_PATH = Path(__file__).resolve().parents[1] / "flymanager" / "utils" / "mongo" / "trays.py"
 MODULE_SPEC = importlib.util.spec_from_file_location("test_trays_module", MODULE_PATH)
 trays_module = importlib.util.module_from_spec(MODULE_SPEC)

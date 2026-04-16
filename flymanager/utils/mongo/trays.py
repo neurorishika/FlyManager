@@ -354,8 +354,8 @@ def move_item_to_tray(user, item_type, item_id, tray_id, position, db):
         True if the item was moved/removed, False otherwise.
     """
     # Import to avoid circular imports
-    from flymanager.utils.mongo.stocks import edit_stock, get_stock
     from flymanager.utils.mongo.crosses import edit_cross, get_cross
+    from flymanager.utils.mongo.stocks import edit_stock, get_stock
 
     # Handle removal from tray (empty tray_id and position)
     if tray_id == "" and position == "":
