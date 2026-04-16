@@ -422,7 +422,6 @@
     top: 0;
     z-index: 2;
     padding: 0 10px 10px;
-    background: var(--panel-background);
     background-clip: padding-box;
     color: var(--muted-text);
     font-size: 0.74rem;
@@ -569,6 +568,7 @@
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
     overflow-wrap: anywhere;
     word-break: break-word;
@@ -655,12 +655,19 @@
 
 .explorer-table ::selection {
     background: color-mix(in srgb, var(--accent-color) 14%, transparent 86%);
-    color: inherit;
+    background-color: color-mix(in srgb, var(--card-bg) 96%, white 4%);
+    background-image: none;
 }
 
 .explorer-table ::-moz-selection {
     background: color-mix(in srgb, var(--accent-color) 14%, transparent 86%);
     color: inherit;
+.column-selector-toggle:hover,
+.column-selector-toggle:focus {
+    background-color: color-mix(in srgb, var(--card-bg) 92%, var(--accent-color) 8%);
+    background-image: none;
+    box-shadow: none;
+}
 }
 
 .table-action-group {
@@ -798,7 +805,8 @@
     min-height: 52px;
     padding-inline: 1.35rem;
     border-radius: 999px;
-    background: linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 96%, white 4%), color-mix(in srgb, var(--panel-background) 94%, var(--bg-color) 6%));
+    background-color: color-mix(in srgb, var(--card-bg) 97%, white 3%);
+    background-image: none;
     border: 1px solid color-mix(in srgb, var(--panel-border) 84%, transparent 16%);
     line-height: 1;
     white-space: nowrap;
@@ -879,12 +887,14 @@
 .column-selector-toggle:hover,
 .column-selector-toggle:focus {
     color: var(--text-color);
-    background: color-mix(in srgb, var(--accent-color) 10%, var(--card-bg) 90%);
+    background-color: color-mix(in srgb, var(--accent-color) 10%, var(--card-bg) 90%);
+    background-image: none;
     box-shadow: var(--surface-shadow);
 }
 
 .column-selector[open] .column-selector-toggle {
-    background: color-mix(in srgb, var(--accent-color) 12%, var(--card-bg) 88%);
+    background-color: color-mix(in srgb, var(--accent-color) 12%, var(--card-bg) 88%);
+    background-image: none;
     border-color: color-mix(in srgb, var(--accent-color) 28%, var(--border-color) 72%);
     color: color-mix(in srgb, var(--accent-color) 76%, var(--text-color) 24%);
     box-shadow: var(--surface-shadow);
@@ -898,8 +908,7 @@
     padding: 14px;
     border-radius: 18px;
     border: 1px solid color-mix(in srgb, var(--panel-border) 84%, transparent 16%);
-    background:
-        linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 96%, white 4%), color-mix(in srgb, var(--panel-background) 94%, var(--bg-color) 6%));
+    background:white;
     box-shadow: 0 24px 44px rgba(15, 23, 42, 0.18);
     z-index: 10;
 }

@@ -42,27 +42,35 @@ The genotype format is `"X_content; chr2_content; chr3_content; chr4_content"` w
 
 These files must be downloaded outside any restricted network. Place them in `data/flybase/`.
 
+Use the FlyBase bulk-data page as the authoritative source for the current release links:
+
+- `https://flybase.org/downloads/bulkdata`
+
+FlyBase now publishes release-specific filenames such as `genotype_phenotype_data_fb_2026_01.tsv.gz`, not just older `*_current.tsv.gz` names. As of release `FB2026_01`, the direct links are:
+
 ```bash
 mkdir -p data/flybase
 cd data/flybase
 
 # Core files
-wget https://s3ftp.flybase.org/releases/current/precomputed_files/alleles/genotype_phenotype_data_current.tsv.gz
-wget https://s3ftp.flybase.org/releases/current/precomputed_files/alleles/fbal_to_fbgn_current.tsv.gz
-wget https://s3ftp.flybase.org/releases/current/precomputed_files/alleles/dmel_classical_and_insertion_allele_descriptions_current.tsv.gz
-wget https://s3ftp.flybase.org/releases/current/precomputed_files/stocks/stocks_current.tsv.gz
-wget https://s3ftp.flybase.org/releases/current/precomputed_files/transposons/transgenic_construct_descriptions_current.tsv.gz
-wget https://s3ftp.flybase.org/releases/current/precomputed_files/alleles/split_system_combinations_current.tsv.gz
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/alleles/genotype_phenotype_data_fb_2026_01.tsv.gz
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/alleles/fbal_to_fbgn_fb_2026_01.tsv.gz
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/alleles/dmel_classical_and_insertion_allele_descriptions_fb_2026_01.tsv.gz
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/stocks/stocks_FB2026_01.tsv.gz
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/transposons/transgenic_construct_descriptions_fb_2026_01.tsv.gz
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/alleles/split_system_combinations_fb_2026_01.tsv.gz
 
 # Cytological map (for balancer selection)
-wget https://s3ftp.flybase.org/releases/current/precomputed_files/genes/gene_map_table_current.tsv.gz
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/genes/gene_map_table_fb_2026_01.tsv.gz
 
 # DPO ontology
 wget http://purl.obolibrary.org/obo/dpo.obo
 
-# Decompress all
+# Decompress all if desired. The new Phase 0 examiner can read .tsv.gz directly.
 gunzip *.gz
 ```
+
+If a later FlyBase release is current by the time you run this, swap `FB2026_01` for the current release identifier shown on the bulk-data page and use the corresponding release-specific filenames.
 
 ### 2.2 Questions to Answer
 
@@ -100,6 +108,8 @@ CRITICAL_MARKERS = ['Cy', 'Sb', 'Tb', 'Hu', 'B', 'w', 'y', 'e', 'cn', 'bw',
 
 This is the most critical question. If common markers have good "visible" coverage with anatomy terms, FlyBase can be a primary source for visual phenotype structured data. If coverage is sparse, the manual dictionary is essential.
 
+Observed result from FB2026_01: common markers do have many `visible` rows, but the useful signal is phenotype-class enrichment rather than direct microscope-facing descriptions. The manual dictionary is still required.
+
 **Question 3 — Qualifier format:**
 ```python
 # Find all rows with "visible" phenotype class
@@ -115,6 +125,8 @@ This is the most critical question. If common markers have good "visible" covera
 # Can we map: BDSC stock# → FBal → FBgn → phenotype data?
 # Print 10 sample rows
 ```
+
+Observed result from FB2026_01: the stocks table is a strong stock-catalog bridge with `FBst`, collection name, species, genotype text, description, and stock number. It is not a direct stock# → FBal lookup table, so allele-level bridging still depends on genotype parsing plus `fbal_to_fbgn`.
 
 **Question 5 — File sizes and row counts:**
 ```python
@@ -182,6 +194,7 @@ Write `data/flybase/EXAMINATION_REPORT.md` containing:
 - File size/row count table
 - BDSC balancer definition structure
 - Explicit assessment: which design assumptions are confirmed, which need revision
+- Per-file value assessment: foundational, secondary, or optional for the genetics pipeline
 
 ### 2.6 Go/No-Go Decision
 
@@ -189,12 +202,18 @@ After Phase 0, decide the phenotype source architecture:
 
 | If... | Then... |
 |-------|---------|
-| Common markers have good "visible" + FBbt coverage in FlyBase | Use FlyBase as primary structured facts source; manual dictionary only for visual descriptions + gap-filling |
-| Common markers have sparse FlyBase coverage | Manual dictionary is the primary source for common markers; FlyBase only for lethality/sterility of obscure alleles |
-| Stocks TSV bridges BDSC↔FlyBase | Use it as the name mapping bridge |
-| Stocks TSV doesn't bridge well | Build bridge from gene stem matching against fbal_to_fbgn |
+| Common markers have many `visible` rows but poor direct visual-description coverage | Keep the manual dictionary as the primary visual source; use FlyBase as phenotype enrichment |
+| `genotype_phenotype_data` has broad phenotype classes and qualifiers | Use it for viability, sterility, dominance, stage/context, and genotype-level enrichment |
+| Stocks TSV is broad across repositories but not a direct allele bridge | Use it as the canonical stock-source layer, not the sole allele-normalization layer |
+| `fbal_to_fbgn` is available | Use it as the core allele→gene bridge |
 | Gene map table has cytological positions | Enable balancer selection by position |
 | No cytological position data | Skip position-based balancer selection; use simpler per-chromosome matching |
+
+Current decision from the examined FB2026_01 bundle:
+
+- Foundational: `stocks`, `genotype_phenotype_data`, `fbal_to_fbgn`, `dmel_classical_and_insertion_allele_descriptions`, `transgenic_construct_descriptions`, `gene_map_table`
+- Secondary: `split_system_combinations`
+- Manual dictionary remains primary for sort-by-eye marker descriptions
 
 ---
 
@@ -240,10 +259,10 @@ def ingest_genotype_phenotype_data(filepath: str, db) -> dict:
     Parse genotype_phenotype_data TSV.
     
     For each row:
-    1. Extract allele symbol, allele ID, gene symbol, gene ID
-    2. Parse phenotype class + qualifiers (pipe-delimited)
-    3. Parse "with" clause if present → mark as conditional
-    4. Extract FBbt anatomy terms if present
+    1. Extract genotype symbols, genotype FlyBase IDs, phenotype class, qualifier names/IDs, and reference
+    2. Parse phenotype class + qualifiers into dominance / stage / context buckets where possible
+    3. Parse conditional wording such as "with genotype" if present
+    4. Preserve raw row context because many rows are genotype-level rather than simple single-allele facts
     5. Insert into flybase_phenotypes collection
     
     Return: {total_rows, inserted, skipped, errors, coverage_stats}
@@ -255,7 +274,19 @@ def ingest_fbal_to_fbgn(filepath: str, db) -> dict:
     pass
 
 def ingest_stocks(filepath: str, db) -> dict:
-    """Parse stocks TSV. Insert into flybase_stock_alleles with BDSC stock# mapping."""
+    """Parse stocks TSV. Insert into flybase_stock_alleles as the canonical multi-repository stock catalog."""
+    pass
+
+def ingest_allele_descriptions(filepath: str, db) -> dict:
+    """Parse allele descriptions for class, insertion/tool context, free-text description, and stock counts."""
+    pass
+
+def ingest_construct_descriptions(filepath: str, db) -> dict:
+    """Parse construct descriptions for encoded products, regulatory regions, tags, and stock counts."""
+    pass
+
+def ingest_gene_map_table(filepath: str, db) -> dict:
+    """Parse gene symbol to recombination / cytological / sequence positions for balancer and linkage logic."""
     pass
 ```
 
@@ -266,7 +297,10 @@ db.flybase_phenotypes.create_index("gene_symbol")
 db.flybase_phenotypes.create_index([("gene_id", 1), ("is_unconditional", 1)])
 db.flybase_allele_genes.create_index("allele_symbol")
 db.flybase_allele_genes.create_index("gene_symbol")
-db.flybase_stock_alleles.create_index("bdsc_stock_number")
+db.flybase_stock_alleles.create_index("stock_number")
+db.flybase_stock_alleles.create_index([("collection_short_name", 1), ("stock_number", 1)])
+db.flybase_stock_alleles.create_index("FBst")
+db.flybase_gene_map.create_index("current_symbol")
 db.balancer_definitions.create_index("symbol")
 ```
 
@@ -305,15 +339,17 @@ Run these checks before proceeding:
 #    For each allele token, check: is it in VISUAL_MARKER_DICTIONARY, or resolvable via FlyBase, or a construct?
 #    Report: % resolved, % unresolved, list of unresolved tokens.
 
-# 2. FlyBase coverage: for each entry in VISUAL_MARKER_DICTIONARY, 
-#    does FlyBase have a matching entry in flybase_phenotypes?
-#    Report concordance.
+# 2. FlyBase coverage: for each entry in VISUAL_MARKER_DICTIONARY,
+#    does FlyBase have a matching phenotype row, allele-description row,
+#    construct row, or stock-linked context?
+#    Report which source is useful for each marker.
 
 # 3. Balancer coverage: does balancer_definitions contain CyO, TM3, TM6B, FM7a, FM7c, SM6a?
 #    Does each have at least one dominant marker?
 
-# 4. BDSC bridge: pick 10 random BDSC stock numbers from bloomington.csv.
-#    Can we look them up in flybase_stock_alleles and get allele IDs?
+# 4. Stock bridge: pick 10 random BDSC stock numbers from bloomington.csv.
+#    Can we look them up in flybase_stock_alleles and recover the FlyBase stock row?
+#    Then test whether genotype parsing + allele/gene joins recover useful phenotype and allele metadata.
 ```
 
 ---
@@ -383,9 +419,10 @@ def resolve_allele_phenotype(token: str, chromosome: int, db) -> dict | None:
     1. Is it a known balancer? → look up balancer_definitions → return all dominant markers
     2. Extract gene stem. Is stem in VISUAL_MARKER_DICTIONARY? → return visual phenotype
     3. Is it a construct? → extract marker genes → return construct marker effects
-    4. Look up gene stem in flybase_allele_genes → get gene_id
-       → query flybase_phenotypes for unconditional annotations → return structured data
-    5. If still unresolved → return None (phenotypically silent for our purposes)
+    4. Look up gene stem / allele token in flybase_allele_genes, allele descriptions,
+       and construct descriptions → recover gene, tool, insertion, and stock context
+    5. Query flybase_phenotypes for enrichment annotations and references
+    6. If still unresolved → return None (phenotypically silent for our purposes)
     
     Returns: {body_part, effect, dominance, scoring_confidence, source, ...} or None
     """
@@ -763,6 +800,7 @@ flymanager/utils/constraints/
 ├── yield_estimator.py      # Vial requirements
 
 flymanager/utils/phenotypes/data/
+├── downloads.py            # Release-aware FlyBase bundle discovery + download
 ├── __init__.py
 ├── flybase_ingest.py       # FlyBase TSV ingestion
 ├── balancer_ingest.py      # BDSC scraping

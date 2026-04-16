@@ -13,7 +13,7 @@ This document specifies an **Automated Crossing Scheme Optimizer** for FlyManage
 
 ### 1.1 External Data Sources
 
-1. **FlyBase Precomputed Bulk Downloads** — lethality, sterility, and conditional phenotype annotations
+1. **FlyBase Precomputed Bulk Downloads** — canonical stock catalog, allele-to-gene bridge, phenotype enrichment, construct metadata, and gene-position support
 2. **Drosophila Phenotype Ontology (DPO)** — formal phenotype classification (~200 terms)
 3. **BDSC Nomenclature Grammar** — formal genotype string parsing rules
 4. **BDSC Core Balancer Definitions** — balancer inversions, breakpoints, and markers
@@ -32,11 +32,14 @@ This document specifies an **Automated Crossing Scheme Optimizer** for FlyManage
 
 | Purpose | Primary Source | Why |
 |---------|---------------|-----|
-| **Visual marker descriptions** (what Cy/Sb/w look like) | Manual dictionary (~50-100 entries) | Common markers are too well-known for anyone to publish about; FlyBase coverage expected to be sparse for these |
-| **Lethality, sterility, conditional phenotypes** | FlyBase `genotype_phenotype_data` bulk TSV | Comprehensive literature-curated data |
-| **Transgene selectable markers** (w+mC, y+, v+) | Construct name parsing (BDSC transposon grammar) | Marker genes encoded in construct name |
+| **Visual marker descriptions** (what Cy/Sb/w look like) | Manual dictionary (~50-100 entries) | The examined FlyBase bundle has many `visible` phenotype rows, but not concise microscope-facing descriptions for common sorting markers |
+| **Lethality, sterility, conditional phenotypes** | FlyBase `genotype_phenotype_data` bulk TSV | Large literature-curated enrichment source with phenotype classes, qualifiers, and references |
+| **Transgene selectable markers** (w+mC, y+, v+) | Construct parsing + FlyBase `transgenic_construct_descriptions` | Construct names still encode selectable markers directly, and FlyBase adds encoded-product/regulatory-region metadata |
+| **Stock sourcing across repositories** | FlyBase `stocks` TSV | Canonical stock catalog spanning Bloomington, Vienna, Kyoto, NIG-Fly, KDRC, FlyORF, NDSSC, and others |
+| **Allele-to-gene bridge** | FlyBase `fbal_to_fbgn` TSV | Direct FBal → FBgn / gene-symbol bridge for joining stock, phenotype, and allele metadata |
+| **Balancer position support** | FlyBase `gene_map_table` TSV | Direct gene-symbol → recombination / cytological / sequence position mapping |
 
-These sources are NOT interchangeable. The manual dictionary is the **guaranteed backbone** for identifiability. FlyBase data enriches beyond that. Construct parsing handles the 83% of gene packages that are transgenes.
+These sources are NOT interchangeable. The manual dictionary is still the **guaranteed backbone** for identifiability. FlyBase is now confirmed as the best canonical enrichment and stock-source layer. Construct parsing remains necessary because FlyManager still starts from genotype strings, not normalized FlyBase entities.
 
 ---
 
@@ -87,16 +90,25 @@ Not supported: Y chromosome, compound chromosomes, translocations, deficiencies/
 ### 3.1 FlyBase Bulk Downloads
 
 ```bash
-# Must run OUTSIDE container (s3ftp.flybase.org not in allowed egress domains)
-wget https://s3ftp.flybase.org/releases/current/precomputed_files/alleles/genotype_phenotype_data_current.tsv.gz
-wget https://s3ftp.flybase.org/releases/current/precomputed_files/alleles/fbal_to_fbgn_current.tsv.gz
-wget https://s3ftp.flybase.org/releases/current/precomputed_files/alleles/dmel_classical_and_insertion_allele_descriptions_current.tsv.gz
-wget https://s3ftp.flybase.org/releases/current/precomputed_files/stocks/stocks_current.tsv.gz
-wget https://s3ftp.flybase.org/releases/current/precomputed_files/transposons/transgenic_construct_descriptions_current.tsv.gz
-wget https://s3ftp.flybase.org/releases/current/precomputed_files/alleles/split_system_combinations_current.tsv.gz
+# Use release-specific links from the FlyBase bulk-data page or the FlyManager downloader.
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/alleles/genotype_phenotype_data_fb_2026_01.tsv.gz
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/alleles/fbal_to_fbgn_fb_2026_01.tsv.gz
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/alleles/dmel_classical_and_insertion_allele_descriptions_fb_2026_01.tsv.gz
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/stocks/stocks_FB2026_01.tsv.gz
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/transposons/transgenic_construct_descriptions_fb_2026_01.tsv.gz
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/alleles/split_system_combinations_fb_2026_01.tsv.gz
+wget https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/genes/gene_map_table_fb_2026_01.tsv.gz
 ```
 
-The **stocks TSV** bridges BDSC↔FlyBase notation (contains BDSC stock numbers alongside FlyBase allele IDs).
+Observed value of the examined FB2026_01 files:
+
+- `stocks`: foundational. Best source for canonical stock sourcing and repository breadth.
+- `genotype_phenotype_data`: foundational. Best source for phenotype enrichment, viability, sterility, and qualifier logic.
+- `fbal_to_fbgn`: foundational. Core allele→gene join table.
+- `dmel_classical_and_insertion_allele_descriptions`: foundational. Strong allele class / insertion / stock-count enrichment source.
+- `transgenic_construct_descriptions`: foundational. Strong construct metadata source with encoded products, regulatory regions, and stock counts.
+- `gene_map_table`: foundational for constraints. Best currently examined source for recombination and cytological position support.
+- `split_system_combinations`: secondary. Useful for split-GAL4 and modern driver-combination handling, but not core to the general genetics pipeline.
 
 ### 3.2 DPO Ontology
 
@@ -128,11 +140,25 @@ Tracks copy count. Warns when sorting relies on dosage differences (confidence ~
 
 ### 4.5 FlyBase Data (ENRICHMENT)
 
-Primary use: lethality/sterility annotations, conditional phenotypes. Qualifier parsing: `"class | qualifier"` with `"with genotype"` clauses. Only unconditional annotations used for standalone allele phenotype.
+Primary use after examining the bundle: phenotype enrichment, stock normalization support, allele/construct metadata, and gene-position support.
+
+- `genotype_phenotype_data`: phenotype classes such as `visible`, `lethal`, `viable`, `female sterile`, plus qualifiers like `recessive`, `dominant`, stage, sex, and clone context.
+- `fbal_to_fbgn`: normalize allele IDs to genes.
+- `allele_descriptions`: capture allele class, insertion/tool context, descriptions, and stock counts.
+- `construct_descriptions`: capture encoded product/tool, regulatory region, tags, and stock counts.
+- `gene_map_table`: support position-aware balancer logic.
+
+Important limitation: the FlyBase phenotype table is not a substitute for a manual visual marker dictionary when the question is what a fly looks like under a stereoscope.
 
 ### 4.6 BDSC↔FlyBase Name Bridge
 
-BDSC stock# → FlyBase stocks TSV → FBal IDs → fbal_to_fbgn → FBgn → phenotype data. Fallback: gene stem matching for user-created stocks.
+Bridge strategy after Phase 0:
+
+- Stock-level bridge: source collection + stock number → FlyBase `stocks` row.
+- Allele/gene bridge: parsed genotype tokens → `fbal_to_fbgn` → FBgn / gene symbol.
+- Enrichment joins: gene / allele context → phenotype, allele-description, and construct-description tables.
+
+The stocks TSV is a strong stock-catalog bridge, but not a direct stock# → FBal lookup table. Allele-level normalization still requires genotype parsing plus FlyBase joins.
 
 ### 4.7 LLM Fallback
 
@@ -142,13 +168,13 @@ Claude API for unresolved alleles. Low confidence (0.3-0.5). Cached in MongoDB.
 
 Collections: `flybase_phenotypes`, `flybase_allele_genes`, `flybase_stock_alleles`, `flybase_constructs`, `flybase_split_combinations`, `balancer_definitions`, `epistasis_rules`, `crossing_scheme_cache`, `sub_scheme_library`.
 
-Required indexes on: `allele_symbol`, `gene_symbol`, `gene_id`, `bdsc_stock_number`, `symbol` (balancers).
+Required indexes on: `allele_symbol`, `gene_symbol`, `gene_id`, `stock_number`, `collection_short_name`, `FBst`, `symbol` (balancers).
 
 ---
 
 ## 5. Subsystem 2: Phenotype Computation Engine
 
-Three-source computation: for each token, check manual dictionary first (guaranteed coverage for common markers), then FlyBase data (lethality/sterility), then construct markers. Apply dominance, epistasis, mini-white dosage. Full-genotype output including cross-chromosome interactions.
+Three-source computation: for each token, check manual dictionary first (guaranteed coverage for common markers), then construct parsing, then FlyBase enrichment (phenotype classes, qualifiers, lethality/sterility, allele context, construct metadata). Apply dominance, epistasis, mini-white dosage, and full-genotype interactions.
 
 ---
 
@@ -239,11 +265,18 @@ Answer these questions BEFORE writing code:
 3. Are FBbt anatomy terms in the phenotype file or separate?
 4. What's the qualifier format?
 
-**Fallback if FlyBase coverage is inadequate:** Manual dictionary is already primary. If lethality data is also sparse, add a `LETHALITY_DICTIONARY` (~30 entries for common homozygous lethals).
+Observed Phase 0 answers from FB2026_01:
+
+- Common markers do have many `visible` rows in `genotype_phenotype_data`.
+- The useful signal is phenotype class + qualifier enrichment, not direct visual descriptions.
+- The `stocks` table is highly useful for stock sourcing, but not sufficient alone for allele normalization.
+- The current examined phenotype file does not provide the hoped-for `FBbt` anatomy coverage for the critical-marker question.
+
+Conclusion: manual dictionary remains primary for visible marker descriptions; FlyBase is the canonical enrichment and stock-source layer.
 
 ### 10.2 Network
 
-Downloads run outside container. User places files in `data/flybase/`. CLI ingests from local files.
+Downloads can run outside the container or through the FlyManager release-aware downloader. Files live in `data/flybase/`. CLI ingestion and examination operate on local files and can read `.tsv.gz` directly.
 
 ---
 
@@ -275,7 +308,7 @@ flymanager/utils/constraints/       # Genetic rules
 ├── target_validation.py, yield_estimator.py
 
 flymanager/utils/phenotypes/data/   # Ingestion pipeline
-├── flybase_ingest.py, balancer_ingest.py, download_script.py, manage.py
+├── flybase_ingest.py, balancer_ingest.py, downloads.py, manage.py
 
 flymanager/utils/crossing/          # Search engine
 ├── simulator.py, optimizer.py, templates.py, scorer.py

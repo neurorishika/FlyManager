@@ -56,6 +56,17 @@
 			"isBackground": false,
 			"problemMatcher": [],
 			"group": "test"
+		},
+		{
+			"label": "analyze flybase stock parser compatibility",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"temp/analyze_flybase_stock_parser.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
 		}
 	]
 }

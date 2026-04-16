@@ -1,0 +1,233 @@
+from copy import deepcopy
+
+CRITICAL_MARKERS = [
+    "Cy",
+    "Sb",
+    "Tb",
+    "Hu",
+    "B",
+    "w",
+    "y",
+    "e",
+    "cn",
+    "bw",
+    "st",
+    "vg",
+    "Ser",
+    "D",
+    "Sp",
+    "sn",
+    "f",
+    "ey",
+]
+
+
+VISUAL_MARKER_DICTIONARY = {
+    "B": {
+        "body_part": "eye",
+        "effect": "bar-shaped eyes",
+        "dominance": "dominant",
+        "display_label": "B",
+        "phenotype_key": "B",
+        "chromosome": 1,
+        "scoring_confidence": 0.92,
+        "source": "manual_dictionary",
+    },
+    "Cy": {
+        "body_part": "wing",
+        "effect": "curly wings",
+        "dominance": "dominant",
+        "display_label": "Cy",
+        "phenotype_key": "Cy",
+        "chromosome": 2,
+        "homozygous_lethal": True,
+        "scoring_confidence": 0.98,
+        "source": "manual_dictionary",
+    },
+    "Hu": {
+        "body_part": "thorax",
+        "effect": "humeral bristle marker",
+        "dominance": "dominant",
+        "display_label": "Hu",
+        "phenotype_key": "Hu",
+        "chromosome": 3,
+        "scoring_confidence": 0.74,
+        "source": "manual_dictionary",
+    },
+    "Sb": {
+        "body_part": "bristle",
+        "effect": "short, thick bristles",
+        "dominance": "dominant",
+        "display_label": "Sb",
+        "phenotype_key": "Sb",
+        "chromosome": 3,
+        "scoring_confidence": 0.94,
+        "source": "manual_dictionary",
+    },
+    "Ser": {
+        "body_part": "wing",
+        "effect": "serrated wing margin",
+        "dominance": "dominant",
+        "display_label": "Ser",
+        "phenotype_key": "Ser",
+        "chromosome": 3,
+        "scoring_confidence": 0.82,
+        "source": "manual_dictionary",
+    },
+    "Tb": {
+        "body_part": "body",
+        "effect": "tubby body shape",
+        "dominance": "dominant",
+        "display_label": "Tb",
+        "phenotype_key": "Tb",
+        "chromosome": 3,
+        "scoring_confidence": 0.8,
+        "source": "manual_dictionary",
+    },
+    "bw": {
+        "body_part": "eye",
+        "effect": "brown eye pigment",
+        "dominance": "recessive",
+        "display_label": "bw",
+        "phenotype_key": "bw",
+        "chromosome": 2,
+        "scoring_confidence": 0.82,
+        "source": "manual_dictionary",
+    },
+    "cn": {
+        "body_part": "eye",
+        "effect": "cinnabar eye color",
+        "dominance": "recessive",
+        "display_label": "cn",
+        "phenotype_key": "cn",
+        "chromosome": 2,
+        "scoring_confidence": 0.83,
+        "source": "manual_dictionary",
+    },
+    "e": {
+        "body_part": "body",
+        "effect": "ebony body color",
+        "dominance": "recessive",
+        "display_label": "e",
+        "phenotype_key": "e",
+        "chromosome": 3,
+        "scoring_confidence": 0.86,
+        "source": "manual_dictionary",
+    },
+    "ey": {
+        "body_part": "eye",
+        "effect": "eye morphology marker",
+        "dominance": "recessive",
+        "display_label": "ey",
+        "phenotype_key": "ey",
+        "chromosome": 4,
+        "scoring_confidence": 0.56,
+        "source": "manual_dictionary",
+    },
+    "f": {
+        "body_part": "bristle",
+        "effect": "forked bristles",
+        "dominance": "recessive",
+        "display_label": "f",
+        "phenotype_key": "f",
+        "chromosome": 1,
+        "scoring_confidence": 0.79,
+        "source": "manual_dictionary",
+    },
+    "sn": {
+        "body_part": "bristle",
+        "effect": "singed bristles",
+        "dominance": "recessive",
+        "display_label": "sn",
+        "phenotype_key": "sn",
+        "chromosome": 1,
+        "scoring_confidence": 0.82,
+        "source": "manual_dictionary",
+    },
+    "st": {
+        "body_part": "eye",
+        "effect": "scarlet eye color",
+        "dominance": "recessive",
+        "display_label": "st",
+        "phenotype_key": "st",
+        "chromosome": 3,
+        "scoring_confidence": 0.83,
+        "source": "manual_dictionary",
+    },
+    "vg": {
+        "body_part": "wing",
+        "effect": "vestigial wings",
+        "dominance": "recessive",
+        "display_label": "vg",
+        "phenotype_key": "vg",
+        "chromosome": 2,
+        "scoring_confidence": 0.88,
+        "source": "manual_dictionary",
+    },
+    "w": {
+        "body_part": "eye",
+        "effect": "white eyes",
+        "dominance": "recessive",
+        "display_label": "w",
+        "phenotype_key": "w_loss",
+        "chromosome": 1,
+        "scoring_confidence": 0.96,
+        "source": "manual_dictionary",
+    },
+    "y": {
+        "body_part": "body",
+        "effect": "yellow body color",
+        "dominance": "recessive",
+        "display_label": "y",
+        "phenotype_key": "y",
+        "chromosome": 1,
+        "scoring_confidence": 0.9,
+        "source": "manual_dictionary",
+    },
+}
+
+
+BALANCER_MARKERS = {
+    "Binscy": ["Cy"],
+    "CyO": ["Cy"],
+    "FM7": ["B"],
+    "FM7a": ["B"],
+    "FM7c": ["B"],
+    "MKRS": ["Sb"],
+    "SM6a": ["Cy"],
+    "TM3": ["Sb", "Ser"],
+    "TM6B": ["Tb", "Hu"],
+    "TM6C": ["Tb"],
+}
+
+
+BALANCER_ALIASES = {
+    "Binsinscy": "Binscy",
+    "Binsn": "Binscy",
+    "FM0": "FM7",
+    "FM3": "FM7",
+    "FM6": "FM7",
+    "FM6B": "FM7",
+    "FM7h": "FM7",
+    "FM7i": "FM7",
+    "FM7j": "FM7",
+    "SM6b": "SM6a",
+    "TM6": "TM6B",
+}
+
+
+KNOWN_BALANCER_SYMBOLS = set(BALANCER_MARKERS) | set(BALANCER_ALIASES) | {
+    "SM1",
+    "SM5",
+    "TM1",
+    "TM2",
+}
+
+
+def get_visual_marker(symbol):
+    entry = VISUAL_MARKER_DICTIONARY.get(symbol)
+    if entry is None:
+        return None
+    marker = deepcopy(entry)
+    marker["gene_stem"] = symbol
+    return marker
