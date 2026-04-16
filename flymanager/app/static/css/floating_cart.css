@@ -1,48 +1,112 @@
 /* Floating Cart Styles */
 .floating-cart-container {
     position: fixed;
-    bottom: 75px; /* Adjust this value to the height of your footer */
-    left: 0;
-    width: 100%;
-    background-color: var(--card-bg);
+    left: 50%;
+    bottom: 16px;
+    width: min(1180px, calc(100% - 24px));
+    background: color-mix(in srgb, var(--card-bg) 82%, var(--bg-color) 18%);
     color: var(--text-color);
-    border-top: 1px solid var(--border-color);
-    box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
-    z-index: 999; /* Just below the footer's z-index */
-    transition: max-height 0.3s ease-in-out;
-    max-height: 60px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent 18%);
+    border-radius: 22px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    z-index: 999;
+    transform: translateX(-50%) translateY(0);
+    transition: max-height 0.28s ease, transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+    max-height: 76px;
     overflow: hidden;
 }
 
 .floating-cart-container.expanded {
-    max-height: 400px;
+    max-height: min(72vh, 560px);
     overflow-y: auto;
+    transform: translateX(-50%) translateY(-4px);
+    box-shadow: 0 28px 64px rgba(0, 0, 0, 0.24);
+    border-color: color-mix(in srgb, var(--accent-color, var(--header-bg)) 35%, var(--border-color) 65%);
+}
+
+.floating-cart-container::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+    pointer-events: none;
 }
 
 .cart-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 20px;
+    gap: 10px;
+    min-height: 76px;
+    padding: 14px clamp(14px, 2vw, 22px);
     cursor: pointer;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid transparent;
 }
 
 .cart-header h3 {
     margin: 0;
-    font-size: 1.2em;
+    font-size: clamp(1rem, 0.95rem + 0.25vw, 1.15rem);
+    font-weight: 700;
+}
+
+.cart-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.cart-header-actions .btn-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 999px;
+    color: var(--muted-text);
+    background: color-mix(in srgb, var(--bg-color) 72%, transparent 28%);
+    border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent 20%);
+    text-decoration: none;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.cart-header-actions .btn-link:hover,
+.cart-header-actions .btn-link:focus-visible {
+    color: var(--text-color);
+    background: color-mix(in srgb, var(--card-bg) 45%, var(--accent-color, var(--header-bg)) 55%);
+    border-color: color-mix(in srgb, var(--accent-color, var(--header-bg)) 55%, transparent 45%);
+    transform: translateY(-1px);
 }
 
 .toggle-cart-btn {
-    background: none;
-    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    background: color-mix(in srgb, var(--bg-color) 66%, transparent 34%);
+    border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent 22%);
+    border-radius: 999px;
     color: var(--text-color);
-    font-size: 1.2em;
+    font-size: 1rem;
     cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.toggle-cart-btn:hover,
+.toggle-cart-btn:focus-visible {
+    background: color-mix(in srgb, var(--card-bg) 45%, var(--accent-color, var(--header-bg)) 55%);
+    border-color: color-mix(in srgb, var(--accent-color, var(--header-bg)) 55%, transparent 45%);
+    transform: translateY(-1px);
 }
 
 .toggle-cart-btn i {
-    transition: transform 0.3s ease-in-out;
+    transition: transform 0.24s ease;
 }
 
 .floating-cart-container.expanded .toggle-cart-btn i {
@@ -50,14 +114,26 @@
 }
 
 .cart-content {
-    padding: 20px;
+    display: grid;
+    gap: 16px;
+    padding: 0 clamp(14px, 2vw, 22px) 22px;
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+    transition: opacity 0.22s ease, transform 0.24s ease;
+}
+
+.floating-cart-container.expanded .cart-content {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 #cartItems {
-    max-height: 250px;
+    max-height: 280px;
     overflow-y: auto;
-    margin-bottom: 15px;
-    padding-right: 5px;
+    margin-bottom: 0;
+    padding: 6px 6px 0 0;
 }
 
 #cartItems::-webkit-scrollbar {
@@ -82,11 +158,13 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
     margin-bottom: 8px;
-    background-color: var(--bg-color);
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent 18%);
 }
 
 .cart-item span {
@@ -108,16 +186,60 @@
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    padding-top: 10px;
-    border-top: 1px solid var(--border-color);
+    padding-top: 14px;
+    border-top: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent 18%);
 }
 
 .cart-actions button {
-    font-size: 0.9em;
-    padding: 4px 8px;
+    min-height: 42px;
 }
 
-/* Ensure content below the cart is not obscured */
-body {
-    padding-bottom: 120px; /* Increased to accommodate both cart and footer */
+/* Reserve space for the fixed cart within the main content, not below the footer */
+body.has-floating-cart .main-content {
+    padding-bottom: calc(clamp(28px, 4vw, 44px) + 104px);
+}
+
+@media (max-width: 767px) {
+    .floating-cart-container {
+        bottom: 10px;
+        width: calc(100% - 12px);
+        max-height: 72px;
+        border-radius: 18px;
+    }
+
+    .floating-cart-container.expanded {
+        max-height: 75vh;
+    }
+
+    .cart-header {
+        min-height: 72px;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .cart-header-actions {
+        flex-shrink: 0;
+    }
+
+    .cart-actions > * {
+        flex: 1 1 140px;
+    }
+
+    .cart-item span {
+        white-space: normal;
+    }
+
+    body.has-floating-cart .main-content {
+        padding-bottom: calc(clamp(28px, 4vw, 44px) + 96px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .floating-cart-container,
+    .cart-content,
+    .toggle-cart-btn,
+    .toggle-cart-btn i,
+    .cart-header-actions .btn-link {
+        transition: none;
+    }
 }

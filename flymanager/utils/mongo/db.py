@@ -1,9 +1,20 @@
 import os
-from pymongo import MongoClient
+
 from dotenv import load_dotenv
+from pymongo import MongoClient
 
 # Load environment variables from .env file
 load_dotenv()
+
+
+def get_mongo_uri():
+    """Return the configured MongoDB URI with a sensible local default."""
+    return os.getenv("MONGO_URI", "mongodb://mongodb:27017").strip()
+
+
+def get_mongo_db_name():
+    """Return the configured MongoDB database name with a sensible default."""
+    return os.getenv("MONGO_DB_NAME", "flymanager").strip()
 
 def create_mongo_client():
     """
@@ -13,8 +24,12 @@ def create_mongo_client():
     client: pymongo.MongoClient
         The MongoDB client instance.
     """
-    mongo_uri = os.getenv("MONGO_URI")
-    client = MongoClient(mongo_uri)
+    mongo_uri = get_mongo_uri()
+    client = MongoClient(
+        mongo_uri,
+        serverSelectionTimeoutMS=int(os.getenv("MONGO_SERVER_SELECTION_TIMEOUT_MS", "5000")),
+        connectTimeoutMS=int(os.getenv("MONGO_CONNECT_TIMEOUT_MS", "5000")),
+    )
     return client
 
 def get_database(client):
@@ -29,8 +44,17 @@ def get_database(client):
     db: pymongo.database.Database
         The database instance.
     """
-    db_name = os.getenv("MONGO_DB_NAME")
+    db_name = get_mongo_db_name()
     return client[db_name]
+
+
+def ping_database(db):
+    """Return True when the MongoDB connection is healthy, else False."""
+    try:
+        db.command("ping")
+        return True
+    except Exception:
+        return False
 
 def reset_database(db):
     """

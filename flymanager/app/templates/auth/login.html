@@ -1,79 +1,38 @@
 {% extends "base.html" %}
 
-{% block title %}Login{% endblock %}
-
-{% block head %}
-<style>
-    .auth-container {
-        background-color: var(--card-bg);
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        width: 100%;
-        max-width: 400px;
-        margin: 0 auto;
-    }
-    .auth-container h2 {
-        margin-bottom: 25px;
-        text-align: center;
-        font-weight: 700;
-        color: var(--header-bg);
-    }
-    .auth-container label {
-        font-weight: 500;
-    }
-    .auth-container .form-control {
-        border-radius: 25px;
-    }
-    .auth-container .btn {
-        border-radius: 25px;
-        font-weight: 700;
-    }
-    .error-message {
-        color: red;
-        text-align: center;
-        margin-bottom: 15px;
-    }
-</style>
-{% endblock %}
+{% block title %}D. manager Login{% endblock %}
 
 {% block content %}
-<div class="auth-container">
-    <h2><em>D. manager</em> @ {{ settings.lab_info.lab_name }} 🪰</h2>
+<div class="auth-shell">
+    <div class="app-panel auth-card">
+    <p class="app-kicker">Fly Inventory Workspace</p>
+    <div class="auth-brand-mark">
+        <img src="{{ url_for('static', filename='branding/logo.svg') }}" alt="D. manager logo">
+        <div>
+            <h2 class="auth-logo"><em>D. manager</em></h2>
+            <p class="mb-0 text-muted">{{ settings.lab_info.lab_name }}</p>
+        </div>
+    </div>
+    <p class="app-page-subtitle">Sign in to manage stocks, crosses, tray layouts, and flip schedules from one place.</p>
     {% if message %}
-        <p class="error-message">{{ message }}</p>
+        <div class="alert alert-danger mt-3 mb-3">{{ message }}</div>
     {% endif %}
-    <form action="{{ url_for('auth.login') }}" method="POST">
+    <form action="{{ url_for('auth.login') }}" method="POST" class="auth-form mt-4">
         <div class="form-group">
             <label for="username">Username:</label>
-            <select id="username" name="username" class="form-control" required onchange="showPasswordField()">
-                <option value="">Select your username</option>
-                {% for user in users %}
-                    <option value="{{ user }}">{{ user }}</option>
-                {% endfor %}
-            </select>
+            <input type="text" id="username" name="username" class="form-control" autocomplete="username" required>
         </div>
-        <div class="form-group" id="password-field" style="display: none;">
+        <div class="form-group" id="password-field">
             <label for="password">Password:</label>
-            <input type="password" id="password" name="password" class="form-control" required>
+            <input type="password" id="password" name="password" class="form-control" autocomplete="current-password" required>
         </div>
-        <button type="submit" class="btn btn-primary btn-block">Login</button>
-        <button type="button" class="btn btn-secondary btn-block" onclick="location.href='{{ url_for('auth.register') }}'">Register</button>
-        <button type="button" class="btn btn-link" onclick="location.href='{{ url_for('auth.forgot_password') }}'">Forgot Password?</button>
+        <div class="auth-actions">
+            <button type="submit" class="btn btn-primary">Login</button>
+            <a href="{{ url_for('auth.register') }}" class="btn btn-secondary">Register New User</a>
+            <a href="{{ url_for('auth.forgot_password') }}" class="btn btn-link">Forgot Password?</a>
+        </div>
     </form>
+    <div class="auth-support">Need access help? Contact {{ settings.lab_info.admin_name }}.</div>
+    </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    function showPasswordField() {
-        var username = document.getElementById("username").value;
-        var passwordField = document.getElementById("password-field");
-        if (username) {
-            passwordField.style.display = "block";
-        } else {
-            passwordField.style.display = "none";
-        }
-    }
-</script>
 {% endblock %}

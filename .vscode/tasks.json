@@ -1,0 +1,61 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "pytest mongo helper tests",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_mongo_records.py",
+				"-q"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "pytest mongo helper tests",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_mongo_records.py",
+				"-q"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "pytest mongo helper tests",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_mongo_records.py",
+				"-q"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "pytest converter import",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_converter_import.py",
+				"-q"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		}
+	]
+}

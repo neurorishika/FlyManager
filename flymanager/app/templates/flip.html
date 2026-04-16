@@ -1,102 +1,598 @@
 {% extends 'base.html' %}
 
+{% block head %}
+<style nonce="{{ csp_nonce }}">
+    .flip-shell {
+        display: grid;
+        gap: 18px;
+    }
+
+    .flip-hero-copy {
+        max-width: 720px;
+    }
+
+    .flip-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .flip-scan-controls {
+        display: flex;
+        align-items: end;
+        justify-content: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .flip-scan-controls .form-control {
+        min-width: 280px;
+    }
+
+    .flip-scan-stack {
+        display: grid;
+        gap: 14px;
+    }
+
+    .flip-scan-mode {
+        max-width: 360px;
+    }
+
+
+    .flip-workflow-strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .flip-workflow-step {
+        border-radius: 18px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--card-bg) 88%, var(--bg-color) 12%);
+        padding: 14px 16px;
+        box-shadow: inset 0 1px 0 var(--surface-border-strong);
+    }
+
+    .flip-workflow-step strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 0.98rem;
+    }
+
+    .flip-workflow-step p {
+        margin: 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .flip-scan-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.9fr);
+        gap: 18px;
+        align-items: start;
+    }
+
+    .flip-source-panel,
+    .flip-guide-panel {
+        border: 1px solid var(--border-color);
+        border-radius: 22px;
+        padding: 18px;
+        background: color-mix(in srgb, var(--card-bg) 92%, var(--bg-color) 8%);
+    }
+
+    .flip-scan-status {
+        margin: 0;
+        max-width: 420px;
+        color: var(--text-color);
+        border-radius: 14px;
+        padding: 12px 14px;
+        border: 1px solid color-mix(in srgb, var(--accent-color) 18%, var(--border-color) 82%);
+        background: color-mix(in srgb, var(--accent-color) 9%, var(--card-bg) 91%);
+    }
+
+    .flip-scan-hint {
+        margin: 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .flip-camera-shell {
+        display: grid;
+        gap: 12px;
+        justify-items: start;
+    }
+
+    .flip-mode-title {
+        margin: 0 0 8px;
+        font-size: clamp(1.15rem, 1.05rem + 0.5vw, 1.45rem);
+        font-weight: 800;
+        letter-spacing: -0.03em;
+    }
+
+    .flip-mode-summary {
+        margin: 0 0 14px;
+        color: var(--muted-text);
+    }
+
+    .flip-guide-meta {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .flip-guide-meta-card {
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 72%, var(--card-bg) 28%);
+        padding: 12px 14px;
+        min-height: 88px;
+    }
+
+    .flip-guide-meta-card span {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--muted-text);
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
+    .flip-guide-meta-card strong {
+        display: block;
+        line-height: 1.3;
+    }
+
+    .flip-browser-callout {
+        display: grid;
+        gap: 6px;
+        margin-bottom: 14px;
+        border-radius: 18px;
+        padding: 14px 16px;
+        border: 1px solid color-mix(in srgb, var(--accent-color) 20%, var(--border-color) 80%);
+        background: color-mix(in srgb, var(--accent-color) 10%, var(--card-bg) 90%);
+    }
+
+    .flip-browser-callout p {
+        margin: 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .flip-compatibility-grid {
+        display: grid;
+        gap: 10px;
+    }
+
+    .flip-compatibility-card {
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 74%, var(--card-bg) 26%);
+        padding: 12px 14px;
+        transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .flip-compatibility-card.is-current {
+        border-color: color-mix(in srgb, var(--accent-color) 45%, var(--border-color) 55%);
+        background: color-mix(in srgb, var(--accent-color) 12%, var(--card-bg) 88%);
+        transform: translateY(-1px);
+    }
+
+    .flip-compatibility-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 6px;
+    }
+
+    .flip-compatibility-head strong {
+        font-size: 0.95rem;
+    }
+
+    .flip-compatibility-card p {
+        margin: 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .flip-support-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 0.76rem;
+        font-weight: 700;
+        white-space: nowrap;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 82%, var(--card-bg) 18%);
+    }
+
+    .flip-support-badge.is-supported {
+        background: color-mix(in srgb, #2f9e44 14%, var(--card-bg) 86%);
+        border-color: color-mix(in srgb, #2f9e44 42%, var(--border-color) 58%);
+    }
+
+    .flip-support-badge.is-limited {
+        background: color-mix(in srgb, #f59f00 15%, var(--card-bg) 85%);
+        border-color: color-mix(in srgb, #f59f00 42%, var(--border-color) 58%);
+    }
+
+    .flip-support-badge.is-unavailable {
+        background: color-mix(in srgb, #e03131 13%, var(--card-bg) 87%);
+        border-color: color-mix(in srgb, #e03131 36%, var(--border-color) 64%);
+    }
+        justify-items: start;
+    }
+
+    .flip-camera-preview {
+        width: min(100%, 420px);
+        aspect-ratio: 4 / 3;
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 78%, black 22%);
+        object-fit: cover;
+    }
+
+    .flip-detail-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.8fr);
+        gap: 18px;
+    }
+
+    .flip-identifier {
+        font-size: clamp(2.2rem, 5vw, 4.6rem);
+        font-weight: 800;
+        line-height: 0.95;
+        margin: 0 0 12px;
+        letter-spacing: -0.04em;
+    }
+
+    .flip-name {
+        font-size: clamp(1.1rem, 1rem + 0.5vw, 1.6rem);
+        font-weight: 700;
+        margin-bottom: 14px;
+    }
+
+    .flip-detail-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .flip-detail-list p {
+        margin: 0;
+    }
+
+    .flip-status-panel {
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 18px;
+        background: color-mix(in srgb, var(--card-bg) 90%, var(--bg-color) 10%);
+    }
+
+    .flip-status-options {
+        display: grid;
+        gap: 10px;
+    }
+
+    .flip-status-option {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--bg-color) 75%, var(--card-bg) 25%);
+    }
+
+    .flip-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+    }
+
+    .flip-current-vial-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 14px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .flip-current-vial-header p {
+        margin: 0;
+    }
+
+    .flip-current-vial-note {
+        max-width: 520px;
+        color: var(--muted-text);
+    }
+
+    .flip-actions .btn {
+        min-width: 160px;
+    }
+
+    .flip-waiting {
+        text-align: center;
+        padding: 24px;
+    }
+
+    @media (max-width: 767px) {
+        .flip-workflow-strip,
+        .flip-scan-grid,
+        .flip-detail-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .flip-guide-meta {
+            grid-template-columns: 1fr;
+        }
+
+        .flip-scan-controls {
+            align-items: stretch;
+        }
+
+        .flip-scan-controls > * {
+            width: 100%;
+        }
+
+        .flip-scan-controls .form-control {
+            min-width: 0;
+        }
+
+        .flip-actions .btn {
+            flex: 1 1 100%;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container mt-5">
-    <h2 class="text-center" style="font-weight: bold;">Stock Flip Tracker</h2>
-    <br>
-    <div id="port-selection" class="row mb-3 align-items-center justify-content-center">
-        <div class="col-auto">
-            <select class="form-select" id="serialPort">
-                {% for port in ports %}
-                    <option value="{{ loop.index0 }}">{{ port.device }} - {{ port.description }}</option>
-                {% endfor %}
-            </select>
+<div class="flip-shell">
+    <div class="app-panel flip-hero">
+        <div class="flip-hero-copy">
+            <p class="app-kicker">Live Flip Workflow</p>
+            <h1 class="app-page-title">Stock Flip Tracker</h1>
+            <p class="app-page-subtitle">Start the scanner, confirm the vial details, then record the flip with status and notes in one step.</p>
         </div>
-        <div class="col-auto">
-            <button id="startScanBtn" class="btn btn-primary">Start Scan</button>
+        <div class="app-chip-row">
+            <span class="app-chip"><i class="fas fa-qrcode"></i> QR-driven workflow</span>
+            <span class="app-chip"><i class="fas fa-clock"></i> Timestamp at scan time</span>
         </div>
     </div>
 
-    <div id="stock-details" style="display: none;">
-        <div class="row">
-            <!-- First Column: Key Details -->
-            <div class="col-md-6">
-                <!-- Key Details (Large and Prominent) -->
-                <div style="font-size: 8em;">
-                    <p>
-                        <strong>
-                            <span id="trayID"></span>-<span id="trayPosition"></span> 
-                        </strong>
-                        <span id="seriesID"></span><span id="replicateID"></span>
-                    </p>
+    <div class="app-panel">
+        <div class="flip-workflow-strip">
+            <div class="flip-workflow-step">
+                <strong>1. Choose a source</strong>
+                <p>Select the scanner mode that matches where the hardware is connected.</p>
+            </div>
+            <div class="flip-workflow-step">
+                <strong>2. Capture the UID</strong>
+                <p>Server, keyboard wedge, camera, or WebSerial can all feed the same lookup flow.</p>
+            </div>
+            <div class="flip-workflow-step">
+                <strong>3. Record the flip</strong>
+                <p>Review the stock card, set the condition, and save the flip with an optional note.</p>
+            </div>
+        </div>
+
+        <div class="flip-scan-grid mt-3">
+            <section class="flip-source-panel">
+                <div class="flip-scan-stack">
+                    <div class="flip-scan-mode">
+                        <label for="scanSource">Scan Source</label>
+                        <select class="form-control" id="scanSource">
+                            <option value="server">Server Scanner</option>
+                            <option value="client-input">Browser Input / Keyboard Scanner</option>
+                            {% if scanner_features.camera_enabled %}
+                            <option value="camera">Camera Scanner</option>
+                            {% endif %}
+                            {% if scanner_features.client_serial_enabled %}
+                            <option value="client-serial">Client Serial Scanner (Chrome or Edge)</option>
+                            {% endif %}
+                        </select>
+                        <p id="scanSourceHint" class="flip-scan-hint">Server mode works regardless of the user's browser because the reader stays attached to the server machine.</p>
+                    </div>
+
+                    <div id="server-scan-controls" class="flip-scan-controls">
+                        <div>
+                            <label for="serialPort">Scanner Port</label>
+                            <select class="form-control" id="serialPort">
+                            {% for port in ports %}
+                                <option value="{{ loop.index0 }}">{{ port.device }} - {{ port.description }}</option>
+                            {% endfor %}
+                            </select>
+                        </div>
+                        <button id="startScanBtn" class="btn btn-primary">Start Scan</button>
+                    </div>
+
+                    <div id="client-input-controls" class="flip-scan-controls is-hidden">
+                        <div>
+                            <label for="browserScanInput">UID Input</label>
+                            <input id="browserScanInput" class="form-control" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Scan with a keyboard wedge after focusing this field">
+                        </div>
+                        <button id="lookupUidBtn" class="btn btn-primary" type="button">Focus Input</button>
+                    </div>
+
+                    {% if scanner_features.camera_enabled %}
+                    <div id="camera-scan-controls" class="flip-camera-shell is-hidden">
+                        <video id="cameraPreview" class="flip-camera-preview is-hidden" muted playsinline></video>
+                        <div class="flip-scan-controls">
+                            <button id="startCameraScanBtn" class="btn btn-primary" type="button">Start Camera</button>
+                            <button id="stopCameraScanBtn" class="btn btn-secondary is-hidden" type="button">Stop Camera</button>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if scanner_features.client_serial_enabled %}
+                    <div id="client-serial-controls" class="flip-scan-controls is-hidden">
+                        <div>
+                            <label for="clientSerialSupport">Client Serial Support</label>
+                            <input id="clientSerialSupport" class="form-control" type="text" value="Requires secure Chrome or Edge on the client machine." readonly>
+                        </div>
+                        <button id="connectClientSerialBtn" class="btn btn-primary" type="button">Connect Client Scanner</button>
+                        <button id="disconnectClientSerialBtn" class="btn btn-secondary is-hidden" type="button">Disconnect</button>
+                    </div>
+                    {% endif %}
+
+                    <p id="scanStatusMessage" class="flip-scan-status">Use the existing server-attached scanner or switch to a browser-side scan source.</p>
                 </div>
-                <div style="font-size: 1.5em; font-weight: bold; margin-top: -10px;">
-                    <p><span id="name"></span> <span id="altReference" class="text-muted"></span></p>
-                    <p><span id="genotype"></span></p>
-                    <p><span id="maleGenotype"></span></p>
-                    <p><span id="femaleGenotype"></span></p>
+            </section>
+
+            <aside class="flip-guide-panel">
+                <p class="app-kicker mb-2">Source Guidance</p>
+                <h2 id="scanModeTitle" class="flip-mode-title">Server Scanner</h2>
+                <p id="scanModeSummary" class="flip-mode-summary">Best when the serial QR reader is physically connected to the server host instead of the user workstation.</p>
+
+                <div class="flip-guide-meta">
+                    <div class="flip-guide-meta-card">
+                        <span>Runs On</span>
+                        <strong id="scanModeRunsOn">Server host</strong>
+                    </div>
+                    <div class="flip-guide-meta-card">
+                        <span>Best For</span>
+                        <strong id="scanModeBestFor">Bench setups where one shared server-attached scanner is already in place.</strong>
+                    </div>
+                    <div class="flip-guide-meta-card">
+                        <span>Requirements</span>
+                        <strong id="scanModeRequirements">A server-visible serial port and an operator using this page.</strong>
+                    </div>
+                    <div class="flip-guide-meta-card">
+                        <span>Browser Scope</span>
+                        <strong id="scanModeBrowserScope">Browser-independent</strong>
+                    </div>
                 </div>
-                <!-- Secondary Details (Smaller) -->
-                <div style="font-size: 1em;">
+
+                <div class="flip-browser-callout">
+                    <strong>Where is WebSerial?</strong>
+                    <p id="webserialExplainer">The WebSerial option appears in Scan Source only when client serial scanning is enabled for this deployment. Even then, it only works in secure Chrome or Edge sessions on the client machine.</p>
+                </div>
+
+                <div class="flip-compatibility-grid">
+                    <div id="compatServer" class="flip-compatibility-card">
+                        <div class="flip-compatibility-head">
+                            <strong>Server Scanner</strong>
+                            <span id="serverSupportBadge" class="flip-support-badge is-supported">Available</span>
+                        </div>
+                        <p>Uses the server-attached serial reader, so browser support is not a factor.</p>
+                    </div>
+
+                    <div id="compatKeyboard" class="flip-compatibility-card">
+                        <div class="flip-compatibility-head">
+                            <strong>Keyboard Wedge</strong>
+                            <span id="keyboardSupportBadge" class="flip-support-badge is-supported">Available</span>
+                        </div>
+                        <p>Works in standard browsers as long as the UID field is focused before scanning.</p>
+                    </div>
+
+                    <div id="compatCamera" class="flip-compatibility-card">
+                        <div class="flip-compatibility-head">
+                            <strong>Camera QR Mode</strong>
+                            <span id="cameraSupportBadge" class="flip-support-badge">Checking</span>
+                        </div>
+                        <p>Needs a secure session and browser camera QR support. Availability depends on the current browser.</p>
+                    </div>
+
+                    <div id="compatWebSerial" class="flip-compatibility-card">
+                        <div class="flip-compatibility-head">
+                            <strong>Client Serial / WebSerial</strong>
+                            <span id="webserialSupportBadge" class="flip-support-badge">Checking</span>
+                        </div>
+                        <p>Only supported in secure Chrome or Edge sessions. Safari and Firefox do not expose WebSerial.</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <div id="stock-details" class="app-panel is-hidden">
+        <div class="flip-current-vial-header">
+            <div>
+                <p class="app-kicker">Current Vial</p>
+                <h2 class="app-section-title mb-1">Review Before Recording</h2>
+                <p class="flip-current-vial-note">Confirm the stock identity, choose the current condition, then save the flip. Scanning another vial automatically advances the desk to the new record.</p>
+            </div>
+        </div>
+
+        <div class="flip-detail-grid">
+            <div>
+                <div class="flip-identifier">
+                    <span id="trayID"></span>-<span id="trayPosition"></span>
+                    <span id="seriesID"></span><span id="replicateID"></span>
+                </div>
+                <div class="flip-name"><span id="name"></span> <span id="altReference" class="text-muted"></span></div>
+                <div class="flip-detail-list">
+                    <p><strong>Genotype:</strong> <span id="genotype"></span></p>
+                    <p><strong>Male Genotype:</strong> <span id="maleGenotype"></span></p>
+                    <p><strong>Female Genotype:</strong> <span id="femaleGenotype"></span></p>
                     <p><strong>UID:</strong> <span id="uniqueID"></span></p>
                 </div>
             </div>
 
-            <!-- Second Column: Status and Flip Time -->
-            <div class="col-md-6">
-                <h3>Status</h3>
-                <div id="status-options" class="mb-3">
-                    <label class="d-block mb-2">
+            <div class="flip-status-panel">
+                <h3 class="app-section-title">Status</h3>
+                <div id="status-options" class="flip-status-options mb-3">
+                    <label class="flip-status-option">
                         <input type="radio" name="status" value="Healthy"> Healthy
                     </label>
-                    <label class="d-block mb-2">
+                    <label class="flip-status-option">
                         <input type="radio" name="status" value="Showing Issues"> Showing Issues
                     </label>
-                    <label class="d-block mb-2">
+                    <label class="flip-status-option">
                         <input type="radio" name="status" value="Needs refresh"> Needs refresh
                     </label>
-                    <label class="d-block mb-2">
+                    <label class="flip-status-option">
                         <input type="radio" name="status" value="Ordered"> Ordered
                     </label>
-                    <label class="d-block mb-2">
+                    <label class="flip-status-option">
                         <input type="radio" name="status" value="No longer maintained"> No longer maintained
                     </label>
                 </div>
 
-                <h3>Flip Time</h3>
+                <h3 class="app-section-title">Flip Time</h3>
                 <input type="datetime-local" id="flipTime" class="form-control">
             </div>
         </div>
 
-        <!-- Comments Section -->
-        <h3 class="mt-4">Add Comment</h3>
-        <textarea id="comment" class="form-control" rows="3"></textarea>
+        <div class="mt-4">
+            <h3 class="app-section-title">Add Comment</h3>
+            <textarea id="comment" class="form-control" rows="3" placeholder="Optional note for this flip"></textarea>
+        </div>
 
-        <!-- Buttons to Flip or Cancel -->
-        <div class="mt-3">
+        <div class="flip-actions">
             <button id="flipBtn" class="btn btn-success">Flip Stock</button>
-            <button id="cancelFlipBtn" class="btn btn-danger">Cancel Flip</button>
+            <button id="cancelFlipBtn" class="btn btn-secondary">Clear Current Vial</button>
         </div>
     </div>
-    <br><br>
-    <div id="scan-waiting" class="text-center" style="display: none;">
+
+    <div id="scan-waiting" class="app-panel flip-waiting is-hidden">
         <h3>Waiting for QR code to be scanned...</h3>
         <div class="spinner-border" role="status">
             <span class="visually-hidden"></span>
         </div>
-        <br>
         <button id="stopScanBtn" class="btn btn-danger mt-3">Stop</button>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // Define URLs for JavaScript using url_for
     const flipVialUrl = "{{ url_for('flip.handle_flip_vial_route') }}";
     const startScanUrl = "{{ url_for('flip.start_scan_route') }}";
     const stopScanUrl = "{{ url_for('flip.stop_scan_route') }}";
+    const lookupUidUrl = "{{ url_for('flip.lookup_uid_route') }}";
+    const scannerFeatures = {{ scanner_features | tojson }};
 </script>
-<script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
-<script src="{{ url_for('static', filename='js/fly_flipper.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/client_scanner.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/fly_flipper.js') }}"></script>
 {% endblock %}

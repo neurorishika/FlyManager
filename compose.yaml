@@ -1,0 +1,65 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: flymanager-mongodb
+    restart: unless-stopped
+    ports:
+      - "${MONGO_PUBLISHED_HOST:-127.0.0.1}:${MONGO_PUBLISHED_PORT:-27017}:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test:
+        ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flymanager-app
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    env_file:
+      - ${FLYMANAGER_ENV_FILE:-.env}
+    environment:
+      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-flymanager}
+      APP_HOST: 0.0.0.0
+      APP_PORT: ${APP_PORT:-5234}
+      FLASK_DEBUG: ${FLASK_DEBUG:-0}
+      WAIT_FOR_MONGO: ${WAIT_FOR_MONGO:-1}
+      WAIT_FOR_MONGO_TIMEOUT: ${WAIT_FOR_MONGO_TIMEOUT:-60}
+      ENABLE_SCHEDULER: ${ENABLE_SCHEDULER:-1}
+      SOCKETIO_ASYNC_MODE: ${SOCKETIO_ASYNC_MODE:-threading}
+      UPLOAD_FOLDER: ${UPLOAD_FOLDER:-data/uploads}
+      SESSION_FILE_DIR: ${SESSION_FILE_DIR:-/tmp/flymanager/flask_session}
+      MAX_UPLOAD_SIZE_BYTES: ${MAX_UPLOAD_SIZE_BYTES:-8388608}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-0}
+    expose:
+      - "5234"
+    ports:
+      - "${APP_PUBLISHED_HOST:-127.0.0.1}:${APP_PORT:-5234}:5234"
+    volumes:
+      - ./data:/app/data
+      - ./flask_session:/tmp/flymanager/flask_session
+      - ./flymanager/app/static/generated_labels:/app/flymanager/app/static/generated_labels
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5234/health/ready', timeout=5)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  mongo_data:

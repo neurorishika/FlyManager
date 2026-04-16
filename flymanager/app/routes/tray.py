@@ -1,12 +1,17 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import (Blueprint, flash, jsonify, redirect, render_template,
+                   request, session, url_for)
+
 from flymanager.app import db
-from flymanager.utils.mongo import (
-    get_database, write_activity,
-    add_tray, get_user_trays, get_tray, delete_tray, update_tray,
-    get_tray_occupancy, calculate_required_vials, move_item_to_tray,
-    get_user_stocks, get_user_crosses
-)
 from flymanager.app.routes.auth import login_required
+from flymanager.app.security import (get_json_payload, limiter,
+                                     normalize_identifier_list,
+                                     normalize_optional_text, parse_int_value)
+from flymanager.utils.mongo import (add_tray, calculate_required_vials,
+                                    delete_tray, get_database, get_tray,
+                                    get_tray_occupancy, get_user_crosses,
+                                    get_user_stocks, get_user_trays,
+                                    move_item_to_tray, update_tray,
+                                    write_activity)
 
 # Create blueprint
 bp = Blueprint('tray', __name__)
@@ -87,6 +92,7 @@ def view_tray(tray_id):
 
 @bp.route('/add_tray', methods=['GET', 'POST'])
 @login_required
+@limiter.limit('20 per hour')
 def add_tray_route():
     """
     Add a new tray.
@@ -99,8 +105,8 @@ def add_tray_route():
         # Get form data
         tray_id = request.form.get('tray_id')
         name = request.form.get('name')
-        rows = request.form.get('rows', 10)
-        columns = request.form.get('columns', 10)
+        rows = parse_int_value(request.form.get('rows', 10), field_name='Rows', minimum=1, maximum=100)
+        columns = parse_int_value(request.form.get('columns', 10), field_name='Columns', minimum=1, maximum=100)
         description = request.form.get('description', '')
         
         # Create tray properties
@@ -128,6 +134,7 @@ def add_tray_route():
 
 @bp.route('/edit_tray/<tray_id>', methods=['GET', 'POST'])
 @login_required
+@limiter.limit('20 per hour')
 def edit_tray_route(tray_id):
     """
     Edit an existing tray.
@@ -145,8 +152,8 @@ def edit_tray_route(tray_id):
     if request.method == 'POST':
         # Get form data
         name = request.form.get('name')
-        rows = request.form.get('rows')
-        columns = request.form.get('columns')
+        rows = parse_int_value(request.form.get('rows'), field_name='Rows', minimum=1, maximum=100)
+        columns = parse_int_value(request.form.get('columns'), field_name='Columns', minimum=1, maximum=100)
         description = request.form.get('description', '')
         
         # Create updates dictionary
@@ -172,6 +179,7 @@ def edit_tray_route(tray_id):
 
 @bp.route('/delete_tray/<tray_id>', methods=['POST'])
 @login_required
+@limiter.limit('10 per hour')
 def delete_tray_route(tray_id):
     """
     Delete a tray.
@@ -205,20 +213,27 @@ def delete_tray_route(tray_id):
 
 @bp.route('/move_to_tray_route', methods=['POST'])
 @login_required
+@limiter.limit('30 per minute')
 def move_to_tray_route():
     """
     Move a stock or cross to a specific tray position.
     """
     # Get data from request
-    data = request.get_json()
-    item_type = data.get('item_type')
-    item_id = data.get('item_id')
-    tray_id = data.get('tray_id')
-    position = data.get('position')
+    try:
+        data = get_json_payload()
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)})
+
+    item_type = normalize_optional_text(data.get('item_type'), field_name='Item type', max_length=16)
+    item_id = normalize_optional_text(data.get('item_id'), field_name='Item ID', max_length=64)
+    tray_id = normalize_optional_text(data.get('tray_id'), field_name='Tray ID', max_length=64)
+    position = normalize_optional_text(data.get('position'), field_name='Position', max_length=16)
     
     # Validate required fields
     if not all([item_type, item_id]):
         return jsonify({"success": False, "message": "Missing item type or ID"})
+    if item_type not in {'stock', 'cross'}:
+        return jsonify({"success": False, "message": "Invalid item type"})
     
     # For removal from tray, tray_id and position should be empty strings
     is_removal = tray_id == '' and position == ''
@@ -248,16 +263,19 @@ def move_to_tray_route():
 
 @bp.route('/bulk_remove_from_tray', methods=['POST'])
 @login_required
+@limiter.limit('20 per minute')
 def bulk_remove_from_tray():
     """
     Remove multiple items from their trays.
     """
-    data = request.get_json()
-    item_type = data.get('item_type')  # 'stock' or 'cross'
-    unique_ids = data.get('uniqueIDs', [])
-    
-    if not unique_ids:
-        return jsonify({"success": False, "message": "No items selected"})
+    try:
+        data = get_json_payload()
+        item_type = normalize_optional_text(data.get('item_type'), field_name='Item type', max_length=16)
+        unique_ids = normalize_identifier_list(data.get('uniqueIDs', []), field_name='uniqueIDs')
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)})
+    if item_type not in {'stock', 'cross'}:
+        return jsonify({"success": False, "message": "Invalid item type"})
     
     user = session.get('username')
     success_count = 0

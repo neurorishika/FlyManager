@@ -38,10 +38,15 @@ flask-socketio = "^5.3.6"
 flask-cors = "^4.0.1"
 python-dotenv = "^1.0.1"
 pymongo = "^4.8.0"
+dnspython = "^2.6.1"
 openpyxl = "^3.1.5"
 flask-mail = "^0.10.0"
 apscheduler = "^3.10.4"
 flask-apscheduler = "^1.13.1"
+gunicorn = "^23.0.0"
+simple-websocket = "^1.1.0"
+flask-wtf = "^1.2.1"
+flask-limiter = "^3.8.0"
 
 [build-system]
 requires = ["poetry-core"]

@@ -1,69 +1,78 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <h1>Tray Management</h1>
-            <div class="mb-4">
-                <a href="{{ url_for('tray.add_tray_route') }}" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Add New Tray
-                </a>
-            </div>
-        </div>
+<div class="app-panel app-page-header">
+    <div>
+        <p class="app-kicker">Physical Layouts</p>
+        <h1 class="app-page-title">Tray Management</h1>
+        <p class="app-page-subtitle">Create, inspect, and maintain tray layouts before placing stocks and crosses.</p>
     </div>
+    <div class="app-toolbar">
+        <span class="app-chip"><i class="fas fa-th"></i> {{ trays|length }} tray{% if trays|length != 1 %}s{% endif %}</span>
+        <a href="{{ url_for('tray.add_tray_route') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add New Tray
+        </a>
+    </div>
+</div>
 
+<div>
     <div class="row">
         <div class="col-12">
             {% if trays %}
-            <div class="card">
-                <div class="card-header">
-                    <h2>Your Trays</h2>
+            <div class="app-panel">
+                <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
+                    <h2 class="app-section-title mb-0">Your Trays</h2>
+                    <div class="app-inline-note">Open a tray to edit layout, drag items, or review occupancy.</div>
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Tray ID</th>
-                                    <th>Name</th>
-                                    <th>Size</th>
-                                    <th>Capacity</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for tray in trays %}
-                                <tr>
-                                    <td>{{ tray.TrayID }}</td>
-                                    <td>{{ tray.Name }}</td>
-                                    <td>{{ tray.Rows }} x {{ tray.Columns }}</td>
-                                    <td>{{ tray.Rows * tray.Columns }} positions</td>
-                                    <td>
-                                        <div class="btn-group" role="group">
-                                            <a href="{{ url_for('tray.view_tray', tray_id=tray.TrayID) }}" class="btn btn-sm btn-info">
-                                                <i class="fas fa-eye"></i> View
-                                            </a>
-                                            <a href="{{ url_for('tray.edit_tray_route', tray_id=tray.TrayID) }}" class="btn btn-sm btn-warning">
-                                                <i class="fas fa-edit"></i> Edit
-                                            </a>
-                                            <button class="btn btn-sm btn-danger" 
-                                                    onclick="confirmDelete('{{ tray.TrayID }}', '{{ tray.Name }}')">
-                                                <i class="fas fa-trash"></i> Delete
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="table-responsive">
+                    <table class="table table-striped align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Tray ID</th>
+                                <th>Name</th>
+                                <th>Size</th>
+                                <th>Capacity</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tray in trays %}
+                            <tr>
+                                <td><strong>{{ tray.TrayID }}</strong></td>
+                                <td>{{ tray.Name }}</td>
+                                <td>{{ tray.Rows }} x {{ tray.Columns }}</td>
+                                <td>{{ tray.Rows * tray.Columns }} positions</td>
+                                <td>
+                                    <div class="app-button-row">
+                                        <a href="{{ url_for('tray.view_tray', tray_id=tray.TrayID) }}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                        <a href="{{ url_for('tray.edit_tray_route', tray_id=tray.TrayID) }}" class="btn btn-sm btn-warning">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </a>
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-danger tray-delete-trigger"
+                                            data-tray-id="{{ tray.TrayID }}"
+                                            data-tray-name="{{ tray.Name }}"
+                                        >
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
             {% else %}
-            <div class="alert alert-info">
+            <div class="app-panel app-empty-state">
                 <h3>No trays found</h3>
-                <p>You haven't created any trays yet. Click the "Add New Tray" button to get started.</p>
+                <p>You haven’t created any trays yet. Add one to start organizing flies by physical position.</p>
+                <div class="app-button-row justify-content-center mt-3">
+                    <a href="{{ url_for('tray.add_tray_route') }}" class="btn btn-primary">Create First Tray</a>
+                </div>
             </div>
             {% endif %}
         </div>
@@ -94,7 +103,13 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
+    document.querySelectorAll('.tray-delete-trigger').forEach(button => {
+        button.addEventListener('click', function() {
+            confirmDelete(this.dataset.trayId, this.dataset.trayName);
+        });
+    });
+
     function confirmDelete(trayId, trayName) {
         document.getElementById('deleteForm').action = "{{ url_for('tray.delete_tray_route', tray_id='') }}" + trayId;
         document.getElementById('deleteTrayName').textContent = trayId + " - " + trayName;

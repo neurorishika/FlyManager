@@ -1,8 +1,19 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-5">
-    <h1 class="text-center">Add New Stock</h1>
+<div class="app-panel app-page-header">
+    <div>
+        <p class="app-kicker">Stock Workflow</p>
+        <h1 class="app-page-title">Add New Stock</h1>
+        <p class="app-page-subtitle">Create a stock record with source information, genotype, husbandry timing, and provenance in one structured form.</p>
+    </div>
+    <div class="app-chip-row">
+        <span class="app-chip"><i class="fas fa-dna"></i> Genotype-aware entry</span>
+        <span class="app-chip"><i class="fas fa-database"></i> Optional source autopopulate</span>
+    </div>
+</div>
+
+<div class="app-panel">
 
     {% if error %}
     <div class="alert alert-danger" role="alert">
@@ -10,8 +21,12 @@
     </div>
     {% endif %}
 
-    <form method="POST" action="{{ url_for('stock.add_stock') }}">
-        <!-- Row 1: Source Dropdown, Source ID Input, and Autopopulate Button -->
+    <form method="POST" action="{{ url_for('stock.add_stock') }}" class="app-form-shell">
+        <div class="app-form-section">
+            <div>
+                <h2 class="app-form-section-title">Source</h2>
+                <p class="app-form-section-copy">Start from an external or internal identifier and optionally autopopulate available data.</p>
+            </div>
         <div class="form-row">
             <div class="form-group col-md-3">
                 <label for="sourceType">Source Type:</label>
@@ -30,8 +45,13 @@
                 <button type="button" id="autopopulateBtn" class="btn btn-primary mt-4 btn-block" disabled>Autopopulate</button>
             </div>
         </div>
+        </div>
 
-        <!-- Row 2: Chromosomes X, 2, 3, 4 -->
+        <div class="app-form-section">
+            <div>
+                <h2 class="app-form-section-title">Genotype</h2>
+                <p class="app-form-section-copy">Enter chromosome-level genotype information using the assisted gene fields.</p>
+            </div>
         <div class="form-row">
             <div class="form-group col-md-2">
                 <label for="genotypeX">Chromosome X:</label>
@@ -64,8 +84,13 @@
                 <input type="text" id="genotype4" name="genotype4" class="form-control tag-input">
             </div>
         </div>
+        </div>
 
-        <!-- Row 3: Name and Alt Reference -->
+        <div class="app-form-section">
+            <div>
+                <h2 class="app-form-section-title">Identity</h2>
+                <p class="app-form-section-copy">Define how the stock should appear throughout the system and how it should be categorized.</p>
+            </div>
         <div class="form-row">
             <div class="form-group col-md-6">
                 <label for="name">Name:</label>
@@ -108,8 +133,13 @@
             <label for="provenance">Provenance:</label>
             <input type="text" id="provenance" name="provenance" class="form-control tag-input" required>
         </div>
+        </div>
 
-        <!-- Row 6: Series ID, Replicate ID, Vial Lifetime, Flip Frequency and Developmental Time-->
+        <div class="app-form-section">
+            <div>
+                <h2 class="app-form-section-title">Care Schedule</h2>
+                <p class="app-form-section-copy">Set the identifiers and timings that drive flipping, eclosion prediction, and scheduling.</p>
+            </div>
         <div class="form-row">
             <div class="form-group col-md-3">
                 <label for="seriesID">Series ID:</label>
@@ -144,16 +174,20 @@
             <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>
         </div>
 
-        <button type="submit" class="btn btn-success btn-block">Add Stock</button>
+        <div class="app-button-row justify-content-end">
+            <a href="{{ url_for('stock.stock_explorer') }}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-success">Add Stock</button>
+        </div>
+        </div>
     </form>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3"></script>
-<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.polyfills.min.js"></script>
+<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3"></script>
+<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.polyfills.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.css" rel="stylesheet" type="text/css" />
-<script>
+<script nonce="{{ csp_nonce }}">
     document.addEventListener("DOMContentLoaded", function() {
 
         const stockData = {{ stock_data | tojson }};

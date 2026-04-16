@@ -1,34 +1,23 @@
 import os
 from datetime import datetime
-from flask import (
-    Blueprint,
-    render_template,
-    request,
-    redirect,
-    session,
-    jsonify,
-    url_for,
-    current_app,
-    flash,
-)
+
+from flask import (Blueprint, current_app, flash, jsonify, redirect,
+                   render_template, request, session, url_for)
 
 # Import necessary components from the app context and services
-from flymanager.app import db, MIN_FLIP_DIFFERENCE, socketio
+from flymanager.app import MIN_FLIP_DIFFERENCE, db, socketio
+from flymanager.app.routes.auth import login_required
+from flymanager.app.security import (get_json_payload, limiter,
+                                     normalize_identifier_list,
+                                     normalize_optional_text, parse_int_value,
+                                     parse_iso_datetime)
 from flymanager.app.services import scanner as scanner_service
-
+from flymanager.utils.labels import generate_label_pdf
+from flymanager.utils.mongo import (flip_cross, flip_stock, get_flip_schedule,
+                                    get_user_crosses, get_user_initials,
+                                    get_user_stocks, write_activity)
 # Import utility functions
 from flymanager.utils.scanner import get_available_ports
-from flymanager.utils.mongo import (
-    get_user_stocks,
-    get_user_crosses,
-    flip_stock,
-    flip_cross,
-    get_flip_schedule,
-    get_user_initials,
-    write_activity,
-)
-from flymanager.utils.labels import generate_label_pdf
-from flymanager.app.routes.auth import login_required
 
 # Define the Blueprint
 bp = Blueprint(
@@ -56,52 +45,87 @@ def flip_interface():
 
 
 @bp.route("/start_scan", methods=["POST"])
+@limiter.limit("20 per minute")
 def start_scan_route():
     """Starts the QR code scanning service on a selected port."""
     if not session.get("username"):
         return jsonify({"success": False, "message": "Authentication required."}), 401
 
     username = session.get("username")
-    data = request.json
-    port_index = data.get("port_index")
-
-    if port_index is None:
-        return jsonify({"success": False, "message": "Port index is required."}), 400
-
     try:
-        port_index = int(port_index)
+        data = get_json_payload()
+        port_index = parse_int_value(
+            data.get("port_index"), field_name="Port index", minimum=0, maximum=255
+        )
         # Call the service function from scanner.py
         response, status_code = scanner_service.start_scan_service(port_index, username)
         return response, status_code
-    except ValueError:
-        return jsonify({"success": False, "message": "Invalid port index."}), 400
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
     except Exception as e:
-        print(f"Error starting scan: {e}")
+        current_app.logger.exception("Error starting scan for %s: %s", username, e)
         return jsonify({"success": False, "message": "Failed to start scanning."}), 500
 
 
 @bp.route("/stop_scan", methods=["POST"])
+@limiter.limit("20 per minute")
 def stop_scan_route():
     """Stops a specific QR code scanning thread."""
     if not session.get("username"):
         return jsonify({"success": False, "message": "Authentication required."}), 401
 
-    data = request.json
-    thread_id = data.get("thread_id")
-
-    if not thread_id:
-        return jsonify({"success": False, "message": "Thread ID is required."}), 400
-
     try:
+        data = get_json_payload()
+        thread_id = normalize_optional_text(
+            data.get("thread_id"), field_name="Thread ID", max_length=128
+        )
+        if not thread_id:
+            return jsonify({"success": False, "message": "Thread ID is required."}), 400
         # Call the service function from scanner.py
         response, status_code = scanner_service.stop_scan_service(thread_id)
         return response, status_code
     except Exception as e:
-        print(f"Error stopping scan: {e}")
+        current_app.logger.exception("Error stopping scan thread %s: %s", thread_id, e)
         return jsonify({"success": False, "message": "Failed to stop scanning."}), 500
 
 
+@bp.route("/lookup_uid", methods=["POST"])
+@limiter.limit("120 per minute")
+def lookup_uid_route():
+    """Resolve a scanned UID for browser-driven scanner workflows."""
+    if not session.get("username"):
+        return jsonify({"success": False, "message": "Authentication required."}), 401
+
+    username = session.get("username")
+    try:
+        data = get_json_payload()
+        uid = normalize_optional_text(data.get("uniqueID"), field_name="UniqueID", max_length=64)
+        if not uid:
+            return jsonify({"success": False, "message": "UniqueID is required."}), 400
+
+        item_type, payload = scanner_service.lookup_uid_result(username, uid, db)
+        if not payload:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "UID not recognized for this user.",
+                        "uniqueID": uid,
+                    }
+                ),
+                404,
+            )
+
+        return jsonify({"success": True, "itemType": item_type, "payload": payload})
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
+    except Exception as e:
+        current_app.logger.exception("Error looking up scanned UID %s for %s: %s", uid, username, e)
+        return jsonify({"success": False, "message": "Failed to look up UID."}), 500
+
+
 @bp.route("/flip_vial", methods=["POST"])
+@limiter.limit("60 per minute")
 def handle_flip_vial_route():
     """Handles the logic for flipping a single vial (stock or cross)."""
     if not session.get("username"):
@@ -116,25 +140,16 @@ def handle_flip_vial_route():
             return jsonify({"message": "Authentication required."}), 401
 
     username = session.get("username")
-    data = request.json
-    uid = data.get("uniqueID")
-    status = data.get("status")  # Optional new status
-    flip_time_str = data.get("flipTime")  # Optional specific time
-    comment = data.get("comment")  # Optional comment
-
-    if not uid:
-        return jsonify({"message": "UniqueID is required."}), 400
-
     try:
+        data = get_json_payload()
+        uid = normalize_optional_text(data.get("uniqueID"), field_name="UniqueID", max_length=64)
+        status = normalize_optional_text(data.get("status"), field_name="Status", max_length=64)
+        comment = normalize_optional_text(data.get("comment"), field_name="Comment", max_length=500)
+        if not uid:
+            return jsonify({"message": "UniqueID is required."}), 400
+
         # Determine flip time
-        flip_time = datetime.now()
-        if flip_time_str:
-            try:
-                # Assuming ISO format like YYYY-MM-DDTHH:MM:SS from JS Date.toISOString()
-                # Need to handle potential timezone info if present
-                flip_time = datetime.fromisoformat(flip_time_str.replace("Z", "+00:00"))
-            except ValueError:
-                return jsonify({"message": "Invalid flip time format."}), 400
+        flip_time = parse_iso_datetime(data.get("flipTime"), field_name="flip time")
 
         # Check stocks and crosses
         stock = db["stocks"].find_one({"UniqueID": uid, "User": username})
@@ -173,8 +188,11 @@ def handle_flip_vial_route():
                     )
                 difference = (flip_time - last_flip_dt).total_seconds()
                 if difference < MIN_FLIP_DIFFERENCE:
-                    print(
-                        f"{item_type} {uid} already flipped recently ({difference:.0f}s ago)"
+                    current_app.logger.info(
+                        "%s %s already flipped recently (%.0fs ago)",
+                        item_type,
+                        uid,
+                        difference,
                     )
                     return (
                         jsonify(
@@ -186,12 +204,16 @@ def handle_flip_vial_route():
                     )  # 409 Conflict
 
             except (ValueError, TypeError) as e:
-                print(
-                    f"Could not parse last flip date '{last_flip_str}' for {item_type.lower()} {uid}: {e}"
+                current_app.logger.warning(
+                    "Could not parse last flip date '%s' for %s %s: %s",
+                    last_flip_str,
+                    item_type.lower(),
+                    uid,
+                    e,
                 )
                 # Decide whether to proceed or return an error if date is unparseable
 
-        print(f"Flipping {item_type.lower()}: {uid} for user {username}")
+        current_app.logger.info("Flipping %s %s for user %s", item_type.lower(), uid, username)
         # Call the appropriate flip function (flip_stock or flip_cross)
         flip_function(
             username, uid, db, flip_time, new_status=status, added_comment=comment
@@ -204,41 +226,26 @@ def handle_flip_vial_route():
         return jsonify({"message": f"{item_type} flipped successfully!"})
 
     except Exception as e:
-        print(f"Error handling flip vial for {uid}: {e}")
-        # Log the full traceback for debugging
-        import traceback
-
-        traceback.print_exc()
+        current_app.logger.exception("Error handling flip vial for %s: %s", uid, e)
         return jsonify({"message": "An internal error occurred during flip."}), 500
 
 
 @bp.route("/bulk_flip", methods=["POST"])
+@limiter.limit("20 per minute")
 def bulk_flip_route():
     """Handles the logic for flipping multiple vials at once."""
     if not session.get("username"):
         return jsonify({"message": "Authentication required."}), 401
 
     username = session.get("username")
-    data = request.json
-    uids = data.get("uniqueIDs", [])
-    status = data.get("status")  # Optional new status for all items
-    flip_time_str = data.get("flipTime")  # Optional specific time
-    comment = data.get("comment", "")  # Optional comment
-
-    if not uids:
-        return jsonify({"message": "At least one UniqueID is required."}), 400
-
-    if not isinstance(uids, list):
-        return jsonify({"message": "uniqueIDs must be a list."}), 400
-
     try:
+        data = get_json_payload()
+        uids = normalize_identifier_list(data.get("uniqueIDs", []), field_name="uniqueIDs")
+        status = normalize_optional_text(data.get("status"), field_name="Status", max_length=64)
+        comment = normalize_optional_text(data.get("comment"), field_name="Comment", max_length=500) or ""
+
         # Determine flip time
-        flip_time = datetime.now()
-        if flip_time_str:
-            try:
-                flip_time = datetime.fromisoformat(flip_time_str.replace("Z", "+00:00"))
-            except ValueError:
-                return jsonify({"message": "Invalid flip time format."}), 400
+        flip_time = parse_iso_datetime(data.get("flipTime"), field_name="flip time")
 
         results = {"success": [], "failed": []}
 
@@ -282,7 +289,7 @@ def bulk_flip_route():
 
             except Exception as e:
                 results["failed"].append({"uid": uid, "reason": str(e)})
-                print(f"Error flipping {uid}: {e}")
+                current_app.logger.warning("Error flipping %s: %s", uid, e)
 
         return jsonify(
             {
@@ -292,34 +299,25 @@ def bulk_flip_route():
         )
 
     except Exception as e:
-        print(f"Error handling bulk flip: {e}")
-        import traceback
-
-        traceback.print_exc()
+        current_app.logger.exception("Error handling bulk flip for %s: %s", username, e)
         return jsonify({"message": "An internal error occurred during bulk flip."}), 500
 
 
 @bp.route("/bulk_status_change", methods=["POST"])
+@limiter.limit("20 per minute")
 def bulk_status_change_route():
     """Handles the logic for changing the status of multiple vials at once without flipping."""
     if not session.get("username"):
         return jsonify({"message": "Authentication required."}), 401
 
     username = session.get("username")
-    data = request.json
-    uids = data.get("uniqueIDs", [])
-    status = data.get("status")  # New status for all items
-
-    if not uids:
-        return jsonify({"message": "At least one UniqueID is required."}), 400
-
-    if not status:
-        return jsonify({"message": "Status is required."}), 400
-
-    if not isinstance(uids, list):
-        return jsonify({"message": "uniqueIDs must be a list."}), 400
-
     try:
+        data = get_json_payload()
+        uids = normalize_identifier_list(data.get("uniqueIDs", []), field_name="uniqueIDs")
+        status = normalize_optional_text(data.get("status"), field_name="Status", max_length=64)
+        if not status:
+            return jsonify({"message": "Status is required."}), 400
+
         results = {"success": [], "failed": []}
 
         for uid in uids:
@@ -369,7 +367,7 @@ def bulk_status_change_route():
 
             except Exception as e:
                 results["failed"].append({"uid": uid, "reason": str(e)})
-                print(f"Error changing status for {uid}: {e}")
+                current_app.logger.warning("Error changing status for %s: %s", uid, e)
 
         return jsonify(
             {
@@ -379,10 +377,7 @@ def bulk_status_change_route():
         )
 
     except Exception as e:
-        print(f"Error handling bulk status change: {e}")
-        import traceback
-
-        traceback.print_exc()
+        current_app.logger.exception("Error handling bulk status change for %s: %s", username, e)
         return (
             jsonify(
                 {"message": "An internal error occurred during bulk status change."}
@@ -508,12 +503,18 @@ def flip_schedule_display():
 
 @bp.route("/generate_labels_for_day", methods=["POST"])
 @login_required
+@limiter.limit("10 per hour")
 def generate_labels_for_day_route():
     """Generates labels for all items scheduled to be flipped on a specific day."""
     username = session.get("username")
     try:
         date_str = request.form.get("date")
-        blank_spaces = int(request.form.get("blank_spaces", 0))
+        blank_spaces = parse_int_value(
+            request.form.get("blank_spaces", 0),
+            field_name="Blank spaces",
+            minimum=0,
+            maximum=200,
+        )
 
         if not date_str:
             flash("Date is required.", "error")

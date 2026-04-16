@@ -1,8 +1,11 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-5">
-    <h1 class="text-center">Upload Data</h1>
+<div class="app-upload-shell">
+    <div class="app-panel">
+    <p class="app-kicker">Utilities</p>
+    <h1 class="app-page-title">Upload Data</h1>
+    <p class="app-page-subtitle">Import an Excel file to update records in bulk. Use this for structured updates rather than manual entry.</p>
     
     {% with messages = get_flashed_messages() %}
     {% if messages %}
@@ -14,12 +17,16 @@
     {% endif %}
     {% endwith %}
     
-    <form method="POST" action="{{ url_for('data.upload_data_route') }}" enctype="multipart/form-data">
+    <form method="POST" action="{{ url_for('data.upload_data_route') }}" enctype="multipart/form-data" class="app-form-shell mt-4">
         <div class="form-group">
             <label for="file">Select Excel File (.xlsx):</label>
             <input type="file" class="form-control-file" id="file" name="file" accept=".xlsx" required>
+            <small class="app-inline-note">Only Excel workbooks in .xlsx format are accepted.</small>
         </div>
-        <button type="submit" class="btn btn-primary">Upload and Update Data</button>
+        <div class="app-button-row justify-content-end">
+            <button type="submit" class="btn btn-primary">Upload and Update Data</button>
+        </div>
     </form>
+    </div>
 </div>
 {% endblock %}

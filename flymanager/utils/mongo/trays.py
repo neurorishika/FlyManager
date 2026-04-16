@@ -324,6 +324,13 @@ def calculate_required_vials(stock_or_cross):
     return required_vials
 
 
+def _get_tray_footprint_positions(position_int, required_vials):
+    """Return the horizontally occupied tray positions for an item."""
+    row = ((position_int - 1) % 10) + 1
+    column = ((position_int - 1) // 10) + 1
+    return [str(((column + offset - 1) * 10) + row) for offset in range(required_vials)]
+
+
 def move_item_to_tray(user, item_type, item_id, tray_id, position, db):
     """
     Move a stock or cross to a specific tray and position.
@@ -385,8 +392,6 @@ def move_item_to_tray(user, item_type, item_id, tray_id, position, db):
         if position_int <= 0 or position_int > (tray["Rows"] * tray["Columns"]):
             return False
 
-        # Calculate row and column for horizontal validation
-        row = ((position_int - 1) % 10) + 1
         column = ((position_int - 1) // 10) + 1
 
         # Check if the last required position would be beyond tray bounds horizontally
@@ -396,13 +401,24 @@ def move_item_to_tray(user, item_type, item_id, tray_id, position, db):
     except ValueError:
         return False
 
-    # Check if any of the required positions are occupied
+    current_footprint = set()
+    current_tray_id = item.get("TrayID", "")
+    current_position = item.get("TrayPosition", "")
+    if current_tray_id == tray_id and current_position:
+        try:
+            current_footprint = set(
+                _get_tray_footprint_positions(
+                    int(float(current_position)),
+                    required_vials,
+                )
+            )
+        except ValueError:
+            current_footprint = set()
+
+    # Check if any of the required positions are occupied by another item
     occupancy = get_tray_occupancy(user, tray_id, db)
-    for i in range(required_vials):
-        # Calculate next position in the row
-        next_column = column + i
-        check_pos = str(((next_column - 1) * 10) + row)
-        if check_pos in occupancy:
+    for check_pos in _get_tray_footprint_positions(position_int, required_vials):
+        if check_pos in occupancy and check_pos not in current_footprint:
             return False
 
     # Move the item

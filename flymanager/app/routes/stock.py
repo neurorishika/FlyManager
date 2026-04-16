@@ -4,42 +4,27 @@ import traceback
 from datetime import datetime
 from urllib.parse import unquote
 
-from flask import (
-    Blueprint,
-    current_app,
-    flash,
-    jsonify,
-    redirect,
-    render_template,
-    request,
-    session,
-    url_for,
-)
+from flask import (Blueprint, current_app, flash, jsonify, redirect,
+                   render_template, request, session, url_for)
 from fuzzywuzzy import fuzz
 
 from flymanager.app import db
 from flymanager.app.routes.auth import login_required
+from flymanager.app.routes.explorer_utils import (collect_unique_values,
+                                                  get_explorer_filter_state,
+                                                  set_flip_display_fields)
+from flymanager.app.security import (get_json_payload, limiter,
+                                     normalize_identifier_list,
+                                     normalize_optional_text, parse_int_value)
 from flymanager.app.settings import DEFAULT_STOCK_PROPERTY_VALUES
 from flymanager.utils.genetics import get_stock_genotype, qc_genotype
 from flymanager.utils.labels import generate_label_pdf
-from flymanager.utils.mongo import (
-    add_metadata,
-    add_to_stock,
-    delete_stock,
-    edit_stock,
-    get_eclosion_in,
-    get_flip_in,
-    get_metadata,
-    get_user_initials,
-    get_user_stocks,
-    update_stock_vials,
-    write_activity,
-)
-from flymanager.utils.utils import (
-    clean_tagify_data,
-    increment_replicate_id,
-    parse_flip_day,
-)
+from flymanager.utils.mongo import (add_metadata, add_to_stock, delete_stock,
+                                    edit_stock, get_eclosion_in, get_flip_in,
+                                    get_metadata, get_user_initials,
+                                    get_user_stocks, update_stock_vials,
+                                    write_activity)
+from flymanager.utils.utils import clean_tagify_data, increment_replicate_id
 
 bp = Blueprint("stock", __name__)  # url_prefix is defined in app/__init__
 
@@ -50,6 +35,7 @@ def stock_explorer():
     username = session.get("username")
     try:
         stocks = get_user_stocks(username, db)
+        all_stocks_for_filters = list(stocks)
         stocks = sorted(
             stocks,
             key=lambda x: (
@@ -63,255 +49,77 @@ def stock_explorer():
         # Add derived fields
         for stock in stocks:
             stock["FlipIn"] = get_flip_in(stock)
-            day_value = parse_flip_day(stock["FlipIn"])
-
-            if day_value == -999:
-                stock["FlipInDisplay"] = "No Flip"
-                stock["FlipInColor"] = "#ffcce0"
-            elif day_value < 0:
-                stock["FlipInDisplay"] = "Overdue"
-                stock["FlipInColor"] = "#f25567"
-            elif day_value < 1:
-                stock["FlipInDisplay"] = "Flip today"
-                stock["FlipInColor"] = "#fca15b"
-            else:
-                stock["FlipInDisplay"] = (
-                    f'Flip in {day_value} day{"s" if day_value > 1 else ""}'
-                )
-                stock["FlipInColor"] = "#66fa78"
+            set_flip_display_fields(
+                stock,
+                raw_value=stock["FlipIn"],
+                display_field="FlipInDisplay",
+            )
 
             stock["EclosesIn"] = get_eclosion_in(stock)
 
         # Initial unique values for filters
-        all_stocks_for_filters = get_user_stocks(
-            username, db
-        )  # Get all again for unfiltered unique values
-        unique_values = {
-            "Type": sorted(
-                list(
-                    set(
-                        str(s.get("Type", ""))
-                        for s in all_stocks_for_filters
-                        if s.get("Type")
-                    )
-                )
-            ),
-            "TrayID": sorted(
-                list(
-                    set(
-                        str(s.get("TrayID", ""))
-                        for s in all_stocks_for_filters
-                        if s.get("TrayID")
-                    )
-                )
-            ),
-            "Status": sorted(
-                list(
-                    set(
-                        str(s.get("Status", ""))
-                        for s in all_stocks_for_filters
-                        if s.get("Status")
-                    )
-                )
-            ),
-            "FoodType": sorted(
-                list(
-                    set(
-                        str(s.get("FoodType", ""))
-                        for s in all_stocks_for_filters
-                        if s.get("FoodType")
-                    )
-                )
-            ),
-            "Provenance": sorted(
-                list(
-                    set(
-                        str(s.get("Provenance", "")).split("/")[0]
-                        for s in all_stocks_for_filters
-                        if s.get("Provenance")
-                    )
-                )
-            ),
-            "Species": sorted(
-                list(
-                    set(
-                        str(s.get("Species", ""))
-                        for s in all_stocks_for_filters
-                        if s.get("Species")
-                    )
-                )
-            ),
-        }
+        unique_values = collect_unique_values(
+            all_stocks_for_filters,
+            {
+                "Type": lambda stock: stock.get("Type"),
+                "TrayID": lambda stock: stock.get("TrayID"),
+                "Status": lambda stock: stock.get("Status"),
+                "FoodType": lambda stock: stock.get("FoodType"),
+                "Provenance": lambda stock: str(stock.get("Provenance", "")).split("/")[0],
+                "Species": lambda stock: stock.get("Species"),
+            },
+        )
 
     except Exception as e:
         print(f"Error fetching stocks for explorer: {e}")
         stocks = []
+        all_stocks_for_filters = []
         unique_values = {
             k: []
             for k in ["Type", "TrayID", "Status", "FoodType", "Provenance", "Species"]
         }
 
-    if request.method == "GET":
-        filter_state = session.get("stock_filter_state", {})
-        # Apply default filter: exclude 'No longer maintained' unless explicitly filtered
-        if not filter_state.get("filterStatus"):
-            filtered_stocks = [
-                s for s in stocks if str(s.get("Status", "")) != "No longer maintained"
-            ]
-        else:
-            filtered_stocks = stocks  # Apply filters later if state exists
+    filter_state, redirect_response = get_explorer_filter_state(
+        session_key="stock_filter_state",
+        clear_endpoint="stock.stock_explorer",
+        field_names=(
+            "filterType",
+            "filterTrayID",
+            "filterStatus",
+            "filterFoodType",
+            "filterProvenance",
+            "filterSpecies",
+            "searchQuery",
+        ),
+    )
+    if redirect_response is not None:
+        return redirect_response
 
-        # If filter state exists from session, apply it now for GET
-        if filter_state:
-            filtered_stocks = _apply_stock_filters(stocks, filter_state)
-            # Recalculate unique values based on the *initially* filtered list for consistency
-            unique_values_filtered = {
-                "Type": sorted(
-                    list(
-                        set(
-                            str(s.get("Type", ""))
-                            for s in filtered_stocks
-                            if s.get("Type")
-                        )
-                    )
-                ),
-                "TrayID": sorted(
-                    list(
-                        set(
-                            str(s.get("TrayID", ""))
-                            for s in filtered_stocks
-                            if s.get("TrayID")
-                        )
-                    )
-                ),
-                "Status": sorted(
-                    list(
-                        set(
-                            str(s.get("Status", ""))
-                            for s in filtered_stocks
-                            if s.get("Status")
-                        )
-                    )
-                ),
-                "FoodType": sorted(
-                    list(
-                        set(
-                            str(s.get("FoodType", ""))
-                            for s in filtered_stocks
-                            if s.get("FoodType")
-                        )
-                    )
-                ),
-                "Provenance": sorted(
-                    list(
-                        set(
-                            str(s.get("Provenance", "")).split("/")[0]
-                            for s in filtered_stocks
-                            if s.get("Provenance")
-                        )
-                    )
-                ),
-                "Species": sorted(
-                    list(
-                        set(
-                            str(s.get("Species", ""))
-                            for s in filtered_stocks
-                            if s.get("Species")
-                        )
-                    )
-                ),
-            }
-            unique_values = unique_values_filtered  # Overwrite unique values based on filtered results
+    filtered_stocks = _apply_stock_filters(stocks, filter_state)
 
-        return render_template(
-            "stock/stock_explorer.html",
-            username=username,
-            stocks=filtered_stocks,
-            unique_values=unique_values,
-            filter_state=filter_state,
+    if filter_state:
+        unique_values = collect_unique_values(
+            filtered_stocks,
+            {
+                "Type": lambda stock: stock.get("Type"),
+                "TrayID": lambda stock: stock.get("TrayID"),
+                "FoodType": lambda stock: stock.get("FoodType"),
+                "Provenance": lambda stock: str(stock.get("Provenance", "")).split("/")[0],
+                "Species": lambda stock: stock.get("Species"),
+            },
         )
+        unique_values["Status"] = collect_unique_values(
+            all_stocks_for_filters,
+            {"Status": lambda stock: stock.get("Status")},
+        )["Status"]
 
-    elif request.method == "POST":
-        if "clear_filters" in request.form:
-            session.pop("stock_filter_state", None)
-            return redirect(url_for("stock.stock_explorer"))
-
-        filter_state = {
-            "filterType": request.form.get("filterType", ""),
-            "filterTrayID": request.form.get("filterTrayID", ""),
-            "filterStatus": request.form.get("filterStatus", ""),
-            "filterFoodType": request.form.get("filterFoodType", ""),
-            "filterProvenance": request.form.get("filterProvenance", ""),
-            "filterSpecies": request.form.get("filterSpecies", ""),
-            "searchQuery": request.form.get("searchQuery", ""),
-        }
-        session["stock_filter_state"] = filter_state
-
-        filtered_stocks = _apply_stock_filters(stocks, filter_state)
-
-        # Recalculate unique values based on filtered results
-        unique_values_filtered = {
-            "Type": sorted(
-                list(
-                    set(
-                        str(s.get("Type", "")) for s in filtered_stocks if s.get("Type")
-                    )
-                )
-            ),
-            "TrayID": sorted(
-                list(
-                    set(
-                        str(s.get("TrayID", ""))
-                        for s in filtered_stocks
-                        if s.get("TrayID")
-                    )
-                )
-            ),
-            "Status": sorted(
-                list(
-                    set(
-                        str(s.get("Status", ""))
-                        for s in filtered_stocks
-                        if s.get("Status")
-                    )
-                )
-            ),
-            "FoodType": sorted(
-                list(
-                    set(
-                        str(s.get("FoodType", ""))
-                        for s in filtered_stocks
-                        if s.get("FoodType")
-                    )
-                )
-            ),
-            "Provenance": sorted(
-                list(
-                    set(
-                        str(s.get("Provenance", "")).split("/")[0]
-                        for s in filtered_stocks
-                        if s.get("Provenance")
-                    )
-                )
-            ),
-            "Species": sorted(
-                list(
-                    set(
-                        str(s.get("Species", ""))
-                        for s in filtered_stocks
-                        if s.get("Species")
-                    )
-                )
-            ),
-        }
-
-        return render_template(
-            "stock/stock_explorer.html",
-            username=username,
-            stocks=filtered_stocks,
-            unique_values=unique_values_filtered,
-            filter_state=filter_state,
-        )
+    return render_template(
+        "stock/stock_explorer.html",
+        username=username,
+        stocks=filtered_stocks,
+        unique_values=unique_values,
+        filter_state=filter_state,
+    )
 
 
 def _apply_stock_filters(stocks, filters):
@@ -325,6 +133,7 @@ def _apply_stock_filters(stocks, filters):
     filter_provenance = filters.get("filterProvenance")
     filter_species = filters.get("filterSpecies")
     search_query = filters.get("searchQuery")
+    no_longer_maintained_status = "No longer maintained"
 
     if filter_type:
         filtered_stocks = [
@@ -335,24 +144,21 @@ def _apply_stock_filters(stocks, filters):
             s for s in filtered_stocks if str(s.get("TrayID", "")) == filter_tray_id
         ]
 
-    # Special handling for status: default is exclude 'No longer maintained'
-    # Check if the filter has been explicitly set to empty in the form vs not being in the filter_state at all
-    if "filterStatus" in filters:
-        if filter_status:
-            # Specific status filter selected
-            filtered_stocks = [
-                s for s in filtered_stocks if str(s.get("Status", "")) == filter_status
-            ]
-        else:
-            # "All" option was selected (empty filter_status but key exists in filters dict)
-            # Include all statuses, including "No longer maintained"
-            pass
-    else:
-        # No filter state exists yet - default to excluding "No longer maintained"
+    if filter_status == no_longer_maintained_status:
         filtered_stocks = [
             s
             for s in filtered_stocks
-            if str(s.get("Status", "")) != "No longer maintained"
+            if str(s.get("Status", "")) == no_longer_maintained_status
+        ]
+    elif filter_status:
+        filtered_stocks = [
+            s for s in filtered_stocks if str(s.get("Status", "")) == filter_status
+        ]
+    else:
+        filtered_stocks = [
+            s
+            for s in filtered_stocks
+            if str(s.get("Status", "")) != no_longer_maintained_status
         ]
 
     if filter_food_type:
@@ -878,6 +684,7 @@ def view_stock(unique_id):
 
 
 @bp.route("/get_internal/<internal_stock_id>", methods=["GET"])
+@login_required
 def get_internal_stock_data(internal_stock_id):
     """Endpoint to fetch data for pre-filling based on an internal stock ID."""
     if not session.get("username"):
@@ -886,21 +693,10 @@ def get_internal_stock_data(internal_stock_id):
     username = session.get("username")  # Current user making the request
 
     try:
-        # Find the stock by its UniqueID (which is the internal_stock_id)
-        # It could belong to any user, not necessarily the current one
-        stock = db["stocks"].find_one({"UniqueID": internal_stock_id})
+        stock = db["stocks"].find_one({"UniqueID": internal_stock_id, "User": username})
 
         if not stock:
             return jsonify({"error": "Stock not found."}), 404
-
-        stock_owner = stock.get("User")
-        provenance = stock.get("Provenance", "")
-
-        # Modify provenance if the stock belongs to a different user
-        if stock_owner != username:
-            org_abv = os.getenv("ORG_ABV", "ORG")  # Get org abbreviation
-            # Prepend owner info to existing provenance
-            provenance = f"{stock_owner}@{org_abv}/{provenance}".strip("/")
 
         # QC Genotype? Original code commented this out. Let's keep it commented.
         # qc_passed, final_genotype = qc_genotype(stock.get('Genotype', ''))
@@ -912,7 +708,7 @@ def get_internal_stock_data(internal_stock_id):
             "altReference": stock.get("AltReference", ""),
             "type": stock.get("Type", ""),
             "foodType": stock.get("FoodType", ""),
-            "provenance": provenance,  # Use potentially modified provenance
+            "provenance": stock.get("Provenance", ""),
             "status": stock.get(
                 "Status", ""
             ),  # Usually not copied? Or default to Active?
@@ -924,11 +720,14 @@ def get_internal_stock_data(internal_stock_id):
         return jsonify(stock_data), 200
 
     except Exception as e:
-        print(f"Error in get_internal_stock_data for {internal_stock_id}: {e}")
+        current_app.logger.exception(
+            "Error in get_internal_stock_data for %s: %s", internal_stock_id, e
+        )
         return jsonify({"error": "An internal error occurred."}), 500
 
 
 @bp.route("/get_bloomington/<bdsc_stock_id>", methods=["GET"])
+@login_required
 def get_bloomington_stock_data(bdsc_stock_id):
     """Endpoint to fetch genotype from Bloomington based on BDSC ID."""
     if not session.get("username"):
@@ -951,18 +750,29 @@ def get_bloomington_stock_data(bdsc_stock_id):
         return jsonify({"genotype": genotype}), 200  # Return original fetched genotype
 
     except Exception as e:
-        print(f"Error in get_bloomington_stock_data for {bdsc_stock_id}: {e}")
+        current_app.logger.exception(
+            "Error in get_bloomington_stock_data for %s: %s", bdsc_stock_id, e
+        )
         return jsonify({"error": "An internal error occurred fetching BDSC data."}), 500
 
 
 @bp.route("/autopopulate_ids", methods=["POST"])
+@login_required
+@limiter.limit("30 per minute")
 def autopopulate_series_replicate_ids():
     """Auto-populates Series ID and Replicate ID based on genotype."""
     if not session.get("username"):
         return jsonify({"error": "User not logged in."}), 401
 
     username = session.get("username")
-    genotype_str = request.json.get("genotype")
+    try:
+        payload = get_json_payload()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    genotype_str = normalize_optional_text(
+        payload.get("genotype"), field_name="Genotype", max_length=500
+    )
 
     if not genotype_str:
         return jsonify({"error": "Genotype is required."}), 400
@@ -1059,19 +869,27 @@ def autopopulate_series_replicate_ids():
         )
 
     except Exception as e:
-        print(f"Error in autopopulate_series_replicate_ids: {e}")
+        current_app.logger.exception(
+            "Error in autopopulate_series_replicate_ids for %s: %s", username, e
+        )
         return jsonify({"error": "An internal error occurred."}), 500
 
 
 @bp.route("/generate_labels", methods=["POST"])
 @login_required
+@limiter.limit("10 per hour")
 def generate_stock_labels():
     """Endpoint to generate stock labels based on selected stocks and quantities."""
     username = session.get("username")
     try:
         selected_uids_str = request.form.get("selected_uids")
         quantities_str = request.form.get("quantities")
-        blank_spaces = int(request.form.get("blank_spaces", 0))
+        blank_spaces = parse_int_value(
+            request.form.get("blank_spaces", 0),
+            field_name="Blank spaces",
+            minimum=0,
+            maximum=200,
+        )
 
         if not selected_uids_str or not quantities_str:
             flash("Missing selected stocks or quantities.", "error")
@@ -1143,21 +961,16 @@ def generate_stock_labels():
         flash(f"Invalid input: {ve}", "error")
         return redirect(url_for("stock.stock_explorer"))
     except Exception as e:
-        print(f"Error generating stock labels: {e}")
+        current_app.logger.exception("Error generating stock labels for %s: %s", username, e)
         flash(f"Error generating labels: {e}", "error")
         return redirect(url_for("stock.stock_explorer"))
 
 
 # Moved from cross blueprint as it queries stocks
 @bp.route("/get_genotype_for_uid/<unique_id>")
+@login_required
 def get_genotype_for_uid(unique_id):
     """Route to fetch genotype based on a stock's Unique ID."""
-    if not session.get("username"):
-        # This might be called via JS without full login context sometimes?
-        # If strict login required, return 401
-        return jsonify({"genotype": "", "error": "Authentication required"}), 401
-        # username = session.get("username") # If login required
-
     try:
         # Find stock by UniqueID - potentially across all users if needed by JS?
         # Original code checked username, let's keep that for now.
@@ -1173,17 +986,17 @@ def get_genotype_for_uid(unique_id):
             # Let's assume it's only for stocks based on DB query.
             return jsonify({"genotype": "", "error": "Stock not found"}), 404
     except Exception as e:
-        print(f"Error in get_genotype_for_uid for {unique_id}: {e}")
+        current_app.logger.exception(
+            "Error in get_genotype_for_uid for %s: %s", unique_id, e
+        )
         return jsonify({"genotype": "", "error": "Internal server error"}), 500
 
 
 # Moved from cross blueprint as it queries stocks
 @bp.route("/get_uids_for_genotype/<path:genotype_str>")  # Use path converter for '/'
+@login_required
 def get_uids_for_genotype(genotype_str):
     """Route to fetch stock UIDs based on genotype."""
-    if not session.get("username"):
-        return jsonify({"uids": [], "error": "Authentication required"}), 401
-
     username = session.get("username")
     # Genotype string might be URL encoded twice in original code? Let's decode once.
     # The <path:..> converter handles '/' correctly.
@@ -1211,16 +1024,16 @@ def get_uids_for_genotype(genotype_str):
         return jsonify({"uids": uid_list})
 
     except Exception as e:
-        print(f"Error in get_uids_for_genotype for '{decoded_genotype}': {e}")
+        current_app.logger.exception(
+            "Error in get_uids_for_genotype for '%s': %s", decoded_genotype, e
+        )
         return jsonify({"uids": [], "error": "Internal server error"}), 500
 
 
 @bp.route("/get_stock_data_for_uid/<unique_id>")
+@login_required
 def get_stock_data_for_uid(unique_id):
     """Route to fetch stock data (including species) based on a stock's Unique ID."""
-    if not session.get("username"):
-        return jsonify({"error": "Authentication required"}), 401
-
     username = session.get("username")
 
     try:
@@ -1239,32 +1052,18 @@ def get_stock_data_for_uid(unique_id):
                 ),  # Include species with default
             }
             return jsonify(stock_data)
-        else:
-            # Try finding admin stock
-            admin_stock = db["stocks"].find_one(
-                {"UniqueID": unique_id, "User": "admin"}
-            )
-            if admin_stock:
-                stock_data = {
-                    "uniqueID": admin_stock.get("UniqueID", ""),
-                    "genotype": admin_stock.get("Genotype", ""),
-                    "name": admin_stock.get("Name", ""),
-                    "type": admin_stock.get("Type", ""),
-                    "status": admin_stock.get("Status", ""),
-                    "species": admin_stock.get(
-                        "Species", "D. melanogaster"
-                    ),  # Include species with default
-                }
-                return jsonify(stock_data)
 
-            return jsonify({"error": "Stock not found"}), 404
+        return jsonify({"error": "Stock not found"}), 404
     except Exception as e:
-        print(f"Error in get_stock_data_for_uid for {unique_id}: {e}")
+        current_app.logger.exception(
+            "Error in get_stock_data_for_uid for %s: %s", unique_id, e
+        )
         return jsonify({"error": "Internal server error"}), 500
 
 
 @bp.route("/delete_permanently", methods=["POST"])
 @login_required
+@limiter.limit("10 per hour")
 def delete_stock_permanently():
     """
     Permanently delete stocks that have the 'No longer maintained' status.
@@ -1279,17 +1078,19 @@ def delete_stock_permanently():
     JSON response with success status, count of deleted items, and count of skipped items.
     """
     username = session.get("username")
-    data = request.json
+    try:
+        data = get_json_payload()
+        unique_ids = normalize_identifier_list(data.get("uniqueIDs", []), field_name="uniqueIDs")
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
 
-    if not data or "uniqueIDs" not in data or not data["uniqueIDs"]:
+    if not unique_ids:
         return (
             jsonify(
                 {"success": False, "message": "No stock IDs provided for deletion"}
             ),
             400,
         )
-
-    unique_ids = data["uniqueIDs"]
     deleted_count = 0
     skipped_count = 0
 

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run FlyManager MongoDB backup hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=flymanager-mongo-backup.service
+
+[Install]
+WantedBy=timers.target

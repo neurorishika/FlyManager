@@ -1,92 +1,362 @@
 {% extends "base.html" %}
 
+{% block head %}
+<style nonce="{{ csp_nonce }}">
+    .tray-view-shell {
+        display: grid;
+        gap: 18px;
+    }
+
+    .tray-workspace-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.95fr);
+        gap: 18px;
+        align-items: start;
+    }
+
+    .tray-board-column,
+    .tray-side-column {
+        min-width: 0;
+    }
+
+    .tray-side-column {
+        display: grid;
+        gap: 18px;
+    }
+
+    .tray-summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .tray-summary .app-chip {
+        justify-content: center;
+    }
+
+    .tray-workspace-card .card-header,
+    .tray-sidebar-card .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .tray-sidebar-card .card-body,
+    .tray-workspace-card .card-body {
+        padding: 1.25rem;
+    }
+
+    .tray-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .tray-stat-card {
+        padding: 0.95rem 1rem;
+        border-radius: 16px;
+        border: 1px solid rgba(124, 100, 173, 0.15);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 244, 255, 0.92));
+        box-shadow: 0 14px 30px rgba(122, 100, 168, 0.08);
+        display: grid;
+        gap: 4px;
+    }
+
+    .tray-stat-label {
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(94, 74, 136, 0.72);
+    }
+
+    .tray-stat-card strong {
+        font-size: 1.75rem;
+        line-height: 1;
+        color: #403061;
+    }
+
+    .tray-stat-card small {
+        color: rgba(64, 48, 97, 0.74);
+    }
+
+    .tray-board-status {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.55rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(122, 100, 168, 0.08);
+        color: #5a467f;
+        font-size: 0.88rem;
+        font-weight: 600;
+    }
+
+    .tray-board-status.is-active {
+        background: rgba(23, 162, 184, 0.12);
+        color: #0f7281;
+    }
+
+    .tray-board-status.is-error {
+        background: rgba(220, 53, 69, 0.12);
+        color: #b02a37;
+    }
+
+    .tray-guidance-banner {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(240px, 0.9fr);
+        gap: 14px;
+        padding: 1rem 1.1rem;
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(119, 87, 177, 0.1), rgba(97, 196, 215, 0.1));
+        border: 1px solid rgba(124, 100, 173, 0.14);
+        margin-bottom: 1rem;
+    }
+
+    .tray-guidance-banner p:last-child {
+        margin-bottom: 0;
+    }
+
+    .tray-guidance-list {
+        margin: 0;
+        padding-left: 1rem;
+        color: rgba(59, 50, 91, 0.88);
+    }
+
+    .tray-guidance-list li + li {
+        margin-top: 0.3rem;
+    }
+
+    .tray-description-card {
+        margin-bottom: 1rem;
+        padding: 0.85rem 1rem;
+        border-radius: 14px;
+        border: 1px solid rgba(124, 100, 173, 0.14);
+        background: rgba(255, 255, 255, 0.88);
+        color: rgba(51, 40, 84, 0.88);
+    }
+
+    .tray-sidebar-note {
+        margin-top: 0.35rem;
+        color: rgba(62, 48, 97, 0.68);
+        font-size: 0.88rem;
+    }
+
+    .tray-tab-count {
+        display: inline-flex;
+        min-width: 1.5rem;
+        justify-content: center;
+        padding: 0.1rem 0.45rem;
+        margin-left: 0.35rem;
+        border-radius: 999px;
+        background: rgba(122, 100, 168, 0.1);
+        color: #5b487f;
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+
+    .tray-search-label {
+        display: block;
+        margin-bottom: 0.35rem;
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: rgba(88, 69, 128, 0.74);
+    }
+
+    .occupied-position-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2.5rem;
+        padding: 0.2rem 0.45rem;
+        border-radius: 999px;
+        font-weight: 700;
+        background: rgba(122, 100, 168, 0.09);
+        color: #56417b;
+    }
+
+    .occupied-type-badge {
+        border-radius: 999px;
+        padding: 0.3rem 0.55rem;
+        font-size: 0.72rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+    }
+
+    .occupied-type-stock {
+        background: rgba(40, 167, 69, 0.12);
+        color: #1f7c36;
+    }
+
+    .occupied-type-cross {
+        background: rgba(0, 123, 255, 0.12);
+        color: #0f5dbb;
+    }
+
+    .tray-occupied-table td,
+    .tray-occupied-table th {
+        vertical-align: middle;
+    }
+
+    @media (max-width: 767px) {
+        .tray-summary {
+            grid-template-columns: 1fr;
+        }
+
+        .tray-stats-grid,
+        .tray-guidance-banner {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 991px) {
+        .tray-workspace-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .tray-stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid mt-4">
+<div class="tray-view-shell">
     <div class="row">
         <div class="col-12">
-            <nav aria-label="breadcrumb">
+            <nav aria-label="breadcrumb" class="mb-0">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{{ url_for('tray.tray_management') }}">Tray Management</a></li>
                     <li class="breadcrumb-item active">{{ tray.TrayID }}</li>
                 </ol>
             </nav>
-            
-            <h1>{{ tray.Name }} <small class="text-muted">(ID: {{ tray.TrayID }})</small></h1>
-            
-            <div class="mb-3">
-                <div class="btn-group" role="group">
+
+            <div class="app-panel app-page-header">
+                <div>
+                    <p class="app-kicker">Tray Workspace</p>
+                    <h1 class="app-page-title">{{ tray.Name }} <small class="text-muted">(ID: {{ tray.TrayID }})</small></h1>
+                    <p class="app-page-subtitle">Place stocks and crosses directly into physical positions, review occupancy, and inspect blocked cells from one screen.</p>
+                </div>
+                <div class="app-button-row">
                     <a href="{{ url_for('tray.edit_tray_route', tray_id=tray.TrayID) }}" class="btn btn-warning">
                         <i class="fas fa-edit"></i> Edit Tray
                     </a>
-                    <button class="btn btn-danger" onclick="confirmDelete('{{ tray.TrayID }}', '{{ tray.Name }}')">
+                    <button
+                        type="button"
+                        class="btn btn-danger tray-delete-trigger"
+                        data-tray-id="{{ tray.TrayID }}"
+                        data-tray-name="{{ tray.Name }}"
+                    >
                         <i class="fas fa-trash"></i> Delete Tray
                     </button>
                 </div>
             </div>
-            
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h2>Tray Layout</h2>
-                    <div>
-                        <span class="badge badge-pill badge-info">{{ tray.Rows }} rows</span>
-                        <span class="badge badge-pill badge-info">{{ tray.Columns }} columns</span>
-                        <span class="badge badge-pill badge-primary">{{ tray.Rows * tray.Columns }} total positions</span>
-                    </div>
+
+            <div class="tray-summary mt-3 mb-3">
+                <span class="app-chip"><i class="fas fa-grip"></i> {{ tray.Rows }} rows</span>
+                <span class="app-chip"><i class="fas fa-grip-lines-vertical"></i> {{ tray.Columns }} columns</span>
+                <span class="app-chip"><i class="fas fa-th"></i> {{ tray.Rows * tray.Columns }} total positions</span>
+            </div>
+
+            <div class="tray-stats-grid mb-4">
+                <div class="tray-stat-card">
+                    <span class="tray-stat-label">Occupied Starts</span>
+                    <strong id="occupiedCount">0</strong>
+                    <small>Primary positions holding an item.</small>
                 </div>
-                <div class="card-body">
-                    <div class="alert alert-info mb-3">
-                        <i class="fas fa-info-circle"></i> 
-                        <strong>Tip:</strong> Drag stocks or crosses from the list on the right to place them in the tray.
-                        Click on an occupied position to see details or move the item.
-                    </div>
-                    
-                    {% if tray.Description %}
-                    <div class="alert alert-secondary">
-                        <strong>Description:</strong> {{ tray.Description }}
-                    </div>
-                    {% endif %}
-                    
-                    <!-- The tray visualization -->
-                    <div id="trayContainer" class="mb-4">
-                        <div id="trayGrid" class="tray-grid"
-                            data-tray-id="{{ tray.TrayID }}"
-                            data-rows="{{ tray.Rows }}"
-                            data-columns="{{ tray.Columns }}">
-                            <!-- Grid will be generated by JavaScript -->
-                        </div>
-                        
-                        <!-- Legend -->
-                        <div class="tray-legend mt-3">
-                            <div class="legend-item">
-                                <div class="legend-color legend-empty"></div>
-                                <span>Empty Position</span>
-                            </div>
-                            <div class="legend-item">
-                                <div class="legend-color legend-stock"></div>
-                                <span>Stock</span>
-                            </div>
-                            <div class="legend-item">
-                                <div class="legend-color legend-cross"></div>
-                                <span>Cross</span>
-                            </div>
-                            <div class="legend-item">
-                                <div class="legend-color legend-blocked"></div>
-                                <span>Blocked Position</span>
-                            </div>
-                        </div>
-                    </div>
+                <div class="tray-stat-card">
+                    <span class="tray-stat-label">Blocked Cells</span>
+                    <strong id="blockedCount">0</strong>
+                    <small>Reserved by multi-vial placements.</small>
+                </div>
+                <div class="tray-stat-card">
+                    <span class="tray-stat-label">Open Cells</span>
+                    <strong id="emptyCount">0</strong>
+                    <small>Available destinations in this tray.</small>
+                </div>
+                <div class="tray-stat-card">
+                    <span class="tray-stat-label">Unplaced Items</span>
+                    <strong id="orphanCount">0</strong>
+                    <small>Stocks and crosses not currently in a tray.</small>
                 </div>
             </div>
-        </div>
-    </div>
-    
-    <div class="row">
-        <!-- Left side: Available Items for Placement -->
-        <div class="col-md-6">
-            <div class="card">
+
+            <div class="tray-workspace-grid">
+                <div class="tray-board-column">
+                    <div class="card tray-workspace-card">
+                        <div class="card-header">
+                            <div>
+                                <h2 class="app-section-title mb-0">Tray Layout</h2>
+                                <div class="app-inline-note">Drag from the side rail or grab an occupied cell to reposition it in the tray.</div>
+                            </div>
+                            <div class="tray-board-status" id="dragStatus">Ready to place or move items.</div>
+                        </div>
+                        <div class="card-body">
+                            <div class="tray-guidance-banner">
+                                <div>
+                                    <p class="mb-2"><strong>Board-first workspace.</strong> The tray itself is the move surface now: drag from the available inventory, or drag any occupied tray cell directly into a new open footprint.</p>
+                                    <ul class="tray-guidance-list">
+                                        <li>Empty cells accept drops when the entire required vial footprint is available.</li>
+                                        <li>Dragging an occupied item previews the full destination span before you drop.</li>
+                                        <li>Click an occupied position for record details or quick removal.</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p class="mb-1"><strong>Placement rule</strong></p>
+                                    <p class="mb-2">Items expand horizontally across the row based on required vial count.</p>
+                                    <p class="mb-0"><strong>Tip</strong>: use the side rail to find orphaned items quickly, then drag them into the board.</p>
+                                </div>
+                            </div>
+
+                            {% if tray.Description %}
+                            <div class="tray-description-card">
+                                <strong>Description:</strong> {{ tray.Description }}
+                            </div>
+                            {% endif %}
+
+                            <div id="trayContainer">
+                                <div id="trayGrid" class="tray-grid"
+                                    data-tray-id="{{ tray.TrayID }}"
+                                    data-rows="{{ tray.Rows }}"
+                                    data-columns="{{ tray.Columns }}">
+                                    <!-- Grid will be generated by JavaScript -->
+                                </div>
+
+                                <div class="tray-legend mt-3">
+                                    <div class="legend-item">
+                                        <div class="legend-color legend-empty"></div>
+                                        <span>Empty</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <div class="legend-color legend-stock"></div>
+                                        <span>Stock</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <div class="legend-color legend-cross"></div>
+                                        <span>Cross</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <div class="legend-color legend-blocked"></div>
+                                        <span>Blocked</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tray-side-column">
+                    <div class="card tray-sidebar-card">
                 <div class="card-header">
+                    <div>
+                        <h3 class="app-section-title mb-0">Available Items</h3>
+                        <div class="tray-sidebar-note">Only orphaned items show by default so the drag list stays focused.</div>
+                    </div>
                     <div class="d-flex justify-content-between align-items-center">
-                        <h3>Available Items</h3>
                         <div class="custom-control custom-switch">
                             <input type="checkbox" class="custom-control-input" id="showAllItems">
                             <label class="custom-control-label" for="showAllItems">Show all items</label>
@@ -96,10 +366,10 @@
                 <div class="card-body">
                     <ul class="nav nav-tabs" id="itemTabs" role="tablist">
                         <li class="nav-item">
-                            <a class="nav-link active" id="stock-tab" data-toggle="tab" href="#stock-content" role="tab">Stocks</a>
+                            <a class="nav-link active" id="stock-tab" data-toggle="tab" href="#stock-content" role="tab">Stocks <span class="tray-tab-count" id="visibleStockCount">0</span></a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" id="cross-tab" data-toggle="tab" href="#cross-content" role="tab">Crosses</a>
+                            <a class="nav-link" id="cross-tab" data-toggle="tab" href="#cross-content" role="tab">Crosses <span class="tray-tab-count" id="visibleCrossCount">0</span></a>
                         </li>
                     </ul>
                     
@@ -107,6 +377,7 @@
                         <!-- Stocks Tab -->
                         <div class="tab-pane fade show active" id="stock-content" role="tabpanel">
                             <div class="form-group">
+                                <label class="tray-search-label" for="stockSearch">Search Stocks</label>
                                 <input type="text" class="form-control" id="stockSearch" placeholder="Search stocks...">
                             </div>
                             
@@ -138,6 +409,7 @@
                         <!-- Crosses Tab -->
                         <div class="tab-pane fade" id="cross-content" role="tabpanel">
                             <div class="form-group">
+                                <label class="tray-search-label" for="crossSearch">Search Crosses</label>
                                 <input type="text" class="form-control" id="crossSearch" placeholder="Search crosses...">
                             </div>
                             
@@ -170,18 +442,18 @@
                     </div>
                 </div>
             </div>
-        </div>
         
-        <!-- Right side: Occupied Positions -->
-        <div class="col-md-6">
-            <div class="card">
+            <div class="card tray-sidebar-card">
                 <div class="card-header">
-                    <h3>Occupied Positions</h3>
+                    <div>
+                        <h3 class="app-section-title mb-0">Occupied Positions</h3>
+                        <div class="tray-sidebar-note">Use View for record details, or drag directly on the board to reposition an item.</div>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div id="occupiedList">
                         {% if occupancy %}
-                            <table class="table table-striped">
+                            <table class="table table-striped mb-0 tray-occupied-table">
                                 <thead>
                                     <tr>
                                         <th>Position</th>
@@ -194,8 +466,8 @@
                                     {% for pos, item in occupancy.items() %}
                                     {% if item.type != 'blocked' %}
                                     <tr>
-                                        <td>{{ pos }}</td>
-                                        <td>{{ item.type|capitalize }}</td>
+                                        <td><span class="occupied-position-pill">{{ pos }}</span></td>
+                                        <td><span class="occupied-type-badge occupied-type-{{ item.type }}">{{ item.type|capitalize }}</span></td>
                                         <td>{{ item.display_name }}</td>
                                         <td>
                                             {% if item.type == 'stock' %}
@@ -309,73 +581,136 @@
 </div>
 
 <!-- CSS Styles for Tray Visualization -->
-<style>
+<style nonce="{{ csp_nonce }}">
     .tray-grid {
         display: grid;
-        gap: 2px;
+        grid-template-rows: repeat({{ tray.Rows }}, 1fr);
+        grid-template-columns: repeat({{ tray.Columns }}, 1fr);
+        gap: 6px;
         margin: auto;
-        border: 1px solid var(--border-color);
-        padding: 2px;
-        background-color: var(--bg-color);
+        border: 1px solid rgba(124, 100, 173, 0.12);
+        border-radius: 22px;
+        padding: 10px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(244, 240, 251, 0.9));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 18px 35px rgba(90, 70, 127, 0.08);
     }
     
     .tray-cell {
-        border: 1px solid var(--border-color);
-        background-color: var(--card-bg);
+        border: 1px solid rgba(124, 100, 173, 0.12);
+        background-color: rgba(255, 255, 255, 0.94);
         color: var(--text-color);
-        padding: 8px;
-        min-height: 60px;
+        padding: 18px 10px 10px;
+        min-height: 92px;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        align-items: center;
+        justify-content: flex-start;
+        align-items: stretch;
         cursor: pointer;
         position: relative;
+        border-radius: 16px;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+        overflow: hidden;
     }
     
     .tray-cell.empty {
-        background-color: var(--bg-color);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 245, 252, 0.92));
+        color: rgba(83, 65, 120, 0.7);
     }
     
     .tray-cell.stock {
-        background-color: rgba(40, 167, 69, 0.1);
-        border-color: rgba(40, 167, 69, 0.2);
+        background: linear-gradient(180deg, rgba(40, 167, 69, 0.12), rgba(40, 167, 69, 0.03));
+        border-color: rgba(40, 167, 69, 0.28);
     }
     
     .tray-cell.cross {
-        background-color: rgba(0, 123, 255, 0.1);
-        border-color: rgba(0, 123, 255, 0.2);
+        background: linear-gradient(180deg, rgba(0, 123, 255, 0.12), rgba(0, 123, 255, 0.03));
+        border-color: rgba(0, 123, 255, 0.28);
     }
     
     .tray-cell.blocked {
-        background-color: var(--card-bg);
-        border-color: var(--border-color);
+        background: repeating-linear-gradient(135deg, rgba(120, 118, 129, 0.08), rgba(120, 118, 129, 0.08) 8px, rgba(120, 118, 129, 0.14) 8px, rgba(120, 118, 129, 0.14) 16px);
+        border-color: rgba(124, 100, 173, 0.16);
         cursor: not-allowed;
-        opacity: 0.8;
+        opacity: 0.9;
+    }
+
+    .tray-cell[data-type] {
+        cursor: grab;
+    }
+
+    .tray-cell[data-type]:hover,
+    .tray-cell.empty:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 24px rgba(90, 70, 127, 0.12);
     }
     
     .tray-cell .position {
         position: absolute;
-        top: 2px;
-        left: 2px;
-        font-size: 0.7em;
-        color: var(--text-color);
-        opacity: 0.7;
+        top: 6px;
+        left: 8px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: rgba(69, 55, 103, 0.62);
+        opacity: 0.9;
     }
     
     .tray-cell .content {
-        text-align: center;
+        text-align: left;
         word-break: break-word;
+        display: grid;
+        gap: 6px;
+        height: 100%;
     }
-    
-    .tray-cell.highlight {
-        border: 2px dashed var(--header-bg);
+
+    .tray-cell-title {
+        font-weight: 700;
+        font-size: 0.9rem;
+        line-height: 1.2;
+        color: rgba(48, 40, 74, 0.94);
+    }
+
+    .tray-cell-meta,
+    .tray-cell-empty-label,
+    .tray-cell-grab,
+    .blocked-info {
+        font-size: 0.78rem;
+        line-height: 1.25;
+        color: rgba(66, 53, 101, 0.72);
+    }
+
+    .tray-cell-grab {
+        margin-top: auto;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+    }
+
+    .tray-cell-empty-label {
+        margin-top: auto;
+    }
+
+    .tray-cell.drop-valid {
+        border-color: rgba(23, 162, 184, 0.48);
+        box-shadow: inset 0 0 0 2px rgba(23, 162, 184, 0.12), 0 12px 24px rgba(23, 162, 184, 0.12);
+        background: linear-gradient(180deg, rgba(23, 162, 184, 0.12), rgba(23, 162, 184, 0.03));
+    }
+
+    .tray-cell.drop-invalid {
+        border-color: rgba(220, 53, 69, 0.36);
+        box-shadow: inset 0 0 0 2px rgba(220, 53, 69, 0.12);
+        background: linear-gradient(180deg, rgba(220, 53, 69, 0.08), rgba(220, 53, 69, 0.03));
+    }
+
+    .tray-cell.is-drag-source {
+        opacity: 0.72;
+        transform: scale(0.98);
     }
     
     .tray-legend {
         display: flex;
         justify-content: center;
-        gap: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
         margin-top: 1rem;
     }
     
@@ -383,13 +718,18 @@
         display: flex;
         align-items: center;
         gap: 5px;
-        color: var(--text-color);
+        color: rgba(67, 53, 101, 0.82);
+        background: rgba(255, 255, 255, 0.74);
+        border: 1px solid rgba(124, 100, 173, 0.12);
+        padding: 0.45rem 0.7rem;
+        border-radius: 999px;
     }
     
     .legend-color {
-        width: 20px;
-        height: 20px;
-        border: 1px solid var(--border-color);
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(124, 100, 173, 0.18);
     }
     
     .legend-empty {
@@ -409,36 +749,36 @@
     }
     
     .blocked-info {
-        font-size: 0.8em;
-        color: var(--text-color);
-        opacity: 0.7;
         text-align: center;
     }
     
     .item-list {
         max-height: 400px;
         overflow-y: auto;
-        border: 1px solid var(--border-color);
+        border: 1px solid rgba(124, 100, 173, 0.12);
         padding: 10px;
-        border-radius: 4px;
+        border-radius: 16px;
+        background: rgba(248, 246, 252, 0.72);
     }
     
     .drag-item {
-        border: 1px solid var(--border-color);
-        padding: 10px;
+        border: 1px solid rgba(124, 100, 173, 0.14);
+        padding: 12px;
         margin-bottom: 10px;
-        border-radius: 4px;
+        border-radius: 14px;
         cursor: grab;
-        background-color: var(--card-bg);
+        background-color: rgba(255, 255, 255, 0.94);
         color: var(--text-color);
-        transition: all 0.2s;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
         font-size: 0.9em;
+        box-shadow: 0 10px 20px rgba(90, 70, 127, 0.06);
     }
     
     .drag-item:hover {
-        background-color: var(--header-bg);
-        color: var(--header-text);
+        background-color: rgba(255, 255, 255, 1);
+        color: var(--text-color);
         transform: translateY(-2px);
+        box-shadow: 0 14px 24px rgba(90, 70, 127, 0.1);
     }
     
     .drag-item .item-header {
@@ -489,26 +829,28 @@
     .add-item-list {
         max-height: 400px;
         overflow-y: auto;
-        border: 1px solid var(--border-color);
-        border-radius: 4px;
+        border: 1px solid rgba(124, 100, 173, 0.12);
+        border-radius: 14px;
         font-size: 0.9em;
+        background: rgba(248, 246, 252, 0.72);
     }
     
     .add-item-option {
-        padding: 8px;
+        padding: 10px;
         margin: 4px;
-        border: 1px solid var(--border-color);
-        border-radius: 4px;
+        border: 1px solid rgba(124, 100, 173, 0.14);
+        border-radius: 12px;
         cursor: pointer;
         transition: all 0.2s;
-        background-color: var(--card-bg);
+        background-color: rgba(255, 255, 255, 0.94);
         color: var(--text-color);
     }
     
     .add-item-option:hover {
-        background-color: var(--header-bg);
-        color: var(--header-text);
+        background-color: rgba(255, 255, 255, 1);
+        color: var(--text-color);
         transform: translateY(-2px);
+        box-shadow: 0 12px 20px rgba(90, 70, 127, 0.08);
     }
     
     .add-item-option.stock {
@@ -535,20 +877,48 @@
     .add-item-option .badge {
         font-size: 0.8em;
     }
+
+    .drag-item.is-hidden,
+    .add-item-option.is-hidden {
+        display: none !important;
+    }
+
+    @media (max-width: 767px) {
+        .tray-grid {
+            gap: 4px;
+            padding: 6px;
+        }
+
+        .tray-cell {
+            min-height: 78px;
+            padding: 16px 8px 8px;
+        }
+
+        .item-list,
+        .add-item-list {
+            max-height: 320px;
+        }
+    }
 </style>
 
 <!-- JavaScript for Tray Visualization -->
-<script>
+<script nonce="{{ csp_nonce }}">
+    let activeDragData = null;
+    let previewedCells = [];
+
     document.addEventListener('DOMContentLoaded', function() {
+        const deleteTrayButton = document.querySelector('.tray-delete-trigger');
+        if (deleteTrayButton) {
+            deleteTrayButton.addEventListener('click', function() {
+                confirmDelete(this.dataset.trayId, this.dataset.trayName);
+            });
+        }
+
         // Get tray dimensions
         const trayGrid = document.getElementById('trayGrid');
         const rows = parseInt(trayGrid.dataset.rows);
         const columns = parseInt(trayGrid.dataset.columns);
         const trayId = trayGrid.dataset.trayId;
-        
-        // Set grid dimensions
-        trayGrid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
-        trayGrid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
         
         // Fetch occupancy data from API
         fetch(`{{ url_for('tray.get_tray_occupancy_api', tray_id='PLACEHOLDER') }}`.replace('PLACEHOLDER', trayId))
@@ -560,6 +930,7 @@
                     
                     // Generate grid cells
                     generateTrayGrid(rows, columns, data.occupancy);
+                    updateWorkspaceStats(rows, columns, data.occupancy);
                     
                     // Set up drag and drop
                     setupDragAndDrop();
@@ -586,7 +957,122 @@
         // Hide non-orphaned items by default (trigger initial filter)
         filterItems('stocksList', '');
         filterItems('crossesList', '');
+        updateItemCounters();
     });
+
+    function updateWorkspaceStats(rows, columns, occupancy) {
+        const positions = Object.values(occupancy || {});
+        const occupiedCount = positions.filter(item => item.type !== 'blocked').length;
+        const blockedCount = positions.filter(item => item.type === 'blocked').length;
+        const totalPositions = rows * columns;
+        const emptyCount = Math.max(totalPositions - occupiedCount - blockedCount, 0);
+
+        document.getElementById('occupiedCount').textContent = occupiedCount;
+        document.getElementById('blockedCount').textContent = blockedCount;
+        document.getElementById('emptyCount').textContent = emptyCount;
+    }
+
+    function updateItemCounters() {
+        const stockItems = Array.from(document.querySelectorAll('#stocksList .drag-item'));
+        const crossItems = Array.from(document.querySelectorAll('#crossesList .drag-item'));
+        const visibleStocks = stockItems.filter(item => !item.classList.contains('is-hidden')).length;
+        const visibleCrosses = crossItems.filter(item => !item.classList.contains('is-hidden')).length;
+        const orphanCount = stockItems.concat(crossItems).filter(item => !(item.dataset.trayId && item.dataset.trayPosition)).length;
+
+        document.getElementById('visibleStockCount').textContent = visibleStocks;
+        document.getElementById('visibleCrossCount').textContent = visibleCrosses;
+        document.getElementById('orphanCount').textContent = orphanCount;
+    }
+
+    function setDragStatus(message, tone = 'idle') {
+        const status = document.getElementById('dragStatus');
+        status.textContent = message;
+        status.classList.remove('is-active', 'is-error');
+
+        if (tone === 'active') {
+            status.classList.add('is-active');
+        } else if (tone === 'error') {
+            status.classList.add('is-error');
+        }
+    }
+
+    function getFootprintPositions(position, requiredVials) {
+        const start = parseInt(position, 10);
+        const span = Math.max(parseInt(requiredVials, 10) || 1, 1);
+        const column = Math.floor((start - 1) / 10) + 1;
+        const row = ((start - 1) % 10) + 1;
+
+        return Array.from({ length: span }, (_, index) => {
+            const nextColumn = column + index;
+            return ((nextColumn - 1) * 10 + row).toString();
+        });
+    }
+
+    function buildDragPayload(element) {
+        return {
+            type: element.dataset.type,
+            id: element.dataset.id,
+            name: element.dataset.name,
+            vials: element.dataset.vials,
+            originTrayId: element.dataset.trayId || '',
+            originPosition: element.dataset.originPosition || element.dataset.trayPosition || '',
+        };
+    }
+
+    function clearFootprintPreview() {
+        previewedCells.forEach(cell => {
+            cell.classList.remove('drop-valid', 'drop-invalid');
+        });
+        previewedCells = [];
+    }
+
+    function renderFootprintPreview(positions, isValid) {
+        clearFootprintPreview();
+        positions.forEach(position => {
+            const cell = document.querySelector(`.tray-cell[data-position="${position}"]`);
+            if (cell) {
+                cell.classList.add(isValid ? 'drop-valid' : 'drop-invalid');
+                previewedCells.push(cell);
+            }
+        });
+    }
+
+    function canPlaceItemAtPosition(data, position) {
+        const trayGrid = document.getElementById('trayGrid');
+        const trayId = trayGrid.dataset.trayId;
+        const requiredVials = Math.max(parseInt(data.vials, 10) || 1, 1);
+        const footprint = getFootprintPositions(position, requiredVials);
+        const allowedFootprint = data.originTrayId === trayId && data.originPosition
+            ? new Set(getFootprintPositions(data.originPosition, requiredVials))
+            : new Set();
+
+        for (const footprintPosition of footprint) {
+            const cell = document.querySelector(`.tray-cell[data-position="${footprintPosition}"]`);
+            if (!cell) {
+                return {
+                    valid: false,
+                    footprint,
+                    message: `Needs ${requiredVials} consecutive positions on the same row.`,
+                };
+            }
+
+            const isOwnFootprint = allowedFootprint.has(footprintPosition);
+            const isUnavailable = !cell.classList.contains('empty') && !isOwnFootprint;
+            if (isUnavailable) {
+                return {
+                    valid: false,
+                    footprint,
+                    message: `Position ${position} overlaps another item or blocked slot.`,
+                };
+            }
+        }
+
+        return {
+            valid: true,
+            footprint,
+            message: `Drop to place ${data.name} at ${position}.`,
+        };
+    }
     
     function generateTrayGrid(rows, columns, occupancy) {
         const trayGrid = document.getElementById('trayGrid');
@@ -623,15 +1109,25 @@
                     if (item.type === 'blocked') {
                         content.innerHTML = `
                             <div class="blocked-info">
-                                Blocked by ${item.blocked_by_type}<br>
-                                at position ${item.blocked_by}<br>
-                                (${item.blocked_by_name})
+                                Reserved by ${item.blocked_by_type}<br>
+                                start ${item.blocked_by}<br>
+                                ${item.blocked_by_name}
                             </div>
                         `;
                     } else {
                         cell.dataset.type = item.type;
                         cell.dataset.id = item.id;
-                        content.innerHTML = `<strong>${item.display_name}</strong>`;
+                        cell.dataset.name = item.display_name;
+                        cell.dataset.vials = item.required_vials;
+                        cell.dataset.trayId = document.getElementById('trayGrid').dataset.trayId;
+                        cell.dataset.originPosition = position;
+                        cell.draggable = true;
+                        cell.title = `Drag to move ${item.display_name}`;
+                        content.innerHTML = `
+                            <div class="tray-cell-title">${item.display_name}</div>
+                            <div class="tray-cell-meta">${item.required_vials} vial footprint</div>
+                            <div class="tray-cell-grab">Drag to move</div>
+                        `;
                         
                         // Set click handler for viewing item details
                         cell.addEventListener('click', function() {
@@ -639,7 +1135,10 @@
                         });
                     }
                 } else {
-                    content.textContent = 'Empty';
+                    content.innerHTML = `
+                        <div class="tray-cell-empty-label">Empty position</div>
+                        <div class="tray-cell-grab">Drop item here</div>
+                    `;
                 }
                 
                 cell.appendChild(content);
@@ -653,8 +1152,8 @@
     const SCROLL_ZONE = 100; // pixels from top/bottom to trigger scroll
     
     function setupDragAndDrop() {
-        // Make items draggable
-        const dragItems = document.querySelectorAll('.drag-item');
+        // Make inventory items and occupied tray cells draggable
+        const dragItems = document.querySelectorAll('.drag-item, .tray-cell[data-type]');
         dragItems.forEach(item => {
             item.addEventListener('dragstart', handleDragStart);
             item.addEventListener('dragend', handleDragEnd);
@@ -664,8 +1163,6 @@
         const cells = document.querySelectorAll('.tray-cell');
         cells.forEach(cell => {
             cell.addEventListener('dragover', handleDragOver);
-            cell.addEventListener('dragenter', handleDragEnter);
-            cell.addEventListener('dragleave', handleDragLeave);
             cell.addEventListener('drop', handleDrop);
         });
         
@@ -702,6 +1199,8 @@
                 clearInterval(scrollInterval);
                 scrollInterval = null;
             }
+
+            clearFootprintPreview();
         });
         
         // Setup empty cell click handlers
@@ -711,83 +1210,59 @@
     }
     
     function handleDragStart(e) {
-        // Add class to indicate dragging
         this.classList.add('dragging');
-        
-        // Set dataTransfer data
-        const data = {
-            type: this.dataset.type,
-            id: this.dataset.id,
-            name: this.dataset.name,
-            vials: this.dataset.vials
-        };
-        
-        e.dataTransfer.setData('text/plain', JSON.stringify(data));
+        this.classList.add('is-drag-source');
+
+        activeDragData = buildDragPayload(this);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', JSON.stringify(activeDragData));
+        setDragStatus(`Dragging ${activeDragData.name}. Hover over an open footprint to move it.`, 'active');
     }
     
     function handleDragEnd(e) {
         this.classList.remove('dragging');
+        this.classList.remove('is-drag-source');
+        activeDragData = null;
+        clearFootprintPreview();
+        setDragStatus('Ready to place or move items.');
     }
     
     function handleDragOver(e) {
-        // Only allow drop on empty cells that aren't blocked
-        if (this.classList.contains('empty') && !this.classList.contains('blocked')) {
+        if (!activeDragData) {
+            return;
+        }
+
+        const preview = canPlaceItemAtPosition(activeDragData, this.dataset.position);
+        renderFootprintPreview(preview.footprint, preview.valid);
+
+        if (preview.valid) {
             e.preventDefault();
+            setDragStatus(preview.message, 'active');
+        } else {
+            setDragStatus(preview.message, 'error');
         }
-    }
-    
-    function handleDragEnter(e) {
-        // Only highlight if the cell is empty and not blocked
-        if (this.classList.contains('empty') && !this.classList.contains('blocked')) {
-            this.classList.add('drag-over');
-        }
-    }
-    
-    function handleDragLeave(e) {
-        this.classList.remove('drag-over');
     }
     
     function handleDrop(e) {
         e.preventDefault();
-        
-        // Remove drag-over class
-        this.classList.remove('drag-over');
-        
-        // Only allow drop on empty cells that aren't blocked
-        if (!this.classList.contains('empty') || this.classList.contains('blocked')) {
+
+        if (!activeDragData) {
             return;
         }
-        
+
         try {
-            // Get the dropped item data
-            const data = JSON.parse(e.dataTransfer.getData('text/plain'));
             const position = this.dataset.position;
             const trayId = document.getElementById('trayGrid').dataset.trayId;
-            
-            // Check if there's enough space for the required vials
-            const requiredVials = parseInt(data.vials);
-            const currentPosition = parseInt(position);
-            
-            // Calculate row and column from position
-            const column = Math.floor((currentPosition - 1) / 10) + 1; // Get tens place (column)
-            const row = ((currentPosition - 1) % 10) + 1; // Get ones place (row)
-            
-            // Check if enough positions are available in the same row
-            for (let i = 0; i < requiredVials; i++) {
-                // Calculate next position in the row
-                const nextColumn = column + i;
-                const checkPosition = ((nextColumn - 1) * 10 + row).toString();
-                const cell = document.querySelector(`.tray-cell[data-position="${checkPosition}"]`);
-                
-                // Check if position exists and is available
-                if (!cell || !cell.classList.contains('empty') || cell.classList.contains('blocked')) {
-                    alert(`Cannot place item here - needs ${requiredVials} consecutive positions in row ${row}`);
-                    return;
-                }
+
+            const preview = canPlaceItemAtPosition(activeDragData, position);
+            clearFootprintPreview();
+            if (!preview.valid) {
+                alert(preview.message);
+                setDragStatus(preview.message, 'error');
+                return;
             }
-            
-            // Call API to move item to tray
-            moveItemToTray(data.type, data.id, trayId, position);
+
+            moveItemToTray(activeDragData.type, activeDragData.id, trayId, position);
         } catch (error) {
             console.error('Error handling item drop:', error);
         }
@@ -882,9 +1357,9 @@
             
             // Show item if it matches the search query AND (showAllItems is true OR item is an orphan)
             if (text.includes(query) && (showAllItems || isOrphan)) {
-                item.style.display = '';
+                item.classList.remove('is-hidden');
             } else {
-                item.style.display = 'none';
+                item.classList.add('is-hidden');
             }
         });
     }
@@ -896,35 +1371,14 @@
         
         // Add click handler
         clickableItem.addEventListener('click', function() {
-            const data = {
-                type: dragItem.dataset.type,
-                id: dragItem.dataset.id,
-                name: dragItem.dataset.name,
-                vials: dragItem.dataset.vials
-            };
+            const data = buildDragPayload(dragItem);
             
             const trayId = document.getElementById('trayGrid').dataset.trayId;
-            
-            // Check space availability before placing
-            const requiredVials = parseInt(data.vials);
-            const currentPosition = parseInt(position);
-            
-            // Calculate row and column from position
-            const column = Math.floor((currentPosition - 1) / 10) + 1; // Get tens place (column)
-            const row = ((currentPosition - 1) % 10) + 1; // Get ones place (row)
-            
-            // Check if enough positions are available in the same row
-            for (let i = 0; i < requiredVials; i++) {
-                // Calculate next position in the row
-                const nextColumn = column + i;
-                const checkPosition = ((nextColumn - 1) * 10 + row).toString();
-                const cell = document.querySelector(`.tray-cell[data-position="${checkPosition}"]`);
-                
-                // Check if position exists and is available
-                if (!cell || !cell.classList.contains('empty') || cell.classList.contains('blocked')) {
-                    alert(`Cannot place item here - needs ${requiredVials} consecutive positions in row ${row}`);
-                    return;
-                }
+
+            const preview = canPlaceItemAtPosition(data, position);
+            if (!preview.valid) {
+                alert(preview.message);
+                return;
             }
             
             // Move item to selected position
@@ -1057,11 +1511,13 @@
             // 2. AND either showAllItems is true OR it's an orphan
             if ((name.includes(query) || genotype.includes(query)) && 
                 (showAllItems || isOrphan)) {
-                item.style.display = '';
+                item.classList.remove('is-hidden');
             } else {
-                item.style.display = 'none';
+                item.classList.add('is-hidden');
             }
         });
+
+        updateItemCounters();
     }
     
     function confirmDelete(trayId, trayName) {

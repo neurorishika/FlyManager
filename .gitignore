@@ -154,6 +154,7 @@ cython_debug/
 # temp and .archive folder
 temp/
 .archive/
+backups/
 # key files anywhere in the project directory and subfolders
 **/*.key
 # data folders anywhere in the project directory and subfolders

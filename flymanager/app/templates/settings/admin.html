@@ -1,93 +1,103 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h1>Application Settings</h1>
-                </div>
-                <div class="card-body">
-                    <form method="POST">
-                        <div class="mb-4">
-                            <h3>Theme Settings</h3>
-                            <div class="form-group">
-                                <div class="custom-control custom-switch">
-                                    <input type="checkbox" class="custom-control-input" id="dark_mode" name="dark_mode" {% if settings.theme.dark_mode %}checked{% endif %}>
-                                    <label class="custom-control-label" for="dark_mode">Dark Mode</label>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="accent_color">Accent Color</label>
-                                <input type="color" class="form-control" id="accent_color" name="accent_color" value="{{ settings.theme.accent_color }}">
-                                <small class="form-text text-muted">This color will be used for highlights and buttons</small>
-                            </div>
-                        </div>
+<div class="app-panel app-page-header">
+    <div>
+        <p class="app-kicker">Administration</p>
+        <h1 class="app-page-title">Application Settings</h1>
+        <p class="app-page-subtitle">Manage theme behavior, lab details, and stock data maintenance from a single control panel.</p>
+    </div>
+    <div class="app-chip-row">
+        <span class="app-chip"><i class="fas fa-cog"></i> Global configuration</span>
+        <span class="app-chip"><i class="fas fa-database"></i> Data maintenance tools</span>
+    </div>
+</div>
 
-                        <div class="mb-4">
-                            <h3>Lab Information</h3>
-                            <div class="form-group">
-                                <label for="lab_name">Lab Name</label>
-                                <input type="text" class="form-control" id="lab_name" name="lab_name" value="{{ settings.lab_info.lab_name }}" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="admin_name">Administrator Name</label>
-                                <input type="text" class="form-control" id="admin_name" name="admin_name" value="{{ settings.lab_info.admin_name }}" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="admin_email">Administrator Email</label>
-                                <input type="email" class="form-control" id="admin_email" name="admin_email" value="{{ settings.lab_info.admin_email }}" required>
-                            </div>
-                        </div>
-
-                        <div class="text-right">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Save Settings
-                            </button>
-                        </div>
-                    </form>
+<div class="app-settings-grid">
+    <div class="app-panel">
+        <form method="POST" class="app-form-shell">
+            <div class="app-form-section">
+                <div>
+                    <h2 class="app-form-section-title">Theme Settings</h2>
+                    <p class="app-form-section-copy">Control the default dark-mode behavior and the accent color used across the interface.</p>
                 </div>
-
-                 <div class="card-header">
-                    <h5>Stock Data Management</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>Bloomington Stock Data</h6>
-                            <p class="text-muted">Update Bloomington stock data from the official source.</p>
-                            <form method="POST" action="{{ url_for('settings.update_bloomington_stock') }}" 
-                                onsubmit="return confirm('This will backup the current data, download the latest version, and update gene metadata. Continue?')">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-download"></i> Update Stock Data & Genes
-                                </button>
-                            </form>
-                            <small class="text-muted">
-                                Downloads new data and automatically updates gene metadata.
-                            </small>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>Gene Metadata Only</h6>
-                            <p class="text-muted">Update gene metadata from existing Bloomington data.</p>
-                            <form method="POST" action="{{ url_for('settings.update_gene_metadata') }}" 
-                                onsubmit="return confirm('This will update gene metadata from the current Bloomington data. Continue?')">
-                                <button type="submit" class="btn btn-secondary">
-                                    <i class="fas fa-dna"></i> Update Genes Only
-                                </button>
-                            </form>
-                            <small class="text-muted">
-                                Uses existing bloomington.csv to update gene collections.
-                            </small>
-                        </div>
+                <div class="form-group">
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" id="dark_mode" name="dark_mode" {% if settings.theme.dark_mode %}checked{% endif %}>
+                        <label class="custom-control-label" for="dark_mode">Dark Mode</label>
                     </div>
-                    <hr>
-                    <small class="text-muted">
-                        <strong>Automatic updates:</strong> 1st of each month at 2:00 AM<br>
-                        <strong>Backups:</strong> Stored in data/backup/ and cleaned up after 12 months<br>
-                        <strong>Gene collections:</strong> X chromosome, 2nd, 3rd, and 4th chromosome genes
-                    </small>
                 </div>
+                <div class="form-group mb-0">
+                    <label for="accent_color">Accent Color</label>
+                    <input type="color" class="form-control" id="accent_color" name="accent_color" value="{{ settings.theme.accent_color }}">
+                    <small class="app-inline-note">This color is used for highlights, buttons, and interface accents.</small>
+                </div>
+            </div>
+
+            <div class="app-form-section">
+                <div>
+                    <h2 class="app-form-section-title">Lab Information</h2>
+                    <p class="app-form-section-copy">Keep the displayed lab and administrator details current for all users.</p>
+                </div>
+                <div class="form-group mb-0">
+                    <label for="lab_name">Lab Name</label>
+                    <input type="text" class="form-control" id="lab_name" name="lab_name" value="{{ settings.lab_info.lab_name }}" required>
+                </div>
+                <div class="form-group mb-0">
+                    <label for="admin_name">Administrator Name</label>
+                    <input type="text" class="form-control" id="admin_name" name="admin_name" value="{{ settings.lab_info.admin_name }}" required>
+                </div>
+                <div class="form-group mb-0">
+                    <label for="admin_email">Administrator Email</label>
+                    <input type="email" class="form-control" id="admin_email" name="admin_email" value="{{ settings.lab_info.admin_email }}" required>
+                </div>
+            </div>
+
+            <div class="app-button-row justify-content-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Settings
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="app-panel">
+        <div class="app-form-section">
+            <div>
+                <h2 class="app-form-section-title">Stock Data Management</h2>
+                <p class="app-form-section-copy">Run manual maintenance jobs for Bloomington reference data and gene metadata.</p>
+            </div>
+
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1">Bloomington Stock Data</h6>
+                    <p class="text-muted mb-0">Update Bloomington stock data from the official source.</p>
+                </div>
+                <form method="POST" action="{{ url_for('settings.update_bloomington_stock') }}" onsubmit="return confirm('This will backup the current data, download the latest version, and update gene metadata. Continue?')">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-download"></i> Update Stock Data & Genes
+                    </button>
+                </form>
+                <small class="text-muted">Downloads new data and automatically updates gene metadata.</small>
+            </div>
+
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1">Gene Metadata Only</h6>
+                    <p class="text-muted mb-0">Update gene metadata from existing Bloomington data.</p>
+                </div>
+                <form method="POST" action="{{ url_for('settings.update_gene_metadata') }}" onsubmit="return confirm('This will update gene metadata from the current Bloomington data. Continue?')">
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="fas fa-dna"></i> Update Genes Only
+                    </button>
+                </form>
+                <small class="text-muted">Uses the current bloomington.csv file to update gene collections.</small>
+            </div>
+
+            <div class="app-inline-note">
+                <strong>Automatic updates:</strong> 1st of each month at 2:00 AM<br>
+                <strong>Backups:</strong> Stored in data/backup/ and cleaned up after 12 months<br>
+                <strong>Gene collections:</strong> X chromosome, 2nd, 3rd, and 4th chromosome genes
             </div>
         </div>
     </div>

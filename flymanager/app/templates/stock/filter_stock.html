@@ -1,42 +1,45 @@
-<form method="post" action="{{ url_for('stock.stock_explorer') }}">
+<form method="post" action="{{ url_for('stock.stock_explorer') }}" class="explorer-filter-form">
+    <div class="filter-row filter-row-primary">
+        <div class="filter-col filter-col-search">
+            <label class="filter-label" for="searchQuery">Search</label>
+            <div class="filter-input-shell filter-input-shell-search">
+                <i class="fas fa-search" aria-hidden="true"></i>
+                <input type="text" id="searchQuery" name="searchQuery" class="form-control explorer-filter-control explorer-filter-search" value="{{ filter_state.searchQuery }}" placeholder="Source ID, name, genotype, tray, or notes">
+            </div>
+        </div>
+
+        {% with filter_name="Status", options=unique_values.Status, selected=filter_state.filterStatus %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+
+        {% with filter_name="Tray ID", options=unique_values.TrayID, selected=filter_state.filterTrayID %}
+            {% include 'filter_field.html' %}
+        {% endwith %}
+    </div>
+
     <div class="filter-row">
         {% with filter_name="Type", options=unique_values.Type, selected=filter_state.filterType %}
             {% include 'filter_field.html' %}
         {% endwith %}
-        
-        {% with filter_name="Tray ID", options=unique_values.TrayID, selected=filter_state.filterTrayID %}
-            {% include 'filter_field.html' %}
-        {% endwith %}
-        
-        {% with filter_name="Status", options=unique_values.Status, selected=filter_state.filterStatus %}
-            {% include 'filter_field.html' %}
-        {% endwith %}
-        
+
         {% with filter_name="Food Type", options=unique_values.FoodType, selected=filter_state.filterFoodType %}
             {% include 'filter_field.html' %}
         {% endwith %}
-        
+
         {% with filter_name="Species", options=unique_values.Species, selected=filter_state.filterSpecies %}
             {% include 'filter_field.html' %}
         {% endwith %}
-        
+
         {% with filter_name="Provenance", options=unique_values.Provenance, selected=filter_state.filterProvenance %}
             {% include 'filter_field.html' %}
         {% endwith %}
-        
-        <div class="filter-col">
-            <label for="searchQuery">Search:</label>
-            <input type="text" id="searchQuery" name="searchQuery" class="form-control" value="{{ filter_state.searchQuery }}">
+    </div>
+
+    <div class="filter-actions">
+        <span class="filter-actions-note">Batch apply for stable results.</span>
+        <div class="app-toolbar">
+            <button type="submit" class="btn btn-primary">Apply</button>
+            <button type="submit" name="clear_filters" class="btn btn-secondary">Clear</button>
         </div>
     </div>
-    {% if filter_state and (filter_state.filterType or filter_state.filterTrayID or filter_state.filterStatus or filter_state.filterFoodType or filter_state.filterSpecies or filter_state.filterProvenance or filter_state.searchQuery) %}
-        <div class="alert alert-info mt-2">
-            <i class="fas fa-info-circle"></i> Filters are currently applied. Please clear filters before applying new ones.
-        </div>
-        <button type="submit" class="btn btn-primary mt-3" disabled>Apply Filters</button>
-        <button type="submit" name="clear_filters" class="btn btn-secondary mt-3">Clear Filters</button>
-    {% else %}
-        <button type="submit" class="btn btn-primary mt-3">Apply Filters</button>
-        <button type="submit" name="clear_filters" class="btn btn-secondary mt-3">Clear Filters</button>
-    {% endif %}
 </form>

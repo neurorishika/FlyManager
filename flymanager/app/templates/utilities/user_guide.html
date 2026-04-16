@@ -3,86 +3,132 @@
 {% block title %}User Guide{% endblock %}
 
 {% block head %}
-<style>
-    .user-guide {
-        padding: 20px 0;
+<style nonce="{{ csp_nonce }}">
+    .guide-shell {
+        display: grid;
+        gap: 18px;
     }
-    
+
+    .guide-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .guide-layout {
+        display: grid;
+        grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+        gap: 18px;
+        align-items: start;
+    }
+
     .guide-nav {
         position: sticky;
-        top: 80px;
-        height: calc(100vh - 120px);
+        top: 84px;
+        max-height: calc(100vh - 112px);
         overflow-y: auto;
-        padding-right: 15px;
+        padding-right: 6px;
     }
-    
+
+    .guide-nav-shell,
+    .guide-content-shell {
+        padding: clamp(18px, 2vw, 24px);
+    }
+
+    .guide-nav-title {
+        margin: 0 0 12px;
+        font-size: var(--font-size-lg);
+    }
+
+    .guide-nav .nav {
+        gap: 8px;
+    }
+
     .guide-nav .nav-link {
-        padding: 0.3rem 0;
+        padding: 0.55rem 0.8rem;
         color: var(--text-color);
+        border: 1px solid transparent;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--bg-color) 84%, var(--card-bg) 16%);
     }
-    
+
     .guide-nav .nav-link.active {
         color: var(--accent-color);
         font-weight: bold;
+        border-color: color-mix(in srgb, var(--accent-color) 30%, var(--border-color) 70%);
+        background: color-mix(in srgb, var(--accent-color) 12%, var(--card-bg) 88%);
     }
-    
+
     .guide-content {
         font-size: 1.05rem;
     }
-    
+
     .guide-section {
-        padding-top: 20px;
-        margin-bottom: 30px;
+        padding-top: 10px;
+        margin-bottom: 34px;
     }
-    
+
     .guide-section h2 {
         border-bottom: 1px solid var(--border-color);
-        padding-bottom: 10px;
+        padding-bottom: 12px;
         margin-bottom: 20px;
+        font-size: clamp(1.45rem, 1.2rem + 0.7vw, 1.9rem);
     }
-    
+
     .guide-section h3 {
-        margin-top: 25px;
-        margin-bottom: 15px;
+        margin-top: 24px;
+        margin-bottom: 14px;
+        font-size: clamp(1.1rem, 1rem + 0.3vw, 1.35rem);
     }
-    
+
+    .guide-section h4,
+    .guide-section h5 {
+        margin-top: 18px;
+        margin-bottom: 10px;
+    }
+
     .guide-section img {
         max-width: 100%;
         border: 1px solid var(--border-color);
-        border-radius: 5px;
+        border-radius: 10px;
         margin: 10px 0;
     }
-    
+
     .step-box {
-        background-color: var(--card-bg);
+        background: color-mix(in srgb, var(--bg-color) 80%, var(--card-bg) 20%);
         border: 1px solid var(--border-color);
-        border-radius: 5px;
-        padding: 15px;
-        margin-bottom: 15px;
+        border-radius: 14px;
+        padding: 16px;
+        margin-bottom: 14px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
     }
-    
+
     .step-number {
-        display: inline-block;
-        width: 25px;
-        height: 25px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
         background-color: var(--accent-color);
         color: white;
         border-radius: 50%;
-        text-align: center;
-        line-height: 25px;
         margin-right: 8px;
+        font-size: 0.9rem;
+        font-weight: 700;
     }
-    
+
     .faq-item {
         margin-bottom: 15px;
     }
-    
+
     .faq-question {
         font-weight: bold;
         cursor: pointer;
         margin-bottom: 5px;
     }
-    
+
     .faq-answer {
         margin-left: 20px;
         display: none;
@@ -95,18 +141,21 @@
     .card-guide {
         margin-bottom: 15px;
         border: 1px solid var(--border-color);
-        border-radius: 5px;
+        border-radius: 14px;
+        overflow: hidden;
+        background: color-mix(in srgb, var(--bg-color) 84%, var(--card-bg) 16%);
     }
 
     .card-header-guide {
-        background-color: var(--header-bg);
-        padding: 10px 15px;
+        background: color-mix(in srgb, var(--header-bg) 18%, var(--card-bg) 82%);
+        padding: 14px 16px;
         cursor: pointer;
         border-bottom: 1px solid var(--border-color);
+        font-weight: 600;
     }
 
     .card-body-guide {
-        padding: 15px;
+        padding: 16px;
         display: none;
     }
 
@@ -117,17 +166,78 @@
     .highlight-box {
         background-color: rgba(var(--accent-color-rgb), 0.1);
         border-left: 4px solid var(--accent-color);
-        padding: 15px;
+        padding: 16px;
         margin: 15px 0;
-        border-radius: 0 5px 5px 0;
+        border-radius: 0 14px 14px 0;
     }
 
     .warning-box {
         background-color: rgba(255, 193, 7, 0.1);
         border-left: 4px solid #ffc107;
-        padding: 15px;
+        padding: 16px;
         margin: 15px 0;
-        border-radius: 0 5px 5px 0;
+        border-radius: 0 14px 14px 0;
+    }
+
+    .guide-content-shell dl {
+        display: grid;
+        grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+        gap: 8px 16px;
+        margin: 0;
+    }
+
+    .guide-content-shell dt {
+        font-weight: 700;
+    }
+
+    .guide-content-shell dd {
+        margin: 0;
+        color: var(--muted-text);
+    }
+
+    .guide-content-shell ul,
+    .guide-content-shell ol {
+        padding-left: 1.3rem;
+    }
+
+    .guide-content-shell li + li {
+        margin-top: 0.35rem;
+    }
+
+    .status-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 700;
+    }
+
+    .status-chip::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: currentColor;
+        box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent);
+    }
+
+    .status-chip.healthy {
+        color: #28a745;
+    }
+
+    .status-chip.warning {
+        color: #ffc107;
+    }
+
+    .status-chip.danger {
+        color: #dc3545;
+    }
+
+    .status-chip.info {
+        color: #17a2b8;
+    }
+
+    .status-chip.muted {
+        color: #6c757d;
     }
 
     code {
@@ -137,15 +247,58 @@
         border-radius: 3px;
         font-family: monospace;
     }
+
+    @media (max-width: 991px) {
+        .guide-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .guide-nav {
+            position: static;
+            max-height: none;
+            padding-right: 0;
+        }
+
+        .guide-nav .nav {
+            flex-direction: row;
+            flex-wrap: wrap;
+        }
+    }
+
+    @media (max-width: 767px) {
+        .guide-content {
+            font-size: 1rem;
+        }
+
+        .guide-content-shell dl {
+            grid-template-columns: 1fr;
+            gap: 4px;
+        }
+
+        .guide-nav .nav-link {
+            width: 100%;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid user-guide">
-    <div class="row">
-        <!-- Sidebar Navigation -->
-        <div class="col-md-3 col-lg-2 guide-nav">
-            <h5>User Guide Contents</h5>
+<div class="guide-shell">
+    <div class="app-panel guide-hero">
+        <div>
+            <p class="app-kicker">Documentation</p>
+            <h1 class="app-page-title"><em>D. manager</em> User Guide</h1>
+            <p class="app-page-subtitle">A reference manual for daily stock maintenance, tray organization, schedules, data workflows, and operator support.</p>
+        </div>
+        <div class="app-chip-row">
+            <span class="app-chip"><i class="fas fa-book"></i> 14 sections</span>
+            <span class="app-chip"><i class="fas fa-life-ring"></i> Lab workflow reference</span>
+        </div>
+    </div>
+
+    <div class="guide-layout">
+        <aside class="app-panel guide-nav-shell guide-nav">
+            <h2 class="guide-nav-title">User Guide Contents</h2>
             <nav class="nav flex-column">
                 <a class="nav-link" href="#getting-started">Getting Started</a>
                 <a class="nav-link" href="#authentication">Authentication</a>
@@ -162,12 +315,10 @@
                 <a class="nav-link" href="#faq">FAQ</a>
                 <a class="nav-link" href="#glossary">Glossary</a>
             </nav>
-        </div>
+        </aside>
 
-        <!-- Main Content -->
-        <div class="col-md-9 col-lg-10 guide-content">
-            <h1 class="text-center mb-4"><em>D. manager</em> User Guide</h1>
-            <p class="lead text-center mb-5">A comprehensive guide to using and managing your fly stocks with <em>D. manager</em></p>
+        <div class="app-panel guide-content-shell">
+        <div class="guide-content">
 
             <!-- Getting Started -->
             <div id="getting-started" class="guide-section">
@@ -807,11 +958,11 @@
                     <div class="card-body-guide" id="faq2">
                         <p>The color indicators represent different status levels:</p>
                         <ul>
-                            <li><strong style="color:#28a745">Green (Healthy)</strong>: Stock/cross is doing well</li>
-                            <li><strong style="color:#ffc107">Yellow (Showing Issues)</strong>: Minor issues observed</li>
-                            <li><strong style="color:#dc3545">Red (Needs Refresh)</strong>: Immediate attention required</li>
-                            <li><strong style="color:#17a2b8">Blue (Ordered)</strong>: Stock has been ordered but not received</li>
-                            <li><strong style="color:#6c757d">Grey (No longer maintained)</strong>: Stock is archived</li>
+                            <li><span class="status-chip healthy">Green (Healthy)</span>: Stock/cross is doing well</li>
+                            <li><span class="status-chip warning">Yellow (Showing Issues)</span>: Minor issues observed</li>
+                            <li><span class="status-chip danger">Red (Needs Refresh)</span>: Immediate attention required</li>
+                            <li><span class="status-chip info">Blue (Ordered)</span>: Stock has been ordered but not received</li>
+                            <li><span class="status-chip muted">Grey (No longer maintained)</span>: Stock is archived</li>
                         </ul>
                     </div>
                 </div>
@@ -920,12 +1071,13 @@
                 </dl>
             </div>
         </div>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // Make sidebar links smooth scroll to sections
     document.addEventListener('DOMContentLoaded', function() {
         const navLinks = document.querySelectorAll('.guide-nav .nav-link');

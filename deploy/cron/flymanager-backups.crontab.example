@@ -1,0 +1,5 @@
+# FlyManager backup schedule example
+# Adjust /opt/flymanager and BACKUP_OFFSITE_DIR for your host.
+
+0 * * * * cd /opt/flymanager && COMPOSE_ARGS="-f compose.yaml -f compose.production.yaml" BACKUP_OFFSITE_DIR=/srv/flymanager-backups ./scripts/mongo-backup.sh >> /opt/flymanager/backups/logs/mongo-backup.log 2>&1
+15 2 * * * cd /opt/flymanager && COMPOSE_ARGS="-f compose.yaml -f compose.production.yaml" BACKUP_OFFSITE_DIR=/srv/flymanager-backups ./scripts/state-backup.sh >> /opt/flymanager/backups/logs/state-backup.log 2>&1

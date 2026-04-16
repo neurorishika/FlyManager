@@ -1,35 +1,25 @@
 import datetime
 
-from flask import (
-    Blueprint,
-    current_app,
-    jsonify,
-    redirect,
-    render_template,
-    request,
-    session,
-    url_for,
-)
+from flask import (Blueprint, current_app, jsonify, redirect, render_template,
+                   request, session, url_for)
 from fuzzywuzzy import fuzz
 
 from flymanager.app import db
 from flymanager.app.routes.auth import login_required
+from flymanager.app.routes.explorer_utils import (collect_unique_values,
+                                                  get_explorer_filter_state,
+                                                  set_flip_display_fields)
+from flymanager.app.security import (get_json_payload, limiter,
+                                     normalize_identifier_list,
+                                     parse_int_value)
 from flymanager.app.settings import DEFAULT_CROSS_PROPERTY_VALUES
 from flymanager.utils.genetics import cross_genotypes, qc_genotype
 from flymanager.utils.labels import generate_label_pdf
-from flymanager.utils.mongo import (
-    add_metadata,
-    add_to_cross,
-    edit_cross,
-    get_all_genotypes,
-    get_eclosion_in,
-    get_flip_in,
-    get_metadata,
-    get_user_crosses,
-    get_user_initials,
-    update_cross_vials,
-    write_activity,
-)
+from flymanager.utils.mongo import (add_metadata, add_to_cross, edit_cross,
+                                    get_all_genotypes, get_eclosion_in,
+                                    get_flip_in, get_metadata,
+                                    get_user_crosses, get_user_initials,
+                                    update_cross_vials, write_activity)
 from flymanager.utils.scanner import get_available_ports
 from flymanager.utils.utils import clean_tagify_data
 
@@ -42,6 +32,7 @@ def cross_explorer():
     username = session.get("username")
 
     crosses = get_user_crosses(username, db)
+    all_crosses_for_filters = list(crosses)
 
     # nested sort by TrayID and TrayPosition
     crosses = sorted(
@@ -55,125 +46,59 @@ def cross_explorer():
     # add FlipIn and EclosesIn fields
     for cross in crosses:
         cross["FlipIn"] = get_flip_in(cross)
-
-        day_value = cross["FlipIn"].split(" ")[0].split(",")[0].strip()
-        day_value = int(day_value) if day_value != "N/A" else -999
-
-        # process the FlipIn field
-        if day_value == -999:
-            cross["FlipIn"] = "No Flip"
-            cross["FlipInColor"] = "#ffcce0"
-        elif day_value < 0:
-            cross["FlipIn"] = "Overdue"
-            cross["FlipInColor"] = "#f25567"
-        elif day_value == 0:
-            cross["FlipIn"] = "Flip today"
-            cross["FlipInColor"] = "#fca15b"
-        else:
-            cross["FlipIn"] = "Flip in {} day{}".format(
-                day_value, "s" if day_value > 1 else ""
-            )
-            cross["FlipInColor"] = "#66fa78"
+        set_flip_display_fields(cross, raw_value=cross["FlipIn"], display_field="FlipIn")
 
         cross["EclosesIn"] = get_eclosion_in(cross)
 
     # Extract unique values for filtering from all crosses (unfiltered)
-    all_crosses_for_filters = get_user_crosses(username, db)
-    unique_values = {
-        "MaleSpecies": sorted(
-            set(
-                str(cross.get("MaleSpecies", "D. melanogaster"))
-                for cross in all_crosses_for_filters
-            )
-        ),
-        "FemaleSpecies": sorted(
-            set(
-                str(cross.get("FemaleSpecies", "D. melanogaster"))
-                for cross in all_crosses_for_filters
-            )
-        ),
-        "TrayID": sorted(
-            set(str(cross["TrayID"]) for cross in all_crosses_for_filters)
-        ),
-        "Status": sorted(
-            set(str(cross["Status"]) for cross in all_crosses_for_filters)
-        ),
-        "FoodType": sorted(
-            set(str(cross["FoodType"]) for cross in all_crosses_for_filters)
-        ),
-    }
+    unique_values = collect_unique_values(
+        all_crosses_for_filters,
+        {
+            "MaleSpecies": lambda cross: cross.get("MaleSpecies", "D. melanogaster"),
+            "FemaleSpecies": lambda cross: cross.get("FemaleSpecies", "D. melanogaster"),
+            "TrayID": lambda cross: cross.get("TrayID"),
+            "Status": lambda cross: cross.get("Status"),
+            "FoodType": lambda cross: cross.get("FoodType"),
+        },
+    )
 
-    if request.method == "GET":
-        # Check if there are filters stored in session
-        filter_state = session.get("filter_state", {})
+    filter_state, redirect_response = get_explorer_filter_state(
+        session_key="filter_state",
+        clear_endpoint="cross.cross_explorer",
+        field_names=(
+            "filterMaleSpecies",
+            "filterFemaleSpecies",
+            "filterTrayID",
+            "filterStatus",
+            "filterFoodType",
+            "searchQuery",
+        ),
+    )
+    if redirect_response is not None:
+        return redirect_response
 
-        # Apply filters if state exists or default to excluding 'No longer maintained'
-        if filter_state:
-            filtered_crosses = _apply_cross_filters(crosses, filter_state)
-            # Recalculate unique values based on filtered crosses
-            unique_values_filtered = {
-                "TrayID": sorted(
-                    set(str(cross["TrayID"]) for cross in filtered_crosses)
-                ),
-                "Status": sorted(
-                    set(str(cross["Status"]) for cross in filtered_crosses)
-                ),
-                "FoodType": sorted(
-                    set(str(cross["FoodType"]) for cross in filtered_crosses)
-                ),
-            }
-            unique_values = unique_values_filtered
-        else:
-            # No filters applied yet, use default behavior to exclude 'No longer maintained'
-            filtered_crosses = [
-                cross
-                for cross in crosses
-                if str(cross["Status"]) != "No longer maintained"
-            ]
+    filtered_crosses = _apply_cross_filters(crosses, filter_state)
 
-        return render_template(
-            "cross/cross_explorer.html",
-            username=username,
-            crosses=filtered_crosses,
-            unique_values=unique_values,
-            filter_state=filter_state,
+    if filter_state:
+        unique_values = collect_unique_values(
+            filtered_crosses,
+            {
+                "TrayID": lambda cross: cross.get("TrayID"),
+                "FoodType": lambda cross: cross.get("FoodType"),
+            },
         )
+        unique_values["Status"] = collect_unique_values(
+            all_crosses_for_filters,
+            {"Status": lambda cross: cross.get("Status")},
+        )["Status"]
 
-    elif request.method == "POST":
-        if "clear_filters" in request.form:
-            session.pop("filter_state", None)
-            return redirect(url_for("cross.cross_explorer"))
-
-        # Get filter values from request
-        filter_state = {
-            "filterMaleSpecies": str(request.form.get("filterMaleSpecies", "")),
-            "filterFemaleSpecies": str(request.form.get("filterFemaleSpecies", "")),
-            "filterTrayID": str(request.form.get("filterTrayID", "")),
-            "filterStatus": str(request.form.get("filterStatus", "")),
-            "filterFoodType": str(request.form.get("filterFoodType", "")),
-            "searchQuery": request.form.get("searchQuery", ""),
-        }
-        session["filter_state"] = filter_state
-
-        # Apply filters
-        filtered_crosses = _apply_cross_filters(crosses, filter_state)
-
-        # Recalculate unique values
-        unique_values = {
-            "TrayID": sorted(set(str(cross["TrayID"]) for cross in filtered_crosses)),
-            "Status": sorted(set(str(cross["Status"]) for cross in filtered_crosses)),
-            "FoodType": sorted(
-                set(str(cross["FoodType"]) for cross in filtered_crosses)
-            ),
-        }
-
-        return render_template(
-            "cross/cross_explorer.html",
-            username=username,
-            crosses=filtered_crosses,
-            unique_values=unique_values,
-            filter_state=filter_state,
-        )
+    return render_template(
+        "cross/cross_explorer.html",
+        username=username,
+        crosses=filtered_crosses,
+        unique_values=unique_values,
+        filter_state=filter_state,
+    )
 
 
 def _apply_cross_filters(crosses, filters):
@@ -186,6 +111,7 @@ def _apply_cross_filters(crosses, filters):
     filter_status = filters.get("filterStatus")
     filter_food_type = filters.get("filterFoodType")
     search_query = filters.get("searchQuery")
+    no_longer_maintained_status = "No longer maintained"
 
     if filter_male_species:
         filtered_crosses = [
@@ -206,29 +132,23 @@ def _apply_cross_filters(crosses, filters):
             if str(cross["TrayID"]) == filter_tray_id
         ]
 
-    # Special handling for status: default is exclude 'No longer maintained'
-    dont_remove_filtered_flag = False
-    if "filterStatus" in filters:
-        if filter_status:
-            if filter_status == "No longer maintained":
-                filtered_crosses = [
-                    cross
-                    for cross in filtered_crosses
-                    if str(cross["Status"]) == "No longer maintained"
-                ]
-                dont_remove_filtered_flag = True
-            else:
-                filtered_crosses = [
-                    cross
-                    for cross in filtered_crosses
-                    if str(cross["Status"]) == filter_status
-                ]
-
-    if not dont_remove_filtered_flag:
+    if filter_status == no_longer_maintained_status:
         filtered_crosses = [
             cross
             for cross in filtered_crosses
-            if str(cross["Status"]) != "No longer maintained"
+            if str(cross["Status"]) == no_longer_maintained_status
+        ]
+    elif filter_status:
+        filtered_crosses = [
+            cross
+            for cross in filtered_crosses
+            if str(cross["Status"]) == filter_status
+        ]
+    else:
+        filtered_crosses = [
+            cross
+            for cross in filtered_crosses
+            if str(cross["Status"]) != no_longer_maintained_status
         ]
 
     if filter_food_type:
@@ -642,9 +562,15 @@ def view_cross(unique_id):
 
 @bp.route("/generate_cross_labels", methods=["POST"])
 @login_required
+@limiter.limit("10 per hour")
 def generate_cross_labels():
     selected_uids = request.form.get("selected_uids").split(",")
-    blank_spaces = int(request.form.get("blank_spaces", 0))
+    blank_spaces = parse_int_value(
+        request.form.get("blank_spaces", 0),
+        field_name="Blank spaces",
+        minimum=0,
+        maximum=200,
+    )
     quantities = request.form.get("quantities").split(",")
 
     # get the user's initials
@@ -696,6 +622,7 @@ def generate_cross_labels():
 
 @bp.route("/delete_cross_permanently", methods=["POST"])
 @login_required
+@limiter.limit("10 per hour")
 def delete_cross_permanently():
     """
     Permanently delete crosses that have the 'No longer maintained' status.
@@ -710,17 +637,19 @@ def delete_cross_permanently():
     JSON response with success status, count of deleted items, and count of skipped items.
     """
     username = session.get("username")
-    data = request.json
+    try:
+        data = get_json_payload()
+        unique_ids = normalize_identifier_list(data.get("uniqueIDs", []), field_name="uniqueIDs")
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
 
-    if not data or "uniqueIDs" not in data or not data["uniqueIDs"]:
+    if not unique_ids:
         return (
             jsonify(
                 {"success": False, "message": "No cross IDs provided for deletion"}
             ),
             400,
         )
-
-    unique_ids = data["uniqueIDs"]
     deleted_count = 0
     skipped_count = 0
 

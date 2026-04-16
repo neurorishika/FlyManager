@@ -1,9 +1,12 @@
+{% set filter_key = filter_name | replace(' ', '') %}
 <div class="filter-col">
-    <label for="filter{{ filter_name }}">{{ filter_name }}:</label>
-    <select id="filter{{ filter_name }}" name="filter{{ filter_name | replace(' ', '') }}" class="form-control">
+    <label class="filter-label" for="filter{{ filter_key }}">{{ filter_name }}</label>
+    <div class="filter-input-shell">
+        <select id="filter{{ filter_key }}" name="filter{{ filter_key }}" class="form-control explorer-filter-control">
         <option value="">All</option>
         {% for value in options %}
             <option value="{{ value }}" {% if selected == value %}selected{% endif %}>{{ value }}</option>
         {% endfor %}
-    </select>
+        </select>
+    </div>
 </div>

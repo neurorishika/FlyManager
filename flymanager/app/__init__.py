@@ -5,38 +5,26 @@ Creates and configures the Flask application.
 """
 
 import os
-import hashlib
-import threading
-from datetime import datetime
+import secrets
+from datetime import timedelta
 
-from flask import (
-    Flask,
-    session,
-    redirect,
-    jsonify,
-    url_for,
-    render_template,
-    request,
-    flash,
-)
-from flask_session import Session as FlaskSession
-from flask_socketio import SocketIO
-from flask_cors import CORS
-from flask_mail import Mail, Message
-from flask_apscheduler import APScheduler
 from dotenv import load_dotenv
+from flask import Flask, jsonify, redirect, render_template, session, url_for
+from flask_apscheduler import APScheduler
+from flask_cors import CORS
+from flask_mail import Mail
+from flask_socketio import SocketIO
+from werkzeug.middleware.proxy_fix import ProxyFix
 
-
+from flask_session import Session as FlaskSession
 # internal imports
-from flymanager.utils.mongo import (
-    create_mongo_client,
-    get_database,
-    get_all_users,
-    get_user_email,
-    get_flip_schedule,
-    get_settings,
-)
-from flymanager.utils.scanner import get_available_ports  # Assuming this exists
+from flymanager.app.security import (add_security_headers, csrf,
+                                     generate_csp_nonce, limiter,
+                                     parse_allowed_origins)
+from flymanager.utils.mongo import (create_mongo_client, get_all_users,
+                                    get_database, get_flip_schedule,
+                                    get_settings, get_user_email,
+                                    ping_database)
 
 # Load environment variables
 load_dotenv()
@@ -49,10 +37,18 @@ active_threads = {}  # For QR Scanner
 # --- Extension Instances ---
 db = get_database(create_mongo_client())
 mail = Mail()
-socketio = SocketIO()
+socketio = SocketIO(async_mode=os.getenv("SOCKETIO_ASYNC_MODE", "threading"))
 scheduler = APScheduler()
 sess = FlaskSession()
 cors = CORS()
+
+
+def env_flag(name, default=False):
+    """Interpret common string environment values as booleans."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 # --- Helper Functions ---
@@ -72,22 +68,58 @@ def create_app():
     )
 
     # --- Configuration ---
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+    session_lifetime_seconds = int(os.getenv("SESSION_LIFETIME_SECONDS", "3600"))
+    provided_secret_key = (os.getenv("SECRET_KEY") or "").strip()
+    secure_cookie_enabled = env_flag("SESSION_COOKIE_SECURE", False)
+    production_domain = (os.getenv("FLYMANAGER_DOMAIN") or "").strip()
+    if not provided_secret_key and (secure_cookie_enabled or production_domain):
+        raise RuntimeError(
+            "SECRET_KEY must be explicitly set for HTTPS or public-domain deployments."
+        )
+
+    app.config["SECRET_KEY"] = provided_secret_key or secrets.token_hex(32)
     app.config["SESSION_TYPE"] = "filesystem"
-    app.config["SESSION_PERMANENT"] = False
-    app.config["PERMANENT_SESSION_LIFETIME"] = 3600
-    app.config["SESSION_FILE_DIR"] = (
-        "/tmp/flask_session"  # Ensure this dir exists and is writable
+    app.config["SESSION_PERMANENT"] = True
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
+        seconds=session_lifetime_seconds
+    )
+    app.config["SESSION_FILE_DIR"] = os.getenv(
+        "SESSION_FILE_DIR", "/tmp/flymanager/flask_session"
     )
     app.config["SESSION_FILE_THRESHOLD"] = 500
     app.config["SESSION_FILE_MODE"] = 0o600  # Use octal literal
-    app.config["UPLOAD_FOLDER"] = os.getenv(
-        "UPLOAD_FOLDER", "/tmp/uploads"
-    )  # Provide default
+    app.config["SESSION_USE_SIGNER"] = True
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = os.getenv(
+        "SESSION_COOKIE_SAMESITE", "Lax"
+    )
+    app.config["SESSION_COOKIE_SECURE"] = secure_cookie_enabled
+    app.config["UPLOAD_FOLDER"] = os.getenv("UPLOAD_FOLDER", "data/uploads")
+    app.config["MAX_CONTENT_LENGTH"] = int(
+        os.getenv("MAX_UPLOAD_SIZE_BYTES", str(8 * 1024 * 1024))
+    )
+    app.config["APP_PORT"] = int(os.getenv("APP_PORT", "5234"))
+    app.config["APP_HOST"] = os.getenv("APP_HOST", "0.0.0.0")
+    app.config["FLASK_DEBUG"] = env_flag("FLASK_DEBUG", False)
+    app.config["MAIL_SUPPRESS_SEND"] = env_flag("MAIL_SUPPRESS_SEND", False)
+    app.config["WTF_CSRF_TIME_LIMIT"] = session_lifetime_seconds
+    app.config["WTF_CSRF_CHECK_DEFAULT"] = True
+    app.config["RATELIMIT_STORAGE_URI"] = os.getenv(
+        "RATELIMIT_STORAGE_URI", "memory://"
+    )
+    app.config["ENABLE_CLIENT_SERIAL_SCANNER"] = env_flag(
+        "ENABLE_CLIENT_SERIAL_SCANNER", False
+    )
+    app.config["ENABLE_CAMERA_SCANNER"] = env_flag(
+        "ENABLE_CAMERA_SCANNER", True
+    )
 
     # Ensure upload and session directories exist
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     os.makedirs(app.config["SESSION_FILE_DIR"], exist_ok=True)
+
+    if env_flag("TRUST_PROXY_HEADERS", bool(production_domain)):
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     app.config.update(
         MAIL_SERVER=os.getenv("SMTP_SERVER"),
@@ -100,28 +132,45 @@ def create_app():
     )
 
     sess.init_app(app)
-    socketio.init_app(app)
-    cors.init_app(app)
+    csrf.init_app(app)
+    limiter.init_app(app)
+
+    cors_allowed_origins = parse_allowed_origins(os.getenv("CORS_ALLOWED_ORIGINS"))
+    socketio.init_app(app, cors_allowed_origins=cors_allowed_origins)
+    if cors_allowed_origins:
+        cors.init_app(app, resources={r"/*": {"origins": cors_allowed_origins}})
+
     mail.init_app(app)
     scheduler.init_app(app)
+    app.after_request(add_security_headers)
+
+    if not provided_secret_key:
+        app.logger.warning(
+            "SECRET_KEY was not provided; using an ephemeral key for local-only runtime."
+        )
 
     # --- Make settings available to all templates ---
     @app.context_processor
     def inject_settings():
-        return dict(settings=get_settings(db))
+        return dict(
+            settings=get_settings(db),
+            csp_nonce=generate_csp_nonce(),
+            scanner_features={
+                "client_serial_enabled": app.config[
+                    "ENABLE_CLIENT_SERIAL_SCANNER"
+                ],
+                "camera_enabled": app.config["ENABLE_CAMERA_SCANNER"],
+            },
+        )
+
+    @app.before_request
+    def ensure_csp_nonce():
+        generate_csp_nonce()
 
     with app.app_context():
         # --- Import and Register Blueprints ---
-        from flymanager.app.routes import (
-            main,
-            auth,
-            stock,
-            cross,
-            flip,
-            data,
-            tray,
-            settings,
-        )
+        from flymanager.app.routes import (auth, cross, data, flip, main,
+                                           settings, stock, tray)
 
         app.register_blueprint(main.bp)
         app.register_blueprint(auth.bp)
@@ -133,13 +182,13 @@ def create_app():
         app.register_blueprint(settings.bp)
 
         # --- Import Services (to ensure they are loaded) ---
-        from flymanager.app.services import email as email_service
-        from flymanager.app.services import scheduler as scheduler_service
-        from flymanager.app.services import scanner as scanner_service
         from flymanager.app.services import bloomington as bloomington_service
+        from flymanager.app.services import email as email_service
+        from flymanager.app.services import scanner as scanner_service
+        from flymanager.app.services import scheduler as scheduler_service
 
         # --- Initialize Scheduler ---
-        if not scheduler.running:
+        if env_flag("ENABLE_SCHEDULER", True) and not scheduler.running:
             # Add scheduled job using the function from services
             scheduler.add_job(
                 id="daily_flip_reminder_job",
@@ -162,7 +211,17 @@ def create_app():
                 replace_existing=True,
             )
             scheduler.start()
-            print("Scheduler started.")
+            app.logger.info("Scheduler started.")
+
+        @app.get("/health")
+        def healthcheck():
+            return jsonify({"status": "ok"}), 200
+
+        @app.get("/health/ready")
+        def readiness_check():
+            if ping_database(db):
+                return jsonify({"status": "ready", "mongo": "ok"}), 200
+            return jsonify({"status": "not_ready", "mongo": "unavailable"}), 503
 
         @app.errorhandler(404)
         def page_not_found(error):

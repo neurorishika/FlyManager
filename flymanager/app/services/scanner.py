@@ -1,13 +1,57 @@
 import threading
+from datetime import datetime  # Added import
+
 import serial
-from datetime import datetime # Added import
 from flask import current_app, jsonify
-from flymanager.app import socketio, db, active_threads
-from flymanager.utils.mongo import get_user_stocks, get_user_crosses
+
+from flymanager.app import active_threads, db, socketio
 # Import get_available_ports from its utility location
 from flymanager.utils.scanner import get_available_ports
 
 # Note: MIN_FLIP_DIFFERENCE is defined in app/__init__.py
+
+
+def _build_stock_payload(stock):
+    return {
+        'uniqueID': stock.get('UniqueID', ''),
+        'name': stock.get('Name', ''),
+        'genotype': stock.get('Genotype', ''),
+        'status': stock.get('Status', ''),
+        'seriesID': stock.get('SeriesID', ''),
+        'replicateID': stock.get('ReplicateID', ''),
+        'trayID': stock.get('TrayID', ''),
+        'trayPosition': stock.get('TrayPosition', ''),
+        'foodType': stock.get('FoodType', ''),
+        'provenance': stock.get('Provenance', ''),
+        'altReference': stock.get('AltReference', ''),
+    }
+
+
+def _build_cross_payload(cross):
+    return {
+        'uniqueID': cross.get('UniqueID', ''),
+        'name': cross.get('Name', ''),
+        'status': cross.get('Status', ''),
+        'maleGenotype': cross.get('MaleGenotype', ''),
+        'femaleGenotype': cross.get('FemaleGenotype', ''),
+        'trayID': cross.get('TrayID', ''),
+        'trayPosition': cross.get('TrayPosition', ''),
+        'foodType': cross.get('FoodType', ''),
+    }
+
+
+def lookup_uid_result(username, uid, database=None):
+    """Resolve a scanned UID to a stock or cross payload for the current user."""
+    active_db = database or db
+    stock = active_db['stocks'].find_one({'UniqueID': uid, 'User': username})
+    if stock:
+        return 'stock', _build_stock_payload(stock)
+
+    cross = active_db['crosses'].find_one({'UniqueID': uid, 'User': username})
+    if cross:
+        return 'cross', _build_cross_payload(cross)
+
+    return None, None
 
 def scan_qr_code_thread(port_index, ports, username, thread_id, baudrate=9600, size=10):
     """
@@ -58,41 +102,15 @@ def scan_qr_code_thread(port_index, ports, username, thread_id, baudrate=9600, s
                         # A potentially safer pattern is to emit the UID via socketio
                         # and handle the DB lookup in a socketio event handler in the main process.
                         try:
-                            # Assuming get_user_stocks/crosses are safe to call from thread
-                            stocks = get_user_stocks(username, db)
-                            matching_stock = next((stock for stock in stocks if stock.get('UniqueID') == uid), None)
-
-                            crosses = get_user_crosses(username, db)
-                            matching_cross = next((cross for cross in crosses if cross.get('UniqueID') == uid), None)
+                            item_type, payload = lookup_uid_result(username, uid, db)
 
                             # Emit results via SocketIO (generally thread-safe)
-                            if matching_stock:
+                            if item_type == 'stock':
                                 print(f'Thread {thread_id}: Stock scanned: {uid}')
-                                socketio.emit('stock_scanned', {
-                                    'uniqueID': uid,
-                                    'name': matching_stock.get('Name', ''),
-                                    'genotype': matching_stock.get('Genotype', ''),
-                                    'status': matching_stock.get('Status', ''),
-                                    'seriesID': matching_stock.get('SeriesID', ''),
-                                    'replicateID': matching_stock.get('ReplicateID', ''),
-                                    'trayID': matching_stock.get('TrayID', ''),
-                                    'trayPosition': matching_stock.get('TrayPosition', ''),
-                                    'foodType': matching_stock.get('FoodType', ''),
-                                    'provenance': matching_stock.get('Provenance', ''),
-                                    'altReference': matching_stock.get('AltReference', '')
-                                })
-                            elif matching_cross:
+                                socketio.emit('stock_scanned', payload)
+                            elif item_type == 'cross':
                                 print(f'Thread {thread_id}: Cross scanned: {uid}')
-                                socketio.emit('cross_scanned', {
-                                        'uniqueID': uid,
-                                        'name': matching_cross.get('Name', ''),
-                                        'status': matching_cross.get('Status', ''),
-                                        'maleGenotype': matching_cross.get('MaleGenotype', ''),
-                                        'femaleGenotype': matching_cross.get('FemaleGenotype', ''),
-                                        'trayID': matching_cross.get('TrayID', ''),
-                                        'trayPosition': matching_cross.get('TrayPosition', ''),
-                                        'foodType': matching_cross.get('FoodType', ''),
-                                })
+                                socketio.emit('cross_scanned', payload)
                             else:
                                 print(f'Thread {thread_id}: QR code {uid} not recognized.')
                                 socketio.emit('qr_not_recognized', {'uniqueID': uid})
@@ -172,5 +190,7 @@ def stop_scan_service(thread_id):
         # The thread is responsible for cleaning itself up from active_threads.
         return jsonify({'success': True, 'message': 'Stop signal sent to scanning thread.'}), 200
     else:
+        print(f"Stop request for non-existent or already stopped thread ID: {thread_id}")
+        return jsonify({'success': False, 'message': 'Scanning thread not found or already stopped.'}), 404
         print(f"Stop request for non-existent or already stopped thread ID: {thread_id}")
         return jsonify({'success': False, 'message': 'Scanning thread not found or already stopped.'}), 404

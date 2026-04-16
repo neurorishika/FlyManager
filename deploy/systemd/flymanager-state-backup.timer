@@ -1,0 +1,10 @@
+[Unit]
+Description=Run FlyManager deployment-state backup daily
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+Persistent=true
+Unit=flymanager-state-backup.service
+
+[Install]
+WantedBy=timers.target

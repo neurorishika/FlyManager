@@ -1,42 +1,92 @@
 {% extends 'base.html' %}
 
+{% block head %}
+<style nonce="{{ csp_nonce }}">
+    .schedule-page {
+        display: grid;
+        gap: 18px;
+    }
+
+    .schedule-list {
+        display: grid;
+        gap: 16px;
+    }
+
+    .schedule-day {
+        display: grid;
+        gap: 14px;
+    }
+
+    .schedule-day-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .schedule-items {
+        margin: 0;
+        padding-left: 1.1rem;
+        display: grid;
+        gap: 8px;
+    }
+
+    .schedule-trays {
+        color: var(--muted-text);
+        margin: 0;
+    }
+
+    @media (max-width: 767px) {
+        .schedule-day-header form,
+        .schedule-day-header .btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container mt-5">
-    <h1 class="text-center">Flip Schedule</h1>
+<div class="schedule-page">
+    <div class="app-panel app-page-header">
+        <div>
+            <p class="app-kicker">Planning</p>
+            <h1 class="app-page-title">Flip Schedule</h1>
+            <p class="app-page-subtitle">Review upcoming workload by day, see which trays are involved, and generate labels directly from the schedule.</p>
+        </div>
+        <div class="app-chip-row">
+            <span class="app-chip"><i class="fas fa-calendar-alt"></i> {{ schedule|length }} scheduled day{% if schedule|length != 1 %}s{% endif %}</span>
+        </div>
+    </div>
 
-    <div class="row">
-        <div class="col-md-12">
-            <ul class="list-group">
-                {% for date, data in schedule.items() %}
-                    <div class="date-section d-flex justify-content-between align-items-center">
-                        <h3>{{ date }} ({{ data.day_of_week }})</h3>  <!-- This will display the day of the week -->
-
-                        <form method="POST" action="{{ url_for('flip.generate_labels_for_day_route') }}" class="ml-3">
+    <div class="schedule-list">
+        {% for date, data in schedule.items() %}
+            <div class="app-panel schedule-day">
+                <div class="schedule-day-header">
+                    <div>
+                        <h3 class="app-section-title mb-1">{{ date }} ({{ data.day_of_week }})</h3>
+                        <p class="schedule-trays"><strong>Trays Needed:</strong> {{ data.trays|join(', ') }}</p>
+                    </div>
+                    <form method="POST" action="{{ url_for('flip.generate_labels_for_day_route') }}">
                             <input type="hidden" name="date" value="{{ date }}">
                             <input type="hidden" name="blank_spaces" id="blankSpaces">
                             <button type="submit" class="btn btn-primary submit-button">Generate Labels for {{ data.day_of_week }}</button>
-                        </form>
-                    </div>
-                    <p><strong>Trays Needed:</strong> {{ data.trays|join(', ') }}</p> <!-- This will show the trays -->
+                    </form>
+                </div>
 
-                    <ul>
+                <ul class="schedule-items">
                         {% for item in data.flip_items %}
-                            <!-- Access the display_string property of the item object -->
                             <li>{{ item.display_string|safe }}</li>
                         {% endfor %}
-                    </ul>
-                    <!-- Add some space between the dates -->
-                    <hr>
-                {% endfor %}
-
-            </ul>
-        </div>
+                </ul>
+            </div>
+        {% endfor %}
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // Select all buttons with the class 'submit-button'
     document.querySelectorAll('.submit-button').forEach(function(button) {
         // Add a click event listener to each button

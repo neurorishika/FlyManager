@@ -1,377 +1,1638 @@
 {% extends "base.html" %}
 
-{% block title %}Homepage{% endblock %}
+{% block title %}D. manager Home{% endblock %}
 
 {% block head %}
-<style>
-    .dashboard-section {
-        background-color: var(--card-bg);
+<style nonce="{{ csp_nonce }}">
+    .dashboard-shell {
+        display: grid;
+        gap: 18px;
+    }
+
+    .dashboard-hero {
+        position: relative;
+        overflow: hidden;
+        padding: clamp(22px, 3vw, 34px);
+        border-radius: 28px;
+        border: 1px solid color-mix(in srgb, var(--header-bg) 16%, var(--panel-border) 84%);
+        background:
+            radial-gradient(circle at top right, color-mix(in srgb, var(--header-bg) 22%, transparent 78%), transparent 36%),
+            radial-gradient(circle at bottom left, color-mix(in srgb, var(--header-bg) 14%, transparent 86%), transparent 30%),
+            linear-gradient(145deg, color-mix(in srgb, var(--card-bg) 92%, white 8%), color-mix(in srgb, var(--bg-color) 84%, var(--card-bg) 16%));
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.12);
+    }
+
+    .dashboard-hero::after {
+        content: "";
+        position: absolute;
+        inset: auto -8% -26% auto;
+        width: 280px;
+        height: 280px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--header-bg) 12%, transparent 88%);
+        filter: blur(4px);
+        pointer-events: none;
+    }
+
+    .hero-grid {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
+        gap: 22px;
+        align-items: start;
+    }
+
+    .hero-brand {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .hero-logo {
+        width: 78px;
+        height: 78px;
+        border-radius: 24px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.72);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
+        backdrop-filter: blur(14px);
+    }
+
+    .hero-copy {
+        max-width: 68ch;
+    }
+
+    .hero-title {
+        margin: 0;
+        font-size: clamp(1.6rem, 1.3rem + 1.2vw, 2.4rem);
+        line-height: 1.05;
+        letter-spacing: -0.03em;
+    }
+
+    .hero-subtitle {
+        margin: 12px 0 0;
+        color: var(--muted-text);
+        font-size: clamp(0.96rem, 0.92rem + 0.2vw, 1.08rem);
+        max-width: 56ch;
+    }
+
+    .hero-meta {
+        margin-top: 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .hero-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0.5rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.62);
+        border: 1px solid rgba(255, 255, 255, 0.72);
         color: var(--text-color);
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        margin-bottom: 20px;
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        backdrop-filter: blur(12px);
+    }
+
+    .hero-snapshot {
+        display: grid;
+        gap: 14px;
+    }
+
+    .snapshot-card {
+        padding: 18px;
+        border-radius: 22px;
+        background: color-mix(in srgb, var(--card-bg) 86%, white 14%);
+        border: 1px solid color-mix(in srgb, var(--header-bg) 14%, var(--border-color) 86%);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+    }
+
+    .snapshot-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .snapshot-metric {
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: color-mix(in srgb, var(--bg-color) 62%, var(--card-bg) 38%);
         border: 1px solid var(--border-color);
+    }
+
+    .snapshot-value {
+        display: block;
+        font-size: clamp(1.2rem, 1.02rem + 0.7vw, 1.65rem);
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        color: var(--accent-color);
+    }
+
+    .snapshot-label {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .snapshot-activity {
+        display: grid;
+        gap: 6px;
+    }
+
+    .snapshot-activity strong {
+        font-size: var(--font-size-sm);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted-text);
+    }
+
+    .snapshot-activity span {
+        font-size: var(--font-size-sm);
+        color: var(--muted-text);
+    }
+
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr);
+        gap: 18px;
+        align-items: start;
+    }
+
+    .dashboard-column {
+        display: grid;
+        gap: 18px;
+    }
+
+    .dashboard-panel {
+        background: var(--panel-background);
+        border: 1px solid var(--panel-border);
+        border-radius: 22px;
+        box-shadow: var(--surface-shadow);
+        padding: clamp(18px, 2vw, 24px);
+    }
+
+    .panel-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .panel-header h3,
+    .panel-header h4 {
+        margin: 0;
+        line-height: 1.1;
+    }
+
+    .panel-copy {
+        margin: 6px 0 0;
+        color: var(--muted-text);
+        max-width: 64ch;
+        font-size: var(--font-size-sm);
+    }
+
+    .section-stack {
+        display: grid;
+        gap: 14px;
     }
 
     .quick-actions {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 10px;
-        margin-bottom: 20px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
     }
 
-    .action-button {
+    .action-card {
+        position: relative;
+        overflow: hidden;
+        display: grid;
+        gap: 10px;
+        padding: 18px;
+        border-radius: 18px;
+        border: 1px solid color-mix(in srgb, var(--header-bg) 18%, var(--border-color) 82%);
+        background: linear-gradient(160deg, color-mix(in srgb, var(--card-bg) 92%, white 8%), color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%));
+        color: var(--text-color);
+        transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+    }
+
+    .action-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+        border-color: color-mix(in srgb, var(--header-bg) 28%, var(--border-color) 72%);
+    }
+
+    .action-card i {
+        width: 42px;
+        height: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 14px;
+        background: color-mix(in srgb, var(--header-bg) 14%, white 86%);
+        color: var(--accent-color);
+        font-size: 1rem;
+    }
+
+    .action-card strong {
+        font-size: 1rem;
+        line-height: 1.2;
+    }
+
+    .action-card span {
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .insight-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .insight-card {
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 68%, var(--card-bg) 32%);
+        min-height: 122px;
+        display: grid;
+        align-content: start;
+        gap: 8px;
+    }
+
+    .insight-value {
+        font-size: clamp(1.45rem, 1.2rem + 0.9vw, 2rem);
+        line-height: 0.95;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        color: var(--accent-color);
+    }
+
+    .insight-label {
+        font-size: 0.95rem;
+        font-weight: 700;
+    }
+
+    .insight-note {
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .trend-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .trend-card {
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 72%, var(--card-bg) 28%);
+        display: grid;
+        gap: 10px;
+    }
+
+    .trend-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .trend-head h4 {
+        margin: 0;
+    }
+
+    .trend-icon {
+        width: 40px;
+        height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 14px;
+        background: color-mix(in srgb, var(--header-bg) 14%, white 86%);
+        color: var(--accent-color);
+    }
+
+    .trend-card.tone-critical .trend-icon {
+        background: rgba(201, 65, 65, 0.12);
+        color: #b33434;
+    }
+
+    .trend-card.tone-today .trend-icon {
+        background: rgba(227, 160, 0, 0.15);
+        color: #9c6d00;
+    }
+
+    .trend-card.tone-watch .trend-icon {
+        background: rgba(24, 151, 183, 0.12);
+        color: #0f728a;
+    }
+
+    .trend-value {
+        font-size: clamp(1.5rem, 1.28rem + 0.8vw, 2.05rem);
+        line-height: 0.95;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        color: var(--accent-color);
+    }
+
+    .trend-meta,
+    .trend-detail,
+    .trend-support {
+        font-size: var(--font-size-sm);
+    }
+
+    .trend-meta,
+    .trend-detail {
+        color: var(--muted-text);
+    }
+
+    .trend-support {
+        font-weight: 700;
+    }
+
+    .sub-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .compact-card {
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 74%, var(--card-bg) 26%);
+    }
+
+    .compact-card h4 {
+        margin: 0 0 12px;
+    }
+
+    .metric-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .tray-heatmap-strip,
+    .queue-strip,
+    .queue-list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .tray-heatmap-card,
+    .queue-card {
+        padding: 15px 16px;
+        border-radius: 18px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
+    }
+
+    .tray-heatmap-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .tray-heatmap-head h4,
+    .queue-body h4 {
+        margin: 0;
+    }
+
+    .tray-heatmap-meta,
+    .queue-context {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .tray-mini-grid {
+        display: grid;
+        gap: 3px;
+        margin-top: 10px;
+    }
+
+    .tray-mini-row {
+        display: grid;
+        gap: 3px;
+    }
+
+    {% for columns in range(1, 21) %}
+    .tray-cols-{{ columns }} {
+        grid-template-columns: repeat({{ columns }}, minmax(0, 1fr));
+    }
+    {% endfor %}
+
+    .tray-mini-cell {
+        aspect-ratio: 1 / 1;
+        min-height: 14px;
+        border-radius: 5px;
         display: flex;
         align-items: center;
-        padding: 15px;
-        background-color: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        color: var(--text-color);
-        transition: all 0.3s ease;
+        justify-content: center;
+        font-size: 0.5rem;
+        font-weight: 800;
+        border: 1px solid rgba(0, 0, 0, 0.06);
     }
 
-    .action-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    .tray-mini-cell.empty {
+        background: color-mix(in srgb, var(--bg-color) 82%, var(--card-bg) 18%);
+        color: transparent;
     }
 
-    .action-button i {
-        margin-right: 10px;
-        font-size: 1.2em;
+    .tray-mini-cell.stock {
+        background: rgba(24, 151, 183, 0.14);
+        color: #0f728a;
     }
 
-    .stats-grid {
+    .tray-mini-cell.cross {
+        background: color-mix(in srgb, var(--header-bg) 16%, white 84%);
+        color: var(--accent-color);
+    }
+
+    .tray-mini-cell.blocked {
+        background: rgba(122, 127, 136, 0.18);
+        color: #58606a;
+    }
+
+    .tray-mini-cell.alert {
+        background: rgba(201, 65, 65, 0.14);
+        color: #b33434;
+    }
+
+    .tray-legend {
+        margin-top: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .queue-panel,
+    .tray-heatmap-panel {
+        margin-top: 2px;
+    }
+
+    .queue-strip {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 15px;
-        margin-bottom: 20px;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(250px, 280px);
+        gap: 12px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        padding-bottom: 6px;
+        scrollbar-width: thin;
+        scroll-snap-type: x proximity;
     }
 
-    .stat-card {
-        background-color: var(--card-bg);
-        padding: 15px;
-        border-radius: 8px;
-        border: 1px solid var(--border-color);
-        text-align: center;
+    .queue-card {
+        padding: 13px;
+        display: grid;
+        gap: 10px;
+        scroll-snap-align: start;
+        min-height: 0;
     }
 
-    .stat-number {
-        font-size: 2em;
-        font-weight: bold;
-        color: {{ settings.theme.accent_color }};
+    .queue-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
     }
 
-    .stat-label {
-        font-size: 0.9em;
-        opacity: 0.8;
+    .queue-topline {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
     }
 
-    .activity-date {
-        font-weight: bold;
-        margin-top: 15px;
-        padding: 5px;
-        background-color: var(--header-bg);
-        color: var(--header-text);
+    .queue-rank {
+        width: 28px;
+        height: 28px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: color-mix(in srgb, var(--header-bg) 16%, white 84%);
+        color: var(--accent-color);
+        font-weight: 800;
+        font-size: 0.82rem;
+        flex: 0 0 auto;
+    }
+
+    .queue-body {
+        display: grid;
+        gap: 5px;
+    }
+
+    .queue-body p {
+        margin: 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .queue-context {
+        gap: 8px;
+        font-size: 0.72rem;
+    }
+
+    .queue-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .queue-actions .btn {
+        flex: 0 0 auto;
+    }
+
+    .tray-heatmap-strip {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(200px, 220px);
+        gap: 12px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        padding-bottom: 6px;
+        scrollbar-width: thin;
+        scroll-snap-type: x proximity;
+    }
+
+    .tray-heatmap-card {
+        padding: 13px;
+        scroll-snap-align: start;
+        min-height: 0;
+    }
+
+    .tray-heatmap-title {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .tray-heatmap-title p {
+        margin: 4px 0 0;
+        color: var(--muted-text);
+        font-size: 0.76rem;
+        line-height: 1.35;
+    }
+
+    .tray-heatmap-head .btn {
+        flex: 0 0 auto;
+    }
+
+    .tray-heatmap-meta {
+        gap: 8px;
+        margin-top: 8px;
+        font-size: 0.72rem;
+    }
+
+    .tray-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .tray-legend-swatch {
+        width: 12px;
+        height: 12px;
         border-radius: 4px;
+        display: inline-block;
     }
 
-    .schedule-item {
-        padding: 10px;
-        margin: 5px 0;
-        border-left: 4px solid {{ settings.theme.accent_color }};
-        background-color: var(--card-bg);
+    .tray-legend-swatch.empty {
+        background: color-mix(in srgb, var(--bg-color) 82%, var(--card-bg) 18%);
+    }
+
+    .tray-legend-swatch.stock {
+        background: rgba(24, 151, 183, 0.35);
+    }
+
+    .tray-legend-swatch.cross {
+        background: color-mix(in srgb, var(--header-bg) 30%, white 70%);
+    }
+
+    .tray-legend-swatch.blocked {
+        background: rgba(122, 127, 136, 0.28);
+    }
+
+    .tray-legend-swatch.alert {
+        background: rgba(201, 65, 65, 0.3);
+    }
+
+    .metric-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: baseline;
+        font-size: var(--font-size-sm);
+    }
+
+    .metric-row strong {
+        font-size: 1rem;
+    }
+
+    .metric-muted {
+        color: var(--muted-text);
+    }
+
+    .status-list,
+    .suggestion-list,
+    .attention-list,
+    .schedule-list,
+    .activity-list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .status-row {
+        display: grid;
+        gap: 8px;
+    }
+
+    .status-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: var(--font-size-sm);
+    }
+
+    .status-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 700;
     }
 
     .status-indicator {
         width: 10px;
         height: 10px;
-        border-radius: 50%;
+        border-radius: 999px;
         display: inline-block;
-        margin-right: 5px;
     }
 
-    .status-healthy { background-color: #28a745; }
-    .status-showing-issues { background-color: #ffc107; }
-    .status-needs-refresh { background-color: #dc3545; }
-    .status-ordered { background-color: #17a2b8; }
-    .status-no-longer-maintained { background-color: #6c757d; }
-    .status-unknown { background-color: #6c757d; }
+    .status-healthy { background-color: #2ca45c; }
+    .status-showing-issues { background-color: #e3a000; }
+    .status-needs-refresh { background-color: #c94141; }
+    .status-ordered { background-color: #1897b7; }
+    .status-no-longer-maintained { background-color: #7a7f88; }
+    .status-unknown { background-color: #7a7f88; }
 
-    .search-container {
-        margin-bottom: 20px;
+    .status-bar {
+        height: 8px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--bg-color) 76%, var(--card-bg) 24%);
+        overflow: hidden;
+    }
+
+    .status-bar > span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, color-mix(in srgb, var(--header-bg) 70%, white 30%), var(--header-bg));
+    }
+
+    {% for value in range(0, 101) %}
+    .status-share-{{ value }} {
+        width: {{ value }}%;
+    }
+
+    .bar-height-{{ value }} {
+        height: {{ value }}%;
+    }
+    {% endfor %}
+
+    .suggestion-card,
+    .attention-card,
+    .schedule-card,
+    .activity-card {
+        padding: 15px 16px;
+        border-radius: 18px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
+    }
+
+    .suggestion-card {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: start;
+    }
+
+    .suggestion-icon {
+        width: 42px;
+        height: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 14px;
+        background: color-mix(in srgb, var(--header-bg) 14%, white 86%);
+        color: var(--accent-color);
+    }
+
+    .suggestion-card h4,
+    .attention-main h4,
+    .mini-section h4,
+    .upcoming-card h4 {
+        margin: 0;
+        line-height: 1.2;
+    }
+
+    .suggestion-card p,
+    .attention-main p,
+    .schedule-card p,
+    .activity-card p,
+    .upcoming-card p {
+        margin: 6px 0 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .attention-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .attention-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .filter-chip {
+        border: 1px solid var(--border-color);
+        background: transparent;
+        color: var(--text-color);
+        border-radius: 999px;
+        padding: 0.45rem 0.8rem;
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        min-height: 0;
+    }
+
+    .filter-chip.is-active {
+        background: var(--header-bg);
+        border-color: var(--header-bg);
+        color: var(--header-text);
+    }
+
+    .attention-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: start;
+    }
+
+    .attention-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .attention-pill,
+    .activity-date,
+    .upcoming-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.32rem 0.68rem;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .attention-pill {
+        background: color-mix(in srgb, var(--header-bg) 16%, white 84%);
+        color: var(--accent-color);
+    }
+
+    .attention-pill.critical {
+        background: rgba(201, 65, 65, 0.12);
+        color: #b33434;
+    }
+
+    .attention-pill.today {
+        background: rgba(227, 160, 0, 0.15);
+        color: #9c6d00;
+    }
+
+    .attention-pill.soon {
+        background: rgba(227, 160, 0, 0.11);
+        color: #9c6d00;
+    }
+
+    .attention-pill.watch {
+        background: rgba(24, 151, 183, 0.12);
+        color: #0f728a;
+    }
+
+    .attention-body {
+        display: grid;
+        gap: 4px;
+    }
+
+    .attention-context {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .attention-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+
+    .attention-empty {
+        padding: 20px;
+        border: 1px dashed var(--border-color);
+        border-radius: 18px;
+        text-align: center;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .schedule-card,
+    .activity-card,
+    .upcoming-card {
+        display: grid;
+        gap: 6px;
+    }
+
+    .schedule-head,
+    .activity-head,
+    .upcoming-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .schedule-time,
+    .activity-time {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted-text);
+        font-weight: 700;
+    }
+
+    .upcoming-count {
+        min-width: 34px;
+        background: color-mix(in srgb, var(--header-bg) 14%, white 86%);
+        color: var(--accent-color);
     }
 
     .week-chart {
         display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 5px;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 12px;
+        align-items: end;
+        min-height: 200px;
         margin-top: 10px;
     }
 
     .day-bar {
+        display: grid;
+        justify-items: center;
+        gap: 8px;
+    }
+
+    .bar-shell {
+        width: 100%;
+        min-height: 140px;
+        border-radius: 18px;
+        border: 1px solid var(--border-color);
+        background: linear-gradient(180deg, color-mix(in srgb, var(--bg-color) 74%, var(--card-bg) 26%), color-mix(in srgb, var(--card-bg) 86%, transparent 14%));
         display: flex;
-        flex-direction: column;
-        align-items: center;
+        align-items: flex-end;
+        padding: 8px;
     }
 
     .bar {
         width: 100%;
-        background-color: {{ settings.theme.accent_color }};
-        border-radius: 4px;
-        margin-bottom: 5px;
+        border-radius: 12px;
+        min-height: 6px;
+        background: linear-gradient(180deg, color-mix(in srgb, var(--header-bg) 68%, white 32%), var(--header-bg));
+        box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.18);
+        transition: height 0.4s ease;
     }
 
     .day-label {
-        font-size: 0.8em;
-        text-align: center;
+        font-size: var(--font-size-sm);
+        font-weight: 700;
     }
 
-    .urgent-item {
-        padding: 10px;
-        margin: 5px 0;
-        border-left: 4px solid #dc3545;
-        background-color: var(--card-bg);
-        display: flex;
-        justify-content: space-between;
+    .day-value {
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .mini-grid {
+        display: grid;
+        gap: 12px;
+    }
+
+    .mini-section {
+        padding-top: 2px;
+    }
+
+    .mini-section + .mini-section {
+        border-top: 1px solid var(--border-color);
+        padding-top: 14px;
+    }
+
+    .activity-date {
+        justify-self: start;
+        background: var(--header-bg);
+        color: var(--header-text);
+        margin-bottom: 2px;
+    }
+
+    .empty-copy {
+        color: var(--muted-text);
+        padding: 6px 0 2px;
+    }
+
+    .dashboard-link {
+        display: inline-flex;
         align-items: center;
+        gap: 8px;
+        font-size: var(--font-size-sm);
+        font-weight: 700;
     }
 
-    .urgent-item .btn-sm {
-        padding: 2px 5px;
-        font-size: 0.8em;
+    .dashboard-link i {
+        font-size: 0.82rem;
     }
 
-    .upcoming-day {
-        margin: 10px 0;
-        padding: 5px;
-        border-bottom: 1px solid var(--border-color);
+    @media (max-width: 1199px) {
+        .hero-grid,
+        .dashboard-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .insight-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .trend-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .queue-strip {
+            grid-auto-columns: minmax(232px, 260px);
+        }
+
+        .tray-heatmap-strip {
+            grid-auto-columns: minmax(190px, 210px);
+        }
     }
 
-    .upcoming-day-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
+    @media (max-width: 767px) {
+        .dashboard-hero {
+            border-radius: 22px;
+            padding: 20px;
+        }
 
-    .upcoming-count {
-        background-color: {{ settings.theme.accent_color }};
-        color: white;
-        border-radius: 50%;
-        width: 24px;
-        height: 24px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.8em;
+        .hero-brand {
+            flex-direction: column;
+        }
+
+        .hero-logo {
+            width: 64px;
+            height: 64px;
+            border-radius: 20px;
+        }
+
+        .snapshot-grid,
+        .sub-grid,
+        .insight-grid,
+        .trend-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .quick-actions {
+            grid-template-columns: 1fr;
+        }
+
+        .suggestion-card,
+        .attention-card {
+            grid-template-columns: 1fr;
+        }
+
+        .attention-actions {
+            justify-content: stretch;
+        }
+
+        .attention-actions .btn {
+            flex: 1 1 0;
+        }
+
+        .week-chart {
+            gap: 8px;
+            min-height: 160px;
+        }
+
+        .bar-shell {
+            min-height: 112px;
+            padding: 6px;
+        }
+
+        .queue-strip {
+            grid-auto-columns: minmax(214px, 232px);
+        }
+
+        .tray-heatmap-strip {
+            grid-auto-columns: minmax(172px, 188px);
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-section">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2><strong> <em>D. manager</em> @ {{ settings.lab_info.lab_name }} 🪰</strong></h2>
-        <div>{{ today_date }}</div>
-    </div>
-    
-    <div class="quick-actions">
-        <a href="{{ url_for('stock.add_stock') }}" class="action-button">
-            <i class="fas fa-plus"></i> Add New Stock
-        </a>
-        <a href="{{ url_for('cross.add_cross') }}" class="action-button">
-            <i class="fas fa-heart"></i> Create Cross
-        </a>
-        <a href="{{ url_for('flip.flip_schedule_display') }}" class="action-button">
-            <i class="fas fa-calendar"></i> View Schedule
-        </a>
-        <a href="{{ url_for('tray.add_tray_route') }}" class="action-button">
-            <i class="fas fa-th"></i> Add Tray
-        </a>
-    </div>
-</div>
-
-<!-- Overview Section -->
-<div class="dashboard-section">
-    <h3>Overview</h3>
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-number">{{ stats.total_stocks }}</div>
-            <div class="stat-label">Total Stocks</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number">{{ stats.total_crosses }}</div>
-            <div class="stat-label">Total Crosses</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number">{{ stats.needs_attention }}</div>
-            <div class="stat-label">Need Attention</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number">{{ stats.tray_usage }}%</div>
-            <div class="stat-label">Tray Usage</div>
-        </div>
-    </div>
-
-    <h4>Vial Statistics</h4>
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-number">{{ stats.total_stock_vials }}</div>
-            <div class="stat-label">Stock Vials</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number">{{ stats.total_cross_vials }}</div>
-            <div class="stat-label">Cross Vials</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number">{{ stats.total_vials }}</div>
-            <div class="stat-label">Total Vials</div>
-        </div>
-    </div>
-
-    <h4>Status Distribution</h4>
-    <div class="stats-grid">
-        {% for status, count in stats.status_distribution.items() %}
-        <div class="stat-card">
-            <div class="status-indicator status-{{ status.lower().replace(' ', '-') }}"></div>
-            <div class="stat-number">{{ count }}</div>
-            <div class="stat-label">{{ status }}</div>
-        </div>
-        {% endfor %}
-    </div>
-</div>
-
-<!-- Main Content Area -->
-<div class="row">
-    <!-- Left Column -->
-    <div class="col-md-6">
-        <!-- Urgent Items Section -->
-        {% if overdue_items or due_today_items %}
-        <div class="dashboard-section">
-            <h3>Urgent Items</h3>
-
-            {% if overdue_items %}
-            <h5 class="text-danger">
-                <i class="fas fa-exclamation-circle"></i> Overdue Items
-            </h5>
-            {% for item in overdue_items %}
-            <div class="urgent-item">
-                <div>
-                    <strong>{{ item.name }}</strong> ({{ item.id }})<br>
-                    <small class="text-danger">{{ item.days_overdue }} day{% if item.days_overdue != 1 %}s{% endif %} overdue</small>
-                    <small>Tray: {{ item.tray }}</small>
-                </div>
-                <div>
-                    <a href="{{ url_for('flip.flip_interface') }}" class="btn btn-danger btn-sm">Flip Now</a>
-                    <a href="{{ url_for(item.type ~ '.view_' ~ item.type, unique_id=item.id) }}" class="btn btn-secondary btn-sm">View</a>
-                </div>
-            </div>
-            {% endfor %}
-            {% endif %}
-
-            {% if due_today_items %}
-            <h5 class="text-warning mt-3">
-                <i class="fas fa-clock"></i> Due Today
-            </h5>
-            {% for item in due_today_items %}
-            <div class="urgent-item">
-                <div>
-                    <strong>{{ item.name }}</strong> ({{ item.id }})<br>
-                    <small>Tray: {{ item.tray }}</small>
-                </div>
-                <div>
-                    <a href="{{ url_for('flip.flip_interface') }}" class="btn btn-warning btn-sm">Flip Now</a>
-                    <a href="{{ url_for(item.type ~ '.view_' ~ item.type, unique_id=item.id) }}" class="btn btn-secondary btn-sm">View</a>
-                </div>
-            </div>
-            {% endfor %}
-            {% endif %}
-        </div>
-        {% endif %}
-
-        <!-- Today's Schedule -->
-        <div class="dashboard-section">
-            <h3>Today's Schedule</h3>
-            {% if schedule %}
-                {% for item in schedule %}
-                <div class="schedule-item">
-                    <small class="text-muted">{{ item.time }}</small>
-                    <div>{{ item.description | safe }}</div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <p>No tasks scheduled for today.</p>
-            {% endif %}
-        </div>
-
-        <!-- Weekly Activity Chart -->
-        <div class="dashboard-section">
-            <h3>Weekly Flip Activity</h3>
-            <div class="d-flex justify-content-between align-items-center">
-                <p>Total flips in the last 7 days: <strong>{{ stats.weekly_flips }}</strong></p>
-                <span>Daily average: <strong>{{ (stats.weekly_flips / 7) | round(1) }}</strong></span>
-            </div>
-            
-            <div class="week-chart">
-                {% set days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
-                {% set max_flips = stats.flips_by_day.values() | max if stats.flips_by_day.values() | list | length > 0 else 1 %}
-                
-                {% for day in days %}
-                    {% set flips = stats.flips_by_day.get(day, 0) %}
-                    {% set height = (flips / max_flips * 100) if max_flips > 0 else 0 %}
-                    <div class="day-bar">
-                        <div class="bar" style="height: {{ height }}px;"></div>
-                        <div class="day-label">{{ day[:3] }}</div>
-                        <div class="day-value">{{ flips }}</div>
+<div class="dashboard-shell">
+    <section class="dashboard-hero">
+        <div class="hero-grid">
+            <div class="hero-copy">
+                <div class="hero-brand">
+                    <img class="hero-logo" src="{{ url_for('static', filename='branding/logo.svg') }}" alt="D. manager logo">
+                    <div>
+                        <p class="app-kicker">Command Center</p>
+                        <h1 class="hero-title"><em>D. manager</em> @ {{ settings.lab_info.lab_name }}</h1>
+                        <p class="hero-subtitle">{{ hero_copy }}</p>
                     </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Right Column -->
-    <div class="col-md-6">
-        <!-- Upcoming Schedule -->
-        <div class="dashboard-section">
-            <h3>Upcoming Schedule</h3>
-            {% if upcoming_schedule %}
-                {% for date, day_data in upcoming_schedule.items() %}
-                <div class="upcoming-day">
-                    <div class="upcoming-day-header">
-                        <strong>{{ day_data.day_name }} ({{ day_data.date }})</strong>
-                        <span class="upcoming-count">{{ day_data.count }}</span>
-                    </div>
-                    <a href="{{ url_for('flip.flip_schedule_display') }}" class="btn btn-sm btn-outline-primary mt-2">
-                        View Schedule
-                    </a>
                 </div>
-                {% endfor %}
-            {% else %}
-                <p>No upcoming schedule for the next 7 days.</p>
-            {% endif %}
-        </div>
+                <div class="hero-meta">
+                    <span class="hero-chip"><i class="far fa-calendar-alt"></i> {{ today_date }}</span>
+                    <span class="hero-chip"><i class="fas fa-layer-group"></i> {{ snapshot.active_lines }} active lines</span>
+                    <span class="hero-chip"><i class="fas fa-bolt"></i> {{ snapshot.tasks_today }} tasks today</span>
+                    <span class="hero-chip"><i class="fas fa-heartbeat"></i> {{ snapshot.healthy_share }}% healthy</span>
+                </div>
+            </div>
 
-        <!-- Recent Activity -->
-        <div class="dashboard-section">
-            <h3>Recent Activity</h3>
-            {% if activities %}
-                {% for date, day_activities in activities.items() %}
-                    <div class="activity-date">{{ date }}</div>
-                    {% for activity in day_activities %}
-                        <div class="schedule-item">
-                            <small class="text-muted">{{ activity.timestamp }}</small>
-                            <div>{{ activity.activity }}</div>
+            <aside class="hero-snapshot">
+                <div class="snapshot-card">
+                    <div class="snapshot-grid">
+                        <div class="snapshot-metric">
+                            <span class="snapshot-value">{{ snapshot.attention_count }}</span>
+                            <span class="snapshot-label">Needs attention</span>
                         </div>
-                    {% endfor %}
-                {% endfor %}
-            {% else %}
-                <p>No recent activity to display.</p>
+                        <div class="snapshot-metric">
+                            <span class="snapshot-value">{{ snapshot.upcoming_count }}</span>
+                            <span class="snapshot-label">Scheduled this week</span>
+                        </div>
+                        <div class="snapshot-metric">
+                            <span class="snapshot-value">{{ tray_summary.free_positions }}</span>
+                            <span class="snapshot-label">Free tray positions</span>
+                        </div>
+                        <div class="snapshot-metric">
+                            <span class="snapshot-value">{{ snapshot.weekly_average }}</span>
+                            <span class="snapshot-label">Daily flip average</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="snapshot-card snapshot-activity">
+                    <strong>Last activity</strong>
+                    <div>{{ snapshot.last_activity_copy }}</div>
+                    <span>{{ snapshot.last_activity_at }}</span>
+                </div>
+            </aside>
+        </div>
+    </section>
+
+    <section class="dashboard-panel">
+        <div class="panel-header">
+            <div>
+                <h3>Workflows</h3>
+                <p class="panel-copy">Fast routes into the most common operations without losing sight of the current state of the colony.</p>
+            </div>
+        </div>
+        <div class="quick-actions">
+            <a href="{{ url_for('stock.add_stock') }}" class="action-card">
+                <i class="fas fa-plus"></i>
+                <strong>Add Stock</strong>
+                <span>Register a new line and place it directly into workflow.</span>
+            </a>
+            <a href="{{ url_for('cross.add_cross') }}" class="action-card">
+                <i class="fas fa-heart"></i>
+                <strong>Create Cross</strong>
+                <span>Start the next experiment from live inventory.</span>
+            </a>
+            <a href="{{ url_for('flip.flip_interface') }}" class="action-card">
+                <i class="fas fa-random"></i>
+                <strong>Flip Desk</strong>
+                <span>Handle single or batch flips from the main scanner workflow.</span>
+            </a>
+            <a href="{{ url_for('stock.stock_explorer') }}" class="action-card">
+                <i class="fas fa-search"></i>
+                <strong>Stock Explorer</strong>
+                <span>Search, filter, and inspect the working stock inventory.</span>
+            </a>
+            <a href="{{ url_for('cross.cross_explorer') }}" class="action-card">
+                <i class="fas fa-dna"></i>
+                <strong>Cross Explorer</strong>
+                <span>Review active crosses, statuses, and vial load.</span>
+            </a>
+            <a href="{{ url_for('tray.tray_management') }}" class="action-card">
+                <i class="fas fa-th-large"></i>
+                <strong>Tray Map</strong>
+                <span>See space pressure and reorganize crowded trays.</span>
+            </a>
+            {% if is_admin %}
+            <a href="{{ url_for('data.download_data_route') }}" class="action-card">
+                <i class="fas fa-file-export"></i>
+                <strong>Export Data</strong>
+                <span>Download the workbook snapshot before major edits.</span>
+            </a>
+            <a href="{{ url_for('data.upload_data_route') }}" class="action-card">
+                <i class="fas fa-file-import"></i>
+                <strong>Import Workbook</strong>
+                <span>Swap in curated updates from Excel when needed.</span>
+            </a>
             {% endif %}
         </div>
+    </section>
+
+    <div class="dashboard-grid">
+        <div class="dashboard-column">
+            <section class="dashboard-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>Operational Snapshot</h3>
+                        <p class="panel-copy">A compact read on inventory scale, pressure points, tray headroom, and recent activity.</p>
+                    </div>
+                </div>
+
+                <div class="insight-grid">
+                    <article class="insight-card">
+                        <div class="insight-value">{{ stats.total_stocks }}</div>
+                        <div class="insight-label">Stocks</div>
+                        <div class="insight-note">Maintained stock lines currently active.</div>
+                    </article>
+                    <article class="insight-card">
+                        <div class="insight-value">{{ stats.total_crosses }}</div>
+                        <div class="insight-label">Crosses</div>
+                        <div class="insight-note">Active experimental crosses in play.</div>
+                    </article>
+                    <article class="insight-card">
+                        <div class="insight-value">{{ stats.total_vials }}</div>
+                        <div class="insight-label">Living Vials</div>
+                        <div class="insight-note">{{ stats.total_stock_vials }} stock and {{ stats.total_cross_vials }} cross vials.</div>
+                    </article>
+                    <article class="insight-card">
+                        <div class="insight-value">{{ tray_summary.usage }}%</div>
+                        <div class="insight-label">Tray Usage</div>
+                        <div class="insight-note">{{ tray_summary.used_positions }} of {{ tray_summary.total_positions }} positions occupied.</div>
+                    </article>
+                </div>
+
+                <div class="sub-grid mt-3">
+                    <div class="compact-card">
+                        <h4>Tray Capacity</h4>
+                        <div class="metric-list">
+                            <div class="metric-row">
+                                <span>Active trays</span>
+                                <strong>{{ tray_summary.active_trays }}/{{ tray_summary.total_trays }}</strong>
+                            </div>
+                            <div class="metric-row">
+                                <span>Free positions</span>
+                                <strong>{{ tray_summary.free_positions }}</strong>
+                            </div>
+                            <div class="metric-row">
+                                <span>Occupied positions</span>
+                                <strong>{{ tray_summary.used_positions }}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="compact-card">
+                        <h4>Weekly Throughput</h4>
+                        <div class="metric-list">
+                            <div class="metric-row">
+                                <span>Flips last 7 days</span>
+                                <strong>{{ stats.weekly_flips }}</strong>
+                            </div>
+                            <div class="metric-row">
+                                <span>Average per day</span>
+                                <strong>{{ snapshot.weekly_average }}</strong>
+                            </div>
+                            <div class="metric-row">
+                                <span>Busiest day</span>
+                                <strong>
+                                    {% if busiest_day %}
+                                        {{ busiest_day.short_label }} · {{ busiest_day.count }}
+                                    {% else %}
+                                        No flips
+                                    {% endif %}
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dashboard-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>Next Best Actions</h3>
+                        <p class="panel-copy">Suggested moves based on current queue pressure, line health, and capacity signals.</p>
+                    </div>
+                </div>
+
+                {% if suggestions %}
+                <div class="suggestion-list">
+                    {% for suggestion in suggestions %}
+                    <article class="suggestion-card">
+                        <span class="suggestion-icon"><i class="{{ suggestion.icon }}"></i></span>
+                        <div>
+                            <h4>{{ suggestion.title }}</h4>
+                            <p>{{ suggestion.copy }}</p>
+                        </div>
+                        <div>
+                            <a href="{{ suggestion.href }}" class="btn btn-outline-primary btn-sm">{{ suggestion.label }}</a>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="empty-copy">No suggestions available right now.</p>
+                {% endif %}
+            </section>
+
+            <section class="dashboard-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>Trend Signals</h3>
+                        <p class="panel-copy">Lightweight trends that show whether queue pressure, crossing pace, and workbook activity are drifting in the right direction.</p>
+                    </div>
+                </div>
+
+                {% if trend_signals %}
+                <div class="trend-grid">
+                    {% for signal in trend_signals %}
+                    <article class="trend-card tone-{{ signal.tone }}">
+                        <div class="trend-head">
+                            <div>
+                                <h4>{{ signal.title }}</h4>
+                            </div>
+                            <span class="trend-icon"><i class="{{ signal.icon }}"></i></span>
+                        </div>
+                        <div class="trend-value">{{ signal.value }}</div>
+                        <div class="trend-meta">{{ signal.meta }}</div>
+                        <div class="trend-detail">{{ signal.detail }}</div>
+                        <div class="trend-support">{{ signal.support }}</div>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="empty-copy">Trend data will appear as activity accumulates.</p>
+                {% endif %}
+            </section>
+
+            <section class="dashboard-panel" id="attention-board">
+                <div class="attention-toolbar">
+                    <div>
+                        <h3>Attention Board</h3>
+                        <p class="panel-copy">Prioritized items that need review. Filter by urgency to focus the next pass through the lab.</p>
+                    </div>
+                    <div class="attention-filters" role="toolbar" aria-label="Attention filters">
+                        <button type="button" class="filter-chip is-active" data-filter="all">All</button>
+                        <button type="button" class="filter-chip" data-filter="critical">Overdue</button>
+                        <button type="button" class="filter-chip" data-filter="today">Due Today</button>
+                        <button type="button" class="filter-chip" data-filter="watch">Review</button>
+                    </div>
+                </div>
+
+                {% if attention_items %}
+                <div class="attention-list" id="attentionList">
+                    {% for item in attention_items %}
+                    <article class="attention-card" data-kind="{{ item.kind }}">
+                        <div class="attention-main">
+                            <div class="attention-meta">
+                                <span class="attention-pill {{ item.kind }}">{{ item.badge }}</span>
+                                <span class="attention-pill">{{ item.type_label }}</span>
+                            </div>
+                            <div class="attention-body">
+                                <h4>{{ item.name }}</h4>
+                                <p>{{ item.detail }}</p>
+                                <div class="attention-context">
+                                    <span>{{ item.id }}</span>
+                                    <span>Tray {{ item.tray }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="attention-actions">
+                            <a href="{{ item.action_href }}" class="btn btn-primary btn-sm">{{ item.action_label }}</a>
+                            <a href="{{ item.view_href }}" class="btn btn-outline-secondary btn-sm">View</a>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+                <div class="attention-empty is-hidden" id="attentionEmpty">No items match this filter.</div>
+                {% else %}
+                <div class="attention-empty">Nothing is flagged right now. The queue is clear.</div>
+                {% endif %}
+            </section>
+
+            <section class="dashboard-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>Weekly Flip Activity</h3>
+                        <p class="panel-copy">Recent execution rhythm across the week, useful for spotting batching patterns and gaps.</p>
+                    </div>
+                    <a class="dashboard-link" href="{{ url_for('flip.flip_schedule_display') }}"><i class="fas fa-arrow-right"></i> Schedule view</a>
+                </div>
+
+                <div class="week-chart">
+                    {% for day in week_chart %}
+                    <div class="day-bar">
+                        <div class="bar-shell">
+                            <div class="bar bar-height-{{ day.height }}"></div>
+                        </div>
+                        <div class="day-label">{{ day.short_label }}</div>
+                        <div class="day-value">{{ day.count }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+
+        <div class="dashboard-column">
+            <section class="dashboard-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>Status Distribution</h3>
+                        <p class="panel-copy">How the active lines are distributed across health and workflow states.</p>
+                    </div>
+                </div>
+
+                {% if status_breakdown %}
+                <div class="status-list">
+                    {% for item in status_breakdown %}
+                    <div class="status-row">
+                        <div class="status-heading">
+                            <span class="status-tag">
+                                <span class="status-indicator status-{{ item.slug }}"></span>
+                                {{ item.status }}
+                            </span>
+                            <span>{{ item.count }} · {{ item.share }}%</span>
+                        </div>
+                        <div class="status-bar"><span class="status-share-{{ item.share }}"></span></div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="empty-copy">No status data available.</p>
+                {% endif %}
+            </section>
+
+            <section class="dashboard-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>Today's Schedule</h3>
+                        <p class="panel-copy">The items already assigned to today from the scheduled flip queue.</p>
+                    </div>
+                </div>
+
+                {% if schedule %}
+                <div class="schedule-list">
+                    {% for item in schedule %}
+                    <article class="schedule-card">
+                        <div class="schedule-head">
+                            <span class="schedule-time">{{ item.time }}</span>
+                        </div>
+                        <div>{{ item.description | safe }}</div>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="empty-copy">No tasks scheduled for today.</p>
+                {% endif %}
+            </section>
+
+            <section class="dashboard-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>Upcoming Schedule</h3>
+                        <p class="panel-copy">The next seven days of scheduled load, so you can spot dense days before they arrive.</p>
+                    </div>
+                    <a class="dashboard-link" href="{{ url_for('flip.flip_schedule_display') }}"><i class="fas fa-arrow-right"></i> Full schedule</a>
+                </div>
+
+                {% if upcoming_schedule_list %}
+                <div class="schedule-list">
+                    {% for day in upcoming_schedule_list %}
+                    <article class="upcoming-card schedule-card">
+                        <div class="upcoming-head">
+                            <h4>{{ day.day_name }} <span class="metric-muted">{{ day.date }}</span></h4>
+                            <span class="upcoming-count">{{ day.count }}</span>
+                        </div>
+                        <p>
+                            {% for preview in day.preview %}
+                                {{ preview | striptags }}{% if not loop.last %}; {% endif %}
+                            {% endfor %}
+                            {% if day.count > day.preview|length %}
+                                and {{ day.count - (day.preview|length) }} more.
+                            {% endif %}
+                        </p>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="empty-copy">No upcoming schedule for the next 7 days.</p>
+                {% endif %}
+            </section>
+
+            <section class="dashboard-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3>Recent Activity</h3>
+                        <p class="panel-copy">The latest activity log grouped by day so you can reconstruct what changed most recently.</p>
+                    </div>
+                </div>
+
+                {% if activities %}
+                <div class="mini-grid">
+                    {% for group in activities %}
+                    <section class="mini-section">
+                        <div class="activity-date">{{ group.date }}</div>
+                        <div class="activity-list">
+                            {% for entry in group.entries %}
+                            <article class="activity-card">
+                                <div class="activity-head">
+                                    <span class="activity-time">{{ entry.timestamp }}</span>
+                                </div>
+                                <div>{{ entry.activity }}</div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="empty-copy">No recent activity to display.</p>
+                {% endif %}
+            </section>
+        </div>
     </div>
+
+    <section class="dashboard-panel queue-panel">
+        <div class="panel-header">
+            <div>
+                <h3>My Queue</h3>
+                <p class="panel-copy">Ranked items that are most likely to matter next. Scroll sideways to scan the whole queue without letting it take over the right rail.</p>
+            </div>
+        </div>
+
+        {% if my_queue %}
+        <div class="queue-strip" aria-label="My queue scroller">
+            {% for item in my_queue %}
+            {% set queue_kind = 'critical' if item.badge == 'Overdue' else 'today' if item.badge == 'Today' else 'soon' if item.badge == 'Soon' else 'watch' %}
+            <article class="queue-card">
+                <div class="queue-head">
+                    <div class="queue-topline">
+                        <span class="queue-rank">{{ loop.index }}</span>
+                        <span class="attention-pill {{ queue_kind }}">{{ item.badge }}</span>
+                        <span class="attention-pill">{{ item.type_label }}</span>
+                    </div>
+                </div>
+                <div class="queue-body">
+                    <h4>{{ item.name }}</h4>
+                    <p>{{ item.reason }}</p>
+                    <div class="queue-context">
+                        <span>{{ item.id }}</span>
+                        <span>Tray {{ item.tray }}</span>
+                        <span>{{ item.vial_count }} living vials</span>
+                    </div>
+                </div>
+                <div class="queue-actions">
+                    <a href="{{ item.action_href }}" class="btn btn-primary btn-sm">{{ item.action_label }}</a>
+                    <a href="{{ item.view_href }}" class="btn btn-outline-secondary btn-sm">View</a>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-copy">No ranked queue items right now. The immediate workload is light.</p>
+        {% endif %}
+    </section>
+
+    <section class="dashboard-panel tray-heatmap-panel">
+        <div class="panel-header">
+            <div>
+                <h3>Tray Heatmap</h3>
+                <p class="panel-copy">A compact horizontal map of every tray. Scroll sideways to scan the full room without letting tray layouts crowd the main dashboard.</p>
+            </div>
+            <a class="dashboard-link" href="{{ url_for('tray.tray_management') }}"><i class="fas fa-arrow-right"></i> Tray management</a>
+        </div>
+
+        {% if tray_heatmaps %}
+        <div class="tray-heatmap-strip" aria-label="Tray heatmap scroller">
+            {% for tray in tray_heatmaps %}
+            <article class="tray-heatmap-card">
+                <div class="tray-heatmap-head">
+                    <div class="tray-heatmap-title">
+                        <h4>{{ tray.tray_id }}</h4>
+                        <p>{{ tray.usage }}% occupied{% if tray.name %} · {{ tray.name }}{% endif %}</p>
+                    </div>
+                    <a href="{{ tray.href }}" class="btn btn-outline-secondary btn-sm">Open</a>
+                </div>
+                <div class="tray-heatmap-meta">
+                    <span>{{ tray.occupied_cells }} used</span>
+                    <span>{{ tray.blocked_cells }} blocked</span>
+                    <span>{{ tray.alert_cells }} flagged</span>
+                </div>
+                <div class="tray-mini-grid">
+                    {% for row in tray.grid_rows %}
+                    <div class="tray-mini-row tray-cols-{{ tray.columns }}">
+                        {% for cell in row.cells %}
+                        <div class="tray-mini-cell {{ cell.state }}" title="{{ cell.position }} · {{ cell.detail }}">{{ cell.label }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        <div class="tray-legend" aria-label="Tray heatmap legend">
+            <span class="tray-legend-item"><span class="tray-legend-swatch empty"></span> Empty</span>
+            <span class="tray-legend-item"><span class="tray-legend-swatch stock"></span> Stock</span>
+            <span class="tray-legend-item"><span class="tray-legend-swatch cross"></span> Cross</span>
+            <span class="tray-legend-item"><span class="tray-legend-swatch blocked"></span> Blocked</span>
+            <span class="tray-legend-item"><span class="tray-legend-swatch alert"></span> Flagged</span>
+        </div>
+        {% else %}
+        <p class="empty-copy">No tray layout data is available yet.</p>
+        {% endif %}
+    </section>
 </div>
 {% endblock %}
 
 {% block scripts %}
+<script nonce="{{ csp_nonce }}">
+    (function () {
+        const attentionList = document.getElementById('attentionList');
+        const filterButtons = Array.from(document.querySelectorAll('.filter-chip'));
+        const emptyState = document.getElementById('attentionEmpty');
+
+        if (!attentionList || !filterButtons.length) {
+            return;
+        }
+
+        const cards = Array.from(attentionList.querySelectorAll('.attention-card'));
+
+        function applyFilter(filter) {
+            let visibleCount = 0;
+
+            cards.forEach(function (card) {
+                const matches = filter === 'all' || card.dataset.kind === filter;
+                card.classList.toggle('is-hidden', !matches);
+                if (matches) {
+                    visibleCount += 1;
+                }
+            });
+
+            if (emptyState) {
+                emptyState.classList.toggle('is-hidden', visibleCount > 0);
+            }
+        }
+
+        filterButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                filterButtons.forEach(function (chip) {
+                    chip.classList.remove('is-active');
+                });
+                button.classList.add('is-active');
+                applyFilter(button.dataset.filter || 'all');
+            });
+        });
+    }());
+</script>
 {% endblock %}

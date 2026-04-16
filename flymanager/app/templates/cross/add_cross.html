@@ -1,8 +1,19 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-5">
-    <h1 class="text-center">Add New Cross</h1>
+<div class="app-panel app-page-header">
+    <div>
+        <p class="app-kicker">Cross Workflow</p>
+        <h1 class="app-page-title">Add New Cross</h1>
+        <p class="app-page-subtitle">Scan or search for parent stocks, confirm species compatibility, and set the cross schedule before saving.</p>
+    </div>
+    <div class="app-chip-row">
+        <span class="app-chip"><i class="fas fa-qrcode"></i> UID scanning supported</span>
+        <span class="app-chip"><i class="fas fa-venus-mars"></i> Species-aware pairing</span>
+    </div>
+</div>
+
+<div class="app-panel">
 
     {% if error %}
     <div class="alert alert-danger" role="alert">
@@ -10,19 +21,63 @@
     </div>
     {% endif %}
 
-    <!-- Port Selection for Scanning -->
-    <div id="port-selection" class="row mb-3 align-items-center justify-content-center">
-        <div class="col-auto">
-            <select class="form-select" id="serialPort">
-                {% for port in ports %}
-                    <option value="{{ loop.index0 }}">{{ port.device }} - {{ port.description }}</option>
-                {% endfor %}
-            </select>
+    <div class="app-form-section">
+        <div>
+            <h2 class="app-form-section-title">Scan Source</h2>
+            <p class="app-form-section-copy">Keep the server-attached scanner for compatibility, use the existing UID fields with a keyboard-style scanner, or use client serial scanning in secure Chrome or Edge.</p>
         </div>
+        <div class="form-row align-items-end">
+            <div class="form-group col-md-4">
+                <label for="scanSource">Scan Source:</label>
+                <select class="form-control" id="scanSource">
+                    <option value="server">Server Scanner</option>
+                    <option value="client-input">Browser Input / Keyboard Scanner</option>
+                    {% if scanner_features.camera_enabled %}
+                    <option value="camera">Camera Scanner</option>
+                    {% endif %}
+                    {% if scanner_features.client_serial_enabled %}
+                    <option value="client-serial">Client Serial Scanner (Chrome or Edge)</option>
+                    {% endif %}
+                </select>
+            </div>
+            <div id="server-port-panel" class="form-group col-md-8">
+                <label for="serialPort">Server Scanner Port:</label>
+                <select class="form-control" id="serialPort">
+                    {% for port in ports %}
+                        <option value="{{ loop.index0 }}">{{ port.device }} - {{ port.description }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if scanner_features.camera_enabled %}
+            <div id="camera-panel" class="form-group col-md-8 is-hidden">
+                <label for="cameraPreview">Camera Scanner:</label>
+                <video id="cameraPreview" class="form-control is-hidden" muted playsinline></video>
+                <div class="mt-2 d-flex flex-wrap gap-2">
+                    <button id="startCameraScanBtn" class="btn btn-secondary" type="button">Start Camera</button>
+                    <button id="stopCameraScanBtn" class="btn btn-outline-secondary is-hidden" type="button">Stop Camera</button>
+                </div>
+            </div>
+            {% endif %}
+            {% if scanner_features.client_serial_enabled %}
+            <div id="client-serial-panel" class="form-group col-md-8 is-hidden">
+                <label for="clientSerialSupport">Client Serial Support:</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="clientSerialSupport" value="Requires secure Chrome or Edge on the client machine." readonly>
+                    <button id="connectClientSerialBtn" class="btn btn-secondary" type="button">Connect</button>
+                    <button id="disconnectClientSerialBtn" class="btn btn-outline-secondary is-hidden" type="button">Disconnect</button>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        <p id="scanStatusMessage" class="text-muted mb-0">The server-attached scanner remains available while client-side scan modes are validated.</p>
     </div>
 
-    <form method="POST" action="{{ url_for('cross.add_cross') }}">
-        <!-- Row 1: Male Unique ID and Genotype -->
+    <form method="POST" action="{{ url_for('cross.add_cross') }}" class="app-form-shell">
+        <div class="app-form-section">
+            <div>
+                <h2 class="app-form-section-title">Parent Selection</h2>
+                <p class="app-form-section-copy">Choose male and female stocks by UID or genotype, then confirm the species match.</p>
+            </div>
         <div class="form-row">
             <div class="form-group col-md-3">
                 <label for="maleUniqueID">Male Unique ID:</label>
@@ -68,13 +123,18 @@
                 <div class="species-display p-2 rounded">
                     <strong>Species: </strong><span id="speciesDisplay">D. melanogaster</span>
                 </div>
-                <div id="speciesWarning" class="alert alert-warning mt-2" style="display: none;">
+                <div id="speciesWarning" class="alert alert-warning mt-2 is-hidden">
                     <strong>Warning:</strong> Male and female species are different. Cross-species crosses may not be viable.
                 </div>
             </div>
         </div>
+        </div>
 
-        <!-- Row 3: Cross Name, Status, Food Type-->
+        <div class="app-form-section">
+            <div>
+                <h2 class="app-form-section-title">Cross Setup</h2>
+                <p class="app-form-section-copy">Name the cross, choose status and food, and configure the maintenance timeline.</p>
+            </div>
         <div class="form-row">
 
             <div class="form-group col-md-6">
@@ -123,27 +183,276 @@
             <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>
         </div>
 
-        <button type="submit" class="btn btn-success btn-block">Add Cross</button>
+        <div class="app-button-row justify-content-end">
+            <a href="{{ url_for('cross.cross_explorer') }}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-success">Add Cross</button>
+        </div>
+        </div>
     </form>
 </div>
 {% endblock %}
 
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3"></script>
-<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.polyfills.min.js"></script>
+<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3"></script>
+<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.polyfills.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.css" rel="stylesheet" type="text/css" />
-<script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}" src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/client_scanner.js') }}"></script>
+<script nonce="{{ csp_nonce }}">
 
     const crossData = {{ cross_data | tojson }};
+    const scannerFeatures = {{ scanner_features | tojson }};
 
     document.addEventListener("DOMContentLoaded", function() {
         // Connect to Socket.IO using the current origin instead of hardcoded port 5000
         const socket = io.connect(window.location.origin, {
             path: '/socket.io'
         });
+        const activeScannerFeatures = window.scannerFeatures || { client_serial_enabled: false, camera_enabled: false };
         let currentThreadId = null;
+        let currentServerTarget = null;
+        let currentClientTarget = null;
+        let clientSerialScanner = null;
+        let cameraScanner = null;
+
+        const scanSource = document.getElementById('scanSource');
+        const serverPortPanel = document.getElementById('server-port-panel');
+        const cameraPanel = document.getElementById('camera-panel');
+        const clientSerialPanel = document.getElementById('client-serial-panel');
+        const clientSerialSupport = document.getElementById('clientSerialSupport');
+        const connectClientSerialBtn = document.getElementById('connectClientSerialBtn');
+        const disconnectClientSerialBtn = document.getElementById('disconnectClientSerialBtn');
+        const cameraPreview = document.getElementById('cameraPreview');
+        const startCameraScanBtn = document.getElementById('startCameraScanBtn');
+        const stopCameraScanBtn = document.getElementById('stopCameraScanBtn');
+        const scanStatusMessage = document.getElementById('scanStatusMessage');
+        const maleUniqueIdInput = document.getElementById('maleUniqueID');
+        const femaleUniqueIdInput = document.getElementById('femaleUniqueID');
+        let maleAutonomousInput = null;
+        let femaleAutonomousInput = null;
+
+        function setScanStatus(message) {
+            scanStatusMessage.textContent = message;
+        }
+
+        function clearParentStock(tagifyInstance, speciesFieldId) {
+            tagifyInstance.removeAllTags();
+            document.getElementById(speciesFieldId).value = 'D. melanogaster';
+            updateSpeciesDisplay();
+        }
+
+        function fetchParentStock(uniqueIdField, tagifyInstance, speciesFieldId) {
+            const uid = uniqueIdField.value;
+            if (!uid) {
+                clearParentStock(tagifyInstance, speciesFieldId);
+                return Promise.resolve();
+            }
+
+            const url = "{{ url_for('stock.get_stock_data_for_uid', unique_id='UID_PLACEHOLDER') }}".replace('UID_PLACEHOLDER', uid);
+            return fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.genotype) {
+                        tagifyInstance.removeAllTags();
+                        tagifyInstance.addTags([data.genotype]);
+                    } else {
+                        tagifyInstance.removeAllTags();
+                    }
+                    document.getElementById(speciesFieldId).value = data.species || 'D. melanogaster';
+                    updateSpeciesDisplay();
+                })
+                .catch(function() {
+                    clearParentStock(tagifyInstance, speciesFieldId);
+                });
+        }
+
+        function applyScannedUID(targetFieldId, uniqueID) {
+            const field = document.getElementById(targetFieldId);
+            if (!field) {
+                return;
+            }
+
+            field.value = uniqueID;
+            field.dispatchEvent(new Event('input'));
+        }
+
+        function ensureClientSerialScanner() {
+            if (clientSerialScanner || !window.FlyManagerClientScanner) {
+                return clientSerialScanner;
+            }
+
+            clientSerialScanner = window.FlyManagerClientScanner.createSerialScanner({
+                baudRate: 9600,
+                onCode: function(uniqueID) {
+                    if (!currentClientTarget) {
+                        setScanStatus(`Received ${uniqueID}, but no target field is armed.`);
+                        return;
+                    }
+
+                    applyScannedUID(currentClientTarget, uniqueID);
+                    setScanStatus(`Scanned ${uniqueID} into ${currentClientTarget === 'maleUniqueID' ? 'male' : 'female'} UID.`);
+                    currentClientTarget = null;
+                },
+                onStatus: function(message) {
+                    setScanStatus(message);
+                },
+                onError: function(error) {
+                    const message = error && error.message ? error.message : 'Client serial scanner error.';
+                    setScanStatus(message);
+                    alert(message);
+                    disconnectClientSerialBtn.classList.add('is-hidden');
+                    connectClientSerialBtn.classList.remove('is-hidden');
+                }
+            });
+
+            return clientSerialScanner;
+        }
+
+        function ensureCameraScanner() {
+            if (cameraScanner || !window.FlyManagerClientScanner) {
+                return cameraScanner;
+            }
+
+            cameraScanner = window.FlyManagerClientScanner.createCameraScanner({
+                onCode: function(uniqueID) {
+                    if (!currentClientTarget) {
+                        setScanStatus(`Received ${uniqueID}, but no target field is armed.`);
+                        return;
+                    }
+
+                    applyScannedUID(currentClientTarget, uniqueID);
+                    setScanStatus(`Scanned ${uniqueID} into ${currentClientTarget === 'maleUniqueID' ? 'male' : 'female'} UID.`);
+                    currentClientTarget = null;
+                },
+                onStatus: function(message) {
+                    setScanStatus(message);
+                },
+                onError: function(error) {
+                    const message = error && error.message ? error.message : 'Camera scanner error.';
+                    setScanStatus(message);
+                    alert(message);
+                    if (stopCameraScanBtn) {
+                        stopCameraScanBtn.classList.add('is-hidden');
+                    }
+                    if (startCameraScanBtn) {
+                        startCameraScanBtn.classList.remove('is-hidden');
+                    }
+                    if (cameraPreview) {
+                        cameraPreview.classList.add('is-hidden');
+                    }
+                }
+            });
+
+            return cameraScanner;
+        }
+
+        function stopServerScanning(resetButtonLabel = true) {
+            if (!currentThreadId) {
+                return Promise.resolve();
+            }
+
+            const threadId = currentThreadId;
+            const activeTarget = currentServerTarget;
+            currentThreadId = null;
+            currentServerTarget = null;
+
+            return fetch("{{ url_for('flip.stop_scan_route') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ thread_id: threadId })
+            }).finally(function() {
+                if (resetButtonLabel && activeTarget === 'male') {
+                    document.getElementById('scanMaleUIDBtn').textContent = 'Scan UID';
+                }
+                if (resetButtonLabel && activeTarget === 'female') {
+                    document.getElementById('scanFemaleUIDBtn').textContent = 'Scan UID';
+                }
+            });
+        }
+
+        function stopCameraScanning() {
+            if (!cameraScanner || !cameraScanner.isActive()) {
+                if (cameraPreview) {
+                    cameraPreview.classList.add('is-hidden');
+                }
+                if (stopCameraScanBtn) {
+                    stopCameraScanBtn.classList.add('is-hidden');
+                }
+                if (startCameraScanBtn) {
+                    startCameraScanBtn.classList.remove('is-hidden');
+                }
+                return Promise.resolve();
+            }
+
+            return cameraScanner.stop().finally(function() {
+                if (cameraPreview) {
+                    cameraPreview.classList.add('is-hidden');
+                }
+                if (stopCameraScanBtn) {
+                    stopCameraScanBtn.classList.add('is-hidden');
+                }
+                if (startCameraScanBtn) {
+                    startCameraScanBtn.classList.remove('is-hidden');
+                }
+            });
+        }
+
+        function updateScanSourceView() {
+            const source = scanSource.value;
+            const webSerialSupported = window.FlyManagerClientScanner && window.FlyManagerClientScanner.supportsWebSerial();
+            const cameraSupported = window.FlyManagerClientScanner && window.FlyManagerClientScanner.supportsCameraScanner();
+
+            serverPortPanel.classList.toggle('is-hidden', source !== 'server');
+            if (cameraPanel) {
+                cameraPanel.classList.toggle('is-hidden', source !== 'camera');
+            }
+            if (clientSerialPanel) {
+                clientSerialPanel.classList.toggle('is-hidden', source !== 'client-serial');
+            }
+
+            if (source !== 'server' && currentThreadId) {
+                stopServerScanning();
+            }
+
+            if (source !== 'camera' && cameraScanner && cameraScanner.isActive()) {
+                stopCameraScanning();
+            }
+
+            if (source !== 'client-serial' && clientSerialScanner && clientSerialScanner.isActive()) {
+                clientSerialScanner.stop().finally(function() {
+                    if (disconnectClientSerialBtn) {
+                        disconnectClientSerialBtn.classList.add('is-hidden');
+                    }
+                    if (connectClientSerialBtn) {
+                        connectClientSerialBtn.classList.remove('is-hidden');
+                    }
+                });
+            }
+
+            if (source === 'server') {
+                setScanStatus('Using the server-attached scanner for UID capture.');
+            } else if (source === 'client-input') {
+                setScanStatus('Use the existing male and female UID fields with a keyboard wedge scanner or manual entry.');
+            } else if (source === 'camera') {
+                if (startCameraScanBtn) {
+                    startCameraScanBtn.disabled = !cameraSupported;
+                }
+                setScanStatus(cameraSupported
+                    ? 'Start the camera scanner, then arm the male or female UID field before scanning.'
+                    : 'Camera scanning requires a secure browser session with BarcodeDetector support.');
+            } else {
+                clientSerialSupport.value = webSerialSupported
+                    ? 'Client serial scanning is available in secure Chrome and Edge sessions.'
+                    : 'Client serial scanning requires a secure Chrome or Edge session on this device.';
+                connectClientSerialBtn.disabled = !webSerialSupported;
+                setScanStatus(webSerialSupported
+                    ? 'Connect the client-side serial scanner, then arm the male or female field before scanning.'
+                    : 'Client serial scanning is not available in this browser session.');
+            }
+        }
 
         // Function to update species display and warning
         function updateSpeciesDisplay() {
@@ -154,16 +463,18 @@
             
             if (maleSpecies === femaleSpecies) {
                 speciesDisplay.textContent = maleSpecies;
-                speciesWarning.style.display = 'none';
+                speciesWarning.classList.add('is-hidden');
             } else {
                 speciesDisplay.textContent = `♂ ${maleSpecies} × ♀ ${femaleSpecies}`;
-                speciesWarning.style.display = 'block';
+                speciesWarning.classList.remove('is-hidden');
             }
         }
 
         // Function to start scanning
         function startScanning(gender) {
             const selectedPort = document.getElementById('serialPort').value;
+            currentServerTarget = gender;
+            setScanStatus(`Waiting for a ${gender} UID from the server-attached scanner...`);
 
             fetch("{{ url_for('flip.start_scan_route') }}", {
                 method: 'POST',
@@ -174,70 +485,243 @@
             })
             .then(response => response.json())
             .then(data => {
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to start scanning.');
+                }
                 currentThreadId = data.thread_id;
                 if (gender === 'male') {
                     document.getElementById('scanMaleUIDBtn').textContent = "Stop Scan";
                 } else {
                     document.getElementById('scanFemaleUIDBtn').textContent = "Stop Scan";
                 }
+            })
+            .catch(error => {
+                currentThreadId = null;
+                currentServerTarget = null;
+                setScanStatus(error.message || 'Failed to start scanning.');
+                alert(error.message || 'Failed to start scanning.');
             });
         }
 
         // Function to stop scanning
         function stopScanning(gender) {
-            fetch("{{ url_for('flip.stop_scan_route') }}", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ thread_id: currentThreadId })
-            })
-            .then(() => {
-                currentThreadId = null;
+            stopServerScanning(false).then(() => {
                 if (gender === 'male') {
                     document.getElementById('scanMaleUIDBtn').textContent = "Scan UID";
                 } else {
                     document.getElementById('scanFemaleUIDBtn').textContent = "Scan UID";
                 }
+                setScanStatus('Server-attached UID scan stopped.');
             });
+        }
+
+        function armClientField(targetFieldId, label) {
+            if (scanSource.value === 'client-input') {
+                const autonomousInput = targetFieldId === 'maleUniqueID' ? maleAutonomousInput : femaleAutonomousInput;
+                if (autonomousInput) {
+                    autonomousInput.focus();
+                } else {
+                    document.getElementById(targetFieldId).focus();
+                }
+                setScanStatus(`Focused the ${label} UID field. Valid 10-character UIDs submit automatically.`);
+                return;
+            }
+
+            if (scanSource.value === 'camera') {
+                currentClientTarget = targetFieldId;
+                const scanner = ensureCameraScanner();
+                if (!scanner) {
+                    setScanStatus('Camera support is unavailable on this page.');
+                    return;
+                }
+
+                const finishConnect = function() {
+                    if (cameraPreview) {
+                        cameraPreview.classList.remove('is-hidden');
+                    }
+                    if (stopCameraScanBtn) {
+                        stopCameraScanBtn.classList.remove('is-hidden');
+                    }
+                    if (startCameraScanBtn) {
+                        startCameraScanBtn.classList.add('is-hidden');
+                    }
+                    setScanStatus(`Camera scanner armed for the ${label} UID field.`);
+                };
+
+                if (scanner.isActive()) {
+                    finishConnect();
+                    return;
+                }
+
+                scanner.start(cameraPreview)
+                    .then(finishConnect)
+                    .catch(function(error) {
+                        currentClientTarget = null;
+                        const message = error && error.message ? error.message : 'Unable to start the camera scanner.';
+                        setScanStatus(message);
+                        alert(message);
+                    });
+                return;
+            }
+
+            if (scanSource.value === 'client-serial' && activeScannerFeatures.client_serial_enabled) {
+                currentClientTarget = targetFieldId;
+                const scanner = ensureClientSerialScanner();
+                if (!scanner) {
+                    setScanStatus('Client serial support is unavailable on this page.');
+                    return;
+                }
+
+                const finishConnect = function() {
+                    disconnectClientSerialBtn.classList.remove('is-hidden');
+                    connectClientSerialBtn.classList.add('is-hidden');
+                    setScanStatus(`Client serial scanner armed for the ${label} UID field.`);
+                };
+
+                if (scanner.isActive()) {
+                    finishConnect();
+                    return;
+                }
+
+                scanner.start()
+                    .then(finishConnect)
+                    .catch(function(error) {
+                        currentClientTarget = null;
+                        const message = error && error.message ? error.message : 'Unable to connect the client serial scanner.';
+                        setScanStatus(message);
+                        alert(message);
+                    });
+            }
         }
 
         // Handle scan button for Male UID
         document.getElementById('scanMaleUIDBtn').addEventListener('click', function() {
-            if (currentThreadId) {
+            if (scanSource.value === 'server' && currentThreadId) {
                 stopScanning('male');
-            } else {
+            } else if (scanSource.value === 'server') {
                 startScanning('male');
+            } else {
+                armClientField('maleUniqueID', 'male');
             }
         });
 
         // Handle scan button for Female UID
         document.getElementById('scanFemaleUIDBtn').addEventListener('click', function() {
-            if (currentThreadId) {
+            if (scanSource.value === 'server' && currentThreadId) {
                 stopScanning('female');
-            } else {
+            } else if (scanSource.value === 'server') {
                 startScanning('female');
+            } else {
+                armClientField('femaleUniqueID', 'female');
             }
         });
 
         socket.on('stock_scanned', function(data) {
             if (currentThreadId) {
-                if (document.getElementById('scanMaleUIDBtn').textContent === "Stop Scan") {
+                if (currentServerTarget === 'male') {
                     document.getElementById('maleUniqueID').value = data.uniqueID;
                     // Trigger the input event to fetch the genotype
                     document.getElementById('maleUniqueID').dispatchEvent(new Event('input'));
                     stopScanning('male');
-                } else if (document.getElementById('scanFemaleUIDBtn').textContent === "Stop Scan") {
+                    setScanStatus(`Scanned ${data.uniqueID} into male UID.`);
+                } else if (currentServerTarget === 'female') {
                     document.getElementById('femaleUniqueID').value = data.uniqueID;
                     // Trigger the input event to fetch the genotype
                     document.getElementById('femaleUniqueID').dispatchEvent(new Event('input'));
                     stopScanning('female');
+                    setScanStatus(`Scanned ${data.uniqueID} into female UID.`);
                 }
             }
         });
 
-        socket.on('qr_not_recognized', function() {
-            alert('QR code not recognized. Please try again.');
+        socket.on('qr_not_recognized', function(data) {
+            const uniqueID = data && data.uniqueID ? data.uniqueID : 'This UID';
+            setScanStatus(`${uniqueID} was not recognized for the current user.`);
+            alert(`${uniqueID} was not recognized for the current user.`);
+        });
+
+        socket.on('scan_error', function(data) {
+            const message = data && data.message ? data.message : 'Scanner error.';
+            setScanStatus(message);
+            alert(message);
+        });
+
+        if (connectClientSerialBtn) {
+            connectClientSerialBtn.addEventListener('click', function() {
+                const scanner = ensureClientSerialScanner();
+                if (!scanner) {
+                    setScanStatus('Client serial support is unavailable on this page.');
+                    return;
+                }
+
+                scanner.start()
+                    .then(function() {
+                        disconnectClientSerialBtn.classList.remove('is-hidden');
+                        connectClientSerialBtn.classList.add('is-hidden');
+                    })
+                    .catch(function(error) {
+                        const message = error && error.message ? error.message : 'Unable to connect the client serial scanner.';
+                        setScanStatus(message);
+                        alert(message);
+                    });
+            });
+        }
+
+        if (disconnectClientSerialBtn) {
+            disconnectClientSerialBtn.addEventListener('click', function() {
+                if (!clientSerialScanner) {
+                    return;
+                }
+
+                clientSerialScanner.stop().finally(function() {
+                    currentClientTarget = null;
+                    disconnectClientSerialBtn.classList.add('is-hidden');
+                    connectClientSerialBtn.classList.remove('is-hidden');
+                });
+            });
+        }
+
+        if (startCameraScanBtn) {
+            startCameraScanBtn.addEventListener('click', function() {
+                const scanner = ensureCameraScanner();
+                if (!scanner) {
+                    setScanStatus('Camera support is unavailable on this page.');
+                    return;
+                }
+
+                scanner.start(cameraPreview)
+                    .then(function() {
+                        cameraPreview.classList.remove('is-hidden');
+                        stopCameraScanBtn.classList.remove('is-hidden');
+                        startCameraScanBtn.classList.add('is-hidden');
+                    })
+                    .catch(function(error) {
+                        const message = error && error.message ? error.message : 'Unable to start the camera scanner.';
+                        setScanStatus(message);
+                        alert(message);
+                    });
+            });
+        }
+
+        if (stopCameraScanBtn) {
+            stopCameraScanBtn.addEventListener('click', function() {
+                currentClientTarget = null;
+                stopCameraScanning();
+            });
+        }
+
+        scanSource.addEventListener('change', updateScanSourceView);
+
+        window.addEventListener('beforeunload', function() {
+            if (currentThreadId) {
+                stopServerScanning(false);
+            }
+            if (clientSerialScanner && clientSerialScanner.isActive()) {
+                clientSerialScanner.stop();
+            }
+            if (cameraScanner && cameraScanner.isActive()) {
+                cameraScanner.stop();
+            }
         });
 
         // Initialize Tagify for Male and Female Genotypes
@@ -277,15 +761,14 @@
                             button.className = 'btn btn-outline-primary btn-sm m-1 m-uid-button';
                             button.textContent = uid;
                             button.type = 'button';
-                            button.style.display = 'inline-block';
-                            button.onclick = function() {
+                            button.addEventListener('click', function() {
                                 document.getElementById('maleUniqueID').value = uid;
                                 document.querySelectorAll('.m-uid-button').forEach(button => {
-                                    button.style.display = 'none';
+                                    button.classList.add('is-hidden');
                                 });
                                 // Trigger input event to fetch species
                                 document.getElementById('maleUniqueID').dispatchEvent(new Event('input'));
-                            };
+                            });
                             maleUIDOptions.appendChild(button);
                         });
                     });
@@ -308,64 +791,43 @@
                             button.className = 'btn btn-outline-primary btn-sm m-1 f-uid-button';
                             button.textContent = uid;
                             button.type = 'button';
-                            button.style.display = 'inline-block';
-                            button.onclick = function() {
+                            button.addEventListener('click', function() {
                                 document.getElementById('femaleUniqueID').value = uid;
                                 document.querySelectorAll('.f-uid-button').forEach(button => {
-                                    button.style.display = 'none';
+                                    button.classList.add('is-hidden');
                                 });
                                 // Trigger input event to fetch species
                                 document.getElementById('femaleUniqueID').dispatchEvent(new Event('input'));
-                            };
+                            });
                             femaleUIDOptions.appendChild(button);
                         });
                     });
             }
         });
 
-        // Fetch genotype and species when Male Unique ID is entered or scanned
-        document.getElementById('maleUniqueID').addEventListener('input', function() {
-            const maleUID = this.value;
-            if (maleUID) {
-                // Construct URL using url_for and replace placeholder
-                const url = "{{ url_for('stock.get_stock_data_for_uid', unique_id='UID_PLACEHOLDER') }}".replace('UID_PLACEHOLDER', maleUID);
-                fetch(url)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.genotype) {
-                            // Remove any existing tags
-                            tagifyMaleGenotype.removeAllTags();
-                            tagifyMaleGenotype.addTags([data.genotype]);
-                        }
-                        // Set the species
-                        document.getElementById('maleSpecies').value = data.species || "D. melanogaster";
-                        // Update species display
-                        updateSpeciesDisplay();
-                    });
-            }
-        });
+        if (window.FlyManagerClientScanner) {
+            maleAutonomousInput = window.FlyManagerClientScanner.createAutonomousUidInput({
+                inputElement: maleUniqueIdInput,
+                resetDelayMs: 10000,
+                onMatch: function() {
+                    return fetchParentStock(maleUniqueIdInput, tagifyMaleGenotype, 'maleSpecies');
+                },
+                onReset: function() {
+                    clearParentStock(tagifyMaleGenotype, 'maleSpecies');
+                }
+            });
 
-        // Fetch genotype and species when Female Unique ID is entered or scanned
-        document.getElementById('femaleUniqueID').addEventListener('input', function() {
-            const femaleUID = this.value;
-            if (femaleUID) {
-                // Construct URL using url_for and replace placeholder
-                const url = "{{ url_for('stock.get_stock_data_for_uid', unique_id='UID_PLACEHOLDER') }}".replace('UID_PLACEHOLDER', femaleUID);
-                fetch(url)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.genotype) {
-                            // Remove any existing tags
-                            tagifyFemaleGenotype.removeAllTags();
-                            tagifyFemaleGenotype.addTags([data.genotype]);
-                        }
-                        // Set the species
-                        document.getElementById('femaleSpecies').value = data.species || "D. melanogaster";
-                        // Update species display
-                        updateSpeciesDisplay();
-                    });
-            }
-        });
+            femaleAutonomousInput = window.FlyManagerClientScanner.createAutonomousUidInput({
+                inputElement: femaleUniqueIdInput,
+                resetDelayMs: 10000,
+                onMatch: function() {
+                    return fetchParentStock(femaleUniqueIdInput, tagifyFemaleGenotype, 'femaleSpecies');
+                },
+                onReset: function() {
+                    clearParentStock(tagifyFemaleGenotype, 'femaleSpecies');
+                }
+            });
+        }
 
         let tagifyFoodType = new Tagify(document.querySelector('#foodType'), {
             whitelist: {{ food_types | tojson }},
@@ -409,6 +871,8 @@
             document.getElementById('name').value = crossData.name;
             document.getElementById('comments').value = crossData.comments;
         }
+
+        updateScanSourceView();
     });
 </script>
 {% endblock %}

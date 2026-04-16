@@ -3,6 +3,15 @@ from flymanager.app import create_app, socketio
 
 app = create_app()
 
+
+def main():
+    socketio.run(
+        app,
+        debug=app.config["FLASK_DEBUG"],
+        host=app.config["APP_HOST"],
+        port=app.config["APP_PORT"],
+    )
+
+
 if __name__ == '__main__':
-    # Use socketio.run to support WebSockets
-    socketio.run(app, debug=True, host='0.0.0.0', port=5234) # Adjust host/port as needed
+    main()

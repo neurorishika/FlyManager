@@ -2,64 +2,41 @@
 
 {% block title %}Register{% endblock %}
 
-{% block head %}
-<style>
-    .auth-container {
-        background-color: var(--card-bg);
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        width: 100%;
-        max-width: 400px;
-        margin: 0 auto;
-    }
-    .auth-container h2 {
-        margin-bottom: 25px;
-        text-align: center;
-        font-weight: 700;
-        color: var(--header-bg);
-    }
-    .auth-container label {
-        font-weight: 500;
-    }
-    .auth-container .form-control {
-        border-radius: 25px;
-    }
-    .auth-container .btn {
-        border-radius: 25px;
-        font-weight: 700;
-    }
-    .error-message {
-        color: red;
-        text-align: center;
-        margin-bottom: 15px;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="auth-container">
-    <h2>Register New User</h2>
+<div class="auth-shell">
+    <div class="app-panel auth-card">
+    <p class="app-kicker">Account Setup</p>
+    <h2 class="auth-logo">Register New User</h2>
+    <p class="app-page-subtitle">Create a new operator account with a username, password, and initials for activity tracking.</p>
     {% if message %}
-        <p class="error-message">{{ message }}</p>
+        <div class="alert alert-danger mt-3 mb-3">{{ message }}</div>
     {% endif %}
-    <form method="POST" action="{{ url_for('auth.register') }}">
+    <form method="POST" action="{{ url_for('auth.register') }}" class="auth-form mt-4">
         <div class="form-group">
             <label for="username">Username:</label>
-            <input type="text" class="form-control" id="username" name="username" required>
+            <input type="text" class="form-control" id="username" name="username" value="{{ form_data.username }}" autocomplete="username" required>
         </div>
         <div class="form-group">
             <label for="password">Password:</label>
-            <input type="password" class="form-control" id="password" name="password" required>
+            <input type="password" class="form-control" id="password" name="password" autocomplete="new-password" required>
+            <small class="form-text text-muted">Use at least 12 characters.</small>
         </div>
         <div class="form-group">
             <label for="initials">Initials:</label>
-            <input type="text" class="form-control" id="initials" name="initials" required>
+            <input type="text" class="form-control" id="initials" name="initials" value="{{ form_data.initials }}" required>
         </div>
-        <button type="submit" class="btn btn-success btn-block">Register</button>
-        <div class="text-center mt-3">
+        <div class="form-group">
+            <label for="email">Recovery Email:</label>
+            <input type="email" class="form-control" id="email" name="email" value="{{ form_data.email }}" autocomplete="email">
+            <small class="form-text text-muted">Optional for now, but needed for self-service password reset.</small>
+        </div>
+        <div class="auth-actions">
+            <button type="submit" class="btn btn-primary">Register</button>
+        </div>
+        <div class="auth-support">
             <a href="{{ url_for('auth.login') }}">Back to Login</a>
         </div>
     </form>
+    </div>
 </div>
 {% endblock %}

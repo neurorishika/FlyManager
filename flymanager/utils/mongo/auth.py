@@ -1,119 +1,183 @@
-import datetime
-from hashlib import shake_256
+import secrets
+from datetime import datetime, timedelta
+from hashlib import sha256, shake_256
+from hmac import compare_digest
 
-def add_user(user, password, initials, db):
-    """
-    Add a user to the MongoDB database
-    Parameters:
-    user: str
-        the username of the user
-    password: str
-        the password of the user
-    initials: str
-        the initials of the user
-    db: pymongo.database.Database
-        the MongoDB database instance
-    Returns:
-    bool
-        True if the user was added, False otherwise
-    """
-    users_collection = db['users']
-    
-    # Check if the user already exists
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from flymanager.utils.mongo.activity import write_activity
+
+PASSWORD_RESET_TOKEN_TTL_MINUTES = 60
+
+
+def normalize_email(email):
+    """Return a normalized email address or None when it is blank."""
+    if email is None:
+        return None
+    normalized = email.strip().lower()
+    return normalized or None
+
+
+def _utcnow():
+    return datetime.utcnow()
+
+
+def _legacy_password_hash(user, password):
+    return shake_256((user + password).encode()).hexdigest(5)
+
+
+def _is_modern_password_hash(password_hash):
+    return password_hash.startswith(("pbkdf2:", "scrypt:"))
+
+
+def _hash_reset_token(token):
+    return sha256(token.encode()).hexdigest()
+
+
+def get_user(user, db):
+    """Return the stored user document for a username."""
+    return db["users"].find_one({"Username": user})
+
+
+def add_user(user, password, initials, db, email=None):
+    """Add a user to the MongoDB database."""
+    users_collection = db["users"]
+    normalized_email = normalize_email(email)
+
     if users_collection.find_one({"Username": user}):
         return False
-    
-    # Hash the password
-    hashed_password = shake_256((user + password).encode()).hexdigest(5)
-    
-    # Add the user document to the collection
+
+    if normalized_email and users_collection.find_one({"Email": normalized_email}):
+        return False
+
     user_document = {
         "Username": user,
-        "Password": hashed_password,
-        "Initials": initials
+        "Password": generate_password_hash(password),
+        "Initials": initials,
+        "PasswordChangedAt": _utcnow(),
     }
-    
+
+    if normalized_email:
+        user_document["Email"] = normalized_email
+
     users_collection.insert_one(user_document)
-    
-    # Log the activity
     write_activity(user, "User added", db)
-    
     return True
 
+
 def get_all_users(db):
-    """
-    Get all the users from the MongoDB collection.
-    Parameters:
-    db: pymongo.database.Database
-        The database connection to the MongoDB database.
-    Returns:
-    clients: dict
-        A dictionary of all the users and their hashed passwords.
-    """
-    # Access the users collection
+    """Get all users as a mapping of username to password hash."""
     users_collection = db["users"]
-    
-    # Query all documents in the users collection
-    users = users_collection.find()
-    
-    # Create a dictionary of {username: password}
     clients = {}
-    for user in users:
+    for user in users_collection.find({}, {"Username": 1, "Password": 1}):
         clients[user["Username"]] = user["Password"]
-    
     return clients
 
-def change_password(user, new_password, db):
-    """
-    Change the password of the user in the MongoDB database.
-    Parameters:
-    user: str
-        the username of the user
-    new_password: str
-        the new password of the user
-    db: pymongo.database.Database
-        the MongoDB database instance
-    Returns:
-    bool
-        True if the password was changed, False otherwise
-    """
 
-    users_collection = db['users']
-    
-    # Hash the new password
-    hashed_password = shake_256((user + new_password).encode()).hexdigest(5)
-    
-    # Update the user document in the collection
+def verify_user_password(user, password, db):
+    """Verify a user's password and migrate legacy hashes on success."""
+    users_collection = db["users"]
+    user_document = users_collection.find_one({"Username": user})
+    if not user_document:
+        return False, False
+
+    stored_hash = user_document.get("Password", "")
+    if _is_modern_password_hash(stored_hash):
+        return check_password_hash(stored_hash, password), False
+
+    legacy_hash = _legacy_password_hash(user, password)
+    if not compare_digest(stored_hash, legacy_hash):
+        return False, False
+
+    users_collection.update_one(
+        {"_id": user_document["_id"]},
+        {
+            "$set": {
+                "Password": generate_password_hash(password),
+                "PasswordChangedAt": _utcnow(),
+                "PasswordMigratedAt": _utcnow(),
+            }
+        },
+    )
+    return True, True
+
+
+def change_password(user, new_password, db):
+    """Change the password of a user."""
+    users_collection = db["users"]
     result = users_collection.update_one(
         {"Username": user},
-        {"$set": {"Password": hashed_password}}
+        {
+            "$set": {
+                "Password": generate_password_hash(new_password),
+                "PasswordChangedAt": _utcnow(),
+            }
+        },
     )
-    
-    # Log the activity
-    write_activity(user, "Password changed", db)
-    
+
+    if result.matched_count > 0:
+        write_activity(user, "Password changed", db)
+
     return result.matched_count > 0
 
-def write_activity(user, activity, db):
-    """
-    Write an activity to the MongoDB collection.
-    Parameters:
-    user: str
-        the username of the user
-    activity: str
-        the activity of the user
-    db: pymongo.database.Database
-        the database instance for MongoDB
-    """
-    # get timestamp
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    
-    # create the activity document
-    activity_document = {
-        "user": user,
-        "timestamp": timestamp,
-        "activity": activity
-    }
-    
-    # insert the document into the activities collection
-    db.activity.insert_one(activity_document)
+
+def create_password_reset_token(user, db, ttl_minutes=PASSWORD_RESET_TOKEN_TTL_MINUTES):
+    """Create a one-time password reset token for the given user."""
+    if not get_user(user, db):
+        return None
+
+    token = secrets.token_urlsafe(32)
+    issued_at = _utcnow()
+    expires_at = issued_at + timedelta(minutes=ttl_minutes)
+    tokens_collection = db["password_reset_tokens"]
+    tokens_collection.delete_many({"Username": user})
+    tokens_collection.insert_one(
+        {
+            "Username": user,
+            "TokenHash": _hash_reset_token(token),
+            "CreatedAt": issued_at,
+            "ExpiresAt": expires_at,
+            "UsedAt": None,
+        }
+    )
+    write_activity(user, "Password reset requested", db)
+    return token
+
+
+def get_reset_token_username(token, db):
+    """Return the username for a valid reset token, otherwise None."""
+    tokens_collection = db["password_reset_tokens"]
+    token_document = tokens_collection.find_one(
+        {"TokenHash": _hash_reset_token(token), "UsedAt": None}
+    )
+    if not token_document:
+        return None
+
+    if token_document["ExpiresAt"] < _utcnow():
+        return None
+
+    return token_document["Username"]
+
+
+def consume_password_reset_token(token, new_password, db):
+    """Consume a valid password reset token and update the password."""
+    tokens_collection = db["password_reset_tokens"]
+    token_document = tokens_collection.find_one(
+        {"TokenHash": _hash_reset_token(token), "UsedAt": None}
+    )
+    if not token_document:
+        return None
+
+    if token_document["ExpiresAt"] < _utcnow():
+        return None
+
+    username = token_document["Username"]
+    if not change_password(username, new_password, db):
+        return None
+
+    tokens_collection.update_one(
+        {"_id": token_document["_id"]},
+        {"$set": {"UsedAt": _utcnow()}},
+    )
+    write_activity(username, "Password reset completed", db)
+    return username

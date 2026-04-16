@@ -1,17 +1,133 @@
 # flymanager/app/routes/main.py
-from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify
-from datetime import datetime, timedelta
 from collections import defaultdict
+from datetime import datetime, timedelta
+
+from flask import (Blueprint, current_app, jsonify, redirect, render_template,
+                   request, session, url_for)
+
 from flymanager.app import db
-from flymanager.utils.mongo import (
-    get_user_activities, get_user_stocks, get_user_crosses, 
-    get_user_trays, get_flip_schedule, get_flip_in, get_settings, get_tray_occupancy
-)
+from flymanager.app.routes.auth import admin_required, login_required
+from flymanager.app.security import get_json_payload, limiter
 from flymanager.app.services.scheduler import schedule_daily_flip_reminders
-from flymanager.app.routes.auth import login_required
+from flymanager.utils.mongo import (get_flip_in, get_flip_schedule,
+                                    get_settings, get_tray_occupancy,
+                                    get_user_activities, get_user_crosses,
+                                    get_user_stocks, get_user_trays)
 from flymanager.utils.utils import get_datetime_from_str
 
 bp = Blueprint('main', __name__)  # Remove url_prefix to handle root URL
+
+ATTENTION_STATUSES = {'Showing Issues', 'Needs refresh'}
+
+
+def _count_alive_vials(item):
+    alive_vials = item.get('CurrentlyAliveVials', '')
+    if not alive_vials:
+        return 0
+    return len([value for value in alive_vials.split(',') if value.strip()])
+
+
+def _parse_flip_day_value(item):
+    try:
+        return int(get_flip_in(item).split(' ')[0].split(',')[0].strip())
+    except (ValueError, AttributeError, IndexError):
+        return None
+
+
+def _format_tray_location(item):
+    tray_id = item.get('TrayID') or 'Unassigned'
+    tray_position = item.get('TrayPosition')
+    if tray_position in (None, ''):
+        return tray_id
+    return f'{tray_id}-{tray_position}'
+
+
+def _safe_int(value, default=0):
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _format_day_phrase(day_value):
+    if day_value == 0:
+        return 'Due today'
+    if day_value is None:
+        return 'No scheduled flip window'
+    if day_value < 0:
+        overdue_days = abs(day_value)
+        return f"{overdue_days} day{'s' if overdue_days != 1 else ''} overdue"
+    return f"Due in {day_value} day{'s' if day_value != 1 else ''}"
+
+
+def _activity_matches(activity_text, *needles):
+    lower_text = activity_text.lower()
+    return any(needle in lower_text for needle in needles)
+
+
+def _build_tray_heatmap(tray, occupancy):
+    rows = _safe_int(tray.get('Rows', 0))
+    columns = _safe_int(tray.get('Columns', 0))
+    total_cells = rows * columns
+    occupied_cells = 0
+    blocked_cells = 0
+    alert_cells = 0
+    grid_rows = []
+
+    for row_index in range(1, rows + 1):
+        row_cells = []
+        for column_index in range(1, columns + 1):
+            position = str(((column_index - 1) * 10) + row_index)
+            item = occupancy.get(position)
+            state = 'empty'
+            label = ''
+            detail = 'Empty position'
+
+            if item:
+                occupied_cells += 1
+                if item.get('type') == 'blocked':
+                    state = 'blocked'
+                    blocked_cells += 1
+                    label = 'B'
+                    detail = (
+                        f"Blocked by {item.get('blocked_by_type', 'item')} "
+                        f"at {item.get('blocked_by', '?')}"
+                    )
+                else:
+                    item_type = item.get('type', 'item')
+                    if item.get('status') in ATTENTION_STATUSES:
+                        state = 'alert'
+                        alert_cells += 1
+                    else:
+                        state = item_type
+                    label = 'C' if item_type == 'cross' else 'S'
+                    detail = item.get('display_name') or item.get('name') or 'Occupied'
+
+                if item.get('status') in ATTENTION_STATUSES and item.get('type') != 'blocked':
+                    detail = f"{detail} · {item.get('status')}"
+
+            row_cells.append({
+                'position': position,
+                'state': state,
+                'label': label,
+                'detail': detail,
+            })
+
+        grid_rows.append({'cells': row_cells})
+
+    usage = round((occupied_cells / total_cells) * 100) if total_cells else 0
+    return {
+        'tray_id': tray.get('TrayID', ''),
+        'name': tray.get('Name', ''),
+        'rows': rows,
+        'columns': columns,
+        'usage': usage,
+        'occupied_cells': occupied_cells,
+        'blocked_cells': blocked_cells,
+        'alert_cells': alert_cells,
+        'grid_rows': grid_rows,
+        'href': url_for('tray.view_tray', tray_id=tray.get('TrayID', '')),
+    }
 
 @bp.route('/')
 @bp.route('/main')
@@ -24,6 +140,7 @@ def index():
 @login_required
 def home():
     username = session.get("username")
+    is_admin = username == 'admin'
     try:
         # Get all user data
         stocks = get_user_stocks(username, db)
@@ -39,106 +156,177 @@ def home():
         # Calculate statistics
         total_stocks = len(active_stocks)
         total_crosses = len(active_crosses)
+        total_lines = total_stocks + total_crosses
         
         # Calculate items needing attention
         needs_attention = 0
         status_distribution = defaultdict(int)
         overdue_items = []
         due_today_items = []
+        issue_items = []
+        attention_items = []
+        queue_candidates = []
+        due_soon_count = 0
         
         # Calculate vial statistics
         total_stock_vials = 0
         total_cross_vials = 0
-        
-        for stock in active_stocks:
-            status = stock.get('Status', 'Unknown')
-            status_distribution[status] += 1
-            
-            flip_in = get_flip_in(stock)
-            day_value = -999
-            try:
-                day_value = int(flip_in.split(' ')[0].split(',')[0].strip())
-            except (ValueError, AttributeError):
-                pass
-                
-            if day_value == 0:
-                due_today_items.append({
-                    'type': 'stock', 
-                    'id': stock.get('UniqueID'),
-                    'name': stock.get('Name', ''),
-                    'tray': f"{stock.get('TrayID', '')}-{stock.get('TrayPosition', '')}"
-                })
-                needs_attention += 1
-            elif day_value < 0 and day_value != -999:
-                overdue_items.append({
-                    'type': 'stock', 
-                    'id': stock.get('UniqueID'),
-                    'name': stock.get('Name', ''),
-                    'days_overdue': abs(day_value),
-                    'tray': f"{stock.get('TrayID', '')}-{stock.get('TrayPosition', '')}"
-                })
-                needs_attention += 1
-            elif status in ['Showing Issues', 'Needs refresh']:
-                needs_attention += 1
-            
-            # Count vials
-            alive_vials = stock.get('CurrentlyAliveVials', '')
-            if alive_vials:
-                total_stock_vials += len(alive_vials.split(', ')) if ',' in alive_vials else 1
-        
-        for cross in active_crosses:
-            status = cross.get('Status', 'Unknown')
-            status_distribution[status] += 1
-            
-            flip_in = get_flip_in(cross)
-            day_value = -999
-            try:
-                day_value = int(flip_in.split(' ')[0].split(',')[0].strip())
-            except (ValueError, AttributeError):
-                pass
-                
-            if day_value == 0:
-                due_today_items.append({
-                    'type': 'cross', 
-                    'id': cross.get('UniqueID'),
-                    'name': cross.get('Name', ''),
-                    'tray': f"{cross.get('TrayID', '')}-{cross.get('TrayPosition', '')}"
-                })
-                needs_attention += 1
-            elif day_value < 0 and day_value != -999:
-                overdue_items.append({
-                    'type': 'cross', 
-                    'id': cross.get('UniqueID'),
-                    'name': cross.get('Name', ''),
-                    'days_overdue': abs(day_value),
-                    'tray': f"{cross.get('TrayID', '')}-{cross.get('TrayPosition', '')}"
-                })
-                needs_attention += 1
-            elif status in ['Showing Issues', 'Needs refresh']:
-                needs_attention += 1
-            
-            # Count vials
-            alive_vials = cross.get('CurrentlyAliveVials', '')
-            if alive_vials:
-                total_cross_vials += len(alive_vials.split(', ')) if ',' in alive_vials else 1
+
+        for item_type, items in (('stock', active_stocks), ('cross', active_crosses)):
+            for item in items:
+                status = item.get('Status', 'Unknown')
+                status_distribution[status] += 1
+                tray_location = _format_tray_location(item)
+                item_name = item.get('Name', '') or item.get('UniqueID', 'Untitled item')
+                item_uid = item.get('UniqueID', '')
+                type_label = item_type.title()
+                view_endpoint = 'stock.view_stock' if item_type == 'stock' else 'cross.view_cross'
+                view_href = url_for(view_endpoint, unique_id=item_uid)
+                day_value = _parse_flip_day_value(item)
+                vial_count = _count_alive_vials(item)
+
+                base_attention_item = {
+                    'type': item_type,
+                    'type_label': type_label,
+                    'id': item_uid,
+                    'name': item_name,
+                    'tray': tray_location,
+                    'view_href': view_href,
+                }
+
+                if day_value == 0:
+                    due_today_items.append({
+                        **base_attention_item,
+                        'detail': 'Due for flip today',
+                    })
+                    attention_items.append({
+                        **base_attention_item,
+                        'kind': 'today',
+                        'priority': 'today',
+                        'badge': 'Due today',
+                        'detail': 'Ready for today\'s flip run',
+                        'action_href': url_for('flip.flip_interface'),
+                        'action_label': 'Open flip desk',
+                    })
+                    needs_attention += 1
+                elif day_value is not None and day_value < 0:
+                    overdue_items.append({
+                        **base_attention_item,
+                        'days_overdue': abs(day_value),
+                        'detail': f"{abs(day_value)} day{'s' if abs(day_value) != 1 else ''} overdue",
+                    })
+                    attention_items.append({
+                        **base_attention_item,
+                        'kind': 'critical',
+                        'priority': 'critical',
+                        'badge': 'Overdue',
+                        'days_overdue': abs(day_value),
+                        'detail': f"{abs(day_value)} day{'s' if abs(day_value) != 1 else ''} overdue",
+                        'action_href': url_for('flip.flip_interface'),
+                        'action_label': 'Flip now',
+                    })
+                    needs_attention += 1
+                elif status in ATTENTION_STATUSES:
+                    issue_items.append({
+                        **base_attention_item,
+                        'status': status,
+                        'detail': status,
+                    })
+                    attention_items.append({
+                        **base_attention_item,
+                        'kind': 'watch',
+                        'priority': 'watch',
+                        'badge': 'Review',
+                        'detail': status,
+                        'action_href': view_href,
+                        'action_label': 'Inspect item',
+                    })
+                    needs_attention += 1
+
+                queue_score = 0
+                queue_badge = 'Review'
+                queue_reason = ''
+                queue_action_href = view_href
+                queue_action_label = 'Open item'
+
+                if day_value is not None:
+                    if day_value < 0:
+                        queue_score = 140 + min(abs(day_value), 14)
+                        queue_badge = 'Overdue'
+                        queue_reason = _format_day_phrase(day_value)
+                        queue_action_href = url_for('flip.flip_interface')
+                        queue_action_label = 'Flip now'
+                    elif day_value == 0:
+                        queue_score = 112
+                        queue_badge = 'Today'
+                        queue_reason = 'Ready for today\'s flip run'
+                        queue_action_href = url_for('flip.flip_interface')
+                        queue_action_label = 'Open flip desk'
+                    elif day_value <= 3:
+                        due_soon_count += 1
+                        queue_score = 86 - (day_value * 6)
+                        queue_badge = 'Soon'
+                        queue_reason = _format_day_phrase(day_value)
+                        queue_action_href = url_for('flip.flip_schedule_display')
+                        queue_action_label = 'View schedule'
+
+                if status in ATTENTION_STATUSES:
+                    queue_score = max(queue_score, 70)
+                    queue_badge = queue_badge if queue_badge != 'Review' or queue_reason else 'Review'
+                    queue_reason = f"{queue_reason} · {status}" if queue_reason else status
+                    if queue_action_href == view_href:
+                        queue_action_label = 'Inspect item'
+
+                if queue_score:
+                    queue_score += min(vial_count, 4)
+                    if item_type == 'cross':
+                        queue_score += 2
+                    queue_candidates.append({
+                        **base_attention_item,
+                        'badge': queue_badge,
+                        'reason': queue_reason,
+                        'score': queue_score,
+                        'day_value': 999 if day_value is None else day_value,
+                        'vial_count': vial_count,
+                        'action_href': queue_action_href,
+                        'action_label': queue_action_label,
+                    })
+
+                if item_type == 'stock':
+                    total_stock_vials += vial_count
+                else:
+                    total_cross_vials += vial_count
 
         # Calculate tray usage accounting for blocking
         total_positions = 0
         used_positions = 0
+        active_trays = 0
+        tray_heatmaps = []
         
         for tray in trays:
             tray_id = tray.get('TrayID')
             if tray_id:
-                tray_rows = tray.get('Rows', 0)
-                tray_columns = tray.get('Columns', 0)
+                tray_rows = _safe_int(tray.get('Rows', 0))
+                tray_columns = _safe_int(tray.get('Columns', 0))
                 total_positions += tray_rows * tray_columns
                 
                 # Get tray occupancy which accounts for blocking
                 try:
                     tray_occupancy = get_tray_occupancy(username, tray_id, db)
-                    used_positions += len(tray_occupancy)
+                    tray_usage_count = len(tray_occupancy)
+                    used_positions += tray_usage_count
+                    if tray_usage_count:
+                        active_trays += 1
+                    tray_heatmaps.append(_build_tray_heatmap(tray, tray_occupancy))
                 except Exception as e:
-                    print(f"Error getting occupancy for tray {tray_id}: {e}")
+                    current_app.logger.warning(
+                        "Error getting occupancy for tray %s: %s", tray_id, e
+                    )
+
+        tray_heatmaps = sorted(
+            tray_heatmaps,
+            key=lambda tray: (-tray['usage'], -tray['alert_cells'], tray['tray_id']),
+        )
         
         tray_usage = round((used_positions / total_positions * 100) if total_positions > 0 else 0)
 
@@ -154,53 +342,295 @@ def home():
             items = schedule_data[today_str]
             for item_str in items:
                 todays_schedule.append({
-                    'time': today.strftime('%H:%M'),
+                    'time': 'Today',
                     'description': item_str
                 })
 
         # Get upcoming schedule (next 7 days)
         upcoming_schedule = {}
+        upcoming_schedule_list = []
         for i in range(1, 8):
             future_date = today + timedelta(days=i)
             future_date_str = future_date.strftime('%Y-%m-%d')
             if future_date_str in schedule_data:
                 day_name = future_date.strftime('%A')
                 items = schedule_data[future_date_str]
-                upcoming_schedule[future_date_str] = {
+                day_payload = {
+                    'iso_date': future_date_str,
                     'day_name': day_name,
                     'date': future_date.strftime('%b %d'),
                     'count': len(items),
-                    'items': items
+                    'items': items,
+                    'preview': items[:2],
                 }
+                upcoming_schedule[future_date_str] = day_payload
+                upcoming_schedule_list.append(day_payload)
+
+        schedule_today_count = len(todays_schedule)
+        upcoming_total = sum(day['count'] for day in upcoming_schedule_list)
+        tasks_today_total = max(schedule_today_count, len(due_today_items))
 
         # Calculate weekly metrics
         one_week_ago = today - timedelta(days=7)
-        one_week_ago_str = one_week_ago.strftime('%Y-%m-%d')
-        
-        # Count flips in the last week
-        weekly_flips = 0
-        flips_by_day = defaultdict(int)
-        
+        parsed_activities = []
         for activity in activities:
             try:
                 activity_time = get_datetime_from_str(activity['timestamp'])
-                if activity_time >= one_week_ago and 'flipped' in activity['activity'].lower():
-                    weekly_flips += 1
-                    day_name = activity_time.strftime('%A')
-                    flips_by_day[day_name] += 1
-            except (ValueError, KeyError):
-                pass
-        
-        # Process activities by date
-        processed_activities = {}
-        for activity in activities[-10:]:  # Get last 10 activities
-            date = get_datetime_from_str(activity['timestamp']).strftime('%Y-%m-%d')
-            if date not in processed_activities:
-                processed_activities[date] = []
-            processed_activities[date].append({
-                'timestamp': get_datetime_from_str(activity['timestamp']).strftime('%H:%M'),
-                'activity': activity['activity']
+            except (ValueError, KeyError, TypeError):
+                continue
+            parsed_activities.append({
+                'datetime': activity_time,
+                'activity': activity.get('activity', ''),
             })
+
+        parsed_activities.sort(key=lambda item: item['datetime'], reverse=True)
+
+        # Count flips in the last week
+        weekly_flips = 0
+        flips_by_day = defaultdict(int)
+
+        for activity in parsed_activities:
+            activity_time = activity['datetime']
+            activity_text = activity['activity']
+            if activity_time >= one_week_ago and 'flipped' in activity_text.lower():
+                weekly_flips += 1
+                day_name = activity_time.strftime('%A')
+                flips_by_day[day_name] += 1
+
+        # Process activities by date
+        activity_groups = []
+        activity_group_map = {}
+        for activity in parsed_activities[:12]:
+            date_key = activity['datetime'].strftime('%Y-%m-%d')
+            if date_key not in activity_group_map:
+                group = {'date': date_key, 'entries': []}
+                activity_group_map[date_key] = group
+                activity_groups.append(group)
+            activity_group_map[date_key]['entries'].append({
+                'timestamp': activity['datetime'].strftime('%H:%M'),
+                'activity': activity['activity'],
+            })
+
+        my_queue = sorted(
+            queue_candidates,
+            key=lambda item: (-item['score'], item['day_value'], item['name'].lower()),
+        )
+
+        thirty_days_ago = today - timedelta(days=30)
+        previous_week_start = today - timedelta(days=14)
+        current_week_crosses = 0
+        previous_week_crosses = 0
+        export_count_30 = 0
+        import_count_30 = 0
+        latest_workbook_activity = None
+
+        for activity in parsed_activities:
+            activity_time = activity['datetime']
+            activity_text = activity['activity']
+
+            if activity_time >= one_week_ago and _activity_matches(activity_text, 'added cross'):
+                current_week_crosses += 1
+            elif previous_week_start <= activity_time < one_week_ago and _activity_matches(activity_text, 'added cross'):
+                previous_week_crosses += 1
+
+            if activity_time >= thirty_days_ago and _activity_matches(activity_text, 'downloaded data to excel'):
+                export_count_30 += 1
+                if latest_workbook_activity is None:
+                    latest_workbook_activity = {
+                        'label': 'Last export',
+                        'time': activity_time.strftime('%b %d'),
+                    }
+            elif activity_time >= thirty_days_ago and _activity_matches(activity_text, 'uploaded data from file'):
+                import_count_30 += 1
+                if latest_workbook_activity is None:
+                    latest_workbook_activity = {
+                        'label': 'Last import',
+                        'time': activity_time.strftime('%b %d'),
+                    }
+
+        attention_priority = {'critical': 0, 'today': 1, 'watch': 2}
+        attention_items = sorted(
+            attention_items,
+            key=lambda item: (
+                attention_priority.get(item['priority'], 9),
+                -item.get('days_overdue', 0),
+                item['name'].lower(),
+            ),
+        )
+
+        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        max_flips = max(flips_by_day.values()) if flips_by_day else 0
+        week_chart = []
+        for day in days:
+            flips = flips_by_day.get(day, 0)
+            height = round((flips / max_flips) * 100) if max_flips else 0
+            week_chart.append({
+                'label': day,
+                'short_label': day[:3],
+                'count': flips,
+                'height': int(height),
+            })
+
+        busiest_day = None
+        if max_flips:
+            busiest_day = max(week_chart, key=lambda item: item['count'])
+
+        healthy_count = status_distribution.get('Healthy', 0)
+        healthy_share = round((healthy_count / total_lines) * 100) if total_lines else 0
+        status_breakdown = []
+        for status, count in sorted(status_distribution.items(), key=lambda item: (-item[1], item[0])):
+            share = round((count / total_lines) * 100) if total_lines else 0
+            status_breakdown.append({
+                'status': status,
+                'count': count,
+                'share': int(share),
+                'slug': status.lower().replace(' ', '-'),
+            })
+
+        tray_summary = {
+            'usage': tray_usage,
+            'used_positions': used_positions,
+            'total_positions': total_positions,
+            'free_positions': max(total_positions - used_positions, 0),
+            'active_trays': active_trays,
+            'total_trays': len(trays),
+        }
+
+        cross_creation_delta = current_week_crosses - previous_week_crosses
+        workbook_touchpoints = import_count_30 + export_count_30
+        trend_signals = [
+            {
+                'title': 'Overdue Drift',
+                'value': len(overdue_items),
+                'meta': 'lines overdue',
+                'detail': f"{due_soon_count} due in the next 3 days",
+                'support': (
+                    'Recovery needed now.' if overdue_items else
+                    'Watch the next 72 hours.' if due_soon_count else
+                    'Queue is stable.'
+                ),
+                'tone': 'critical' if overdue_items else 'watch' if due_soon_count else 'calm',
+                'icon': 'fas fa-wave-square',
+            },
+            {
+                'title': 'Cross Creation',
+                'value': current_week_crosses,
+                'meta': 'crosses this week',
+                'detail': f"vs {previous_week_crosses} in the previous 7 days",
+                'support': (
+                    f"{cross_creation_delta:+d} week-over-week" if cross_creation_delta else
+                    'Flat week-over-week'
+                ),
+                'tone': 'today' if cross_creation_delta > 0 else 'watch' if cross_creation_delta < 0 else 'calm',
+                'icon': 'fas fa-dna',
+            },
+            {
+                'title': 'Import / Export',
+                'value': workbook_touchpoints,
+                'meta': 'workbook touchpoints in 30 days',
+                'detail': f"{import_count_30} imports, {export_count_30} exports",
+                'support': (
+                    f"{latest_workbook_activity['label']} {latest_workbook_activity['time']}" if latest_workbook_activity else
+                    'No recent workbook activity'
+                ),
+                'tone': 'watch' if workbook_touchpoints else 'calm',
+                'icon': 'fas fa-file-alt',
+            },
+        ]
+
+        last_activity = parsed_activities[0] if parsed_activities else None
+        snapshot = {
+            'active_lines': total_lines,
+            'tasks_today': tasks_today_total,
+            'attention_count': len(attention_items),
+            'upcoming_count': upcoming_total,
+            'healthy_share': healthy_share,
+            'weekly_average': round(weekly_flips / 7, 1),
+            'last_activity_at': last_activity['datetime'].strftime('%b %d, %H:%M') if last_activity else 'No recent activity',
+            'last_activity_copy': last_activity['activity'] if last_activity else 'Nothing logged yet.',
+        }
+
+        if attention_items:
+            hero_copy = (
+                f"{len(attention_items)} item{'s' if len(attention_items) != 1 else ''} need attention across "
+                f"{total_lines} active line{'s' if total_lines != 1 else ''}. Start with overdue flips, then clear today's queue."
+            )
+        elif tasks_today_total or upcoming_total:
+            hero_copy = (
+                f"Today's work is steady: {tasks_today_total} scheduled task{'s' if tasks_today_total != 1 else ''} today and "
+                f"{upcoming_total} more over the next week."
+            )
+        else:
+            hero_copy = (
+                f"The colony is stable with {total_lines} active line{'s' if total_lines != 1 else ''}. "
+                "Use the dashboard to review inventory health, tray headroom, and recent changes."
+            )
+
+        suggestions = []
+        if overdue_items:
+            suggestions.append({
+                'title': f"Clear {len(overdue_items)} overdue item{'s' if len(overdue_items) != 1 else ''}",
+                'copy': 'Work through the oldest flip delays first so tray timing stays recoverable.',
+                'href': url_for('flip.flip_interface'),
+                'label': 'Open flip desk',
+                'icon': 'fas fa-exclamation-triangle',
+                'tone': 'critical',
+            })
+        if schedule_today_count or due_today_items:
+            suggestions.append({
+                'title': 'Run today\'s queue',
+                'copy': 'Use the schedule view to batch the day and avoid context switching between trays.',
+                'href': url_for('flip.flip_schedule_display'),
+                'label': 'View schedule',
+                'icon': 'fas fa-calendar-day',
+                'tone': 'today',
+            })
+        if issue_items:
+            suggestions.append({
+                'title': f"Review {len(issue_items)} line{'s' if len(issue_items) != 1 else ''} showing issues",
+                'copy': 'Inspect flagged stocks and crosses before they turn into missed flips or stale metadata.',
+                'href': url_for('stock.stock_explorer'),
+                'label': 'Open explorer',
+                'icon': 'fas fa-search',
+                'tone': 'watch',
+            })
+        if tray_usage >= 85:
+            suggestions.append({
+                'title': 'Tray capacity is getting tight',
+                'copy': 'Create space now to avoid blocking new setups and recovery work later this week.',
+                'href': url_for('tray.tray_management'),
+                'label': 'Review trays',
+                'icon': 'fas fa-th-large',
+                'tone': 'watch',
+            })
+        if total_crosses == 0 and total_stocks:
+            suggestions.append({
+                'title': 'Plan the next cross',
+                'copy': 'You have stock inventory ready but no active crosses in play.',
+                'href': url_for('cross.add_cross'),
+                'label': 'Create cross',
+                'icon': 'fas fa-heart',
+                'tone': 'calm',
+            })
+        if is_admin:
+            suggestions.append({
+                'title': 'Protect the current dataset',
+                'copy': 'Export the workbook before large imports or metadata updates.',
+                'href': url_for('data.download_data_route'),
+                'label': 'Download data',
+                'icon': 'fas fa-file-export',
+                'tone': 'calm',
+            })
+        if not suggestions:
+            suggestions.append({
+                'title': 'Explore the live inventory',
+                'copy': 'Nothing is urgent right now. Use the explorers to audit line health and tray placement.',
+                'href': url_for('stock.stock_explorer'),
+                'label': 'Open stocks',
+                'icon': 'fas fa-vial',
+                'tone': 'calm',
+            })
+        suggestions = suggestions[:4]
 
         # Prepare stats for template
         stats = {
@@ -219,28 +649,73 @@ def home():
         return render_template(
             "home.html",
             username=username,
-            activities=processed_activities,
+            activities=activity_groups,
             schedule=todays_schedule,
             upcoming_schedule=upcoming_schedule,
+            upcoming_schedule_list=upcoming_schedule_list,
             overdue_items=sorted(overdue_items, key=lambda x: x['days_overdue'], reverse=True),
             due_today_items=due_today_items,
+            issue_items=issue_items,
+            attention_items=attention_items,
+            suggestions=suggestions,
+            snapshot=snapshot,
+            tray_summary=tray_summary,
+            tray_heatmaps=tray_heatmaps,
+            my_queue=my_queue,
+            trend_signals=trend_signals,
+            week_chart=week_chart,
+            busiest_day=busiest_day,
+            status_breakdown=status_breakdown,
+            hero_copy=hero_copy,
+            is_admin=is_admin,
             stats=stats,
             settings=settings,
             today_date=today.strftime('%B %d, %Y')
         )
 
     except Exception as e:
-        print(f"Error generating homepage for {username}: {e}")
-        import traceback
-        traceback.print_exc()
+        current_app.logger.exception("Error generating homepage for %s: %s", username, e)
         return render_template(
             "home.html",
             username=username,
-            activities={},
+            activities=[],
             schedule=[],
             upcoming_schedule={},
+            upcoming_schedule_list=[],
             overdue_items=[],
             due_today_items=[],
+            issue_items=[],
+            attention_items=[],
+            suggestions=[],
+            snapshot={
+                'active_lines': 0,
+                'tasks_today': 0,
+                'attention_count': 0,
+                'upcoming_count': 0,
+                'healthy_share': 0,
+                'weekly_average': 0,
+                'last_activity_at': 'No recent activity',
+                'last_activity_copy': 'Nothing logged yet.',
+            },
+            tray_summary={
+                'usage': 0,
+                'used_positions': 0,
+                'total_positions': 0,
+                'free_positions': 0,
+                'active_trays': 0,
+                'total_trays': 0,
+            },
+            tray_heatmaps=[],
+            my_queue=[],
+            trend_signals=[],
+            week_chart=[
+                {'label': day, 'short_label': day[:3], 'count': 0, 'height': 0}
+                for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            ],
+            busiest_day=None,
+            status_breakdown=[],
+            hero_copy='The dashboard is temporarily unavailable, but core navigation is still accessible.',
+            is_admin=is_admin,
             stats={
                 'total_stocks': 0, 
                 'total_crosses': 0, 
@@ -258,21 +733,25 @@ def home():
         )
 
 # Route to manually trigger the reminder task for testing
-@bp.route('/test_send_reminder')
+@bp.route('/test_send_reminder', methods=['POST'])
 @login_required
+@admin_required
+@limiter.limit("2 per hour")
 def test_send_reminder_route():
     try:
-        # Run the task directly (requires app context, which we have in a request)
-        schedule_daily_flip_reminders()
-        return "Test reminder task triggered!"
+        schedule_daily_flip_reminders(current_app._get_current_object())
+        return jsonify({"status": "success"})
     except Exception as e:
-        print(f"Error triggering test reminder: {e}")
-        return f"Error triggering test reminder: {e}", 500
+        current_app.logger.exception("Error triggering test reminder: %s", e)
+        return jsonify({"status": "error"}), 500
 
 @bp.route('/update_theme', methods=['POST'])
+@bp.route('/main/update_theme', methods=['POST'])
+@login_required
+@limiter.limit("30 per minute")
 def update_theme():
     if request.is_json:
-        data = request.get_json()
+        data = get_json_payload()
         theme = data.get('theme')
         if theme in ['light', 'dark']:
             session['theme'] = theme

@@ -2,20 +2,65 @@
 
 {% block title %}Cross Explorer{% endblock %}
 
+{% block body_class %}has-floating-cart{% endblock %}
+
 {% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/explorer_shared.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/cross_explorer.css') }}">
 {% endblock %}
 
 {% block content %}
-<div class="filters">
-    <h3>Filters</h3>
-    <div class="alert alert-info" role="alert">
-        <strong>Note:</strong> Stocks/Crosses with the status "No longer maintained" are excluded by default. To view them, please filter by the "No longer maintained" status.
+<div class="app-panel explorer-header">
+    <div>
+        <p class="app-kicker">Collection Browser</p>
+        <h1 class="app-page-title">Cross Explorer</h1>
+        <p class="app-page-subtitle">Review active crosses, switch perspectives quickly, and batch label, tray, or flip operations from one workspace.</p>
+    </div>
+    <div class="app-chip-row">
+        <span class="app-chip"><i class="fas fa-heart"></i> {{ crosses|length }} visible crosses</span>
+        <span class="app-chip"><i class="fas fa-layer-group"></i> Card and table views</span>
+    </div>
+</div>
+
+<div class="filters app-panel">
+    <div class="filter-panel-heading">
+        <div>
+            <p class="app-kicker">Filters</p>
+            <h2 class="filter-panel-title">Cross Filter Bar</h2>
+        </div>
+        <div class="filter-panel-meta">
+            <span class="app-chip"><i class="fas fa-sliders-h"></i> {{ crosses|length }} results</span>
+            <span class="app-chip filter-default-chip"><i class="fas fa-eye-slash"></i> Archived hidden by default</span>
+        </div>
     </div>
     {% include 'cross/filter_cross.html' %}
 </div>
-<div class="mb-3 d-flex justify-content-between">
-    <a href="{{ url_for('cross.add_cross') }}"><button class="btn btn-success">Add New Cross</button></a>
+{% if filter_state and (filter_state.filterMaleSpecies or filter_state.filterFemaleSpecies or filter_state.filterStatus or filter_state.filterFoodType or filter_state.filterTrayID or filter_state.searchQuery) %}
+<div class="app-panel active-filter-panel">
+    <div class="filter-summary-heading">
+        <p class="app-kicker">Applied Filters</p>
+        <p class="active-filter-copy">{{ crosses|length }} result{% if crosses|length != 1 %}s{% endif %}</p>
+    </div>
+    <div class="active-filter-actions">
+        <div class="app-chip-row">
+            {% if filter_state.filterMaleSpecies %}<span class="app-chip">Male species: {{ filter_state.filterMaleSpecies }}</span>{% endif %}
+            {% if filter_state.filterFemaleSpecies %}<span class="app-chip">Female species: {{ filter_state.filterFemaleSpecies }}</span>{% endif %}
+            {% if filter_state.filterStatus %}<span class="app-chip">Status: {{ filter_state.filterStatus }}</span>{% endif %}
+            {% if filter_state.filterFoodType %}<span class="app-chip">Food: {{ filter_state.filterFoodType }}</span>{% endif %}
+            {% if filter_state.filterTrayID %}<span class="app-chip">Tray: {{ filter_state.filterTrayID }}</span>{% endif %}
+            {% if filter_state.searchQuery %}<span class="app-chip">Search: {{ filter_state.searchQuery }}</span>{% endif %}
+        </div>
+        <form method="post" action="{{ url_for('cross.cross_explorer') }}">
+            <button type="submit" name="clear_filters" class="btn btn-outline-secondary">Clear All</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+<div class="explorer-toolbar mb-3">
+    <div class="app-toolbar">
+        <a href="{{ url_for('cross.add_cross') }}" class="btn btn-success">Add New Cross</a>
+        <span class="explorer-results-meta">{{ crosses|length }} cross{% if crosses|length != 1 %}es{% endif %} in view</span>
+    </div>
     <div class="view-toggle-container">
         <div class="btn-group" role="group">
             <button type="button" class="btn btn-outline-secondary active" id="cardViewBtn">
@@ -29,11 +74,18 @@
 </div>
 <div class="cross-container">
     <div class="cross-items-grid" id="cardView">
+        {% if not crosses %}
+        <div class="explorer-empty-state">
+            <i class="fas fa-inbox"></i>
+            <h3>No crosses match the current filters</h3>
+            <p>Adjust the filters above or create a new cross to populate this view.</p>
+        </div>
+        {% endif %}
         {% for cross in crosses %}
-        <div class="cross-item" data-status="{{ cross.Status }}" id="item-{{ loop.index }}" onclick="toggleCheckbox('cross{{ loop.index }}', event)">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="cross-item" data-status="{{ cross.Status }}" data-checkbox-id="cross{{ loop.index }}" id="item-{{ loop.index }}">
+            <div class="cross-item-header">
                 <div class="checkbox-and-badges">
-                    <input type="checkbox" id="cross{{ loop.index }}" onclick="toggleCheckbox('cross{{ loop.index }}', event)">
+                    <input type="checkbox" id="cross{{ loop.index }}" class="cross-selection-checkbox">
                     <div class="badges">
                         <span class="badge badge-info">{{ cross.FoodType }}</span>
                         <span class="badge badge-secondary">{{ cross.Status }}</span>
@@ -42,23 +94,23 @@
                         {% else %}
                         <span class="badge badge-species">♂ {{ cross.MaleSpecies|default('D. melanogaster') }} × ♀ {{ cross.FemaleSpecies|default('D. melanogaster') }}</span>
                         {% endif %}
-                        <span class="badge badge-flip" style="background-color:{{ cross.FlipInColor }}">{{ cross.FlipIn }}</span>
+                        <span class="badge badge-flip {{ cross.FlipInClass }}">{{ cross.FlipIn }}</span>
                         <span class="badge badge-eclose">Ecloses in {{ cross.EclosesIn }}</span>
                     </div>
                 </div>
-                <div style="display: flex; align-items: center;">
-                    <button class="btn btn-link btn-sm expand-btn" onclick="event.stopPropagation(); toggleDetails({{ loop.index }})">
+                <div class="cross-item-actions">
+                    <button type="button" class="btn btn-link btn-sm expand-btn" data-action="toggle-details" data-index="{{ loop.index }}">
                         <i class="fas fa-chevron-down" id="expand-icon-{{ loop.index }}"></i>
                     </button>
-                    <button class="btn btn-link btn-sm duplicate-cross-btn" onclick="event.stopPropagation(); duplicateCross('{{ cross.UniqueID }}')">
+                    <button type="button" class="btn btn-link btn-sm duplicate-cross-btn" data-action="duplicate-cross" data-unique-id="{{ cross.UniqueID }}">
                         <i class="fas fa-clone"></i>
                     </button>
-                    <button class="btn btn-link btn-sm view-details-btn" onclick="event.stopPropagation(); viewDetails('{{ cross.UniqueID }}')">
+                    <button type="button" class="btn btn-link btn-sm view-details-btn" data-action="view-cross" data-unique-id="{{ cross.UniqueID }}">
                         <i class="fas fa-external-link-alt"></i>
                     </button>
                 </div>
             </div>
-            <div style="flex-grow: 1; padding-top: 10px;">
+            <div class="cross-item-summary">
                 <h5>
                     {% if cross.TrayID and cross.TrayPosition %}
                         {{ cross.TrayID }}-{{ cross.TrayPosition }}
@@ -71,15 +123,15 @@
                     <strong>Unique Identifier:</strong> <i>{{ cross.UniqueID }}</i>
                 </p>
             </div>
-            <div class="details" id="details-{{ loop.index }}" style="display: none; width: 100%;">
-                <div style="display: flex; flex-wrap: wrap;">
-                    <div style="flex: 1;">
+            <div class="details is-hidden" id="details-{{ loop.index }}">
+                <div class="details-grid">
+                    <div class="details-col">
                         <p><strong>Male Unique ID:</strong> {{ cross.MaleUniqueID }}</p>
                         <p><strong>Female Unique ID:</strong> {{ cross.FemaleUniqueID }}</p>
                         <p><strong>Comments:</strong> {{ cross.Comments }}</p>
                         <p><strong>Creation Date:</strong> {{ cross.CreationDate }}</p>
                     </div>
-                    <div style="flex: 1;">
+                    <div class="details-col">
                         <p><strong>Last Flip Date:</strong> {{ cross.LastFlipDate }}</p>
                         <p><strong>Data Modified Date:</strong> {{ cross.DataModifiedDate }}</p>
                     </div>
@@ -89,7 +141,7 @@
         {% endfor %}
     </div>
     
-    <div id="tableView" class="table-responsive" style="display: none;">
+    <div id="tableView" class="table-responsive is-hidden">
         <table class="table table-striped table-hover">
             <thead>
                 <tr>
@@ -107,10 +159,17 @@
                 </tr>
             </thead>
             <tbody>
+                {% if not crosses %}
+                <tr>
+                    <td colspan="11">
+                        <div class="explorer-empty-table-state">No crosses match the current filters.</div>
+                    </td>
+                </tr>
+                {% endif %}
                 {% for cross in crosses %}
                 <tr class="cross-row" data-status="{{ cross.Status }}" data-index="{{ loop.index }}">
                     <td>
-                        <input type="checkbox" id="crossTable{{ loop.index }}" onclick="toggleTableCheckbox('crossTable{{ loop.index }}', event)">
+                        <input type="checkbox" id="crossTable{{ loop.index }}" class="cross-table-selection-checkbox">
                     </td>
                     <td class="tray-cell">
                         {% if cross.TrayID and cross.TrayPosition %}
@@ -140,22 +199,22 @@
                             {{ cross.Status }}
                         </span>
                     </td>
-                    <td><span style="color:{{ cross.FlipInColor }}; font-weight: bold;">{{ cross.FlipIn }}</span></td>
+                    <td><span class="flip-value {{ cross.FlipInClass }}">{{ cross.FlipIn }}</span></td>
                     <td>{{ cross.EclosesIn }}</td>
                     <td>
                         <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-primary btn-sm" onclick="viewDetails('{{ cross.UniqueID }}')" title="View Details">
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-action="view-cross" data-unique-id="{{ cross.UniqueID }}" title="View Details">
                                 <i class="fas fa-eye"></i>
                             </button>
-                            <button class="btn btn-outline-secondary btn-sm" onclick="duplicateCross('{{ cross.UniqueID }}')" title="Duplicate Cross">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-action="duplicate-cross" data-unique-id="{{ cross.UniqueID }}" title="Duplicate Cross">
                                 <i class="fas fa-clone"></i>
                             </button>
                             <button class="btn btn-outline-info btn-sm show-details-btn" data-index="{{ loop.index }}" title="Show Details">
                                 <i class="fas fa-info-circle"></i>
                             </button>
                         </div>
-                        <div class="row-details" id="tableDetails-{{ loop.index }}" style="display: none;">
-                            <div class="mt-2 p-2 border rounded">
+                        <div class="row-details is-hidden" id="tableDetails-{{ loop.index }}">
+                            <div class="details-panel mt-2">
                                 <p><strong>Unique ID:</strong> {{ cross.UniqueID }}</p>
                                 <p><strong>Male Unique ID:</strong> {{ cross.MaleUniqueID }}</p>
                                 <p><strong>Female Unique ID:</strong> {{ cross.FemaleUniqueID }}</p>
@@ -174,19 +233,19 @@
 </div>
 
 <div class="floating-cart-container">
-    <div class="cart-header" onclick="toggleCart()">
+    <div class="cart-header" data-cart-toggle>
         <h3>Cart (<span id="cartCount">0</span> items)</h3>
         <div class="cart-header-actions">
-            <button type="button" id="addToCartBtn" class="btn btn-link" title="Add to Cart" onclick="event.stopPropagation();">
+            <button type="button" id="addToCartBtn" class="btn btn-link" title="Add selected to cart" data-cart-control>
                 <i class="fas fa-cart-plus"></i>
             </button>
-            <button type="button" id="selectAllBtn" class="btn btn-link" title="Select All" onclick="event.stopPropagation();">
+            <button type="button" id="selectAllBtn" class="btn btn-link" title="Select visible" data-cart-control>
                 <i class="fas fa-check-square"></i>
             </button>
-            <button type="button" id="deselectAllBtn" class="btn btn-link" title="Deselect All" onclick="event.stopPropagation();">
+            <button type="button" id="deselectAllBtn" class="btn btn-link" title="Clear selection" data-cart-control>
                 <i class="fas fa-square"></i>
             </button>
-            <button type="button" id="emptyCartBtn" class="btn btn-link" title="Empty Cart" onclick="event.stopPropagation();">
+            <button type="button" id="emptyCartBtn" class="btn btn-link" title="Empty Cart" data-cart-control>
                 <i class="fas fa-trash"></i>
             </button>
             <button class="toggle-cart-btn">
@@ -308,7 +367,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // Define URLs for JavaScript using url_for
     const viewCrossUrlBase = "{{ url_for('cross.view_cross', unique_id='UNIQUE_ID_PLACEHOLDER') }}";
     const addCrossUrlBase = "{{ url_for('cross.add_cross', unique_id='UNIQUE_ID_PLACEHOLDER') }}";
@@ -318,6 +377,6 @@
     const deleteCrossUrl = "{{ url_for('cross.delete_cross_permanently') }}";
     const filterStatus = "{{ filter_state.filterStatus }}";
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
-<script src="{{ url_for('static', filename='js/cross_explorer.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/explorer_shared.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/cross_explorer.js') }}"></script>
 {% endblock %}

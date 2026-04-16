@@ -1,10 +1,24 @@
 from datetime import datetime
+from html import escape
 
+from flask import current_app
 from flask_mail import Message
 
 # Import app context variables and mongo utils
 from flymanager.app import db, mail
 from flymanager.utils.mongo import get_flip_schedule, get_user_email
+
+
+def mail_is_configured():
+    """Return True when outbound mail has enough configuration to send."""
+    if current_app.config.get("MAIL_SUPPRESS_SEND"):
+        return False
+
+    required_values = (
+        current_app.config.get("MAIL_SERVER"),
+        current_app.config.get("MAIL_DEFAULT_SENDER"),
+    )
+    return all(required_values)
 
 
 def send_flip_reminder_email(username):
@@ -14,12 +28,16 @@ def send_flip_reminder_email(username):
     """
     today = datetime.now().strftime("%Y-%m-%d")
     try:
+        if not mail_is_configured():
+            current_app.logger.info("Mail is not configured. Skipping reminder email delivery.")
+            return
+
         # These functions need access to the 'db' object from the app context
         schedule = get_flip_schedule(username, db)
         user_email = get_user_email(username, db)
 
         if not user_email:
-            print(f"No email found for user {username}. Skipping reminder.")
+            current_app.logger.info("No email found for user %s. Skipping reminder.", username)
             return
 
         overdue_flips = []
@@ -32,8 +50,12 @@ def send_flip_reminder_email(username):
 
         if num_vials == 0:
             # Optionally send a "No flips today" email or just log
-            print(f"No flips scheduled or overdue for {today} for {username}")
+            current_app.logger.info(
+                "No flips scheduled or overdue for %s for %s", today, username
+            )
             # return # Uncomment if you don't want emails when there's nothing to flip
+
+        safe_username = escape(username)
 
         # Compose the email subject
         if overdue_flips and today_schedule:
@@ -195,7 +217,7 @@ def send_flip_reminder_email(username):
                 
                 <div class="content">
                     <div class="greeting">
-                        Hello <strong>{username}</strong>,
+                        Hello <strong>{safe_username}</strong>,
                     </div>"""
 
         # Add overdue flips section
@@ -208,7 +230,7 @@ def send_flip_reminder_email(username):
                         </h2>
                         <ul class="flip-list">"""
             for overdue_item in overdue_flips:
-                email_body += f'<li class="flip-item overdue">{overdue_item}</li>'
+                email_body += f'<li class="flip-item overdue">{escape(overdue_item)}</li>'
             email_body += """
                         </ul>
                     </div>
@@ -225,7 +247,7 @@ def send_flip_reminder_email(username):
         if today_schedule:
             email_body += '<ul class="flip-list">'
             for item in today_schedule:
-                email_body += f'<li class="flip-item today">{item}</li>'
+                email_body += f'<li class="flip-item today">{escape(item)}</li>'
             email_body += "</ul>"
         else:
             email_body += '<div class="no-flips-message">🎉 No flips scheduled for today! You can take a breather.</div>'
@@ -245,10 +267,59 @@ def send_flip_reminder_email(username):
         # Send the email using the 'mail' object from the app context
         msg = Message(subject=email_subject, recipients=[user_email], html=email_body)
         mail.send(msg)
-        print(f"Flip reminder email sent to {username} at {user_email}")
+        current_app.logger.info("Flip reminder email sent to %s at %s", username, user_email)
 
     except Exception as e:
-        print(f"Failed to send flip reminder email to {username}: {e}")
-        import traceback
+        current_app.logger.exception(
+            "Failed to send flip reminder email to %s: %s", username, e
+        )
 
-        traceback.print_exc()  # Log full error for debugging
+
+def send_password_reset_email(username, reset_url):
+    """Send a password reset link to the user's stored recovery email."""
+    try:
+        if not mail_is_configured():
+            current_app.logger.info(
+                "Mail is not configured. Skipping password reset email delivery."
+            )
+            return False
+
+        user_email = get_user_email(username, db)
+        if not user_email:
+            current_app.logger.info(
+                "No recovery email found for user %s. Skipping password reset email.",
+                username,
+            )
+            return False
+
+        safe_username = escape(username)
+        safe_reset_url = escape(reset_url)
+        email_subject = "Reset your D. manager password"
+        email_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #1f2933; line-height: 1.6;">
+            <div style="max-width: 640px; margin: 0 auto; padding: 24px;">
+                <h2 style="margin-bottom: 8px;">Password reset requested</h2>
+                <p>Hello <strong>{safe_username}</strong>,</p>
+                <p>A request was made to reset your D. manager password. Use the button below within the next hour to choose a new password.</p>
+                <p style="margin: 28px 0;">
+                    <a href="{safe_reset_url}" style="background: #2563eb; color: #ffffff; padding: 12px 18px; border-radius: 8px; text-decoration: none; font-weight: 600;">Reset password</a>
+                </p>
+                <p>If you did not request this, you can ignore this email.</p>
+                <p style="font-size: 0.9rem; color: #52606d;">If the button does not work, paste this link into your browser:</p>
+                <p style="font-size: 0.9rem; word-break: break-all; color: #52606d;">{safe_reset_url}</p>
+            </div>
+        </body>
+        </html>
+        """
+        msg = Message(subject=email_subject, recipients=[user_email], html=email_body)
+        mail.send(msg)
+        current_app.logger.info(
+            "Password reset email sent to %s at %s", username, user_email
+        )
+        return True
+    except Exception as e:
+        current_app.logger.exception(
+            "Failed to send password reset email to %s: %s", username, e
+        )
+        return False
