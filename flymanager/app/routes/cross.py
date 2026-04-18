@@ -1,29 +1,256 @@
 import datetime
 
-from flask import (Blueprint, current_app, jsonify, redirect, render_template,
-                   request, session, url_for)
+from flask import (Blueprint, current_app, flash, jsonify, redirect,
+                   render_template, request, session, url_for)
 from fuzzywuzzy import fuzz
 
 from flymanager.app import db
 from flymanager.app.routes.auth import login_required
-from flymanager.app.routes.explorer_utils import (collect_unique_values,
-                                                  get_explorer_filter_state,
-                                                  set_flip_display_fields)
+from flymanager.app.routes.explorer_utils import (
+    collect_unique_values, get_explorer_filter_state,
+    get_explorer_pagination_state, paginate_explorer_records,
+    set_flip_display_fields)
 from flymanager.app.security import (get_json_payload, limiter,
                                      normalize_identifier_list,
                                      parse_int_value, require_confirmation)
 from flymanager.app.settings import DEFAULT_CROSS_PROPERTY_VALUES
-from flymanager.utils.genetics import cross_genotypes, qc_genotype
+from flymanager.utils.genetics import qc_genotype
 from flymanager.utils.labels import generate_label_pdf
-from flymanager.utils.mongo import (add_metadata, add_to_cross, edit_cross,
-                                    get_all_genotypes, get_eclosion_in,
+from flymanager.utils.mongo import (OperationLockConflict, add_metadata,
+                                    add_to_cross, edit_cross,
+                                    get_accessible_cross,
+                                    get_accessible_crosses, get_all_genotypes,
+                                    get_direct_reports, get_eclosion_in,
                                     get_flip_in, get_metadata,
-                                    get_user_crosses, get_user_initials,
-                                    update_cross_vials, write_activity)
+                                    get_user_initials, hold_operation_lock,
+                                    update_cross_vials,
+                                    update_document_assignment, write_activity)
+from flymanager.utils.phenotypes.image_library import \
+    select_prediction_reference_images
+from flymanager.utils.phenotypes.predictor import (build_cross_phenotype_cache,
+                                                   get_cached_cross_phenotype)
 from flymanager.utils.scanner import get_available_ports
 from flymanager.utils.utils import clean_tagify_data
 
 bp = Blueprint("cross", __name__)  # url_prefix defined in app/__init__
+
+
+def _get_cross_phenotype_for_view(cross):
+    def _normalize_simulation_summary(summary):
+        summary = summary or {}
+        best_sortable_class = summary.get("best_sortable_class") or {}
+        return {
+            "raw_class_count": summary.get("raw_class_count", 0),
+            "viable_class_count": summary.get("viable_class_count", 0),
+            "pruned_class_count": summary.get("pruned_class_count", 0),
+            "viable_fraction": summary.get("viable_fraction", 0.0),
+            "identifiable_viable_fraction": summary.get("identifiable_viable_fraction", 0.0),
+            "confident_sortable_fraction": summary.get("confident_sortable_fraction", 0.0),
+            "low_confidence_sorting_fraction": summary.get("low_confidence_sorting_fraction", 0.0),
+            "weighted_identifiability_score": summary.get("weighted_identifiability_score", 0.0),
+            "estimated_sortable_targets_per_vial": summary.get("estimated_sortable_targets_per_vial", 0.0),
+            "visible_marker_class_count": summary.get("visible_marker_class_count", 0),
+            "best_sortable_class": {
+                **best_sortable_class,
+                "identifiability": best_sortable_class.get("identifiability") or {},
+                "yield_estimate": best_sortable_class.get("yield_estimate") or {},
+            } if best_sortable_class else None,
+        }
+
+    def _normalize_direction_evaluation(direction_evaluation):
+        if not isinstance(direction_evaluation, dict):
+            return None
+
+        def _normalize_side(side):
+            payload = direction_evaluation.get(side) or {}
+            return {
+                "male_genotype": payload.get("male_genotype", ""),
+                "female_genotype": payload.get("female_genotype", ""),
+                "score": payload.get("score", 0.0),
+                "summary": _normalize_simulation_summary(payload.get("summary") or {}),
+            }
+
+        return {
+            "forward": _normalize_side("forward"),
+            "reverse": _normalize_side("reverse"),
+            "recommended_direction": direction_evaluation.get("recommended_direction", "equivalent"),
+            "recommended_cross": direction_evaluation.get("recommended_cross"),
+            "same_outcome": bool(direction_evaluation.get("same_outcome")),
+            "rationale": list(direction_evaluation.get("rationale") or []),
+            "operational_notes": list(direction_evaluation.get("operational_notes") or []),
+        }
+
+    raw_cache = cross.get("PhenotypeCache")
+    phenotype_cache = get_cached_cross_phenotype(cross)
+    if not phenotype_cache and isinstance(raw_cache, dict):
+        male_genotype = str(cross.get("MaleGenotype", "")).strip()
+        female_genotype = str(cross.get("FemaleGenotype", "")).strip()
+        if male_genotype and female_genotype:
+            phenotype_cache = build_cross_phenotype_cache(male_genotype, female_genotype)
+    if phenotype_cache:
+        parent_phenotypes = phenotype_cache["parentPhenotypes"]
+        normalized_parent_phenotypes = {
+            **parent_phenotypes,
+            "male": {
+                **parent_phenotypes.get("male", {}),
+                "construct_annotation_labels": parent_phenotypes.get("male", {}).get("construct_annotation_labels", []),
+                "split_system_labels": parent_phenotypes.get("male", {}).get("split_system_labels", []),
+                "provenance_summary": parent_phenotypes.get("male", {}).get("provenance_summary", {"counts": {}, "primary_basis": "unknown"}),
+                "viability_status": parent_phenotypes.get("male", {}).get("viability_status", "unknown"),
+                "fertility_status": parent_phenotypes.get("male", {}).get("fertility_status", "unknown"),
+                "lethal_alleles": parent_phenotypes.get("male", {}).get("lethal_alleles", []),
+                "sterile_alleles": parent_phenotypes.get("male", {}).get("sterile_alleles", []),
+                "reference_images": select_prediction_reference_images(
+                    parent_phenotypes.get("male", {}),
+                    base_dir=current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH"),
+                    limit=3,
+                ),
+            },
+            "female": {
+                **parent_phenotypes.get("female", {}),
+                "construct_annotation_labels": parent_phenotypes.get("female", {}).get("construct_annotation_labels", []),
+                "split_system_labels": parent_phenotypes.get("female", {}).get("split_system_labels", []),
+                "provenance_summary": parent_phenotypes.get("female", {}).get("provenance_summary", {"counts": {}, "primary_basis": "unknown"}),
+                "viability_status": parent_phenotypes.get("female", {}).get("viability_status", "unknown"),
+                "fertility_status": parent_phenotypes.get("female", {}).get("fertility_status", "unknown"),
+                "lethal_alleles": parent_phenotypes.get("female", {}).get("lethal_alleles", []),
+                "sterile_alleles": parent_phenotypes.get("female", {}).get("sterile_alleles", []),
+                "reference_images": select_prediction_reference_images(
+                    parent_phenotypes.get("female", {}),
+                    base_dir=current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH"),
+                    limit=3,
+                ),
+            },
+        }
+        normalized_predicted_offspring = []
+        for offspring in phenotype_cache["predictedOffspring"]:
+            phenotype = offspring.get("phenotype", {})
+            identifiability = offspring.get("identifiability") or {}
+            validation = offspring.get("validation") or {}
+            yield_estimate = offspring.get("yield_estimate") or {}
+            normalized_predicted_offspring.append(
+                {
+                    **offspring,
+                    "is_viable": offspring.get("is_viable", True),
+                    "pruned": offspring.get("pruned", False),
+                    "prune_reasons": offspring.get("prune_reasons", []),
+                    "viable_probability": offspring.get("viable_probability", offspring.get("probability", 0.0)),
+                    "viable_probability_percent": offspring.get("viable_probability_percent", offspring.get("probability_percent", 0.0)),
+                    "phenotype": {
+                        **phenotype,
+                        "construct_annotation_labels": phenotype.get("construct_annotation_labels", []),
+                        "split_system_labels": phenotype.get("split_system_labels", []),
+                        "provenance_summary": phenotype.get("provenance_summary", {"counts": {}, "primary_basis": "unknown"}),
+                        "viability_status": phenotype.get("viability_status", "unknown"),
+                        "fertility_status": phenotype.get("fertility_status", "unknown"),
+                        "lethal_alleles": phenotype.get("lethal_alleles", []),
+                        "sterile_alleles": phenotype.get("sterile_alleles", []),
+                        "stage_specific_effects": phenotype.get("stage_specific_effects", []),
+                        "reference_images": select_prediction_reference_images(
+                            phenotype,
+                            base_dir=current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH"),
+                            limit=3,
+                        ),
+                    },
+                    "identifiability": {
+                        "label": identifiability.get("label", "Sortability unavailable"),
+                        "confidence_label": identifiability.get("confidence_label", "low"),
+                        "score": identifiability.get("score", 0.0),
+                        "identifiable": identifiability.get("identifiable", False),
+                        "distinguishing_features": identifiability.get("distinguishing_features", []),
+                        "exclusion_features": identifiability.get("exclusion_features", []),
+                        "low_confidence_features": identifiability.get("low_confidence_features", []),
+                        "confusable_genotypes": identifiability.get("confusable_genotypes", []),
+                        "confusable_rows": identifiability.get("confusable_rows", []),
+                        "warnings": identifiability.get("warnings", []),
+                        "selection_instructions": identifiability.get("selection_instructions", ""),
+                        "depends_on_low_confidence_sorting": identifiability.get("depends_on_low_confidence_sorting", False),
+                        "uses_exclusion_sorting": identifiability.get("uses_exclusion_sorting", False),
+                    },
+                    "validation": {
+                        "viable": validation.get("viable", False),
+                        "fertile": validation.get("fertile", False),
+                        "maintainable": validation.get("maintainable", False),
+                        "requires_recombination": validation.get("requires_recombination", False),
+                        "impossible_reasons": validation.get("impossible_reasons", []),
+                        "unsupported_reasons": validation.get("unsupported_reasons", []),
+                        "issues": validation.get("issues", []),
+                    },
+                    "yield_estimate": {
+                        "expected_targets_per_vial": yield_estimate.get("expected_targets_per_vial", 0.0),
+                        "yield_label": yield_estimate.get("yield_label", "low"),
+                        "recommended_parallel_vials": yield_estimate.get("recommended_parallel_vials", 0),
+                    },
+                }
+            )
+        return (
+            normalized_parent_phenotypes,
+            normalized_predicted_offspring,
+            {
+                "cached_at": phenotype_cache.get("computedAt", ""),
+                "is_cached": True,
+                "simulation_summary": _normalize_simulation_summary(
+                    phenotype_cache.get("simulationSummary") or {}
+                ),
+                "direction_evaluation": _normalize_direction_evaluation(
+                    phenotype_cache.get("directionEvaluation")
+                ),
+            },
+        )
+
+    parent_phenotypes = {
+        "male": {
+            "summary": "Phenotype cache not generated",
+            "confidence_label": "low",
+            "construct_annotation_labels": [],
+            "split_system_labels": [],
+            "provenance_summary": {"counts": {}, "primary_basis": "unknown"},
+            "viability_status": "unknown",
+            "fertility_status": "unknown",
+            "lethal_alleles": [],
+            "sterile_alleles": [],
+            "reference_images": [],
+            "warnings": [
+                "Refresh the cache from this record to generate phenotype previews.",
+            ],
+        },
+        "female": {
+            "summary": "Phenotype cache not generated",
+            "confidence_label": "low",
+            "construct_annotation_labels": [],
+            "split_system_labels": [],
+            "provenance_summary": {"counts": {}, "primary_basis": "unknown"},
+            "viability_status": "unknown",
+            "fertility_status": "unknown",
+            "lethal_alleles": [],
+            "sterile_alleles": [],
+            "reference_images": [],
+            "warnings": [
+                "Refresh the cache from this record to generate phenotype previews.",
+            ],
+        },
+        "summary": "Phenotype cache not generated",
+        "source_counts": {},
+    }
+    return parent_phenotypes, [], {
+        "cached_at": "",
+        "is_cached": False,
+        "simulation_summary": None,
+        "direction_evaluation": None,
+    }
+
+
+def _get_cross_phenotype_summary(cross):
+    phenotype_cache = get_cached_cross_phenotype(cross)
+    raw_cache = cross.get("PhenotypeCache")
+    if not phenotype_cache and isinstance(raw_cache, dict):
+        male_genotype = str(cross.get("MaleGenotype", "")).strip()
+        female_genotype = str(cross.get("FemaleGenotype", "")).strip()
+        if male_genotype and female_genotype:
+            phenotype_cache = build_cross_phenotype_cache(male_genotype, female_genotype)
+    if not phenotype_cache:
+        return "Refresh in record"
+    return phenotype_cache["parentPhenotypes"].get("summary", "Phenotype unavailable")
 
 
 @bp.route("/cross_explorer", methods=["GET", "POST"])
@@ -31,24 +258,14 @@ bp = Blueprint("cross", __name__)  # url_prefix defined in app/__init__
 def cross_explorer():
     username = session.get("username")
 
-    crosses = get_user_crosses(username, db)
+    crosses = get_accessible_crosses(username, db, annotate=True)
     all_crosses_for_filters = list(crosses)
 
-    # nested sort by TrayID and TrayPosition
-    crosses = sorted(
-        crosses,
-        key=lambda x: (
-            str(x["TrayID"]),
-            int(float(x["TrayPosition"])) if x["TrayPosition"] != "" else 0,
-        ),
-    )
-
-    # add FlipIn and EclosesIn fields
-    for cross in crosses:
-        cross["FlipIn"] = get_flip_in(cross)
-        set_flip_display_fields(cross, raw_value=cross["FlipIn"], display_field="FlipIn")
-
-        cross["EclosesIn"] = get_eclosion_in(cross)
+    scope_counts = {
+        "maintain": sum(1 for cross in all_crosses_for_filters if cross.get("AssignmentScope") != "assigned_out"),
+        "assigned_out": sum(1 for cross in all_crosses_for_filters if cross.get("AssignmentScope") == "assigned_out"),
+        "incoming": sum(1 for cross in all_crosses_for_filters if cross.get("AssignmentScope") == "incoming"),
+    }
 
     # Extract unique values for filtering from all crosses (unfiltered)
     unique_values = collect_unique_values(
@@ -62,6 +279,9 @@ def cross_explorer():
         },
     )
 
+    pagination_state = get_explorer_pagination_state(
+        session_key="cross_explorer_pagination",
+    )
     filter_state, redirect_response = get_explorer_filter_state(
         session_key="filter_state",
         clear_endpoint="cross.cross_explorer",
@@ -78,6 +298,13 @@ def cross_explorer():
         return redirect_response
 
     filtered_crosses = _apply_cross_filters(crosses, filter_state)
+    filtered_crosses = sorted(
+        filtered_crosses,
+        key=lambda cross: (
+            str(cross.get("TrayID", "")),
+            int(float(cross.get("TrayPosition", "0") or "0")),
+        ),
+    )
 
     if filter_state:
         unique_values = collect_unique_values(
@@ -92,13 +319,49 @@ def cross_explorer():
             {"Status": lambda cross: cross.get("Status")},
         )["Status"]
 
+    pagination = paginate_explorer_records(
+        filtered_crosses,
+        page=pagination_state["page"],
+        per_page=pagination_state["per_page"],
+        per_page_value=pagination_state["per_page_value"],
+    )
+    pagination["per_page_options"] = pagination_state["per_page_options"]
+    page_crosses = pagination["items"]
+
+    for cross in page_crosses:
+        cross["FlipIn"] = get_flip_in(cross)
+        set_flip_display_fields(cross, raw_value=cross["FlipIn"], display_field="FlipIn")
+        cross["EclosesIn"] = get_eclosion_in(cross)
+        cross["ParentPhenotypeGuess"] = _get_cross_phenotype_summary(cross)
+
     return render_template(
         "cross/cross_explorer.html",
         username=username,
-        crosses=filtered_crosses,
+        crosses=page_crosses,
+        scope_counts=scope_counts,
         unique_values=unique_values,
         filter_state=filter_state,
+        pagination=pagination,
     )
+
+
+@bp.route("/cross_explorer/selection", methods=["GET"])
+@login_required
+def cross_explorer_selection():
+    username = session.get("username")
+    crosses = get_accessible_crosses(username, db, annotate=False)
+    filter_state = session.get("filter_state", {})
+    filtered_crosses = _apply_cross_filters(crosses, filter_state)
+    filtered_crosses = sorted(
+        filtered_crosses,
+        key=lambda cross: (
+            str(cross.get("TrayID", "")),
+            int(float(cross.get("TrayPosition", "0") or "0")),
+        ),
+    )
+
+    items = [_build_cross_selection_item(cross) for cross in filtered_crosses]
+    return jsonify({"count": len(items), "items": items})
 
 
 def _apply_cross_filters(crosses, filters):
@@ -176,6 +439,26 @@ def _apply_cross_filters(crosses, filters):
     return filtered_crosses
 
 
+def _build_cross_selection_item(cross):
+    tray_id = str(cross.get("TrayID", "") or "").strip()
+    tray_position = str(cross.get("TrayPosition", "") or "").strip()
+
+    if tray_id and tray_position:
+        identifier = f"Tray {tray_id}-{tray_position}"
+    elif tray_id:
+        identifier = f"Tray {tray_id}"
+    else:
+        identifier = "Unassigned tray"
+
+    return {
+        "id": str(cross.get("UniqueID", "") or "").strip(),
+        "quantity": 1,
+        "identifier": identifier,
+        "name": str(cross.get("Name", "") or "").strip(),
+        "uid": str(cross.get("UniqueID", "") or "").strip(),
+    }
+
+
 @bp.route("/add_cross", methods=["GET", "POST"])
 @bp.route("/add_cross/<unique_id>", methods=["GET", "POST"])
 @login_required
@@ -208,7 +491,7 @@ def add_cross(unique_id=None):
     # If a unique_id is provided, fetch the cross data to duplicate it
     if unique_id and request.method == "GET":
         try:
-            cross = db["crosses"].find_one({"UniqueID": unique_id})
+            cross = get_accessible_cross(username, unique_id, db)
             if cross:
                 cross_data = {
                     "maleUniqueID": cross["MaleUniqueID"],
@@ -363,9 +646,13 @@ def view_cross(unique_id):
 
     # Fetch cross data
     try:
-        cross = db["crosses"].find_one({"UniqueID": unique_id, "User": username})
+        cross = get_accessible_cross(username, unique_id, db, annotate=True)
         if not cross:
-            return jsonify({"error": "Cross not found."}), 404
+            return redirect(url_for("cross.cross_explorer"))
+
+        owner_username = cross.get("User", "")
+        can_edit_record = bool(cross.get("ViewerCanEdit"))
+        direct_reports = get_direct_reports(username, db) if can_edit_record else []
 
         # Prepare data for template display
         cross_data = {
@@ -414,18 +701,23 @@ def view_cross(unique_id):
             "modificationLog": str(cross.get("ModificationLog", "")).replace(
                 "; ", "\n"
             ),
+            "ownerUser": cross.get("OwnerUser", owner_username),
+            "assignedTo": cross.get("AssignedTo", ""),
+            "maintainerUser": cross.get("MaintainerUser", owner_username),
+            "assignmentScopeLabel": cross.get("AssignmentScopeLabel", "Maintain"),
+            "assignmentScopeDetail": cross.get("AssignmentScopeDetail", "Owned by you"),
         }
     except Exception as e:
         print(f"Error fetching cross {unique_id} for view: {e}")
-        return jsonify({"error": "Error fetching cross data."}), 500
+        return redirect(url_for("cross.cross_explorer"))
 
-    # Predict offspring genotypes
-    predicted_offspring = cross_genotypes(
-        cross_data["maleGenotype"], cross_data["femaleGenotype"]
-    )
+    parent_phenotypes, predicted_offspring, phenotype_cache_meta = _get_cross_phenotype_for_view(cross)
 
     if request.method == "POST":
         try:
+            if not can_edit_record:
+                raise ValueError("Only the owner can edit cross metadata.")
+
             # Process input data
             male_genotype_input = clean_tagify_data(request.form.get("maleGenotype"))[0]
             female_genotype_input = clean_tagify_data(
@@ -501,23 +793,25 @@ def view_cross(unique_id):
                     food_types=food_types,
                     genotypes=genotypes,
                     cross_data=cross_data,
+                    parent_phenotypes=parent_phenotypes,
                     predicted_offspring=predicted_offspring,
+                    phenotype_cache_meta=phenotype_cache_meta,
                     error=error_message,
                     message="No changes detected.",
                 )
 
             # Edit cross in the user's collection
-            success = edit_cross(username, unique_id, db, changed_fields)
+            success = edit_cross(owner_username, unique_id, db, changed_fields)
 
             if success:
                 # Get the updated cross data
                 try:
                     edited_cross = db["crosses"].find_one(
-                        {"UniqueID": unique_id, "User": username}
+                        {"UniqueID": unique_id, "User": owner_username}
                     )
                     if edited_cross:
                         # Update the cross vials
-                        update_cross_vials(edited_cross, username, db)
+                        update_cross_vials(edited_cross, owner_username, db)
                         print(f"Vials updated for edited cross {unique_id}.")
                     else:
                         print(
@@ -560,9 +854,73 @@ def view_cross(unique_id):
         food_types=food_types,
         genotypes=genotypes,
         cross_data=cross_data,
+        parent_phenotypes=parent_phenotypes,
         predicted_offspring=predicted_offspring,
+        phenotype_cache_meta=phenotype_cache_meta,
+        can_edit_record=can_edit_record,
+        direct_reports=direct_reports,
         error=error_message,
     )
+
+
+@bp.route("/assign_cross/<unique_id>", methods=["POST"])
+@login_required
+@limiter.limit("20 per hour")
+def assign_cross(unique_id):
+    username = session.get("username")
+    assignee = request.form.get("assignee", "")
+
+    cross = get_accessible_cross(username, unique_id, db, annotate=True)
+    if not cross or not cross.get("ViewerCanEdit"):
+        return redirect(url_for("cross.view_cross", unique_id=unique_id))
+
+    success, error_message = update_document_assignment(
+        "crosses",
+        username,
+        unique_id,
+        assignee,
+        db,
+    )
+    if not success:
+        return redirect(url_for("cross.view_cross", unique_id=unique_id))
+
+    write_activity(username, f"Updated cross assignment for {unique_id}", db)
+    return redirect(url_for("cross.view_cross", unique_id=unique_id))
+
+
+@bp.route("/view_cross/<unique_id>/refresh_phenotype", methods=["POST"])
+@login_required
+@limiter.limit("20 per hour")
+def refresh_cross_phenotype(unique_id):
+    username = session.get("username")
+
+    cross = get_accessible_cross(username, unique_id, db, annotate=True)
+    if not cross:
+        return redirect(url_for("cross.cross_explorer"))
+
+    owner_username = cross.get("User", "")
+    try:
+        with hold_operation_lock(
+            db,
+            key=f"record:phenotype-refresh:cross:{unique_id}",
+            actor=username,
+            label=f"Cross phenotype refresh {unique_id}",
+            ttl_seconds=300,
+            metadata={"route": "refresh_cross_phenotype", "uid": unique_id},
+            conflict_message=f"A phenotype refresh for cross {unique_id} is already running. Please wait for it to finish.",
+        ):
+            phenotype_cache = build_cross_phenotype_cache(
+                cross.get("MaleGenotype", ""),
+                cross.get("FemaleGenotype", ""),
+            )
+            db["crosses"].update_one(
+                {"UniqueID": unique_id, "User": owner_username},
+                {"$set": {"PhenotypeCache": phenotype_cache}},
+            )
+            write_activity(username, f"Refreshed phenotype cache for cross {unique_id}", db)
+    except OperationLockConflict as exc:
+        flash(str(exc), "warning")
+    return redirect(url_for("cross.view_cross", unique_id=unique_id))
 
 
 @bp.route("/generate_cross_labels", methods=["POST"])
@@ -583,7 +941,7 @@ def generate_cross_labels():
     user_initials = get_user_initials(username, db)
 
     # get the selected stocks
-    crosses = get_user_crosses(username, db)
+    crosses = get_accessible_crosses(username, db)
     selected_crosses = [
         cross for cross in crosses if str(cross["UniqueID"]) in selected_uids
     ]

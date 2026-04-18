@@ -17,7 +17,9 @@
         <p class="app-page-subtitle">Review active crosses, switch perspectives quickly, and batch label, tray, or flip operations from one workspace.</p>
     </div>
     <div class="app-chip-row">
-        <span class="app-chip"><i class="fas fa-heart"></i> {{ crosses|length }} visible crosses</span>
+        <span class="app-chip"><i class="fas fa-heart"></i> {{ pagination.page_count }} loaded{% if not pagination.is_all %} of {{ pagination.total_items }} matching crosses{% else %} crosses{% endif %}</span>
+        <span class="app-chip"><i class="fas fa-hand-paper"></i> {{ scope_counts.maintain }} to maintain</span>
+        {% if scope_counts.assigned_out %}<span class="app-chip"><i class="fas fa-share-square"></i> {{ scope_counts.assigned_out }} assigned out</span>{% endif %}
         <span class="app-chip"><i class="fas fa-layer-group"></i> Card and table views</span>
     </div>
 </div>
@@ -29,7 +31,7 @@
             <h2 class="filter-panel-title">Cross Filter Bar</h2>
         </div>
         <div class="filter-panel-meta">
-            <span class="app-chip"><i class="fas fa-sliders-h"></i> {{ crosses|length }} results</span>
+            <span class="app-chip"><i class="fas fa-sliders-h"></i> {{ pagination.total_items }} results</span>
             <span class="app-chip filter-default-chip"><i class="fas fa-eye-slash"></i> Archived hidden by default</span>
         </div>
     </div>
@@ -39,7 +41,7 @@
 <div class="app-panel active-filter-panel">
     <div class="filter-summary-heading">
         <p class="app-kicker">Applied Filters</p>
-        <p class="active-filter-copy">{{ crosses|length }} result{% if crosses|length != 1 %}s{% endif %}</p>
+        <p class="active-filter-copy">{{ pagination.total_items }} result{% if pagination.total_items != 1 %}s{% endif %}</p>
     </div>
     <div class="active-filter-actions">
         <div class="app-chip-row">
@@ -51,6 +53,7 @@
             {% if filter_state.searchQuery %}<span class="app-chip">Search: {{ filter_state.searchQuery }}</span>{% endif %}
         </div>
         <form method="post" action="{{ url_for('cross.cross_explorer') }}">
+            <input type="hidden" name="per_page" value="{{ pagination.per_page_value }}">
             <button type="submit" name="clear_filters" class="btn btn-outline-secondary">Clear All</button>
         </form>
     </div>
@@ -59,7 +62,7 @@
 <div class="explorer-toolbar mb-3">
     <div class="app-toolbar">
         <a href="{{ url_for('cross.add_cross') }}" class="btn btn-success">Add New Cross</a>
-        <span class="explorer-results-meta">{{ crosses|length }} cross{% if crosses|length != 1 %}es{% endif %} in view</span>
+        <span class="explorer-results-meta">{% if pagination.total_items %}Showing {{ pagination.start_index }}-{{ pagination.end_index }} of {{ pagination.total_items }} cross{% if pagination.total_items != 1 %}es{% endif %}{% else %}0 crosses in view{% endif %}</span>
     </div>
     <div class="explorer-toolbar-controls">
         <details class="column-selector">
@@ -77,6 +80,7 @@
                 <div class="column-selector-grid">
                     <label class="column-selector-option"><input type="checkbox" data-column-toggle="male"> Male genotype</label>
                     <label class="column-selector-option"><input type="checkbox" data-column-toggle="female"> Female genotype</label>
+                    <label class="column-selector-option"><input type="checkbox" data-column-toggle="phenotype"> Parent phenotype</label>
                     <label class="column-selector-option"><input type="checkbox" data-column-toggle="species"> Species</label>
                     <label class="column-selector-option"><input type="checkbox" data-column-toggle="food"> Food</label>
                     <label class="column-selector-option"><input type="checkbox" data-column-toggle="eclose"> Eclose</label>
@@ -94,6 +98,33 @@
             </div>
         </div>
     </div>
+</div>
+{% with endpoint_name='cross.cross_explorer', item_label='cross', item_plural_label='crosses' %}
+{% include 'explorer_pagination.html' %}
+{% endwith %}
+<div class="edge-dock edge-dock-left" data-edge-dock="left" aria-label="Selection controls">
+    <button type="button" id="selectVisibleDockBtn" class="edge-dock-action" title="Select every filtered result on this page" aria-label="Select all results on this page">
+        <i class="fas fa-check-square"></i>
+        <span class="edge-dock-label">Select visible</span>
+    </button>
+    <button type="button" id="selectAllDockBtn" class="edge-dock-action" title="Select every filtered result across all pages" aria-label="Select all results across all pages">
+        <i class="fas fa-check-double"></i>
+        <span class="edge-dock-label">Select all</span>
+    </button>
+    <button type="button" id="clearSelectionDockBtn" class="edge-dock-action" title="Clear the current selection" aria-label="Unselect all items">
+        <i class="fas fa-square"></i>
+        <span class="edge-dock-label">Unselect all</span>
+    </button>
+</div>
+<div class="edge-dock edge-dock-right" data-edge-dock="right" aria-label="Page navigation controls">
+    <button type="button" id="scrollTopDockBtn" class="edge-dock-action" title="Jump to the top of the page" aria-label="Scroll to top">
+        <i class="fas fa-arrow-up"></i>
+        <span class="edge-dock-label">Top</span>
+    </button>
+    <button type="button" id="scrollBottomDockBtn" class="edge-dock-action" title="Jump to the bottom of the page" aria-label="Scroll to bottom">
+        <i class="fas fa-arrow-down"></i>
+        <span class="edge-dock-label">Bottom</span>
+    </button>
 </div>
 <div class="cross-container">
     <div class="cross-items-grid" id="cardView">
@@ -113,6 +144,7 @@
                         <span>Select</span>
                     </label>
                     <div class="badges">
+                        <span class="badge badge-assignment badge-assignment-{{ cross.AssignmentScope }}">{{ cross.AssignmentScopeLabel }}</span>
                         <span class="badge badge-info">{{ cross.FoodType }}</span>
                         <span class="badge badge-secondary">{{ cross.Status }}</span>
                         {% if cross.MaleSpecies == cross.FemaleSpecies %}
@@ -136,6 +168,8 @@
                 <h5>{{ cross.Name }}</h5>
                 <p class="cross-item-genotype" title="{{ cross.MaleGenotype }}"><strong>Male Genotype:</strong> {{ cross.MaleGenotype }}</p>
                 <p class="cross-item-genotype" title="{{ cross.FemaleGenotype }}"><strong>Female Genotype:</strong> {{ cross.FemaleGenotype }}</p>
+                <p class="cross-item-submeta"><strong>Phenotype:</strong> {{ cross.ParentPhenotypeGuess }}</p>
+                <p class="cross-item-submeta"><strong>Responsibility:</strong> {{ cross.AssignmentScopeDetail }}</p>
                 <p class="cross-item-submeta"><strong>Unique Identifier:</strong> <i>{{ cross.UniqueID }}</i></p>
             </div>
             <div class="cross-item-actions">
@@ -154,6 +188,7 @@
                     <div class="details-col">
                         <p><strong>Male Unique ID:</strong> {{ cross.MaleUniqueID }}</p>
                         <p><strong>Female Unique ID:</strong> {{ cross.FemaleUniqueID }}</p>
+                        <p><strong>Owner / Maintainer:</strong> {{ cross.OwnerUser }} / {{ cross.MaintainerUser }}</p>
                         <p><strong>Comments:</strong> {{ cross.Comments }}</p>
                         <p><strong>Creation Date:</strong> {{ cross.CreationDate }}</p>
                     </div>
@@ -176,6 +211,7 @@
                     <th class="sortable" data-sort="name" data-column-key="name">Cross<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="male" data-column-key="male">Male Genotype<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="female" data-column-key="female">Female Genotype<i class="fas fa-sort ml-1"></i></th>
+                    <th data-column-key="phenotype">Parent Phenotype</th>
                     <th class="sortable" data-sort="species" data-column-key="species">Species<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="food" data-column-key="food">Food<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="status" data-column-key="status">Status<i class="fas fa-sort ml-1"></i></th>
@@ -187,7 +223,7 @@
             <tbody>
                 {% if not crosses %}
                 <tr>
-                    <td colspan="11">
+                    <td colspan="12">
                         <div class="explorer-empty-table-state">No crosses match the current filters.</div>
                     </td>
                 </tr>
@@ -211,7 +247,7 @@
                     <td class="name-cell" data-column-key="name" title="{{ cross.Name }}">
                         <div class="table-name-wrap">
                             <div class="table-primary table-clamp-2">{{ cross.Name }}</div>
-                            <div class="table-secondary table-clamp-2">{{ cross.UniqueID }}</div>
+                            <div class="table-secondary table-clamp-2">{{ cross.UniqueID }} · {{ cross.AssignmentScopeDetail }}</div>
                         </div>
                     </td>
                     <td class="genotype-cell" data-column-key="male" title="{{ cross.MaleGenotype }}">
@@ -224,6 +260,11 @@
                         <div class="table-genotype-wrap">
                             <div class="table-secondary">Female</div>
                             <div class="table-primary table-clamp-2">{{ cross.FemaleGenotype }}</div>
+                        </div>
+                    </td>
+                    <td data-column-key="phenotype" title="{{ cross.ParentPhenotypeGuess }}">
+                        <div class="table-name-wrap">
+                            <div class="table-primary table-clamp-2">{{ cross.ParentPhenotypeGuess }}</div>
                         </div>
                     </td>
                     <td data-column-key="species">
@@ -269,7 +310,7 @@
                     </td>
                 </tr>
                 <tr class="explorer-detail-row is-hidden" id="tableDetails-{{ loop.index }}" data-index="{{ loop.index }}">
-                    <td colspan="11">
+                    <td colspan="12">
                         <div class="explorer-detail-card">
                             <div class="explorer-detail-grid">
                                 <div class="explorer-detail-block">
@@ -277,11 +318,13 @@
                                     <p><strong>Unique ID:</strong> {{ cross.UniqueID }}</p>
                                     <p><strong>Male Unique ID:</strong> {{ cross.MaleUniqueID }}</p>
                                     <p><strong>Female Unique ID:</strong> {{ cross.FemaleUniqueID }}</p>
+                                    <p><strong>Owner / Maintainer:</strong> {{ cross.OwnerUser }} / {{ cross.MaintainerUser }}</p>
                                 </div>
                                 <div class="explorer-detail-block">
                                     <p class="explorer-detail-label">Collection</p>
                                     <p><strong>Food:</strong> {{ cross.FoodType }}</p>
                                     <p><strong>Status:</strong> {{ cross.Status }}</p>
+                                    <p><strong>Phenotype:</strong> {{ cross.ParentPhenotypeGuess }}</p>
                                     <p><strong>Species:</strong> {{ cross.MaleSpecies|default('D. melanogaster') }}{% if cross.MaleSpecies != cross.FemaleSpecies %} / {{ cross.FemaleSpecies|default('D. melanogaster') }}{% endif %}</p>
                                 </div>
                                 <div class="explorer-detail-block explorer-detail-block-wide">
@@ -300,6 +343,9 @@
         </table>
     </div>
 </div>
+{% with endpoint_name='cross.cross_explorer', item_label='cross', item_plural_label='crosses' %}
+{% include 'explorer_pagination.html' %}
+{% endwith %}
 
 <div class="floating-cart-container">
     <div class="cart-header" data-cart-toggle>
@@ -307,12 +353,6 @@
         <div class="cart-header-actions">
             <button type="button" id="addToCartBtn" class="btn btn-link" title="Add selected to cart" data-cart-control>
                 <i class="fas fa-cart-plus"></i>
-            </button>
-            <button type="button" id="selectAllBtn" class="btn btn-link" title="Select visible" data-cart-control>
-                <i class="fas fa-check-square"></i>
-            </button>
-            <button type="button" id="deselectAllBtn" class="btn btn-link" title="Clear selection" data-cart-control>
-                <i class="fas fa-square"></i>
             </button>
             <button type="button" id="emptyCartBtn" class="btn btn-link" title="Empty Cart" data-cart-control>
                 <i class="fas fa-trash"></i>
@@ -444,6 +484,7 @@
     const bulkStatusUrl = "{{ url_for('flip.bulk_status_change_route') }}";
     const bulkRemoveFromTrayUrl = "{{ url_for('tray.bulk_remove_from_tray') }}";
     const deleteCrossUrl = "{{ url_for('cross.delete_cross_permanently') }}";
+    const crossSelectionUrl = "{{ url_for('cross.cross_explorer_selection') }}";
     const filterStatus = "{{ filter_state.filterStatus }}";
 </script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/explorer_shared.js') }}"></script>

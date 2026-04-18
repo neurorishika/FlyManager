@@ -2,6 +2,36 @@ import datetime
 from hashlib import shake_256
 
 
+def _normalize_text(value):
+    return str(value or "").strip()
+
+
+def annotate_tray_access(tray, viewer):
+    annotated = dict(tray)
+    owner = _normalize_text(tray.get("User"))
+    annotated.update(
+        {
+            "OwnerUser": owner,
+            "ViewerCanEdit": owner == viewer,
+            "TrayScope": "owned" if owner == viewer else "shared",
+            "TrayScopeLabel": "Owned" if owner == viewer else f"Owned by {owner}",
+        }
+    )
+    return annotated
+
+
+def _dedupe_trays(trays):
+    deduped = []
+    seen_ids = set()
+    for tray in trays:
+        tray_id = tray.get("UniqueID")
+        if tray_id in seen_ids:
+            continue
+        seen_ids.add(tray_id)
+        deduped.append(tray)
+    return deduped
+
+
 def add_tray(user, properties, db):
     """
     Add a tray to the user's tray collection in MongoDB.
@@ -87,6 +117,70 @@ def get_user_trays(user, db):
     return list(trays)
 
 
+def get_accessible_trays(user, db):
+    from flymanager.utils.mongo.access import (get_accessible_crosses,
+                                               get_accessible_stocks)
+
+    trays_collection = db["trays"]
+    trays = list(trays_collection.find({"User": user}))
+
+    accessible_items = list(get_accessible_stocks(user, db)) + list(
+        get_accessible_crosses(user, db)
+    )
+    for item in accessible_items:
+        owner = _normalize_text(item.get("User"))
+        tray_id = _normalize_text(item.get("TrayID"))
+        if not owner or not tray_id:
+            continue
+        tray = trays_collection.find_one({"User": owner, "TrayID": tray_id})
+        if tray:
+            trays.append(tray)
+
+    deduped_trays = _dedupe_trays(trays)
+    deduped_trays.sort(
+        key=lambda tray: (
+            _normalize_text(tray.get("User")) != user,
+            _normalize_text(tray.get("User")),
+            _normalize_text(tray.get("TrayID")),
+        )
+    )
+    return [annotate_tray_access(tray, user) for tray in deduped_trays]
+
+
+def get_accessible_tray(user, tray_key, db):
+    normalized_key = _normalize_text(tray_key)
+    if not normalized_key:
+        return None
+
+    accessible_trays = get_accessible_trays(user, db)
+
+    for tray in accessible_trays:
+        if _normalize_text(tray.get("UniqueID")) == normalized_key:
+            return tray
+
+    owned_match = next(
+        (
+            tray
+            for tray in accessible_trays
+            if _normalize_text(tray.get("User")) == user
+            and _normalize_text(tray.get("TrayID")) == normalized_key
+        ),
+        None,
+    )
+    if owned_match:
+        return owned_match
+
+    tray_matches = [
+        tray
+        for tray in accessible_trays
+        if _normalize_text(tray.get("TrayID")) == normalized_key
+    ]
+    if len(tray_matches) == 1:
+        return tray_matches[0]
+
+    return None
+
+
 def get_tray(user, tray_id, db):
     """
     Get a specific tray by ID from MongoDB.
@@ -104,6 +198,9 @@ def get_tray(user, tray_id, db):
         The tray document, or None if not found.
     """
     trays_collection = db["trays"]
+    tray = trays_collection.find_one({"User": user, "UniqueID": tray_id})
+    if tray:
+        return tray
     tray = trays_collection.find_one({"User": user, "TrayID": tray_id})
     return tray
 
@@ -125,7 +222,10 @@ def delete_tray(user, tray_id, db):
         True if the tray was deleted, False otherwise.
     """
     trays_collection = db["trays"]
-    result = trays_collection.delete_one({"User": user, "TrayID": tray_id})
+    tray = get_tray(user, tray_id, db)
+    if not tray:
+        return False
+    result = trays_collection.delete_one({"User": user, "UniqueID": tray["UniqueID"]})
     return result.deleted_count > 0
 
 
@@ -165,7 +265,7 @@ def update_tray(user, tray_id, updates, db):
 
     # If there are updates, add to the ModificationLog and DataModifiedDate
     if modification_log_entries:
-        current_tray = trays_collection.find_one({"User": user, "TrayID": tray_id})
+        current_tray = get_tray(user, tray_id, db)
         if current_tray:
             modification_log = current_tray.get("ModificationLog", "")
             new_modification_log = "; ".join(modification_log_entries)
@@ -178,7 +278,8 @@ def update_tray(user, tray_id, updates, db):
 
             # Update the tray document in MongoDB
             result = trays_collection.update_one(
-                {"User": user, "TrayID": tray_id}, {"$set": update_fields}
+                {"User": user, "UniqueID": current_tray["UniqueID"]},
+                {"$set": update_fields},
             )
 
             return result.matched_count > 0
@@ -354,33 +455,49 @@ def move_item_to_tray(user, item_type, item_id, tray_id, position, db):
         True if the item was moved/removed, False otherwise.
     """
     # Import to avoid circular imports
-    from flymanager.utils.mongo.crosses import edit_cross, get_cross
-    from flymanager.utils.mongo.stocks import edit_stock, get_stock
+    from flymanager.utils.mongo.access import (get_accessible_cross,
+                                               get_accessible_stock)
+    from flymanager.utils.mongo.crosses import edit_cross
+    from flymanager.utils.mongo.stocks import edit_stock
+
+    owner_username = ""
 
     # Handle removal from tray (empty tray_id and position)
     if tray_id == "" and position == "":
-        updates = {"TrayID": "", "TrayPosition": ""}
         if item_type == "stock":
-            return edit_stock(user, item_id, db, updates)
+            item = get_accessible_stock(user, item_id, db, annotate=True)
+            if not item:
+                return False
+            owner_username = item.get("User", "")
+            return edit_stock(owner_username, item_id, db, {"TrayID": "", "TrayPosition": ""})
         elif item_type == "cross":
-            return edit_cross(user, item_id, db, updates)
+            item = get_accessible_cross(user, item_id, db, annotate=True)
+            if not item:
+                return False
+            owner_username = item.get("User", "")
+            return edit_cross(owner_username, item_id, db, {"TrayID": "", "TrayPosition": ""})
         else:
             return False
 
     # Validate the tray exists for moves to a tray
-    tray = get_tray(user, tray_id, db)
+    tray = get_accessible_tray(user, tray_id, db)
     if not tray:
         return False
+    tray_owner = tray.get("User", "")
 
     # Get the item to calculate required vials
     if item_type == "stock":
-        item = get_stock(user, item_id, db)
+        item = get_accessible_stock(user, item_id, db, annotate=True)
     elif item_type == "cross":
-        item = get_cross(user, item_id, db)
+        item = get_accessible_cross(user, item_id, db, annotate=True)
     else:
         return False
 
     if not item or item.get("Status") == "No longer maintained":
+        return False
+
+    owner_username = item.get("User", "")
+    if not owner_username or owner_username != tray_owner:
         return False
 
     # Calculate required vials
@@ -404,7 +521,7 @@ def move_item_to_tray(user, item_type, item_id, tray_id, position, db):
     current_footprint = set()
     current_tray_id = item.get("TrayID", "")
     current_position = item.get("TrayPosition", "")
-    if current_tray_id == tray_id and current_position:
+    if current_tray_id == tray.get("TrayID", "") and current_position:
         try:
             current_footprint = set(
                 _get_tray_footprint_positions(
@@ -416,17 +533,17 @@ def move_item_to_tray(user, item_type, item_id, tray_id, position, db):
             current_footprint = set()
 
     # Check if any of the required positions are occupied by another item
-    occupancy = get_tray_occupancy(user, tray_id, db)
+    occupancy = get_tray_occupancy(tray_owner, tray.get("TrayID", ""), db)
     for check_pos in _get_tray_footprint_positions(position_int, required_vials):
         if check_pos in occupancy and check_pos not in current_footprint:
             return False
 
     # Move the item
-    updates = {"TrayID": tray_id, "TrayPosition": position}
+    updates = {"TrayID": tray.get("TrayID", ""), "TrayPosition": position}
 
     if item_type == "stock":
-        return edit_stock(user, item_id, db, updates)
+        return edit_stock(owner_username, item_id, db, updates)
     elif item_type == "cross":
-        return edit_cross(user, item_id, db, updates)
+        return edit_cross(owner_username, item_id, db, updates)
     else:
         return False

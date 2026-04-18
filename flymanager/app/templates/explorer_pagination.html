@@ -1,0 +1,55 @@
+<div class="app-panel explorer-pagination-panel mb-3">
+    <div class="app-toolbar justify-content-between align-items-center flex-wrap">
+        <div class="explorer-results-meta">
+            {% if pagination.total_items %}
+                {% if pagination.is_all %}
+                    Showing all {{ pagination.total_items }} {{ item_plural_label if pagination.total_items != 1 else item_label }}
+                {% else %}
+                    Showing {{ pagination.start_index }}-{{ pagination.end_index }} of {{ pagination.total_items }} {{ item_plural_label if pagination.total_items != 1 else item_label }}
+                {% endif %}
+            {% else %}
+                No {{ item_plural_label }} to display
+            {% endif %}
+        </div>
+        <div class="app-toolbar">
+            <form method="get" action="{{ url_for(endpoint_name) }}" class="form-inline" data-explorer-per-page-form>
+                <input type="hidden" name="page" value="1">
+                <label class="mr-2 mb-0">Loaded per page</label>
+                <select name="per_page" class="form-control" data-explorer-per-page-select>
+                    {% for option in pagination.per_page_options %}
+                    <option value="{{ option.value }}" {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            {% if not pagination.is_all and pagination.total_pages > 1 %}
+            <nav aria-label="{{ item_label }} explorer pages">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item {% if not pagination.has_previous %}disabled{% endif %}">
+                        {% if pagination.has_previous %}
+                        <a class="page-link" href="{{ url_for(endpoint_name, page=pagination.previous_page, per_page=pagination.per_page_value) }}">Previous</a>
+                        {% else %}
+                        <span class="page-link">Previous</span>
+                        {% endif %}
+                    </li>
+                    {% for page_number in pagination.page_numbers %}
+                    <li class="page-item {% if page_number == pagination.page %}active{% endif %}">
+                        {% if page_number == pagination.page %}
+                        <span class="page-link">{{ page_number }}</span>
+                        {% else %}
+                        <a class="page-link" href="{{ url_for(endpoint_name, page=page_number, per_page=pagination.per_page_value) }}">{{ page_number }}</a>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                        {% if pagination.has_next %}
+                        <a class="page-link" href="{{ url_for(endpoint_name, page=pagination.next_page, per_page=pagination.per_page_value) }}">Next</a>
+                        {% else %}
+                        <span class="page-link">Next</span>
+                        {% endif %}
+                    </li>
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>

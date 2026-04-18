@@ -7,17 +7,34 @@ from flask import (Blueprint, current_app, jsonify, redirect, render_template,
 
 from flymanager.app import db
 from flymanager.app.routes.auth import admin_required, login_required
+from flymanager.app.routes.explorer_utils import (
+    get_explorer_pagination_state, paginate_explorer_records)
 from flymanager.app.security import get_json_payload, limiter
+from flymanager.app.services import flybase as flybase_service
 from flymanager.app.services.scheduler import schedule_daily_flip_reminders
-from flymanager.utils.mongo import (get_flip_in, get_flip_schedule,
-                                    get_settings, get_tray_occupancy,
-                                    get_user_activities, get_user_crosses,
-                                    get_user_stocks, get_user_trays)
+from flymanager.app.services.stock_standardization import \
+    review_stock_standardization
+from flymanager.utils.mongo import (get_accessible_crosses,
+                                    get_accessible_stocks, get_flip_in,
+                                    get_flip_schedule, get_settings,
+                                    get_tray_occupancy, get_user_activities,
+                                    get_user_trays)
 from flymanager.utils.utils import get_datetime_from_str
 
 bp = Blueprint('main', __name__)  # Remove url_prefix to handle root URL
 
 ATTENTION_STATUSES = {'Showing Issues', 'Needs refresh'}
+DASHBOARD_PANEL_PAGE_SIZE = 6
+ATTENTION_BOARD_PAGE_SIZE = DASHBOARD_PANEL_PAGE_SIZE
+TODAYS_SCHEDULE_PAGE_SIZE = DASHBOARD_PANEL_PAGE_SIZE
+UPCOMING_SCHEDULE_PAGE_SIZE = DASHBOARD_PANEL_PAGE_SIZE
+RECENT_ACTIVITY_PAGE_SIZE = DASHBOARD_PANEL_PAGE_SIZE
+ATTENTION_FILTER_OPTIONS = (
+    {'value': 'all', 'label': 'All'},
+    {'value': 'critical', 'label': 'Overdue'},
+    {'value': 'today', 'label': 'Due Today'},
+    {'value': 'watch', 'label': 'Review'},
+)
 
 
 def _count_alive_vials(item):
@@ -40,6 +57,13 @@ def _format_tray_location(item):
     if tray_position in (None, ''):
         return tray_id
     return f'{tray_id}-{tray_position}'
+
+
+def _merge_responsibility_detail(base_detail, item):
+    responsibility_detail = item.get('AssignmentScopeDetail')
+    if not responsibility_detail:
+        return base_detail
+    return f'{base_detail} · {responsibility_detail}' if base_detail else responsibility_detail
 
 
 def _safe_int(value, default=0):
@@ -129,6 +153,143 @@ def _build_tray_heatmap(tray, occupancy):
         'href': url_for('tray.view_tray', tray_id=tray.get('TrayID', '')),
     }
 
+
+def _parse_dashboard_page_arg(arg_name, default=1):
+    try:
+        return max(1, int(request.args.get(arg_name, default)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_attention_filter(value):
+    normalized_value = str(value or 'all').strip().lower()
+    allowed_filters = {option['value'] for option in ATTENTION_FILTER_OPTIONS}
+    if normalized_value in allowed_filters:
+        return normalized_value
+    return 'all'
+
+
+def _paginate_dashboard_records(records, *, page_arg_name, per_page):
+    return paginate_explorer_records(
+        records,
+        page=_parse_dashboard_page_arg(page_arg_name),
+        per_page=per_page,
+        per_page_value=str(per_page),
+    )
+
+
+def _reviewer_position_value(value):
+    try:
+        return int(float(str(value or '0').strip()))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _reviewer_record_sort_key(row):
+    return (
+        str(row.get('trayID', '')),
+        _reviewer_position_value(row.get('trayPosition')),
+        str(row.get('name', '')),
+        str(row.get('uniqueID', '')),
+        str(row.get('subjectLabel', '')),
+    )
+
+
+def _build_standardization_reviewer_row(*, record_type, subject_label, unique_id,
+                                        name, genotype, tray_id, tray_position,
+                                        assignment_scope_label,
+                                        assignment_scope_detail, action_href,
+                                        action_label):
+    review = review_stock_standardization(str(genotype or ''), candidate_limit=0)
+    issues = list(review.get('issues') or [])
+    top_tokens = [issue.get('token', '') for issue in issues[:4] if issue.get('token')]
+    recommended_replacements = [
+        {
+            'from': issue.get('token', ''),
+            'to': issue.get('recommended_replacement', ''),
+        }
+        for issue in issues
+        if issue.get('token') and issue.get('recommended_replacement')
+    ]
+
+    return {
+        'recordType': record_type,
+        'recordTypeLabel': 'Stock' if record_type == 'stock' else 'Cross',
+        'subjectLabel': subject_label,
+        'uniqueID': str(unique_id or ''),
+        'name': str(name or ''),
+        'genotype': str(genotype or ''),
+        'trayID': str(tray_id or ''),
+        'trayPosition': str(tray_position or ''),
+        'assignmentScopeLabel': str(assignment_scope_label or 'Maintain'),
+        'assignmentScopeDetail': str(assignment_scope_detail or 'Owned by you'),
+        'issueCount': int(review.get('issue_count') or 0),
+        'unresolvedCount': int((review.get('summary') or {}).get('unresolved_token', 0)),
+        'unmodeledCount': int((review.get('summary') or {}).get('standard_format_unmodeled', 0)),
+        'topTokens': top_tokens,
+        'recommendedReplacements': recommended_replacements[:3],
+        'actionHref': action_href,
+        'actionLabel': action_label,
+    }
+
+
+def _build_standardization_reviewer_rows(stocks, crosses):
+    rows = []
+
+    for stock in stocks:
+        genotype = str(stock.get('Genotype') or '').strip()
+        if not genotype:
+            continue
+        rows.append(
+            _build_standardization_reviewer_row(
+                record_type='stock',
+                subject_label='Stock genotype',
+                unique_id=stock.get('UniqueID'),
+                name=stock.get('Name'),
+                genotype=genotype,
+                tray_id=stock.get('TrayID'),
+                tray_position=stock.get('TrayPosition'),
+                assignment_scope_label=stock.get('AssignmentScopeLabel'),
+                assignment_scope_detail=stock.get('AssignmentScopeDetail'),
+                action_href=url_for('stock.view_stock', unique_id=stock.get('UniqueID')),
+                action_label='Open Stock',
+            )
+        )
+
+    for cross in crosses:
+        cross_name = str(cross.get('Name') or cross.get('UniqueID') or '')
+        for subject_label, genotype_key in (
+            ('Male Parent', 'MaleGenotype'),
+            ('Female Parent', 'FemaleGenotype'),
+        ):
+            genotype = str(cross.get(genotype_key) or '').strip()
+            if not genotype:
+                continue
+            rows.append(
+                _build_standardization_reviewer_row(
+                    record_type='cross_parent',
+                    subject_label=subject_label,
+                    unique_id=cross.get('UniqueID'),
+                    name=cross_name,
+                    genotype=genotype,
+                    tray_id=cross.get('TrayID'),
+                    tray_position=cross.get('TrayPosition'),
+                    assignment_scope_label=cross.get('AssignmentScopeLabel'),
+                    assignment_scope_detail=cross.get('AssignmentScopeDetail'),
+                    action_href=url_for('cross.view_cross', unique_id=cross.get('UniqueID')),
+                    action_label='Open Cross',
+                )
+            )
+
+    rows.sort(
+        key=lambda row: (
+            -int(row.get('issueCount') or 0),
+            0 if row.get('recordType') == 'stock' else 1,
+            _reviewer_record_sort_key(row),
+        )
+    )
+    return rows
+
 @bp.route('/')
 @bp.route('/main')
 def index():
@@ -142,9 +303,15 @@ def home():
     username = session.get("username")
     is_admin = username == 'admin'
     try:
+        flybase_reference_status = (
+            flybase_service.get_flybase_reference_status(current_app._get_current_object())
+            if is_admin
+            else None
+        )
+
         # Get all user data
-        stocks = get_user_stocks(username, db)
-        crosses = get_user_crosses(username, db)
+        stocks = get_accessible_stocks(username, db, annotate=True)
+        crosses = get_accessible_crosses(username, db, annotate=True)
         trays = get_user_trays(username, db)
         activities = get_user_activities(username, db)
         settings = get_settings(db)
@@ -184,6 +351,8 @@ def home():
                 view_href = url_for(view_endpoint, unique_id=item_uid)
                 day_value = _parse_flip_day_value(item)
                 vial_count = _count_alive_vials(item)
+                is_delegated_out = item.get('AssignmentScope') == 'assigned_out'
+                viewer_can_maintain = not is_delegated_out
 
                 base_attention_item = {
                     'type': item_type,
@@ -192,52 +361,77 @@ def home():
                     'name': item_name,
                     'tray': tray_location,
                     'view_href': view_href,
+                    'responsibility': item.get('AssignmentScopeDetail', ''),
                 }
 
                 if day_value == 0:
-                    due_today_items.append({
-                        **base_attention_item,
-                        'detail': 'Due for flip today',
-                    })
-                    attention_items.append({
-                        **base_attention_item,
-                        'kind': 'today',
-                        'priority': 'today',
-                        'badge': 'Due today',
-                        'detail': 'Ready for today\'s flip run',
-                        'action_href': url_for('flip.flip_interface'),
-                        'action_label': 'Open flip desk',
-                    })
+                    if viewer_can_maintain:
+                        due_today_items.append({
+                            **base_attention_item,
+                            'detail': _merge_responsibility_detail('Due for flip today', item),
+                        })
+                        attention_items.append({
+                            **base_attention_item,
+                            'kind': 'today',
+                            'priority': 'today',
+                            'badge': 'Due today',
+                            'detail': _merge_responsibility_detail('Ready for today\'s flip run', item),
+                            'action_href': url_for('flip.flip_interface'),
+                            'action_label': 'Open flip desk',
+                        })
+                    else:
+                        attention_items.append({
+                            **base_attention_item,
+                            'kind': 'watch',
+                            'priority': 'watch',
+                            'badge': 'Assigned out',
+                            'detail': _merge_responsibility_detail('Due today', item),
+                            'action_href': view_href,
+                            'action_label': 'Inspect item',
+                        })
                     needs_attention += 1
                 elif day_value is not None and day_value < 0:
-                    overdue_items.append({
-                        **base_attention_item,
-                        'days_overdue': abs(day_value),
-                        'detail': f"{abs(day_value)} day{'s' if abs(day_value) != 1 else ''} overdue",
-                    })
-                    attention_items.append({
-                        **base_attention_item,
-                        'kind': 'critical',
-                        'priority': 'critical',
-                        'badge': 'Overdue',
-                        'days_overdue': abs(day_value),
-                        'detail': f"{abs(day_value)} day{'s' if abs(day_value) != 1 else ''} overdue",
-                        'action_href': url_for('flip.flip_interface'),
-                        'action_label': 'Flip now',
-                    })
+                    overdue_detail = f"{abs(day_value)} day{'s' if abs(day_value) != 1 else ''} overdue"
+                    if viewer_can_maintain:
+                        overdue_items.append({
+                            **base_attention_item,
+                            'days_overdue': abs(day_value),
+                            'detail': _merge_responsibility_detail(overdue_detail, item),
+                        })
+                        attention_items.append({
+                            **base_attention_item,
+                            'kind': 'critical',
+                            'priority': 'critical',
+                            'badge': 'Overdue',
+                            'days_overdue': abs(day_value),
+                            'detail': _merge_responsibility_detail(overdue_detail, item),
+                            'action_href': url_for('flip.flip_interface'),
+                            'action_label': 'Flip now',
+                        })
+                    else:
+                        attention_items.append({
+                            **base_attention_item,
+                            'kind': 'critical',
+                            'priority': 'critical',
+                            'badge': 'Assigned out',
+                            'days_overdue': abs(day_value),
+                            'detail': _merge_responsibility_detail(overdue_detail, item),
+                            'action_href': view_href,
+                            'action_label': 'Inspect item',
+                        })
                     needs_attention += 1
                 elif status in ATTENTION_STATUSES:
                     issue_items.append({
                         **base_attention_item,
                         'status': status,
-                        'detail': status,
+                        'detail': _merge_responsibility_detail(status, item),
                     })
                     attention_items.append({
                         **base_attention_item,
                         'kind': 'watch',
                         'priority': 'watch',
-                        'badge': 'Review',
-                        'detail': status,
+                        'badge': 'Review' if viewer_can_maintain else 'Assigned out',
+                        'detail': _merge_responsibility_detail(status, item),
                         'action_href': view_href,
                         'action_label': 'Inspect item',
                     })
@@ -249,7 +443,7 @@ def home():
                 queue_action_href = view_href
                 queue_action_label = 'Open item'
 
-                if day_value is not None:
+                if viewer_can_maintain and day_value is not None:
                     if day_value < 0:
                         queue_score = 140 + min(abs(day_value), 14)
                         queue_badge = 'Overdue'
@@ -457,6 +651,32 @@ def home():
                 item['name'].lower(),
             ),
         )
+        attention_filter = _normalize_attention_filter(request.args.get('attention_filter'))
+        filtered_attention_items = (
+            attention_items
+            if attention_filter == 'all'
+            else [item for item in attention_items if item['kind'] == attention_filter]
+        )
+        attention_pagination = _paginate_dashboard_records(
+            filtered_attention_items,
+            page_arg_name='attention_page',
+            per_page=ATTENTION_BOARD_PAGE_SIZE,
+        )
+        schedule_pagination = _paginate_dashboard_records(
+            todays_schedule,
+            page_arg_name='schedule_page',
+            per_page=TODAYS_SCHEDULE_PAGE_SIZE,
+        )
+        upcoming_schedule_pagination = _paginate_dashboard_records(
+            upcoming_schedule_list,
+            page_arg_name='upcoming_page',
+            per_page=UPCOMING_SCHEDULE_PAGE_SIZE,
+        )
+        activity_pagination = _paginate_dashboard_records(
+            activity_groups,
+            page_arg_name='activity_page',
+            per_page=RECENT_ACTIVITY_PAGE_SIZE,
+        )
 
         days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         max_flips = max(flips_by_day.values()) if flips_by_day else 0
@@ -621,6 +841,15 @@ def home():
                 'icon': 'fas fa-file-export',
                 'tone': 'calm',
             })
+        if is_admin and flybase_reference_status and flybase_reference_status.get('status_tone') != 'success':
+            suggestions.insert(0, {
+                'title': f"FlyBase sync {flybase_reference_status.get('status_label', 'needs review').lower()}",
+                'copy': flybase_reference_status.get('status_message', 'Review the FlyBase sync controls and rerun the latest release refresh if needed.'),
+                'href': url_for('settings.admin_settings'),
+                'label': 'Open admin settings',
+                'icon': 'fas fa-database',
+                'tone': 'critical' if flybase_reference_status.get('status_tone') == 'danger' else 'watch',
+            })
         if not suggestions:
             suggestions.append({
                 'title': 'Explore the live inventory',
@@ -649,14 +878,20 @@ def home():
         return render_template(
             "home.html",
             username=username,
-            activities=activity_groups,
-            schedule=todays_schedule,
+            activities=activity_pagination['items'],
+            activity_pagination=activity_pagination,
+            schedule=schedule_pagination['items'],
+            schedule_pagination=schedule_pagination,
             upcoming_schedule=upcoming_schedule,
-            upcoming_schedule_list=upcoming_schedule_list,
+            upcoming_schedule_list=upcoming_schedule_pagination['items'],
+            upcoming_schedule_pagination=upcoming_schedule_pagination,
             overdue_items=sorted(overdue_items, key=lambda x: x['days_overdue'], reverse=True),
             due_today_items=due_today_items,
             issue_items=issue_items,
-            attention_items=attention_items,
+            attention_items=attention_pagination['items'],
+            attention_pagination=attention_pagination,
+            attention_filter=attention_filter,
+            attention_filter_options=ATTENTION_FILTER_OPTIONS,
             suggestions=suggestions,
             snapshot=snapshot,
             tray_summary=tray_summary,
@@ -668,6 +903,7 @@ def home():
             status_breakdown=status_breakdown,
             hero_copy=hero_copy,
             is_admin=is_admin,
+            flybase_reference_status=flybase_reference_status,
             stats=stats,
             settings=settings,
             today_date=today.strftime('%B %d, %Y')
@@ -679,13 +915,35 @@ def home():
             "home.html",
             username=username,
             activities=[],
+            activity_pagination=_paginate_dashboard_records(
+                [],
+                page_arg_name='activity_page',
+                per_page=RECENT_ACTIVITY_PAGE_SIZE,
+            ),
             schedule=[],
+            schedule_pagination=_paginate_dashboard_records(
+                [],
+                page_arg_name='schedule_page',
+                per_page=TODAYS_SCHEDULE_PAGE_SIZE,
+            ),
             upcoming_schedule={},
             upcoming_schedule_list=[],
+            upcoming_schedule_pagination=_paginate_dashboard_records(
+                [],
+                page_arg_name='upcoming_page',
+                per_page=UPCOMING_SCHEDULE_PAGE_SIZE,
+            ),
             overdue_items=[],
             due_today_items=[],
             issue_items=[],
             attention_items=[],
+            attention_pagination=_paginate_dashboard_records(
+                [],
+                page_arg_name='attention_page',
+                per_page=ATTENTION_BOARD_PAGE_SIZE,
+            ),
+            attention_filter='all',
+            attention_filter_options=ATTENTION_FILTER_OPTIONS,
             suggestions=[],
             snapshot={
                 'active_lines': 0,
@@ -716,6 +974,7 @@ def home():
             status_breakdown=[],
             hero_copy='The dashboard is temporarily unavailable, but core navigation is still accessible.',
             is_admin=is_admin,
+            flybase_reference_status=None,
             stats={
                 'total_stocks': 0, 
                 'total_crosses': 0, 
@@ -731,6 +990,67 @@ def home():
             settings=get_settings(db),
             today_date=datetime.now().strftime('%B %d, %Y')
         )
+
+
+@bp.route('/reviewer')
+@login_required
+def standardization_reviewer():
+    username = session.get('username')
+    pagination_state = get_explorer_pagination_state(
+        session_key='standardization_reviewer_pagination',
+    )
+
+    try:
+        stocks = get_accessible_stocks(username, db, annotate=True)
+        crosses = get_accessible_crosses(username, db, annotate=True)
+        reviewer_rows = _build_standardization_reviewer_rows(stocks, crosses)
+        pagination = paginate_explorer_records(
+            reviewer_rows,
+            page=pagination_state['page'],
+            per_page=pagination_state['per_page'],
+            per_page_value=pagination_state['per_page_value'],
+        )
+        pagination['per_page_options'] = pagination_state['per_page_options']
+        summary = {
+            'totalTargets': len(reviewer_rows),
+            'stockTargets': sum(1 for row in reviewer_rows if row['recordType'] == 'stock'),
+            'crossParentTargets': sum(1 for row in reviewer_rows if row['recordType'] == 'cross_parent'),
+            'flaggedTargets': sum(1 for row in reviewer_rows if row['issueCount']),
+            'cleanTargets': sum(1 for row in reviewer_rows if not row['issueCount']),
+            'totalIssues': sum(int(row['issueCount'] or 0) for row in reviewer_rows),
+            'totalUnresolved': sum(int(row['unresolvedCount'] or 0) for row in reviewer_rows),
+            'totalUnmodeled': sum(int(row['unmodeledCount'] or 0) for row in reviewer_rows),
+            'targetsWithRecommendations': sum(1 for row in reviewer_rows if row['recommendedReplacements']),
+        }
+    except Exception as exc:
+        current_app.logger.exception('Error loading reviewer data for %s: %s', username, exc)
+        pagination = paginate_explorer_records(
+            [],
+            page=pagination_state['page'],
+            per_page=pagination_state['per_page'],
+            per_page_value=pagination_state['per_page_value'],
+        )
+        pagination['per_page_options'] = pagination_state['per_page_options']
+        reviewer_rows = []
+        summary = {
+            'totalTargets': 0,
+            'stockTargets': 0,
+            'crossParentTargets': 0,
+            'flaggedTargets': 0,
+            'cleanTargets': 0,
+            'totalIssues': 0,
+            'totalUnresolved': 0,
+            'totalUnmodeled': 0,
+            'targetsWithRecommendations': 0,
+        }
+
+    return render_template(
+        'stock/standardization_overview.html',
+        username=username,
+        review_rows=pagination['items'],
+        pagination=pagination,
+        summary=summary,
+    )
 
 # Route to manually trigger the reminder task for testing
 @bp.route('/test_send_reminder', methods=['POST'])

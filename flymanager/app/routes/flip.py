@@ -13,9 +13,14 @@ from flymanager.app.security import (get_json_payload, limiter,
                                      parse_iso_datetime)
 from flymanager.app.services import scanner as scanner_service
 from flymanager.utils.labels import generate_label_pdf
-from flymanager.utils.mongo import (flip_cross, flip_stock, get_flip_schedule,
-                                    get_user_crosses, get_user_initials,
-                                    get_user_stocks, write_activity)
+from flymanager.utils.mongo import (OperationLockConflict, edit_cross,
+                                    edit_stock, flip_cross, flip_stock,
+                                    get_accessible_cross, get_accessible_stock,
+                                    get_flip_schedule,
+                                    get_maintainable_crosses,
+                                    get_maintainable_stocks, get_user_initials,
+                                    hold_operation_lock, hold_operation_locks,
+                                    record_operation_lock_keys, write_activity)
 # Import utility functions
 from flymanager.utils.scanner import get_available_ports
 
@@ -40,7 +45,15 @@ def flip_interface():
     # Pass active threads to template to show current scanning status?
     # active_scan_info = {tid: info['port_index'] for tid, info in scanner_service.active_threads.items()}
     return render_template(
-        "flip.html", username=username, ports=ports
+        "flip.html",
+        username=username,
+        ports=ports,
+        enable_client_serial_scanner=current_app.config.get(
+            "ENABLE_CLIENT_SERIAL_SCANNER", False
+        ),
+        enable_camera_scanner=current_app.config.get(
+            "ENABLE_CAMERA_SCANNER", True
+        ),
     )  # Add active_scan_info if needed
 
 
@@ -152,8 +165,8 @@ def handle_flip_vial_route():
         flip_time = parse_iso_datetime(data.get("flipTime"), field_name="flip time")
 
         # Check stocks and crosses
-        stock = db["stocks"].find_one({"UniqueID": uid, "User": username})
-        cross = db["crosses"].find_one({"UniqueID": uid, "User": username})
+        stock = get_accessible_stock(username, uid, db)
+        cross = get_accessible_cross(username, uid, db)
 
         item_type = None
         item_data = None
@@ -165,11 +178,13 @@ def handle_flip_vial_route():
             item_data = stock
             flip_function = flip_stock
             last_flip_str = stock.get("LastFlipDate")
+            owner_username = stock.get("User", username)
         elif cross:
             item_type = "Cross"
             item_data = cross
             flip_function = flip_cross
             last_flip_str = cross.get("LastFlipDate")
+            owner_username = cross.get("User", username)
         else:
             return jsonify({"message": "UID not recognized for this user."}), 404
 
@@ -214,17 +229,27 @@ def handle_flip_vial_route():
                 # Decide whether to proceed or return an error if date is unparseable
 
         current_app.logger.info("Flipping %s %s for user %s", item_type.lower(), uid, username)
-        # Call the appropriate flip function (flip_stock or flip_cross)
-        flip_function(
-            username, uid, db, flip_time, new_status=status, added_comment=comment
-        )
-        write_activity(username, f"Flipped {item_type.lower()} {uid}", db)
+        with hold_operation_lock(
+            db,
+            key=f"record-mutation:{uid}",
+            actor=username,
+            label=f"Flip {item_type.lower()} {uid}",
+            ttl_seconds=300,
+            metadata={"route": "flip_vial", "uid": uid},
+            conflict_message=f"{item_type} {uid} is already being updated. Please wait for that request to finish.",
+        ):
+            flip_function(
+                owner_username, uid, db, flip_time, new_status=status, added_comment=comment
+            )
+            write_activity(username, f"Flipped {item_type.lower()} {uid}", db)
 
         # Emit update via SocketIO? (Optional)
         # socketio.emit('vial_flipped', {'uniqueID': uid, 'type': item_type.lower(), 'status': status or item_data.get('Status')})
 
         return jsonify({"message": f"{item_type} flipped successfully!"})
 
+    except OperationLockConflict as exc:
+        return jsonify({"message": str(exc)}), 409
     except Exception as e:
         current_app.logger.exception("Error handling flip vial for %s: %s", uid, e)
         return jsonify({"message": "An internal error occurred during flip."}), 500
@@ -249,47 +274,53 @@ def bulk_flip_route():
 
         results = {"success": [], "failed": []}
 
-        for uid in uids:
-            try:
-                # Check stocks and crosses
-                stock = db["stocks"].find_one({"UniqueID": uid, "User": username})
-                cross = db["crosses"].find_one({"UniqueID": uid, "User": username})
+        with hold_operation_locks(
+            db,
+            keys=record_operation_lock_keys(uids),
+            actor=username,
+            label="Bulk flip",
+            ttl_seconds=900,
+            metadata={"route": "bulk_flip", "uid_count": len(uids)},
+            conflict_message="Another request is already updating one or more selected records. Please wait for it to finish before retrying the bulk flip.",
+        ):
+            for uid in uids:
+                try:
+                    stock = get_accessible_stock(username, uid, db)
+                    cross = get_accessible_cross(username, uid, db)
 
-                item_type = None
-                item_data = None
-                flip_function = None
+                    item_type = None
+                    flip_function = None
 
-                if stock:
-                    item_type = "Stock"
-                    item_data = stock
-                    flip_function = flip_stock
-                elif cross:
-                    item_type = "Cross"
-                    item_data = cross
-                    flip_function = flip_cross
-                else:
-                    results["failed"].append(
-                        {"uid": uid, "reason": "UID not recognized for this user."}
+                    if stock:
+                        item_type = "Stock"
+                        flip_function = flip_stock
+                        owner_username = stock.get("User", username)
+                    elif cross:
+                        item_type = "Cross"
+                        flip_function = flip_cross
+                        owner_username = cross.get("User", username)
+                    else:
+                        results["failed"].append(
+                            {"uid": uid, "reason": "UID not recognized for this user."}
+                        )
+                        continue
+
+                    flip_function(
+                        owner_username,
+                        uid,
+                        db,
+                        flip_time,
+                        new_status=status,
+                        added_comment=comment,
                     )
-                    continue
+                    write_activity(
+                        username, f"Flipped {item_type.lower()} {uid} (bulk operation)", db
+                    )
+                    results["success"].append({"uid": uid, "type": item_type})
 
-                # Flip the item
-                flip_function(
-                    username,
-                    uid,
-                    db,
-                    flip_time,
-                    new_status=status,
-                    added_comment=comment,
-                )
-                write_activity(
-                    username, f"Flipped {item_type.lower()} {uid} (bulk operation)", db
-                )
-                results["success"].append({"uid": uid, "type": item_type})
-
-            except Exception as e:
-                results["failed"].append({"uid": uid, "reason": str(e)})
-                current_app.logger.warning("Error flipping %s: %s", uid, e)
+                except Exception as e:
+                    results["failed"].append({"uid": uid, "reason": str(e)})
+                    current_app.logger.warning("Error flipping %s: %s", uid, e)
 
         return jsonify(
             {
@@ -298,6 +329,8 @@ def bulk_flip_route():
             }
         )
 
+    except OperationLockConflict as exc:
+        return jsonify({"message": str(exc), "results": {"success": [], "failed": []}}), 409
     except Exception as e:
         current_app.logger.exception("Error handling bulk flip for %s: %s", username, e)
         return jsonify({"message": "An internal error occurred during bulk flip."}), 500
@@ -315,59 +348,74 @@ def bulk_status_change_route():
         data = get_json_payload()
         uids = normalize_identifier_list(data.get("uniqueIDs", []), field_name="uniqueIDs")
         status = normalize_optional_text(data.get("status"), field_name="Status", max_length=64)
+        comment = normalize_optional_text(data.get("comment"), field_name="Comment", max_length=500)
         if not status:
             return jsonify({"message": "Status is required."}), 400
 
         results = {"success": [], "failed": []}
 
-        for uid in uids:
-            try:
-                # Check stocks and crosses
-                stock = db["stocks"].find_one({"UniqueID": uid, "User": username})
-                cross = db["crosses"].find_one({"UniqueID": uid, "User": username})
+        with hold_operation_locks(
+            db,
+            keys=record_operation_lock_keys(uids),
+            actor=username,
+            label="Bulk status change",
+            ttl_seconds=900,
+            metadata={"route": "bulk_status_change", "uid_count": len(uids), "status": status},
+            conflict_message="Another request is already updating one or more selected records. Please wait for it to finish before retrying the bulk status change.",
+        ):
+            for uid in uids:
+                try:
+                    stock = get_accessible_stock(username, uid, db)
+                    cross = get_accessible_cross(username, uid, db)
 
-                if stock:
-                    db["stocks"].update_one(
-                        {"UniqueID": uid, "User": username},
-                        {
-                            "$set": {
-                                "Status": status,
-                                "DataModifiedDate": datetime.now().strftime(
-                                    "%Y-%m-%d %H:%M:%S"
-                                ),
-                            }
-                        },
-                    )
-                    item_type = "Stock"
-                elif cross:
-                    db["crosses"].update_one(
-                        {"UniqueID": uid, "User": username},
-                        {
-                            "$set": {
-                                "Status": status,
-                                "DataModifiedDate": datetime.now().strftime(
-                                    "%Y-%m-%d %H:%M:%S"
-                                ),
-                            }
-                        },
-                    )
-                    item_type = "Cross"
-                else:
-                    results["failed"].append(
-                        {"uid": uid, "reason": "UID not recognized for this user."}
-                    )
-                    continue
+                    if stock:
+                        stock_updates = {"Status": status}
+                        if comment:
+                            existing_comments = str(stock.get("Comments", "") or "").strip()
+                            stock_updates["Comments"] = (
+                                f"{comment}; {existing_comments}" if existing_comments else comment
+                            )
 
-                write_activity(
-                    username,
-                    f"Changed status of {item_type.lower()} {uid} to {status} (bulk operation)",
-                    db,
-                )
-                results["success"].append({"uid": uid, "type": item_type})
+                        edit_stock(
+                            stock["User"],
+                            uid,
+                            db,
+                            stock_updates,
+                            refresh_vials=False,
+                        )
+                        item_type = "Stock"
+                    elif cross:
+                        cross_updates = {"Status": status}
+                        if comment:
+                            existing_comments = str(cross.get("Comments", "") or "").strip()
+                            cross_updates["Comments"] = (
+                                f"{comment}; {existing_comments}" if existing_comments else comment
+                            )
 
-            except Exception as e:
-                results["failed"].append({"uid": uid, "reason": str(e)})
-                current_app.logger.warning("Error changing status for %s: %s", uid, e)
+                        edit_cross(
+                            cross["User"],
+                            uid,
+                            db,
+                            cross_updates,
+                            refresh_vials=False,
+                        )
+                        item_type = "Cross"
+                    else:
+                        results["failed"].append(
+                            {"uid": uid, "reason": "UID not recognized for this user."}
+                        )
+                        continue
+
+                    write_activity(
+                        username,
+                        f"Changed status of {item_type.lower()} {uid} to {status} (bulk operation)",
+                        db,
+                    )
+                    results["success"].append({"uid": uid, "type": item_type})
+
+                except Exception as e:
+                    results["failed"].append({"uid": uid, "reason": str(e)})
+                    current_app.logger.warning("Error changing status for %s: %s", uid, e)
 
         return jsonify(
             {
@@ -376,6 +424,8 @@ def bulk_status_change_route():
             }
         )
 
+    except OperationLockConflict as exc:
+        return jsonify({"message": str(exc), "results": {"success": [], "failed": []}}), 409
     except Exception as e:
         current_app.logger.exception("Error handling bulk status change for %s: %s", username, e)
         return (
@@ -398,8 +448,8 @@ def flip_schedule_display():
 
         enhanced_schedule = {}
         # Fetch all stocks and crosses once for efficient lookup
-        stocks = get_user_stocks(username, db)
-        crosses = get_user_crosses(username, db)
+        stocks = get_maintainable_stocks(username, db)
+        crosses = get_maintainable_crosses(username, db)
         stock_map = {s.get("UniqueID"): s for s in stocks}
         cross_map = {c.get("UniqueID"): c for c in crosses}
 
@@ -538,8 +588,8 @@ def generate_labels_for_day_route():
         selected_items_data = []
         item_types = []
         # Fetch all stocks and crosses once
-        stocks = get_user_stocks(username, db)
-        crosses = get_user_crosses(username, db)
+        stocks = get_maintainable_stocks(username, db)
+        crosses = get_maintainable_crosses(username, db)
         stock_map = {s.get("UniqueID"): s for s in stocks}
         cross_map = {c.get("UniqueID"): c for c in crosses}
 

@@ -1,7 +1,7 @@
 # FlyManager Crossing Scheme Optimizer — Implementation Plan for Claude Code
 
 **Project Owner:** Rishika Mohanta (neurorishika)  
-**Repository:** https://github.com/neurorishika/FlyManager  
+**Repository:** <https://github.com/neurorishika/FlyManager>  
 **Design Document:** See `FlyManager_CrossingOptimizer_DesignDoc_v6_FINAL.md` (co-located with this file)  
 **Date:** April 2026
 
@@ -14,6 +14,115 @@ FlyManager is a Flask/MongoDB app for managing *Drosophila melanogaster* stocks 
 The core challenge: at every step of a crossing scheme, you have to sort the correct progeny from siblings by looking at them under a microscope. The system must predict what every progeny class *looks like* and verify the desired class is visually distinguishable.
 
 **Before writing any optimizer code, we need to build and validate the phenotype prediction pipeline.** Most of this plan is about verifying data sources and building that pipeline. The actual search algorithm comes last.
+
+## 0.1 Current Status Snapshot (2026-04-17)
+
+The repository has already implemented a meaningful subset of the phenotype foundation, but it has **not** implemented the crossing optimizer itself.
+
+| Phase | Status | Current Repo State |
+| ----- | ----- | ----- |
+| Phase 0 | Complete | FlyBase release discovery/download, local examination report generation, visible-marker inventory audit, unresolved-token curation, balancer reference scraping/reporting, live stock-resolution auditing, and admin sync health/status reporting are present |
+| Phase 1 | Complete | Manual marker dictionary, parser, construct-marker extraction, reviewed aliases, curated balancer metadata, Mongo-backed FlyBase ingestion, balancer ingestion, ingestion CLI commands, refresh-lifecycle integration, and the hybrid Mongo-plus-JSON cache architecture are present |
+| Phase 2 | Complete and shipped | Stock/cross phenotype previews, parent/offspring phenotype cache generation, cache refresh/backfill, FlyBase consequence annotations, provenance-aware scoring, sibling confusability analysis, and a standalone phenotype sandbox are implemented |
+| Phase 3 | Complete | `flymanager/utils/constraints/` now provides balancer selection, interchromosomal-risk scoring, marker-stability assessment, target validation, yield heuristics, and regression tests |
+| Phase 4 | Substantial partial implementation | `flymanager/utils/crossing/` now ships a phenotype-aware simulator wrapper, viability-aware pruning, sibling identifiability scoring, reciprocal-direction evaluation, simulator summaries, regression tests, and cross-view/cache integration; remaining gaps are broader historical-cross validation and optimizer/search consumption |
+| Phase 5 | Not started | No optimizer/search/templates/scoring modules |
+| Phase 6 | Not started | No optimizer blueprint, dedicated optimizer templates, or batch planner UI |
+
+This document now serves two purposes:
+
+1. Preserve the target architecture.
+2. Record where the current repo diverges from that target so future work can resume from the real baseline.
+
+## 0.2 Phase-by-Phase Implementation Checklist
+
+Use this as the execution checklist for closing the remaining gaps. Checked items are already in the repository in some form. Unchecked items are still missing or only partially covered.
+
+### Phase 0 Checklist: Data Examination and Source Validation
+
+- [x] Discover the latest FlyBase release and download the required bulk-data bundle
+- [x] Generate and maintain `data/flybase/EXAMINATION_REPORT.md`
+- [x] Audit visible-marker coverage in FlyBase phenotype data
+- [x] Audit compatible Bloomington stock rows against the phenotype pipeline
+- [x] Generate unresolved-token curation output for Bloomington-package parsing
+- [x] Expose FlyBase sync health and report status in admin workflows
+- [x] Expose ingestion, balancer-refresh, and phenotype-cache provenance in admin/status surfaces
+- [x] Scrape and normalize BDSC balancer definition pages into a structured dataset
+- [x] Capture balancer breakpoint and marker-stability facts from external sources instead of only curated code constants
+- [x] Write a persistent Phase 0 summary that explicitly compares external-data assumptions against live Mongo usage patterns
+
+### Phase 1 Checklist: Ingestion and Knowledge Base
+
+- [x] Maintain a curated manual visual-marker dictionary in `visual_markers.py`
+- [x] Support allele-specific marker overrides and reviewed bare-token aliases
+- [x] Parse genotype packages into constructs, classical alleles, balancers, aberrations, and unresolved tokens
+- [x] Extract construct markers such as mini-white, `y+`, and `v+`
+- [x] Build a local FlyBase evidence cache for allele evidence, aliases, construct annotations, and split-system annotations
+- [x] Resolve phenotype evidence by merging curated markers, construct parsing, reviewed aliases, and FlyBase cache lookups
+- [x] Create a normalized Mongo-backed ingestion pipeline for FlyBase TSVs (`flybase_ingest.py`)
+- [x] Create a balancer-ingestion module (`balancer_ingest.py`) instead of relying only on curated metadata in code
+- [x] Materialize queryable Mongo collections for FlyBase phenotype rows, allele-gene mappings, stocks, constructs, and gene-map data
+- [x] Add ingestion-oriented CLI commands such as `ingest-flybase`, `ingest-balancers`, and `test-allele`
+- [x] Add coverage validation that reports source-by-source resolution quality across the real stock collection
+- [x] Integrate FlyBase and balancer ingestion into the refresh lifecycle so reference data refreshes together
+- [x] Decide and document the hybrid architecture: Mongo-ingested reference collections are authoritative, while the JSON evidence cache remains the runtime fast path with file fallback
+- [x] Prefer Mongo-backed cache regeneration when a database handle is already available
+
+### Phase 2 Checklist: Phenotype Computation and Preview
+
+- [x] Compute visible marker summaries for a genotype/sex pair
+- [x] Predict stock-level phenotype summaries across male and female projections
+- [x] Annotate cross offspring predictions with phenotype summaries and confidence labels
+- [x] Cache phenotype summaries on stock and cross records
+- [x] Expose phenotype previews in stock view, cross view, and explorer surfaces
+- [x] Add refresh and bulk-backfill actions for phenotype caches
+- [x] Surface construct-annotation and split-system notes in phenotype output
+- [x] Add viability, lethality, sterility, and stage-aware phenotype consequences from FlyBase phenotype classes and qualifiers
+- [x] Add a formal epistasis engine for masking and interaction rules such as `cn` + `bw`
+- [x] Add full-genotype identifiability analysis for answering whether the desired class is uniquely sortable from siblings
+- [x] Add confusable-class detection across sibling progeny rather than reporting each class independently
+- [x] Add a standalone phenotype-preview API or sandbox UI for arbitrary genotype testing outside stock/cross pages
+- [x] Add provenance-aware scoring that distinguishes high-confidence microscope markers from low-confidence inference-only signals
+
+### Phase 3 Checklist: Genetic Constraint Engine
+
+- [x] Create `flymanager/utils/constraints/`
+- [x] Implement balancer selection by chromosome and gene position
+- [x] Implement interchromosomal-effect and multi-balancer risk checks
+- [x] Implement marker-stability scoring for candidate sorting markers
+- [x] Implement impossible-target and unsupported-target validation
+- [x] Implement yield estimation and vial-requirement heuristics
+- [x] Add tests that validate constraint outputs against known Drosophila genetics rules
+
+### Phase 4 Checklist: Enhanced Simulator and Identifiability
+
+- [x] Wrap `cross_genotypes()` with phenotype-aware simulation outputs
+- [x] Add viability-aware pruning of impossible or non-surviving offspring classes
+- [x] Add direction-aware cross evaluation when reciprocal crosses behave differently
+- [x] Implement identifiability scoring for each offspring class relative to siblings
+- [x] Detect when a planned step depends on non-unique or low-confidence sorting
+- [ ] Add regression tests based on real historical crosses and expected sortable classes
+
+### Phase 5 Checklist: Optimizer and Search
+
+- [x] Create `flymanager/utils/crossing/`
+- [ ] Implement formal crossing templates for common balancing and stock-building patterns
+- [ ] Implement target decomposition into chromosome-level subgoals
+- [ ] Implement candidate-scheme generation and pruning
+- [ ] Implement multi-factor scoring for generations, confidence, yield, and stock cost
+- [ ] Implement memoization and reusable sub-scheme caching
+- [ ] Add gold-standard optimizer tests against hand-designed schemes
+
+### Phase 6 Checklist: UI and Workflow Integration
+
+- [ ] Create `flymanager/app/routes/optimizer.py`
+- [ ] Create dedicated optimizer templates under `flymanager/app/templates/optimizer/`
+- [ ] Add target-genotype entry, validation, and dry-run preview flows
+- [ ] Add interactive per-step phenotype and identifiability explanations in the UI
+- [ ] Add scheme editing and re-scoring after user adjustments
+- [ ] Add persistence for saved schemes and cached optimizer results
+- [ ] Add batch-planning support for multi-target projects
+- [ ] Run end-to-end user testing with real lab workflows before declaring the optimizer production-ready
 
 ---
 
@@ -37,6 +146,8 @@ The genotype format is `"X_content; chr2_content; chr3_content; chr4_content"` w
 ## 2. Phase 0: Data Examination (DO THIS FIRST)
 
 **Goal:** Download external data sources, examine them, and verify our design assumptions before writing any ingestion code.
+
+**Implementation status as of 2026-04-17:** Implemented as a hybrid local-file plus Mongo workflow. The repo already contains `flymanager/utils/phenotypes/data/downloads.py`, `examiner.py`, `balancer_ingest.py`, and `manage.py`, plus `data/flybase/EXAMINATION_REPORT.md`, monthly refresh hooks, and status surfaces that expose ingestion and cache provenance.
 
 ### 2.1 Download FlyBase Bulk Data
 
@@ -174,6 +285,8 @@ url2 = "https://bdsc.indiana.edu/stocks/balancers/balancer_intro.html"
 # Extract: selection rules, interchromosomal effect warnings
 ```
 
+**Current implementation note:** this BDSC balancer scraping step is now implemented in `flymanager/utils/phenotypes/data/balancer_ingest.py`. The repo can write structured balancer JSON/Markdown reports, persist normalized balancer definitions into MongoDB, and still keep curated balancer shorthand in `flymanager/utils/phenotypes/visual_markers.py` as a runtime fallback.
+
 ### 2.4 Examine User's Existing Cross Data
 
 The user's BDSC digest is at: (provided as uploaded file — examine the gene packages)
@@ -214,12 +327,16 @@ Current decision from the examined FB2026_01 bundle:
 - Foundational: `stocks`, `genotype_phenotype_data`, `fbal_to_fbgn`, `dmel_classical_and_insertion_allele_descriptions`, `transgenic_construct_descriptions`, `gene_map_table`
 - Secondary: `split_system_combinations`
 - Manual dictionary remains primary for sort-by-eye marker descriptions
+- Mongo-ingested FlyBase and balancer collections are the authoritative reference-data layer refreshed by the monthly/admin sync workflow
+- `PHENOTYPE_EVIDENCE_CACHE.json` remains the runtime fast path and is rebuilt from Mongo-ingested collections when a database handle is available, with raw-file fallback retained for offline tooling
 
 ---
 
 ## 3. Phase 1: Data Ingestion + Manual Dictionary
 
 **Goal:** Get all phenotype data into a queryable form.
+
+**Implementation status as of 2026-04-17:** Complete for the planned Phase 1 scope. The manual dictionary, allele-specific overrides, reviewed aliases, construct-marker extraction, parser, resolver, Mongo-backed FlyBase ingestion layer (`flybase_ingest.py`), balancer ingestion/reporting (`balancer_ingest.py`), materialized reference collections, and management CLI commands now exist. The architecture decision is also made: Mongo-ingested reference collections are authoritative, while the JSON evidence cache remains the runtime fast layer.
 
 ### 3.1 Manual Visual Marker Dictionary
 
@@ -252,6 +369,8 @@ Sources for curating this dictionary:
 ### 3.2 FlyBase Ingestion Pipeline
 
 Create `flymanager/utils/phenotypes/data/flybase_ingest.py`:
+
+Current implementation note: this Mongo ingestion pipeline now exists in `flymanager/utils/phenotypes/data/flybase_ingest.py` and is wired into the monthly/admin refresh flow. `flymanager/utils/phenotypes/flybase_pipeline.py` remains the runtime cache layer and can rebuild its JSON evidence cache from Mongo-ingested collections when a database handle is available, or directly from files as a fallback.
 
 ```python
 def ingest_genotype_phenotype_data(filepath: str, db) -> dict:
@@ -315,6 +434,8 @@ Scrape BDSC balancer_defs.html and balancer_intro.html. For each balancer, store
 - Recommended stocks
 - Marker stability assessment
 
+Current implementation note: the scraper and persisted balancer dataset now exist in `balancer_ingest.py` and `balancer_definitions`, while `visual_markers.py` still carries curated balancer shorthand for fast runtime resolution and fallback behavior.
+
 ### 3.4 Management CLI
 
 Create `flymanager/utils/phenotypes/data/manage.py`:
@@ -328,6 +449,8 @@ Create `flymanager/utils/phenotypes/data/manage.py`:
 # python manage.py test-allele Cy   — look up allele across all sources
 # python manage.py test-genotype "w[1118]; P{...}/CyO; +; +"
 ```
+
+Current implementation note: `manage.py` now ships `examine`, `audit-bloomington`, `marker-inventory`, `discover-flybase`, `download-flybase`, `ingest-flybase`, `ingest-balancers`, `test-allele`, `audit-live-resolution`, and `test-genotype`.
 
 ### 3.5 Phase 1 Validation
 
@@ -357,6 +480,8 @@ Run these checks before proceeding:
 ## 4. Phase 2: Phenotype Computation + Preview
 
 **Goal:** Given any genotype string, predict its visible phenotype. Ship as a standalone UI feature.
+
+**Implementation status as of 2026-04-17:** Partially implemented and already exposed in the main app, but not as a standalone optimizer blueprint. The current repo ships `compute_marker_phenotype()` in `compute.py`, higher-level stock/cross prediction helpers in `predictor.py`, phenotype cache builders, cache validation helpers, stock-view phenotype preview UI, cross-view parent/offspring previews, explorer summaries, and admin/home backfill actions.
 
 ### 4.1 BDSC Grammar Parser
 
@@ -461,6 +586,13 @@ def compute_phenotype(genotype: str, sex: str, db) -> dict:
     """
 ```
 
+Current implementation note: the closest shipped equivalent is split across two layers:
+
+- `compute_marker_phenotype(genotype, sex)` returns expressed markers, unresolved tokens, mini-white copy counts, construct annotations, split-system annotations, and a short marker summary.
+- `predict_individual_phenotype()` and `predict_stock_phenotype()` add confidence labels, sex-aware stock projections, warnings, and cache-ready payloads.
+
+The currently shipped code now includes FlyBase-derived viability/fertility consequences, lethal and sterile allele annotations, and the formal epistasis layer used by the higher-level prediction helpers. The remaining gap is that the standalone preview path is still narrower than the later optimizer-target model, and the richer viability-aware pruning/search behavior lives in the Phase 4 simulator rather than in a single monolithic `compute_phenotype()` API.
+
 ### 4.4 Phenotype Preview UI
 
 Create a Flask route and template that lets users type a genotype and see its predicted phenotype:
@@ -478,6 +610,13 @@ def preview_phenotype():
     phenotype = compute_phenotype(normalized, sex, db)
     return jsonify(phenotype)
 ```
+
+Current implementation note: this exact optimizer blueprint route does not exist. Instead, FlyManager now exposes a standalone phenotype sandbox at `GET/POST /stock/phenotype_preview`, and phenotype preview is also embedded into existing stock and cross record views, with manual refresh endpoints:
+
+- `POST /stock/view/<unique_id>/refresh_phenotype`
+- `POST /cross/view_cross/<unique_id>/refresh_phenotype`
+
+These routes rebuild cached phenotype payloads and render them inside the normal stock/cross UI.
 
 ### 4.5 Phase 2 Validation
 
@@ -513,6 +652,8 @@ This is the most important validation step. Run `compute_phenotype()` on the use
 ## 5. Phase 3: Genetic Constraint Engine
 
 **Goal:** Build the Drosophila-specific biological rules that the optimizer needs.
+
+**Implementation status as of 2026-04-17:** Complete for the Phase 3 baseline. The repo now ships `flymanager/utils/constraints/` with `balancer_selection.py`, `interchromosomal.py`, `marker_stability.py`, `target_validation.py`, and `yield_estimator.py`, plus regression tests that cover conservative Drosophila-specific validation and risk rules.
 
 ### 5.1 Balancer Selection by Cytological Position
 
@@ -584,6 +725,8 @@ def validate_target(target_genotype: str, target_sex: str, db) -> dict:
 
 **Goal:** Wrap `cross_genotypes()` to produce phenotype-annotated progeny tables with identifiability checking.
 
+**Implementation status as of 2026-04-17:** Substantial partial implementation. The repo now ships `flymanager/utils/crossing/simulator.py` with `simulate_cross()`, `cross_genotypes_with_phenotypes()`, and `evaluate_cross_directions()`, plus `flymanager/utils/phenotypes/identifiability.py` for sibling-aware sortability analysis. Cross phenotype caches now persist simulator summaries and reciprocal-direction evaluations, and the cross detail view surfaces prune reasons, viable-pool percentages, low-confidence sorting cues, and reciprocal direction guidance. Remaining work is mainly validation depth and wiring these outputs into the future optimizer/search layer.
+
 ### 6.1 Enhanced Simulator
 
 Create `flymanager/utils/crossing/simulator.py`:
@@ -598,6 +741,8 @@ def cross_genotypes_with_phenotypes(male: str, female: str, db) -> list[dict]:
     5. Return enriched progeny table
     """
 ```
+
+Current implementation note: this wrapper now exists via `simulate_cross()` and `cross_genotypes_with_phenotypes()` in `flymanager/utils/crossing/simulator.py`. The returned rows include phenotype payloads, target-validation output, yield estimates, viability flags, prune reasons, viable-only renormalized probabilities, and sibling identifiability annotations.
 
 ### 6.2 Identifiability Checker
 
@@ -622,6 +767,8 @@ def check_identifiability(progeny_classes: list[dict], target_indices: list[int]
     """
 ```
 
+Current implementation note: `flymanager/utils/phenotypes/identifiability.py` now implements this sibling-aware comparison layer. It flags confusable sibling classes, exclusion-only sorting, mini-white-only and Tb-only discriminator cases, and low-confidence sorting dependence, and produces explicit selection instructions for each viable progeny class.
+
 ### 6.3 Cross Direction Evaluation
 
 ```python
@@ -633,6 +780,8 @@ def evaluate_cross_directions(parent_a: str, parent_b: str, db) -> dict:
     Consider: X-linked markers, virgin collection ease (balanced female = easier).
     """
 ```
+
+Current implementation note: this reciprocal-evaluation layer now exists in `flymanager/utils/crossing/simulator.py`. It compares forward and reverse summaries, emits a recommended direction plus rationale/operational notes, and the compact summary is now cached and rendered in the cross detail UI.
 
 ### 6.4 Phase 4 Validation
 
@@ -656,6 +805,8 @@ def evaluate_cross_directions(parent_a: str, parent_b: str, db) -> dict:
 ## 7. Phase 5: Search Engine
 
 **Goal:** Given a target genotype + available stocks, find optimal crossing schemes.
+
+**Implementation status as of 2026-04-17:** Not started beyond the Phase 4 simulator foundation. `flymanager/utils/crossing/` exists today, but it currently contains only the simulator layer and exports; template generation, optimizer search, scoring, decomposition, memoization, cache, and batch planning modules are still absent.
 
 ### 7.1 Template Definitions
 
@@ -742,6 +893,8 @@ Test against gold standard schemes:
 
 ## 8. Phase 6: UI + Integration
 
+**Implementation status as of 2026-04-17:** Not started beyond phenotype preview surfaces inside existing stock/cross/admin pages.
+
 - Flask Blueprint with routes for preview, compute, simulate, batch
 - Templates: index, preview, results, scheme_detail, batch, simulate, preferences
 - SocketIO for progress on long computations
@@ -774,41 +927,60 @@ beautifulsoup4 = "^4.12"     # BDSC page scraping
 lxml = "^5.1"                # HTML parser for BeautifulSoup
 ```
 
+Implementation status as of 2026-04-17: these dependencies are still planned and are not listed in the repository `pyproject.toml`. The current FlyBase downloader/examiner uses only standard-library networking and HTML parsing.
+
 ---
 
-## 11. File Tree (What to Create)
+## 11. File Tree
 
-```
+Already present in the repository:
+
+```text
 flymanager/utils/phenotypes/
 ├── __init__.py
-├── parser.py               # BDSC grammar parser
-├── visual_markers.py       # VISUAL_MARKER_DICTIONARY (curated)
-├── construct_markers.py    # Transgene marker extraction + mini-white
-├── resolver.py             # Three-source resolution pipeline
-├── compute.py              # compute_phenotype()
-├── identifiability.py      # Full-genotype identifiability
-├── genotype_matching.py    # Phenotypic equivalence + stock identity
-├── epistasis.py            # cn+bw=white, etc.
-├── split_gal4.py           # AD/DBD awareness
+├── backfill.py
+├── compute.py
+├── construct_markers.py
+├── epistasis.py
+├── flybase_pipeline.py
+├── identifiability.py
+├── parser.py
+├── predictor.py
+├── resolver.py
+├── visual_markers.py
 
 flymanager/utils/constraints/
 ├── __init__.py
-├── balancer_selection.py   # Cytological position matching
-├── interchromosomal.py     # Multi-balancer risk
-├── marker_stability.py     # Stability scores
-├── target_validation.py    # Impossible target detection
-├── yield_estimator.py      # Vial requirements
-
-flymanager/utils/phenotypes/data/
-├── downloads.py            # Release-aware FlyBase bundle discovery + download
-├── __init__.py
-├── flybase_ingest.py       # FlyBase TSV ingestion
-├── balancer_ingest.py      # BDSC scraping
-├── manage.py               # CLI tool
+├── _shared.py
+├── balancer_selection.py
+├── interchromosomal.py
+├── marker_stability.py
+├── target_validation.py
+├── yield_estimator.py
 
 flymanager/utils/crossing/
 ├── __init__.py
-├── simulator.py            # cross_genotypes_with_phenotypes()
+├── simulator.py
+
+flymanager/utils/phenotypes/data/
+├── balancer_ingest.py
+├── downloads.py
+├── examiner.py
+├── flybase_ingest.py
+├── manage.py
+```
+
+Still planned to create:
+
+```text
+flymanager/utils/phenotypes/
+├── genotype_matching.py    # Phenotypic equivalence + stock identity
+├── split_gal4.py           # AD/DBD awareness
+
+flymanager/utils/phenotypes/data/
+├── __init__.py             # optional package marker only
+
+flymanager/utils/crossing/
 ├── optimizer.py            # find_optimal_schemes()
 ├── templates.py            # Formalized crossing templates
 ├── scorer.py               # Multi-dimensional scoring
@@ -823,27 +995,33 @@ flymanager/app/templates/optimizer/*.html
 
 data/flybase/               # User-downloaded, gitignored
 tests/                      # 18+ test files
-```
+```text
 
 ---
 
 ## 12. Order of Operations (Summary)
 
-```
-Phase 0 (Week 1)     → Download data, examine, write EXAMINATION_REPORT.md
-                        GO/NO-GO: confirm architecture assumptions
-Phase 1 (Weeks 1-3)  → Curate dictionary, ingest FlyBase, ingest balancers
-                        VALIDATE: coverage audit, cross-source concordance
-Phase 2 (Weeks 3-5)  → Parser, resolver, compute_phenotype(), SHIP PREVIEW UI
-                        VALIDATE: test against user's actual stocks and crosses
-Phase 3 (Weeks 5-7)  → Balancer selection, target validation, constraints
-                        VALIDATE: biological correctness of constraint outputs
-Phase 4 (Weeks 7-9)  → Enhanced simulator, identifiability checker
-                        VALIDATE: test against real crosses with known selection criteria
+```text
+Phase 0              → Already largely in repo: discover/download data, examine, write EXAMINATION_REPORT.md
+                        REMAINING: optional deeper source-quality audits only when a new FlyBase release changes assumptions
+Phase 1              → Already in repo: dictionary, parser, resolver, Mongo ingestion, balancer ingest, and hybrid cache/runtime plumbing
+                        REMAINING: no blocking Phase 1 architecture work
+Phase 2              → Complete in repo: shipped phenotype previews, FlyBase consequence annotations, sibling confusability analysis, and standalone phenotype sandbox
+                        REMAINING: no blocking Phase 2 checklist work
+Phase 3 (Weeks 5-7)  → Complete in repo: balancer selection, target validation, risk scoring, and yield heuristics
+                        REMAINING: keep these validators stable as optimizer/search pruning inputs
+Phase 4 (Weeks 7-9)  → Substantially implemented in repo: enhanced simulator, identifiability checker, reciprocal evaluation, and cross-view/cache integration
+                        REMAINING: validate against real crosses with known selection criteria and broaden regression coverage beyond synthetic cases
 Phase 5 (Weeks 9-13) → Templates, optimizer, scoring
                         VALIDATE: gold standard schemes, comparison to user's history
 Phase 6 (Weeks 13-16)→ UI, integration, batch mode
                         VALIDATE: end-to-end user testing
 ```
 
-**The most important thing: Phase 0 happens before any code. Don't skip it.**
+**Updated sequencing note:** Phase 0 through Phase 3 are complete and the first substantial slice of Phase 4 is now shipped. The next real implementation boundary is finishing Phase 4 validation and then building Phase 5 search/optimizer modules on top of the new simulator outputs.
+
+### 12.1 Recommended Next Steps
+
+1. Add a real historical-cross validation corpus so the Phase 4 simulator can be checked against actual lab selection outcomes rather than only synthetic regression fixtures.
+2. Start the Phase 5 search package with `templates.py`, `optimizer.py`, and `scorer.py`, reusing `simulate_cross()`, `evaluate_cross_directions()`, and the Phase 3 validators as pruning/scoring inputs.
+3. Create the dedicated optimizer blueprint and UI flows so the new simulator rationale can be reused outside the existing cross detail page.

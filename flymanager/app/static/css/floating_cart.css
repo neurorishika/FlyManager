@@ -194,12 +194,103 @@
     min-height: 42px;
 }
 
+.edge-dock {
+    position: fixed;
+    top: 50%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    background: color-mix(in srgb, var(--card-bg) 84%, var(--bg-color) 16%);
+    border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent 20%);
+    border-radius: 22px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(16px) saturate(135%);
+    -webkit-backdrop-filter: blur(16px) saturate(135%);
+    z-index: 998;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease, transform 0.24s ease, box-shadow 0.24s ease;
+}
+
+.edge-dock-left {
+    left: 0;
+    transform: translate(calc(-100% + 18px), -50%);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-left: none;
+}
+
+.edge-dock-right {
+    right: 0;
+    transform: translate(calc(100% - 18px), -50%);
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: none;
+}
+
+.edge-dock.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.edge-dock-left.is-visible {
+    transform: translate(0, -50%);
+}
+
+.edge-dock-right.is-visible {
+    transform: translate(0, -50%);
+}
+
+.edge-dock.is-empty {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.edge-dock-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 46px;
+    min-width: 170px;
+    padding: 0 16px;
+    color: var(--text-color);
+    background: color-mix(in srgb, var(--bg-color) 72%, transparent 28%);
+    border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent 20%);
+    border-radius: 999px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+
+.edge-dock-action:hover,
+.edge-dock-action:focus-visible {
+    color: var(--text-color);
+    background: color-mix(in srgb, var(--card-bg) 42%, var(--accent-color, var(--header-bg)) 58%);
+    border-color: color-mix(in srgb, var(--accent-color, var(--header-bg)) 58%, transparent 42%);
+    transform: translateY(-1px);
+}
+
+.edge-dock-action:disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.edge-dock-action.is-hidden {
+    display: none;
+}
+
+.edge-dock-label {
+    font-size: 0.92rem;
+}
+
 /* Reserve space for the fixed cart within the main content, not below the footer */
 body.has-floating-cart .main-content {
     padding-bottom: calc(clamp(28px, 4vw, 44px) + 104px);
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767px), (pointer: coarse) {
     .floating-cart-container {
         bottom: 10px;
         width: calc(100% - 12px);
@@ -229,13 +320,76 @@ body.has-floating-cart .main-content {
         white-space: normal;
     }
 
+    .edge-dock {
+        top: auto;
+        left: 50%;
+        right: auto;
+        flex-direction: row;
+        width: min(calc(100% - 20px), 420px);
+        justify-content: center;
+        transform: translateX(-50%);
+        opacity: 1;
+        pointer-events: auto;
+        border-radius: 18px;
+        border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent 20%);
+    }
+
+    .edge-dock-left,
+    .edge-dock-right,
+    .edge-dock-left.is-visible,
+    .edge-dock-right.is-visible {
+        transform: translateX(-50%);
+    }
+
+    .edge-dock-left {
+        bottom: 156px;
+    }
+
+    .edge-dock-right {
+        bottom: 214px;
+    }
+
+    .edge-dock-action {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
     body.has-floating-cart .main-content {
-        padding-bottom: calc(clamp(28px, 4vw, 44px) + 96px);
+        padding-bottom: calc(clamp(28px, 4vw, 44px) + 244px);
+    }
+}
+
+@media (max-width: 575px) {
+    .edge-dock {
+        width: calc(100% - 12px);
+        padding: 8px;
+        gap: 6px;
+    }
+
+    .edge-dock-left {
+        bottom: 144px;
+    }
+
+    .edge-dock-right {
+        bottom: 196px;
+    }
+
+    .edge-dock-action {
+        width: 44px;
+        min-width: 44px;
+        padding: 0;
+        justify-content: center;
+    }
+
+    .edge-dock-label {
+        display: none;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .floating-cart-container,
+    .edge-dock,
+    .edge-dock-action,
     .cart-content,
     .toggle-cart-btn,
     .toggle-cart-btn i,

@@ -6,3 +6,20 @@
 .cross-item-submeta {
     margin-top: 8px;
 }
+
+.badge-assignment {
+    border: 1px solid transparent;
+}
+
+.badge-assignment-owned,
+.badge-assignment-incoming {
+    background: color-mix(in srgb, var(--success-color) 22%, white 78%);
+    color: color-mix(in srgb, var(--success-color) 82%, black 18%);
+    border-color: color-mix(in srgb, var(--success-color) 38%, transparent 62%);
+}
+
+.badge-assignment-assigned_out {
+    background: color-mix(in srgb, var(--warning-color) 24%, white 76%);
+    color: color-mix(in srgb, var(--warning-color) 78%, black 22%);
+    border-color: color-mix(in srgb, var(--warning-color) 36%, transparent 64%);
+}

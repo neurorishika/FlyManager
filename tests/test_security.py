@@ -1,6 +1,6 @@
 import re
 from datetime import datetime, timedelta
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, MagicMock, call, patch
 
 import pytest
 
@@ -25,6 +25,7 @@ def _make_app(monkeypatch):
     monkeypatch.setenv("ENABLE_SCHEDULER", "0")
     monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     monkeypatch.setenv("MAIL_SUPPRESS_SEND", "1")
+    monkeypatch.setenv("WARM_PAGE_CACHES_ON_STARTUP", "0")
     monkeypatch.delenv("FLYMANAGER_DOMAIN", raising=False)
 
     with patch("flymanager.app.get_settings", return_value=_settings_payload()):
@@ -218,16 +219,31 @@ def test_home_page_renders_without_inline_style_attributes(monkeypatch):
         with client.session_transaction() as sess:
             sess["username"] = "admin"
 
-        with patch("flymanager.app.routes.main.get_user_stocks", return_value=[]), patch(
-            "flymanager.app.routes.main.get_user_crosses", return_value=[]
+        with patch("flymanager.app.routes.main.get_accessible_stocks", return_value=[]), patch(
+            "flymanager.app.routes.main.get_accessible_crosses", return_value=[]
         ), patch("flymanager.app.routes.main.get_user_trays", return_value=[]), patch(
             "flymanager.app.routes.main.get_user_activities", return_value=[]
-        ), patch("flymanager.app.routes.main.get_flip_schedule", return_value={}):
+        ), patch("flymanager.app.routes.main.get_flip_schedule", return_value={}), patch(
+            "flymanager.app.routes.main.flybase_service.get_flybase_reference_status",
+            return_value={
+                "status_tone": "success",
+                "status_label": "Healthy",
+                "status_message": "FlyBase reference data is current based on the latest successful sync from today.",
+                "status_detail": "Release FB2026_01 synced at 2026-04-17 11:15:00.",
+                "last_attempt_at": "2026-04-17 11:15:00",
+                "last_error": "",
+                "release": "FB2026_01",
+                "total_files": 8,
+                "supported_rows": 144,
+                "examination_exists": True,
+            },
+        ):
             response = client.get("/home")
 
     page = response.get_data(as_text=True)
     assert response.status_code == 200
     assert "style=" not in page
+    assert "onsubmit=" not in page
 
 
 def test_home_page_renders_dashboard_command_sections(monkeypatch):
@@ -300,23 +316,234 @@ def test_home_page_renders_dashboard_command_sections(monkeypatch):
         with client.session_transaction() as sess:
             sess["username"] = "admin"
 
-        with patch("flymanager.app.routes.main.get_user_stocks", return_value=stocks), patch(
-            "flymanager.app.routes.main.get_user_crosses", return_value=crosses
+        with patch("flymanager.app.routes.main.get_accessible_stocks", return_value=stocks), patch(
+            "flymanager.app.routes.main.get_accessible_crosses", return_value=crosses
         ), patch("flymanager.app.routes.main.get_user_trays", return_value=trays), patch(
             "flymanager.app.routes.main.get_user_activities", return_value=activities
         ), patch("flymanager.app.routes.main.get_flip_schedule", return_value=schedule), patch(
             "flymanager.app.routes.main.get_tray_occupancy", return_value=occupancy
+        ), patch(
+            "flymanager.app.routes.main.flybase_service.get_flybase_reference_status",
+            return_value={
+                "status_tone": "warning",
+                "status_label": "Stale",
+                "status_message": "The latest successful FlyBase sync is 75 days ago.",
+                "status_detail": "Monthly refresh may have been skipped or delayed. Review the admin sync controls and rerun if needed.",
+                "last_attempt_at": "2026-04-17 11:30:00",
+                "last_error": "",
+                "release": "FB2026_01",
+                "total_files": 8,
+                "supported_rows": 144,
+                "examination_exists": True,
+            },
         ):
             response = client.get("/home")
 
     page = response.get_data(as_text=True)
     assert response.status_code == 200
+    assert "onsubmit=" not in page
+    assert "data-confirm-message=\"This will backfill missing or stale phenotype caches for the stocks and crosses you currently maintain. Continue?\"" in page
     assert "Tray Heatmap" in page
     assert "My Queue" in page
     assert "Trend Signals" in page
     assert "Overdue Drift" in page
     assert "Tray Heatmap" in page
+    assert "FlyBase Sync Health" in page
+    assert "Stale" in page
+    assert "Phenotype Cache" in page
+    assert "Backfill My Phenotype Caches" in page
+    assert "Refresh All Provider Caches" in page
+    assert "data-confirm-message=\"This will rerun provider match caching for every stock in the database. Continue?\"" in page
+    assert "Genotype Reviewer" in page
     assert ">Open<" in page
+
+
+def test_home_page_paginates_attention_board_and_todays_schedule(monkeypatch):
+    app = _make_app(monkeypatch)
+    today = datetime.now().strftime("%Y-%m-%d")
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    stocks = [
+        {
+            "Status": "Healthy",
+            "Name": f"Stock {index}",
+            "UniqueID": f"STK{index:03d}",
+            "TrayID": "T1",
+            "TrayPosition": str(index),
+            "CurrentlyAliveVials": "1,2",
+            "NextFlipDates": yesterday,
+        }
+        for index in range(1, 9)
+    ]
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "scientist"
+
+        with patch("flymanager.app.routes.main.get_accessible_stocks", return_value=stocks), patch(
+            "flymanager.app.routes.main.get_accessible_crosses", return_value=[]
+        ), patch("flymanager.app.routes.main.get_user_trays", return_value=[]), patch(
+            "flymanager.app.routes.main.get_user_activities", return_value=[]
+        ), patch(
+            "flymanager.app.routes.main.get_flip_schedule",
+            return_value={today: [f"Task {index}" for index in range(1, 9)]},
+        ):
+            response = client.get("/home?attention_page=2&schedule_page=2")
+
+    page = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert page.count('class="attention-card"') == 2
+    assert page.count('class="schedule-card"') == 2
+    assert "Showing 7-8 of 8 items" in page
+    assert "Showing 7-8 of 8 scheduled items" in page
+    assert "attention_page=1" in page
+    assert "schedule_page=2" in page
+    assert "attention_page=2" in page
+    assert "schedule_page=1" in page
+
+
+def test_home_page_attention_filter_is_server_paginated(monkeypatch):
+    app = _make_app(monkeypatch)
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    stocks = [
+        {
+            "Status": "Healthy",
+            "Name": "Stock Overdue",
+            "UniqueID": "STK001",
+            "TrayID": "T1",
+            "TrayPosition": "1",
+            "CurrentlyAliveVials": "1,2",
+            "NextFlipDates": yesterday,
+        }
+    ]
+    crosses = [
+        {
+            "Status": "Showing Issues",
+            "Name": "Cross Review",
+            "UniqueID": "CRS001",
+            "TrayID": "T1",
+            "TrayPosition": "2",
+            "CurrentlyAliveVials": "1",
+            "NextFlipDates": "",
+        }
+    ]
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "scientist"
+
+        with patch("flymanager.app.routes.main.get_accessible_stocks", return_value=stocks), patch(
+            "flymanager.app.routes.main.get_accessible_crosses", return_value=crosses
+        ), patch("flymanager.app.routes.main.get_user_trays", return_value=[]), patch(
+            "flymanager.app.routes.main.get_user_activities", return_value=[]
+        ), patch("flymanager.app.routes.main.get_flip_schedule", return_value={}):
+            response = client.get("/home?attention_filter=watch")
+
+    page = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert page.count('class="attention-card"') == 1
+    assert "Showing 1-1 of 1 items" in page
+    assert "attention_filter=watch" in page
+
+
+def test_home_page_paginates_upcoming_schedule_and_recent_activity(monkeypatch):
+    app = _make_app(monkeypatch)
+    now = datetime.now()
+    schedule = {}
+    activities = []
+
+    for offset in range(1, 8):
+        future_date = (now + timedelta(days=offset)).strftime("%Y-%m-%d")
+        schedule[future_date] = [f"Upcoming task {offset}"]
+
+    for offset in range(8):
+        activity_time = now - timedelta(days=offset)
+        activities.append(
+            {
+                "timestamp": activity_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "activity": f"Activity {offset + 1}",
+            }
+        )
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "scientist"
+
+        with patch("flymanager.app.routes.main.get_accessible_stocks", return_value=[]), patch(
+            "flymanager.app.routes.main.get_accessible_crosses", return_value=[]
+        ), patch("flymanager.app.routes.main.get_user_trays", return_value=[]), patch(
+            "flymanager.app.routes.main.get_user_activities", return_value=activities
+        ), patch("flymanager.app.routes.main.get_flip_schedule", return_value=schedule):
+            response = client.get("/home?upcoming_page=2&activity_page=2")
+
+    page = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert page.count('class="upcoming-card schedule-card"') == 1
+    assert page.count('class="mini-section"') == 2
+    assert "Showing 7-7 of 7 upcoming days" in page
+    assert "Showing 7-8 of 8 activity days" in page
+    assert "upcoming_page=1" in page
+    assert "activity_page=2" in page
+    assert "upcoming_page=2" in page
+    assert "activity_page=1" in page
+
+
+def test_home_page_renders_phenotype_cache_backfill_for_standard_user(monkeypatch):
+    app = _make_app(monkeypatch)
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "scientist"
+
+        with patch("flymanager.app.routes.main.get_accessible_stocks", return_value=[]), patch(
+            "flymanager.app.routes.main.get_accessible_crosses", return_value=[]
+        ), patch("flymanager.app.routes.main.get_user_trays", return_value=[]), patch(
+            "flymanager.app.routes.main.get_user_activities", return_value=[]
+        ), patch("flymanager.app.routes.main.get_flip_schedule", return_value={}):
+            response = client.get("/home")
+
+    page = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "Phenotype Cache" in page
+    assert "Backfill My Phenotype Caches" in page
+    assert "Refresh All Provider Caches" not in page
+    assert "Backfill All Phenotype Caches" not in page
+
+
+def test_home_page_renders_failed_flybase_sync_warning_for_admin(monkeypatch):
+    app = _make_app(monkeypatch)
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "admin"
+
+        with patch("flymanager.app.routes.main.get_accessible_stocks", return_value=[]), patch(
+            "flymanager.app.routes.main.get_accessible_crosses", return_value=[]
+        ), patch("flymanager.app.routes.main.get_user_trays", return_value=[]), patch(
+            "flymanager.app.routes.main.get_user_activities", return_value=[]
+        ), patch("flymanager.app.routes.main.get_flip_schedule", return_value={}), patch(
+            "flymanager.app.routes.main.flybase_service.get_flybase_reference_status",
+            return_value={
+                "status_tone": "danger",
+                "status_label": "Failed",
+                "status_message": "The last FlyBase refresh attempt failed at 2026-04-17 11:30:00.",
+                "status_detail": "Last successful sync: 2026-04-01 10:00:00 (16 days ago).",
+                "last_attempt_at": "2026-04-17 11:30:00",
+                "last_error": "network timeout",
+                "release": "FB2026_01",
+                "total_files": 8,
+                "supported_rows": 144,
+                "examination_exists": True,
+            },
+        ):
+            response = client.get("/home")
+
+    page = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "FlyBase Sync Health" in page
+    assert "Failed" in page
+    assert "The last FlyBase refresh attempt failed at 2026-04-17 11:30:00." in page
 
 
 def test_login_page_uses_local_vendor_assets(monkeypatch):
@@ -471,7 +698,7 @@ def test_reminder_route_allows_admin_post(monkeypatch):
     schedule_mock.assert_called_once()
 
 
-def test_stock_uid_lookup_is_limited_to_current_user(monkeypatch):
+def test_stock_uid_lookup_is_limited_to_current_access_scope(monkeypatch):
     app = _make_app(monkeypatch)
     collection = MagicMock()
     collection.find_one.return_value = None
@@ -484,9 +711,10 @@ def test_stock_uid_lookup_is_limited_to_current_user(monkeypatch):
             response = client.get("/stock/get_stock_data_for_uid/ABC123")
 
     assert response.status_code == 404
-    collection.find_one.assert_called_once_with(
-        {"UniqueID": "ABC123", "User": "scientist"}
-    )
+    assert collection.find_one.call_args_list == [
+        call({"UniqueID": "ABC123", "User": "scientist"}),
+        call({"UniqueID": "ABC123", "AssignedTo": "scientist"}),
+    ]
 
 
 def test_flip_uid_lookup_returns_shared_scan_payload(monkeypatch):

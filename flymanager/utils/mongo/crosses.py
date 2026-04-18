@@ -16,6 +16,7 @@ from flymanager.utils.mongo_records import (apply_updates_to_owned_document,
                                             get_owned_document,
                                             prune_vial_schedule,
                                             require_fields)
+from flymanager.utils.phenotypes.predictor import build_cross_phenotype_cache
 
 
 def add_to_cross(user, properties, db):
@@ -70,6 +71,10 @@ def add_to_cross(user, properties, db):
             "FemaleUniqueID": properties["FemaleUniqueID"],
             "MaleGenotype": male_genotype,
             "FemaleGenotype": female_genotype,
+            "PhenotypeCache": build_cross_phenotype_cache(
+                male_genotype,
+                female_genotype,
+            ),
             "Name": properties["Name"],
             "TrayID": "",
             "TrayPosition": "",
@@ -185,12 +190,31 @@ def edit_cross(user, uid, db, updates, log_activity=True, refresh_vials=True):
         True if the cross was updated, False if not found.
     """
 
+    prepared_updates = dict(updates)
+    if "MaleGenotype" in prepared_updates or "FemaleGenotype" in prepared_updates:
+        current_cross = get_cross(user, uid, db)
+        if not current_cross:
+            return False
+
+        male_genotype = prepared_updates.get(
+            "MaleGenotype",
+            current_cross.get("MaleGenotype", ""),
+        )
+        female_genotype = prepared_updates.get(
+            "FemaleGenotype",
+            current_cross.get("FemaleGenotype", ""),
+        )
+        prepared_updates["PhenotypeCache"] = build_cross_phenotype_cache(
+            male_genotype,
+            female_genotype,
+        )
+
     success, current_cross = apply_updates_to_owned_document(
         "crosses",
         user,
         uid,
         db,
-        updates,
+        prepared_updates,
         log_activity=log_activity,
     )
 

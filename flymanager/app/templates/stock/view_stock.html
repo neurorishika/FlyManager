@@ -3,7 +3,7 @@
 {% block title %}Stock Viewer{% endblock %}
 
 {% block head %}
-<link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.css" rel="stylesheet" type="text/css" />
+<link href="{{ url_for('static', filename='vendor/tagify/tagify.css') }}" rel="stylesheet" type="text/css" />
 <style nonce="{{ csp_nonce }}">
     .stock-view-summary-grid {
         display: grid;
@@ -75,24 +75,337 @@
 
     .stock-log-value {
         min-height: 156px;
+        max-height: 320px;
         align-items: flex-start;
         white-space: pre-wrap;
         line-height: 1.5;
+        overflow: auto;
+        scrollbar-gutter: stable;
     }
 
     .stock-view-footer-actions {
         margin-top: 4px;
     }
 
+    .stock-source-panel {
+        display: grid;
+        gap: 16px;
+    }
+
+    .stock-assignment-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    .stock-assignment-cell {
+        padding: 14px;
+        border-radius: 14px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 76%, var(--card-bg) 24%);
+    }
+
+    .stock-assignment-cell p {
+        margin: 0;
+    }
+
+    .stock-source-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    .stock-source-cell {
+        padding: 14px;
+        border-radius: 14px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 76%, var(--card-bg) 24%);
+    }
+
+    .stock-source-cell p {
+        margin: 0;
+    }
+
+    .stock-match-results {
+        display: grid;
+        gap: 10px;
+    }
+
+    .stock-match-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 72%, var(--card-bg) 28%);
+    }
+
+    .stock-match-copy {
+        margin: 4px 0 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .stock-match-cache-summary {
+        display: grid;
+        gap: 4px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 76%, var(--card-bg) 24%);
+    }
+
+    .stock-match-cache-summary p {
+        margin: 0;
+    }
+
+    .stock-match-error {
+        margin: 0;
+        color: #b02a37;
+        font-weight: 600;
+    }
+
+    .stock-review-panel {
+        display: grid;
+        gap: 14px;
+    }
+
+    .stock-review-summary {
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 76%, var(--card-bg) 24%);
+    }
+
+    .stock-review-summary p {
+        margin: 0;
+    }
+
+    .stock-review-issue {
+        display: grid;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 72%, var(--card-bg) 28%);
+    }
+
+    .stock-review-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .stock-review-header p,
+    .stock-review-candidate-copy,
+    .stock-review-meta,
+    .stock-review-empty {
+        margin: 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .stock-review-recommendation,
+    .stock-review-ambiguity,
+    .stock-review-search {
+        display: grid;
+        gap: 8px;
+    }
+
+    .stock-review-token {
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .stock-review-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
+        font-size: var(--font-size-sm);
+        white-space: nowrap;
+    }
+
+    .stock-review-candidate-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .stock-review-candidate {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 68%, var(--card-bg) 32%);
+    }
+
+    .stock-review-search-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .stock-review-search-row .form-control {
+        flex: 1 1 220px;
+    }
+
+    .stock-review-apply-note {
+        color: color-mix(in srgb, var(--success-color) 78%, var(--text-color) 22%);
+        font-weight: 600;
+    }
+
+    .stock-phenotype-summary {
+        display: grid;
+        gap: 12px;
+    }
+
+    .stock-phenotype-metadata {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .stock-phenotype-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0.4rem 0.75rem;
+        border-radius: 999px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
+        font-size: var(--font-size-sm);
+    }
+
+    .stock-phenotype-pill.is-high {
+        border-color: color-mix(in srgb, var(--success-color) 38%, var(--border-color) 62%);
+    }
+
+    .stock-phenotype-pill.is-medium {
+        border-color: color-mix(in srgb, var(--warning-color) 45%, var(--border-color) 55%);
+    }
+
+    .stock-phenotype-pill.is-low {
+        border-color: color-mix(in srgb, var(--danger-color) 45%, var(--border-color) 55%);
+    }
+
+    .stock-phenotype-warning-list {
+        display: grid;
+        gap: 8px;
+    }
+
+    .stock-phenotype-image-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 420px));
+        justify-content: start;
+        align-items: start;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .stock-phenotype-image-card {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        width: min(100%, 420px);
+        max-width: 420px;
+        justify-self: start;
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        overflow: hidden;
+        background: color-mix(in srgb, var(--card-bg) 94%, white 6%);
+    }
+
+    .stock-phenotype-image-media {
+        aspect-ratio: 4 / 3;
+        overflow: hidden;
+        background: color-mix(in srgb, var(--bg-color) 88%, var(--card-bg) 12%);
+    }
+
+    .stock-phenotype-image-card img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .stock-phenotype-image-card-body {
+        display: grid;
+        gap: 0.35rem;
+        padding: 0.85rem 0.95rem 1rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .stock-phenotype-image-card-title {
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .stock-phenotype-image-card-copy {
+        margin: 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+        line-height: 1.4;
+    }
+
+    .stock-phenotype-image-card-meta {
+        margin: 0.1rem 0 0;
+        color: var(--muted-text);
+        font-size: 0.82rem;
+        text-transform: capitalize;
+    }
+
+    .stock-phenotype-warning {
+        padding: 0.8rem 1rem;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 70%, var(--warning-color) 10%);
+        color: var(--muted-text);
+    }
+
     @media (max-width: 991px) {
         .stock-view-summary-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .stock-source-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .stock-assignment-grid {
+            grid-template-columns: 1fr;
         }
     }
 
     @media (max-width: 767px) {
         .stock-view-summary-grid {
             grid-template-columns: 1fr;
+        }
+
+        .stock-source-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .stock-phenotype-image-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .stock-phenotype-image-card {
+            width: 100%;
+            max-width: none;
+        }
+
+        .stock-match-item {
+            display: grid;
         }
     }
 </style>
@@ -107,9 +420,14 @@
     </div>
     <div class="app-toolbar">
         <a href="{{ url_for('stock.stock_explorer') }}" class="btn btn-secondary">Back to Stocks</a>
+        {% if stock_data.providerURL %}
+        <a href="{{ stock_data.providerURL }}" class="btn btn-outline-info" target="_blank" rel="noopener noreferrer">Open Source Link</a>
+        {% endif %}
+        {% if can_edit_record %}
         <button type="button" id="enableEditBtn" class="btn btn-primary">Enable Editing</button>
         <button type="button" id="cancelEditBtn" class="btn btn-outline-secondary is-hidden">Cancel</button>
         <button type="submit" form="stockViewForm" id="saveTopBtn" class="btn btn-success is-hidden">Save Changes</button>
+        {% endif %}
     </div>
 </div>
 
@@ -144,7 +462,90 @@
     {% endif %}
 
     <div class="stock-view-note app-inline-note">
+        {% if can_edit_record %}
         Editable fields stay locked until you enter edit mode. History, schedule outputs, and modification logs are read-only because they are generated by the system.
+        {% else %}
+        This stock is visible because it is part of your maintenance scope. Metadata edits stay with the owner, but you can still manage day-to-day maintenance from the flip desk.
+        {% endif %}
+    </div>
+
+    <div class="app-panel stock-source-panel">
+        <div>
+            <p class="app-kicker">Responsibility</p>
+            <h2 class="app-form-section-title">Owner & Maintainer</h2>
+            <p class="app-form-section-copy">Track who owns the line and who is currently responsible for maintaining it.</p>
+        </div>
+        <div class="stock-assignment-grid">
+            <div class="stock-assignment-cell">
+                <p class="stock-summary-label">Owner</p>
+                <p>{{ stock_data.ownerUser }}</p>
+            </div>
+            <div class="stock-assignment-cell">
+                <p class="stock-summary-label">Current Maintainer</p>
+                <p>{{ stock_data.maintainerUser }}</p>
+            </div>
+            <div class="stock-assignment-cell">
+                <p class="stock-summary-label">Your View</p>
+                <p>{{ stock_data.assignmentScopeLabel }}</p>
+                <p class="stock-match-copy">{{ stock_data.assignmentScopeDetail }}</p>
+            </div>
+        </div>
+        {% if can_edit_record %}
+        <form method="POST" action="{{ url_for('stock.assign_stock', unique_id=stock_data.uniqueID) }}" class="app-button-row align-items-end">
+            <div class="form-group mb-0 flex-grow-1">
+                <label for="assignee">Assign Maintenance To</label>
+                <select class="form-control" id="assignee" name="assignee">
+                    <option value="">Maintain myself</option>
+                    {% for report_username in direct_reports %}
+                    <option value="{{ report_username }}" {% if stock_data.assignedTo == report_username %}selected{% endif %}>{{ report_username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Update Assignment</button>
+        </form>
+        {% endif %}
+    </div>
+
+    <div class="app-panel stock-source-panel">
+        <div class="app-toolbar justify-content-between align-items-start">
+            <div>
+                <p class="app-kicker">Ordering Metadata</p>
+                <h2 class="app-form-section-title">Provider Links & Matches</h2>
+                <p class="app-form-section-copy">Use the current source link when this stock is already provider-linked, or reverse-search external candidates using FlyBase IDs and normalized genotype.</p>
+            </div>
+            <button type="button" id="findProviderMatchesBtn" class="btn btn-outline-secondary">Find Provider Matches</button>
+        </div>
+        <div class="stock-source-grid">
+            <div class="stock-source-cell">
+                <p class="stock-summary-label">Source</p>
+                <p>{{ stock_data.sourceType or 'OTHER' }}{% if stock_data.sourceCollection %} / {{ stock_data.sourceCollection }}{% endif %}</p>
+            </div>
+            <div class="stock-source-cell">
+                <p class="stock-summary-label">Source ID</p>
+                <p>{{ stock_data.sourceID or 'Unavailable' }}</p>
+            </div>
+            <div class="stock-source-cell">
+                <p class="stock-summary-label">FlyBase Stock ID</p>
+                <p>{{ stock_data.flyBaseStockID or 'Unavailable' }}</p>
+            </div>
+            <div class="stock-source-cell">
+                <p class="stock-summary-label">Support Status</p>
+                <p>{{ stock_data.externalSupportStatus or 'manual' }}</p>
+            </div>
+        </div>
+        <div id="providerMatchesPanel" class="stock-match-results is-hidden"></div>
+    </div>
+
+    <div class="app-panel stock-review-panel">
+        <div class="app-toolbar justify-content-between align-items-start">
+            <div>
+                <p class="app-kicker">Canonicalization Review</p>
+                <h2 class="app-form-section-title">Stock Reviewer</h2>
+                <p class="app-form-section-copy">Review unresolved or non-canonical genotype tokens against FlyBase aliases, insertion descriptions, and construct annotations before saving a standardized genotype.</p>
+            </div>
+            <button type="button" id="reviewStandardizationBtn" class="btn btn-outline-secondary">Review Standardization</button>
+        </div>
+        <div id="standardizationReviewPanel" class="stock-review-panel is-hidden"></div>
     </div>
 
     <form id="stockViewForm" method="POST" action="{{ url_for('stock.view_stock', unique_id=stock_data.uniqueID) }}" class="app-form-shell stock-view-form">
@@ -234,6 +635,131 @@
 
         <div class="app-form-section">
             <div>
+                <h2 class="app-form-section-title">Phenotype Preview</h2>
+                <p class="app-form-section-copy">Cached best-guess visible phenotype derived from the current marker model. Refresh it manually here or let it update automatically when the genotype changes.</p>
+            </div>
+            <div class="app-toolbar">
+                <span class="stock-phenotype-pill">{% if stock_phenotype.is_cached %}Cached {{ stock_phenotype.cached_at }}{% else %}Cache missing{% endif %}</span>
+                <form method="POST" action="{{ url_for('stock.refresh_stock_phenotype', unique_id=stock_data.uniqueID) }}" data-progress-form data-progress-message="Refreshing this stock phenotype cache..." data-progress-duplicate-message="This stock phenotype refresh is already in progress." data-progress-label="Refreshing...">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-secondary btn-sm">Refresh Cache</button>
+                </form>
+            </div>
+            <div class="app-detail-grid">
+                <div class="span-12 app-view-field stock-phenotype-summary">
+                    <label>Best Guess Visible Phenotype</label>
+                    <div class="app-view-value multiline">{{ stock_phenotype.best_guess_summary }} ({{ stock_phenotype.confidence_label|title }})</div>
+                    <div class="stock-phenotype-metadata">
+                        {% if stock_phenotype.best_guess_basis == 'female_reference' %}
+                        <span class="stock-phenotype-pill">Female-reference stock reading</span>
+                        {% elif stock_phenotype.best_guess_basis == 'shared_core' %}
+                        <span class="stock-phenotype-pill">Shared across male and female projections</span>
+                        {% elif stock_phenotype.best_guess_basis == 'shared' %}
+                        <span class="stock-phenotype-pill">Same in male and female projections</span>
+                        {% elif stock_phenotype.best_guess_basis == 'sex_dependent' %}
+                        <span class="stock-phenotype-pill">Sex-dependent phenotype</span>
+                        {% elif stock_phenotype.best_guess_basis == 'cache_missing' %}
+                        <span class="stock-phenotype-pill">Manual refresh required</span>
+                        {% endif %}
+                    </div>
+                    {% if stock_phenotype.reference_images %}
+                    <div class="stock-phenotype-image-grid">
+                        {% for image in stock_phenotype.reference_images %}
+                        <div class="stock-phenotype-image-card">
+                            <div class="stock-phenotype-image-media">
+                                <img src="{{ url_for('stock.phenotype_reference_image', relative_path=image.relative_path) }}" alt="Reference image for {{ image.display_label }}">
+                            </div>
+                            <div class="stock-phenotype-image-card-body">
+                                <div class="stock-phenotype-image-card-title">{{ image.display_label }}</div>
+                                <div class="stock-phenotype-image-card-copy">{{ image.effect or 'Reference example from the local phenotype image library.' }}</div>
+                                <div class="stock-phenotype-image-card-meta">{{ image.body_part or 'phenotype' }}{% if image.source_name or image.source_collection %} · {{ image.source_name or image.source_collection|replace('_', ' ') }}{% endif %}</div>
+                                {% if image.provenance %}
+                                <div class="stock-phenotype-image-card-copy mt-1">{{ image.provenance }}</div>
+                                {% endif %}
+                                {% if image.credit %}
+                                <div class="stock-phenotype-image-card-copy mt-1">{{ image.credit }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="span-4 app-view-field">
+                    <label>Female Projection</label>
+                    <div class="app-view-value multiline">{{ stock_phenotype.female_summary or 'Unavailable' }}</div>
+                    {% if stock_phenotype.female_construct_annotation_labels %}
+                    <div class="small text-muted mt-2">Construct annotations: {{ stock_phenotype.female_construct_annotation_labels|join(' · ') }}</div>
+                    {% endif %}
+                    {% if stock_phenotype.female_split_system_labels %}
+                    <div class="small text-muted mt-1">Split systems: {{ stock_phenotype.female_split_system_labels|join(' · ') }}</div>
+                    {% endif %}
+                </div>
+                <div class="span-4 app-view-field">
+                    <label>Male Projection</label>
+                    <div class="app-view-value multiline">{{ stock_phenotype.male_summary or 'Not uniquely inferable from stored stock genotype' }}</div>
+                    {% if stock_phenotype.male_construct_annotation_labels %}
+                    <div class="small text-muted mt-2">Construct annotations: {{ stock_phenotype.male_construct_annotation_labels|join(' · ') }}</div>
+                    {% endif %}
+                    {% if stock_phenotype.male_split_system_labels %}
+                    <div class="small text-muted mt-1">Split systems: {{ stock_phenotype.male_split_system_labels|join(' · ') }}</div>
+                    {% endif %}
+                </div>
+                <div class="span-4 app-view-field">
+                    <label>Shared Markers</label>
+                    <div class="app-view-value multiline">{{ stock_phenotype.shared_summary or 'Unavailable' }}</div>
+                </div>
+                <div class="span-4 app-view-field">
+                    <label>Phenotype Basis</label>
+                    <div class="app-view-value multiline">{{ stock_phenotype.provenance_summary.primary_basis|replace('_', ' ')|title }}</div>
+                    {% if stock_phenotype.provenance_summary.counts %}
+                    <div class="small text-muted mt-1">
+                        {% for label, count in stock_phenotype.provenance_summary.counts.items() %}
+                        {{ label|replace('_', ' ') }}: {{ count }}{% if not loop.last %} · {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="span-4 app-view-field">
+                    <label>Viability</label>
+                    <div class="app-view-value multiline">{{ stock_phenotype.viability_status|replace('_', ' ')|title }}</div>
+                    {% if stock_phenotype.lethal_alleles %}
+                    <div class="small text-muted mt-1">Risk alleles: {{ stock_phenotype.lethal_alleles|join(', ') }}</div>
+                    {% endif %}
+                </div>
+                <div class="span-4 app-view-field">
+                    <label>Fertility</label>
+                    <div class="app-view-value multiline">{{ stock_phenotype.fertility_status|replace('_', ' ')|title }}</div>
+                    {% if stock_phenotype.sterile_alleles %}
+                    <div class="small text-muted mt-1">Risk alleles: {{ stock_phenotype.sterile_alleles|join(', ') }}</div>
+                    {% endif %}
+                </div>
+                <div class="span-6 app-view-field">
+                    <label>Female-Only Markers</label>
+                    <div class="app-view-value multiline">{% if stock_phenotype.female_only_labels %}{{ stock_phenotype.female_only_labels|join(', ') }}{% else %}None{% endif %}</div>
+                </div>
+                <div class="span-6 app-view-field">
+                    <label>Male-Only Markers</label>
+                    <div class="app-view-value multiline">{% if stock_phenotype.male_only_labels %}{{ stock_phenotype.male_only_labels|join(', ') }}{% else %}None{% endif %}</div>
+                </div>
+                {% if stock_phenotype.stage_specific_effects %}
+                <div class="span-12 app-view-field">
+                    <label>Stage-Specific Effects</label>
+                    <div class="app-view-value multiline">{{ stock_phenotype.stage_specific_effects|join(' · ') }}</div>
+                </div>
+                {% endif %}
+                {% if stock_phenotype.warnings %}
+                <div class="span-12 stock-phenotype-warning-list">
+                    {% for warning in stock_phenotype.warnings %}
+                    <div class="stock-phenotype-warning">{{ warning }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="app-form-section">
+            <div>
                 <h2 class="app-form-section-title">Scheduling</h2>
                 <p class="app-form-section-copy">Lifecycle parameters used by the scheduler, flip timing, and maintenance planning.</p>
             </div>
@@ -293,25 +819,30 @@
                 </div>
                 <div class="span-8 app-view-field">
                     <label>Modification Log</label>
-                    <div class="app-view-value multiline">{{ stock_data.modificationLog or 'No modifications logged yet.' }}</div>
+                    <div class="app-view-value multiline stock-log-value">{{ stock_data.modificationLog or 'No modifications logged yet.' }}</div>
                 </div>
             </div>
 
+            {% if can_edit_record %}
             <div class="app-button-row justify-content-end stock-view-footer-actions is-hidden" id="stockViewFooterActions">
                 <button type="button" class="btn btn-outline-secondary" id="cancelEditFooterBtn">Cancel</button>
                 <button type="submit" class="btn btn-success" id="saveBottomBtn">Save Changes</button>
             </div>
+            {% endif %}
         </div>
     </form>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3"></script>
-<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.polyfills.min.js"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.min.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.polyfills.min.js') }}"></script>
 <script nonce="{{ csp_nonce }}">
 document.addEventListener("DOMContentLoaded", function() {
     const stockData = {{ stock_data | tojson }};
+    const canEditRecord = {{ 'true' if can_edit_record else 'false' }};
+    const reverseSearchUrl = "{{ url_for('stock.reverse_search_stock', unique_id=stock_data.uniqueID) }}";
+    const standardizationReviewUrl = "{{ url_for('stock.review_stock_standardization_route', unique_id=stock_data.uniqueID) }}";
     const editableFields = document.querySelectorAll('[data-editable="true"]');
     const form = document.getElementById('stockViewForm');
     const enableEditBtn = document.getElementById('enableEditBtn');
@@ -319,6 +850,12 @@ document.addEventListener("DOMContentLoaded", function() {
     const cancelEditFooterBtn = document.getElementById('cancelEditFooterBtn');
     const saveTopBtn = document.getElementById('saveTopBtn');
     const footerActions = document.getElementById('stockViewFooterActions');
+    const findProviderMatchesBtn = document.getElementById('findProviderMatchesBtn');
+    const providerMatchesPanel = document.getElementById('providerMatchesPanel');
+    const reviewStandardizationBtn = document.getElementById('reviewStandardizationBtn');
+    const standardizationReviewPanel = document.getElementById('standardizationReviewPanel');
+    let providerMatchesLoading = false;
+    let standardizationReviewLoading = false;
 
     let tagifyX;
     let tagify2;
@@ -329,6 +866,18 @@ document.addEventListener("DOMContentLoaded", function() {
     let tagifySpecies;
     let tagifyProvenance;
 
+    function setProviderMatchButtonLabel(label) {
+        if (findProviderMatchesBtn) {
+            findProviderMatchesBtn.textContent = label;
+        }
+    }
+
+    function setStandardizationButtonLabel(label) {
+        if (reviewStandardizationBtn) {
+            reviewStandardizationBtn.textContent = label;
+        }
+    }
+
     function splitPart(part) {
         return part ? part.split('/').map(item => item.trim()).filter(Boolean) : [];
     }
@@ -337,11 +886,14 @@ document.addEventListener("DOMContentLoaded", function() {
         return instance ? instance.value.map(item => item.value) : fallback;
     }
 
-    function createTagifyInstance(selector, config, values, readonly) {
+    function createTagifyInstance(selector, existingInstance, config, values, readonly) {
         const element = document.querySelector(selector);
-        if (element._tagify) {
-            element._tagify.destroy();
+        element.disabled = false;
+        element.removeAttribute('disabled');
+        if (existingInstance) {
+            existingInstance.destroy();
         }
+        element.value = '';
 
         const instance = new Tagify(element, {
             ...config,
@@ -374,46 +926,46 @@ document.addEventListener("DOMContentLoaded", function() {
         const speciesValues = getInstanceValues(tagifySpecies, stockData.species ? [stockData.species] : ['D. melanogaster']);
         const provenanceValues = getInstanceValues(tagifyProvenance, (stockData.provenance || '').split('/').filter(Boolean));
 
-        tagifyX = createTagifyInstance('#genotypeX', {
+        tagifyX = createTagifyInstance('#genotypeX', tagifyX, {
             maxTags: 2,
             whitelist: {{ genesX | tojson }},
             delimiters: null
         }, genotypeValues[0], readonly);
 
-        tagify2 = createTagifyInstance('#genotype2', {
+        tagify2 = createTagifyInstance('#genotype2', tagify2, {
             maxTags: 2,
             whitelist: {{ genes2 | tojson }},
             delimiters: null
         }, genotypeValues[1], readonly);
 
-        tagify3 = createTagifyInstance('#genotype3', {
+        tagify3 = createTagifyInstance('#genotype3', tagify3, {
             maxTags: 2,
             whitelist: {{ genes3 | tojson }},
             delimiters: null
         }, genotypeValues[2], readonly);
 
-        tagify4 = createTagifyInstance('#genotype4', {
+        tagify4 = createTagifyInstance('#genotype4', tagify4, {
             maxTags: 2,
             whitelist: {{ genes4 | tojson }},
             delimiters: null
         }, genotypeValues[3], readonly);
 
-        tagifyType = createTagifyInstance('#type', {
+        tagifyType = createTagifyInstance('#type', tagifyType, {
             whitelist: {{ types | tojson }},
             maxTags: 1
         }, typeValues, readonly);
 
-        tagifyFoodType = createTagifyInstance('#foodType', {
+        tagifyFoodType = createTagifyInstance('#foodType', tagifyFoodType, {
             whitelist: {{ food_types | tojson }},
             maxTags: 1
         }, foodValues, readonly);
 
-        tagifySpecies = createTagifyInstance('#species', {
+        tagifySpecies = createTagifyInstance('#species', tagifySpecies, {
             whitelist: {{ species_list | tojson }},
             maxTags: 1
         }, speciesValues, readonly);
 
-        tagifyProvenance = createTagifyInstance('#provenance', {
+        tagifyProvenance = createTagifyInstance('#provenance', tagifyProvenance, {
             whitelist: {{ provenances | tojson }},
             delimiters: null
         }, provenanceValues, readonly);
@@ -434,33 +986,486 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function setEditMode(enabled) {
         editableFields.forEach(field => {
-            field.disabled = !enabled;
+            if (field.classList.contains('tag-input')) {
+                field.disabled = false;
+                field.removeAttribute('disabled');
+                return;
+            }
+
+            field.disabled = !enabled || !canEditRecord;
         });
 
-        initializeTagify(!enabled);
-        enableEditBtn.classList.toggle('is-hidden', enabled);
-        cancelEditBtn.classList.toggle('is-hidden', !enabled);
-        saveTopBtn.classList.toggle('is-hidden', !enabled);
-        footerActions.classList.toggle('is-hidden', !enabled);
+        initializeTagify(!enabled || !canEditRecord);
+        if (!canEditRecord) {
+            return;
+        }
+
+        if (enableEditBtn) {
+            enableEditBtn.classList.toggle('is-hidden', enabled);
+        }
+        if (cancelEditBtn) {
+            cancelEditBtn.classList.toggle('is-hidden', !enabled);
+        }
+        if (saveTopBtn) {
+            saveTopBtn.classList.toggle('is-hidden', !enabled);
+        }
+        if (footerActions) {
+            footerActions.classList.toggle('is-hidden', !enabled);
+        }
+    }
+
+    function renderProviderMatches(candidates, options) {
+        const config = options || {};
+        providerMatchesPanel.innerHTML = '';
+        providerMatchesPanel.classList.remove('is-hidden');
+
+        if (!candidates.length) {
+            const emptyState = document.createElement('p');
+            emptyState.className = 'stock-match-copy';
+            emptyState.textContent = 'No provider-backed candidates were found for this stock.';
+            providerMatchesPanel.appendChild(emptyState);
+            return;
+        }
+
+        candidates.forEach(candidate => {
+            const item = document.createElement('div');
+            item.className = 'stock-match-item';
+
+            const meta = document.createElement('div');
+
+            const title = document.createElement('strong');
+            title.textContent = `${candidate.sourceCollection || candidate.stockSource} ${candidate.sourceID}`;
+
+            const subtitle = document.createElement('p');
+            subtitle.className = 'stock-match-copy';
+            subtitle.textContent = `${candidate.name || 'Unnamed stock'} • Score ${candidate.matchScore}`;
+
+            const reasons = document.createElement('p');
+            reasons.className = 'stock-match-copy';
+            reasons.textContent = (candidate.matchReasons || []).join(' • ');
+
+            meta.appendChild(title);
+            meta.appendChild(subtitle);
+            meta.appendChild(reasons);
+            item.appendChild(meta);
+
+            if (candidate.providerURL) {
+                const link = document.createElement('a');
+                link.href = candidate.providerURL;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.className = 'btn btn-outline-info btn-sm';
+                link.textContent = 'Open';
+                item.appendChild(link);
+            }
+
+            providerMatchesPanel.appendChild(item);
+        });
+    }
+
+    function renderProviderMatchError(messageText) {
+        providerMatchesPanel.innerHTML = '';
+        providerMatchesPanel.classList.remove('is-hidden');
+
+        const message = document.createElement('p');
+        message.className = 'stock-match-error';
+        message.textContent = messageText;
+        providerMatchesPanel.appendChild(message);
+    }
+
+    function renderProviderMatchLoading() {
+        providerMatchesPanel.innerHTML = '';
+        providerMatchesPanel.classList.remove('is-hidden');
+
+        const message = document.createElement('p');
+        message.className = 'stock-match-copy';
+        message.textContent = 'Searching provider catalogs for candidate matches...';
+        providerMatchesPanel.appendChild(message);
+    }
+
+    function replaceTokenInInstance(instance, originalToken, replacementToken) {
+        if (!instance) {
+            return false;
+        }
+
+        const updatedValues = instance.value.map(function(item) {
+            return item.value;
+        });
+        let changed = false;
+
+        for (let index = 0; index < updatedValues.length; index += 1) {
+            const currentValue = updatedValues[index];
+            if (currentValue === originalToken || currentValue.toLowerCase() === originalToken.toLowerCase()) {
+                updatedValues[index] = replacementToken;
+                changed = true;
+            }
+        }
+
+        if (!changed) {
+            return false;
+        }
+
+        instance.removeAllTags();
+        if (updatedValues.length) {
+            instance.addTags(updatedValues);
+        }
+        return true;
+    }
+
+    function applyStandardizationReplacement(originalToken, replacementToken, noteElement) {
+        if (!canEditRecord) {
+            return;
+        }
+
+        setEditMode(true);
+        const replaced = [tagifyX, tagify2, tagify3, tagify4].some(function(instance) {
+            return replaceTokenInInstance(instance, originalToken, replacementToken);
+        });
+
+        if (noteElement) {
+            noteElement.textContent = replaced
+                ? `Applied ${replacementToken} to the genotype editor. Save changes to persist it.`
+                : `Could not find ${originalToken} in the current editor state.`;
+        }
+    }
+
+    function renderStandardizationLoading() {
+        standardizationReviewPanel.innerHTML = '';
+        standardizationReviewPanel.classList.remove('is-hidden');
+
+        const message = document.createElement('p');
+        message.className = 'stock-review-empty';
+        message.textContent = 'Searching FlyBase allele and construct references for standardization candidates...';
+        standardizationReviewPanel.appendChild(message);
+    }
+
+    function renderStandardizationError(messageText) {
+        standardizationReviewPanel.innerHTML = '';
+        standardizationReviewPanel.classList.remove('is-hidden');
+
+        const message = document.createElement('p');
+        message.className = 'stock-match-error';
+        message.textContent = messageText;
+        standardizationReviewPanel.appendChild(message);
+    }
+
+    function renderStandardizationReview(review) {
+        standardizationReviewPanel.innerHTML = '';
+        standardizationReviewPanel.classList.remove('is-hidden');
+
+        const summary = document.createElement('div');
+        summary.className = 'stock-review-summary';
+        const summaryText = document.createElement('p');
+        const issueCount = Number(review.issue_count || 0);
+        summaryText.textContent = issueCount
+            ? `${issueCount} genotype token${issueCount === 1 ? '' : 's'} need review before this record is fully standardized.`
+            : 'No non-standard or unmapped genotype tokens were detected in this stock.';
+        summary.appendChild(summaryText);
+        standardizationReviewPanel.appendChild(summary);
+
+        if (!issueCount) {
+            return;
+        }
+
+        (review.issues || []).forEach(function(issue) {
+            const issueCard = document.createElement('div');
+            issueCard.className = 'stock-review-issue';
+
+            const header = document.createElement('div');
+            header.className = 'stock-review-header';
+
+            const headerCopy = document.createElement('div');
+            const tokenTitle = document.createElement('div');
+            tokenTitle.className = 'stock-review-token';
+            tokenTitle.textContent = issue.token;
+            const issueMeta = document.createElement('p');
+            issueMeta.className = 'stock-review-meta';
+            issueMeta.textContent = `${issue.issue_label} • ${issue.occurrence_count} occurrence${issue.occurrence_count === 1 ? '' : 's'}`;
+            headerCopy.appendChild(tokenTitle);
+            headerCopy.appendChild(issueMeta);
+            header.appendChild(headerCopy);
+
+            const issuePill = document.createElement('span');
+            issuePill.className = 'stock-review-pill';
+            issuePill.textContent = issue.issue_type === 'unresolved_token' ? 'Needs canonical token' : 'Check allele mapping';
+            header.appendChild(issuePill);
+            issueCard.appendChild(header);
+
+            const applyNote = document.createElement('p');
+            applyNote.className = 'stock-review-meta stock-review-apply-note';
+
+            if (issue.recommended_replacement) {
+                const recommendation = document.createElement('div');
+                recommendation.className = 'stock-review-recommendation';
+                const recommendationText = document.createElement('p');
+                recommendationText.className = 'stock-review-candidate-copy';
+                recommendationText.textContent = `Recommended replacement: ${issue.recommended_replacement} (${issue.recommended_source.replaceAll('_', ' ')})`;
+                recommendation.appendChild(recommendationText);
+
+                if (canEditRecord) {
+                    const applyBtn = document.createElement('button');
+                    applyBtn.type = 'button';
+                    applyBtn.className = 'btn btn-outline-primary btn-sm';
+                    applyBtn.textContent = 'Apply Recommended Replacement';
+                    applyBtn.addEventListener('click', function() {
+                        applyStandardizationReplacement(issue.token, issue.recommended_replacement, applyNote);
+                    });
+                    recommendation.appendChild(applyBtn);
+                }
+                issueCard.appendChild(recommendation);
+            }
+
+            if ((issue.ambiguous_candidates || []).length) {
+                const ambiguity = document.createElement('div');
+                ambiguity.className = 'stock-review-ambiguity';
+                const ambiguityText = document.createElement('p');
+                ambiguityText.className = 'stock-review-candidate-copy';
+                ambiguityText.textContent = `FlyBase has multiple exact alias candidates for this token: ${(issue.ambiguous_candidates || []).join(' • ')}`;
+                ambiguity.appendChild(ambiguityText);
+                issueCard.appendChild(ambiguity);
+            }
+
+            const searchSection = document.createElement('div');
+            searchSection.className = 'stock-review-search';
+            const searchRow = document.createElement('div');
+            searchRow.className = 'stock-review-search-row';
+            const searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.className = 'form-control';
+            searchInput.value = issue.search_query || issue.token;
+            searchInput.setAttribute('aria-label', `Search FlyBase candidates for ${issue.token}`);
+            searchRow.appendChild(searchInput);
+
+            const searchBtn = document.createElement('button');
+            searchBtn.type = 'button';
+            searchBtn.className = 'btn btn-outline-secondary btn-sm';
+            searchBtn.textContent = 'Search Again';
+            searchBtn.addEventListener('click', function() {
+                loadStandardizationReview({ token: issue.token, query: searchInput.value });
+            });
+            searchRow.appendChild(searchBtn);
+            searchSection.appendChild(searchRow);
+            issueCard.appendChild(searchSection);
+
+            const candidateList = document.createElement('div');
+            candidateList.className = 'stock-review-candidate-list';
+
+            if (!(issue.fuzzy_candidates || []).length) {
+                const empty = document.createElement('p');
+                empty.className = 'stock-review-empty';
+                empty.textContent = 'No strong FlyBase fuzzy candidates were found for this search term.';
+                candidateList.appendChild(empty);
+            }
+
+            (issue.fuzzy_candidates || []).forEach(function(candidate) {
+                const candidateItem = document.createElement('div');
+                candidateItem.className = 'stock-review-candidate';
+
+                const candidateCopy = document.createElement('div');
+                const candidateTitle = document.createElement('strong');
+                candidateTitle.textContent = candidate.canonical_token;
+                candidateCopy.appendChild(candidateTitle);
+
+                const candidateMeta = document.createElement('p');
+                candidateMeta.className = 'stock-review-candidate-copy';
+                candidateMeta.textContent = `${candidate.source} • score ${candidate.match_score} • matched on ${candidate.match_basis}`;
+                candidateCopy.appendChild(candidateMeta);
+
+                if (candidate.display_label && candidate.display_label !== candidate.canonical_token) {
+                    const candidateLabel = document.createElement('p');
+                    candidateLabel.className = 'stock-review-candidate-copy';
+                    candidateLabel.textContent = candidate.display_label;
+                    candidateCopy.appendChild(candidateLabel);
+                }
+
+                const details = [candidate.gene_symbol, candidate.insertion_symbol, candidate.regulatory_region_symbol, candidate.encoded_product_symbol]
+                    .filter(Boolean)
+                    .join(' • ');
+                if (details) {
+                    const detailsCopy = document.createElement('p');
+                    detailsCopy.className = 'stock-review-candidate-copy';
+                    detailsCopy.textContent = details;
+                    candidateCopy.appendChild(detailsCopy);
+                }
+
+                if (candidate.description) {
+                    const candidateDescription = document.createElement('p');
+                    candidateDescription.className = 'stock-review-candidate-copy';
+                    candidateDescription.textContent = candidate.description;
+                    candidateCopy.appendChild(candidateDescription);
+                }
+
+                candidateItem.appendChild(candidateCopy);
+
+                if (canEditRecord) {
+                    const applyCandidateBtn = document.createElement('button');
+                    applyCandidateBtn.type = 'button';
+                    applyCandidateBtn.className = 'btn btn-outline-info btn-sm';
+                    applyCandidateBtn.textContent = 'Apply Candidate';
+                    applyCandidateBtn.addEventListener('click', function() {
+                        applyStandardizationReplacement(issue.token, candidate.canonical_token, applyNote);
+                    });
+                    candidateItem.appendChild(applyCandidateBtn);
+                }
+
+                candidateList.appendChild(candidateItem);
+            });
+
+            issueCard.appendChild(candidateList);
+            issueCard.appendChild(applyNote);
+            standardizationReviewPanel.appendChild(issueCard);
+        });
+    }
+
+    function loadStandardizationReview(options) {
+        const config = options || {};
+        if (standardizationReviewLoading) {
+            return;
+        }
+
+        standardizationReviewLoading = true;
+        if (reviewStandardizationBtn) {
+            reviewStandardizationBtn.disabled = true;
+            setStandardizationButtonLabel(config.query ? 'Searching Reviewer...' : 'Reviewing...');
+        }
+        renderStandardizationLoading();
+
+        const requestUrl = new URL(standardizationReviewUrl, window.location.origin);
+        if (config.token) {
+            requestUrl.searchParams.set('token', config.token);
+        }
+        if (config.query) {
+            requestUrl.searchParams.set('query', config.query);
+        }
+
+        fetch(requestUrl.toString())
+            .then(function(response) {
+                return response.json().then(function(data) {
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Stock reviewer failed.');
+                    }
+                    return data;
+                });
+            })
+            .then(function(data) {
+                renderStandardizationReview(data);
+            })
+            .catch(function(error) {
+                renderStandardizationError(error.message);
+            })
+            .finally(function() {
+                standardizationReviewLoading = false;
+                if (reviewStandardizationBtn) {
+                    reviewStandardizationBtn.disabled = false;
+                    setStandardizationButtonLabel('Refresh Standardization Review');
+                }
+            });
+    }
+
+    function loadProviderMatches(options) {
+        const config = options || {};
+        if (providerMatchesLoading) {
+            return;
+        }
+
+        providerMatchesLoading = true;
+        if (findProviderMatchesBtn) {
+            findProviderMatchesBtn.disabled = true;
+            setProviderMatchButtonLabel(config.isAutomatic ? 'Searching Automatically...' : 'Searching...');
+        }
+        renderProviderMatchLoading();
+
+        const requestUrl = new URL(reverseSearchUrl, window.location.origin);
+        if (config.refresh) {
+            requestUrl.searchParams.set('refresh', '1');
+        }
+
+        fetch(requestUrl.toString())
+            .then(function(response) {
+                return response.json().then(function(data) {
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Reverse search failed.');
+                    }
+                    return data;
+                });
+            })
+            .then(function(data) {
+                renderProviderMatches(data.candidates || [], {
+                    cachedAt: data.cachedAt || '',
+                    fromCache: Boolean(data.cached),
+                    cacheCountLabel: data.cacheCountLabel || '',
+                    cacheStatusLabel: data.cacheStatusLabel || '',
+                    primaryMatchLabel: data.primaryMatchLabel || '',
+                });
+            })
+            .catch(function(error) {
+                renderProviderMatchError(error.message);
+            })
+            .finally(function() {
+                providerMatchesLoading = false;
+                if (findProviderMatchesBtn) {
+                    findProviderMatchesBtn.disabled = false;
+                    setProviderMatchButtonLabel('Refresh Provider Matches');
+                }
+            });
     }
 
     populateFields();
-    initializeTagify(true);
     setEditMode(false);
 
-    enableEditBtn.addEventListener('click', function() {
-        setEditMode(true);
-    });
+    if (enableEditBtn) {
+        enableEditBtn.addEventListener('click', function() {
+            setEditMode(true);
+        });
+    }
 
-    cancelEditBtn.addEventListener('click', function() {
-        window.location.reload();
-    });
+    if (cancelEditBtn) {
+        cancelEditBtn.addEventListener('click', function() {
+            window.location.reload();
+        });
+    }
 
-    cancelEditFooterBtn.addEventListener('click', function() {
-        window.location.reload();
-    });
+    if (cancelEditFooterBtn) {
+        cancelEditFooterBtn.addEventListener('click', function() {
+            window.location.reload();
+        });
+    }
+
+    if (findProviderMatchesBtn) {
+        findProviderMatchesBtn.addEventListener('click', function() {
+            loadProviderMatches({ isAutomatic: false, refresh: true });
+        });
+    }
+
+    if (reviewStandardizationBtn) {
+        reviewStandardizationBtn.addEventListener('click', function() {
+            loadStandardizationReview();
+        });
+    }
+
+    if (stockData.providerMatchesLoaded) {
+        renderProviderMatches(stockData.providerMatches || [], {
+            cachedAt: stockData.providerMatchesCachedAt || '',
+            fromCache: true,
+            cacheCountLabel: stockData.providerMatchesCountLabel || '',
+            cacheStatusLabel: stockData.providerMatchesStatusLabel || '',
+            primaryMatchLabel: stockData.providerMatchesPrimaryLabel || '',
+        });
+        setProviderMatchButtonLabel('Refresh Provider Matches');
+    } else if (!stockData.providerURL) {
+        loadProviderMatches({ isAutomatic: true });
+    }
+
+    if (stockData.standardizationReview) {
+        renderStandardizationReview(stockData.standardizationReview);
+        setStandardizationButtonLabel('Refresh Standardization Review');
+    }
 
     form.addEventListener('submit', function(event) {
+        if (!canEditRecord) {
+            return;
+        }
+
         if (!confirm('Are you sure you want to submit the changes?')) {
             event.preventDefault();
             return;

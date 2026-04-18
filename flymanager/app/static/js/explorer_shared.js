@@ -68,6 +68,10 @@
     }
 
     function createJsonRequest(url, payload) {
+        if (!url) {
+            return Promise.reject(new Error('Explorer action URL is not configured.'));
+        }
+
         return fetch(url, {
             method: 'POST',
             headers: {
@@ -75,7 +79,37 @@
             },
             body: JSON.stringify(payload),
         }).then(function(response) {
-            return response.json();
+            return response.json()
+                .catch(function() {
+                    return {};
+                })
+                .then(function(data) {
+                    if (!response.ok) {
+                        throw new Error(data.message || data.error || 'Request failed.');
+                    }
+                    return data;
+                });
+        });
+    }
+
+    function bindPerPageControls() {
+        document.querySelectorAll('[data-explorer-per-page-select]').forEach(function(select) {
+            if (select.dataset.perPageBound === 'true') {
+                return;
+            }
+
+            select.dataset.perPageBound = 'true';
+            select.addEventListener('change', function() {
+                const nextValue = String(select.value || '').trim();
+                if (!nextValue) {
+                    return;
+                }
+
+                const nextUrl = new URL(window.location.href);
+                nextUrl.searchParams.set('per_page', nextValue);
+                nextUrl.searchParams.delete('page');
+                window.location.assign(nextUrl.toString());
+            });
         });
     }
 
@@ -83,11 +117,290 @@
         let cart = JSON.parse(localStorage.getItem(config.cartStorageKey)) || [];
         let currentView = localStorage.getItem(config.viewStorageKey) || 'card';
         let currentSort = { column: '', direction: 'asc' };
+        let edgeDockHideTimer = null;
+        let selectedItems = loadSelectedItems();
         const requiredTableColumns = config.requiredTableColumns || [];
         let visibleTableColumns = loadVisibleTableColumns();
+        let activeBulkOperation = null;
+        let operationStatusResetTimer = null;
+
+        function clearOperationStatusResetTimer() {
+            if (operationStatusResetTimer) {
+                window.clearTimeout(operationStatusResetTimer);
+                operationStatusResetTimer = null;
+            }
+        }
+
+        function ensureOperationStatusElement() {
+            const cartContent = document.querySelector('.cart-content');
+            if (!cartContent) {
+                return null;
+            }
+
+            let statusElement = cartContent.querySelector('[data-explorer-operation-status]');
+            if (statusElement) {
+                return statusElement;
+            }
+
+            statusElement = document.createElement('div');
+            statusElement.className = 'explorer-operation-status is-hidden';
+            statusElement.setAttribute('data-explorer-operation-status', '');
+            statusElement.setAttribute('role', 'status');
+            statusElement.setAttribute('aria-live', 'polite');
+            cartContent.appendChild(statusElement);
+            return statusElement;
+        }
+
+        function ensureModalOperationStatusElement() {
+            const modalBody = document.querySelector('#bulkFlipModal .modal-body');
+            if (!modalBody) {
+                return null;
+            }
+
+            let statusElement = modalBody.querySelector('[data-explorer-modal-operation-status]');
+            if (statusElement) {
+                return statusElement;
+            }
+
+            statusElement = document.createElement('div');
+            statusElement.className = 'explorer-operation-status explorer-operation-status-modal is-hidden';
+            statusElement.setAttribute('data-explorer-modal-operation-status', '');
+            statusElement.setAttribute('role', 'status');
+            statusElement.setAttribute('aria-live', 'polite');
+            modalBody.appendChild(statusElement);
+            return statusElement;
+        }
+
+        function setOperationStatus(message, tone, options) {
+            const settings = options || {};
+            const elements = [ensureOperationStatusElement()];
+
+            if (settings.includeModal !== false) {
+                elements.push(ensureModalOperationStatusElement());
+            }
+
+            elements.forEach(function(element) {
+                if (!element) {
+                    return;
+                }
+
+                if (!message) {
+                    element.textContent = '';
+                    element.classList.add('is-hidden');
+                    element.dataset.tone = '';
+                    return;
+                }
+
+                element.textContent = message;
+                element.dataset.tone = tone || 'info';
+                element.classList.remove('is-hidden');
+            });
+        }
+
+        function scheduleOperationStatusReset() {
+            clearOperationStatusResetTimer();
+            operationStatusResetTimer = window.setTimeout(function() {
+                setOperationStatus('', 'info');
+            }, 5000);
+        }
+
+        function setButtonBusyState(button, isBusy, pendingLabel) {
+            if (!button) {
+                return;
+            }
+
+            if (!button.dataset.defaultLabel) {
+                button.dataset.defaultLabel = button.innerHTML;
+            }
+
+            button.disabled = isBusy;
+            button.classList.toggle('is-busy', isBusy);
+
+            if (isBusy) {
+                button.innerHTML = `<span class="explorer-inline-spinner" aria-hidden="true"></span><span>${pendingLabel}</span>`;
+                button.setAttribute('aria-busy', 'true');
+                return;
+            }
+
+            button.innerHTML = button.dataset.defaultLabel;
+            button.removeAttribute('aria-busy');
+        }
+
+        function setBulkOperationControlsDisabled(isDisabled, operationName, pendingLabel) {
+            const bulkFlipBtn = document.getElementById('bulkFlipBtn');
+            const bulkStatusBtn = document.getElementById('bulkStatusBtn');
+            const removeFromTrayBtn = document.getElementById('removeFromTrayBtn');
+            const confirmBulkFlipBtn = document.getElementById('confirmBulkFlipBtn');
+            const emptyCartBtn = document.getElementById('emptyCartBtn');
+            const generateLabelsBtn = document.getElementById('generateLabelsBtn');
+            const bulkFlipModal = document.getElementById('bulkFlipModal');
+
+            [bulkFlipBtn, bulkStatusBtn, removeFromTrayBtn, emptyCartBtn, generateLabelsBtn].forEach(function(button) {
+                if (!button) {
+                    return;
+                }
+                button.disabled = isDisabled;
+                button.classList.toggle('is-busy', isDisabled && button.id !== 'confirmBulkFlipBtn');
+            });
+
+            document.querySelectorAll('.bulk-status-item').forEach(function(item) {
+                item.classList.toggle('disabled', isDisabled);
+                item.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
+                item.tabIndex = isDisabled ? -1 : 0;
+            });
+
+            if (bulkFlipModal) {
+                bulkFlipModal.setAttribute('aria-busy', isDisabled ? 'true' : 'false');
+                bulkFlipModal.querySelectorAll('[data-dismiss="modal"], .modal-header .close').forEach(function(button) {
+                    button.disabled = isDisabled;
+                });
+            }
+
+            if (confirmBulkFlipBtn) {
+                const label = pendingLabel || (operationName ? `${operationName}...` : 'Working...');
+                setButtonBusyState(confirmBulkFlipBtn, isDisabled, label);
+            }
+        }
+
+        function beginBulkOperation(operationKey, progressMessage, pendingLabel) {
+            if (activeBulkOperation) {
+                setOperationStatus(`${activeBulkOperation.label} is already running. Please wait for it to finish.`, 'warning');
+                return false;
+            }
+
+            clearOperationStatusResetTimer();
+            activeBulkOperation = {
+                key: operationKey,
+                label: progressMessage,
+            };
+            setBulkOperationControlsDisabled(true, progressMessage, pendingLabel);
+            setOperationStatus(progressMessage, 'progress');
+            return true;
+        }
+
+        function finishBulkOperation(successMessage, tone, keepVisible) {
+            activeBulkOperation = null;
+            setBulkOperationControlsDisabled(false);
+            setOperationStatus(successMessage, tone || 'success');
+            if (!keepVisible) {
+                scheduleOperationStatusReset();
+            }
+        }
+
+        function getSelectionStorageKey() {
+            return `${config.viewStorageKey}Selection`;
+        }
 
         function getColumnStorageKey() {
             return `${config.viewStorageKey}Columns`;
+        }
+
+        function normalizeSelectionItem(item) {
+            if (!item || !item.uid) {
+                return null;
+            }
+
+            const quantity = Number(item.quantity);
+            return {
+                id: item.id || item.uid,
+                quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+                identifier: item.identifier || '',
+                name: item.name || '',
+                uid: item.uid,
+            };
+        }
+
+        function loadSelectedItems() {
+            try {
+                const storedItems = JSON.parse(sessionStorage.getItem(getSelectionStorageKey()));
+                if (!Array.isArray(storedItems)) {
+                    return new Map();
+                }
+
+                return new Map(
+                    storedItems
+                        .map(normalizeSelectionItem)
+                        .filter(Boolean)
+                        .map(function(item) {
+                            return [item.uid, item];
+                        })
+                );
+            } catch (error) {
+                console.warn('Unable to load explorer selection state:', error);
+                return new Map();
+            }
+        }
+
+        function saveSelectedItems() {
+            sessionStorage.setItem(
+                getSelectionStorageKey(),
+                JSON.stringify(Array.from(selectedItems.values()))
+            );
+        }
+
+        function getSelectionItemForIndex(index) {
+            const card = document.getElementById(`item-${index}`);
+            const tableCheckbox = document.getElementById(config.tableCheckboxPrefix + index);
+            const row = tableCheckbox ? tableCheckbox.closest('tr') : null;
+            const detailsRow = document.getElementById(`tableDetails-${index}`);
+            let item = null;
+
+            if (card) {
+                item = config.buildCartItemFromCard(index, card);
+            } else if (row) {
+                item = config.buildCartItemFromTable(index, row, card, detailsRow);
+            }
+
+            return normalizeSelectionItem(item);
+        }
+
+        function syncSelectAllTableState() {
+            const selectAllTable = document.getElementById('selectAllTable');
+            if (!selectAllTable) {
+                return;
+            }
+
+            const pageItems = Array.from(document.querySelectorAll(config.cardCheckboxSelector))
+                .map(function(checkbox) {
+                    return getSelectionItemForIndex(checkbox.id.replace(config.cardCheckboxPrefix, ''));
+                })
+                .filter(Boolean);
+
+            selectAllTable.checked = pageItems.length > 0 && pageItems.every(function(item) {
+                return selectedItems.has(item.uid);
+            });
+        }
+
+        function syncSelectionInputsFromState() {
+            document.querySelectorAll(config.cardCheckboxSelector).forEach(function(checkbox) {
+                const index = checkbox.id.replace(config.cardCheckboxPrefix, '');
+                const item = getSelectionItemForIndex(index);
+                const isChecked = item ? selectedItems.has(item.uid) : false;
+                const tableCheckbox = document.getElementById(config.tableCheckboxPrefix + index);
+
+                checkbox.checked = isChecked;
+                setCardState(document.getElementById(`item-${index}`), isChecked);
+
+                if (tableCheckbox) {
+                    tableCheckbox.checked = isChecked;
+                    setRowState(tableCheckbox.closest('tr'), isChecked);
+                }
+            });
+
+            syncSelectAllTableState();
+        }
+
+        function setSelectedItems(items) {
+            selectedItems = new Map(
+                items
+                    .map(normalizeSelectionItem)
+                    .filter(Boolean)
+                    .map(function(item) {
+                        return [item.uid, item];
+                    })
+            );
+            saveSelectedItems();
+            syncSelectionInputsFromState();
         }
 
         function normalizeVisibleTableColumns(columns) {
@@ -255,7 +568,124 @@
         }
 
         function getSelectedCheckboxes() {
-            return Array.from(document.querySelectorAll(`${config.cardCheckboxSelector}:checked`));
+            return Array.from(selectedItems.values());
+        }
+
+        function isElementVisible(element) {
+            if (!element) {
+                return false;
+            }
+
+            return element.getClientRects().length > 0;
+        }
+
+        function setSelectionStateForIndex(index, isChecked, persistSelection) {
+            const cardCheckbox = document.getElementById(config.cardCheckboxPrefix + index);
+            const tableCheckbox = document.getElementById(config.tableCheckboxPrefix + index);
+            const item = getSelectionItemForIndex(index);
+
+            if (item) {
+                if (isChecked) {
+                    selectedItems.set(item.uid, item);
+                } else {
+                    selectedItems.delete(item.uid);
+                }
+            }
+
+            if (cardCheckbox) {
+                cardCheckbox.checked = isChecked;
+                setCardState(document.getElementById(`item-${index}`), isChecked);
+            }
+
+            if (tableCheckbox) {
+                tableCheckbox.checked = isChecked;
+                setRowState(tableCheckbox.closest('tr'), isChecked);
+            }
+
+            if (persistSelection !== false) {
+                saveSelectedItems();
+            }
+        }
+
+        function updateDockActionState() {
+            const selectButtons = ['selectVisibleDockBtn', 'selectAllDockBtn'].map(function(id) {
+                return document.getElementById(id);
+            }).filter(Boolean);
+            const clearSelectionButton = document.getElementById('clearSelectionDockBtn');
+            const totalItems = document.querySelectorAll(config.cardCheckboxSelector).length;
+            const selectionCount = getSelectedCheckboxes().length;
+
+            selectButtons.forEach(function(button) {
+                button.disabled = totalItems === 0;
+            });
+
+            if (clearSelectionButton) {
+                clearSelectionButton.disabled = selectionCount === 0;
+            }
+        }
+
+        function updateScrollDockState() {
+            const scrollTopBtn = document.getElementById('scrollTopDockBtn');
+            const scrollBottomBtn = document.getElementById('scrollBottomDockBtn');
+            const rightDock = document.querySelector('[data-edge-dock="right"]');
+            const maxScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 0);
+            const atTop = window.scrollY <= 24;
+            const atBottom = maxScroll <= 24 || window.scrollY >= maxScroll - 24;
+
+            if (scrollTopBtn) {
+                scrollTopBtn.classList.toggle('is-hidden', atTop);
+            }
+
+            if (scrollBottomBtn) {
+                scrollBottomBtn.classList.toggle('is-hidden', atBottom);
+            }
+
+            if (rightDock) {
+                rightDock.classList.toggle('is-empty', atTop && atBottom);
+            }
+        }
+
+        function clearEdgeDockHideTimer() {
+            if (edgeDockHideTimer !== null) {
+                window.clearTimeout(edgeDockHideTimer);
+                edgeDockHideTimer = null;
+            }
+        }
+
+        function scheduleEdgeDockHide() {
+            if (!window.matchMedia('(pointer: fine)').matches) {
+                return;
+            }
+
+            clearEdgeDockHideTimer();
+            edgeDockHideTimer = window.setTimeout(function() {
+                document.querySelectorAll('.edge-dock').forEach(function(dock) {
+                    if (dock.matches(':hover') || dock.contains(document.activeElement)) {
+                        return;
+                    }
+
+                    dock.classList.remove('is-visible');
+                });
+            }, 1100);
+        }
+
+        function revealEdgeDock(side) {
+            const dock = document.querySelector(`[data-edge-dock="${side}"]`);
+            if (!dock || dock.classList.contains('is-empty')) {
+                return;
+            }
+
+            dock.classList.add('is-visible');
+            scheduleEdgeDockHide();
+        }
+
+        function revealEdgeDocksTemporarily() {
+            if (!window.matchMedia('(pointer: fine)').matches) {
+                return;
+            }
+
+            revealEdgeDock('left');
+            revealEdgeDock('right');
         }
 
         function syncSelectionSummary() {
@@ -275,6 +705,8 @@
             if (cartCountInlineEl) {
                 cartCountInlineEl.textContent = cart.length;
             }
+
+            updateDockActionState();
         }
 
         function updateCart() {
@@ -344,6 +776,7 @@
 
             syncTableModeControls();
             saveViewPreference();
+            syncSelectionInputsFromState();
         }
 
         function sortTable(column) {
@@ -432,17 +865,8 @@
         function toggleTableCheckbox(checkboxId, event) {
             event.stopPropagation();
             const checkbox = document.getElementById(checkboxId);
-            const row = checkbox.closest('tr');
             const index = checkboxId.replace(config.tableCheckboxPrefix, '');
-            const cardCheckbox = document.getElementById(config.cardCheckboxPrefix + index);
-            const card = document.getElementById(`item-${index}`);
-
-            setRowState(row, checkbox.checked);
-
-            if (cardCheckbox) {
-                cardCheckbox.checked = checkbox.checked;
-                setCardState(card, checkbox.checked);
-            }
+            setSelectionStateForIndex(index, checkbox.checked);
 
             syncSelectionSummary();
         }
@@ -454,16 +878,9 @@
 
             const checkbox = row.querySelector('input[type="checkbox"]');
             const index = checkbox.id.replace(config.tableCheckboxPrefix, '');
-            const cardCheckbox = document.getElementById(config.cardCheckboxPrefix + index);
-            const card = document.getElementById(`item-${index}`);
 
             checkbox.checked = !checkbox.checked;
-            setRowState(row, checkbox.checked);
-
-            if (cardCheckbox) {
-                cardCheckbox.checked = checkbox.checked;
-                setCardState(card, checkbox.checked);
-            }
+            setSelectionStateForIndex(index, checkbox.checked);
 
             syncSelectionSummary();
         }
@@ -518,31 +935,69 @@
         }
 
         function selectVisibleItems() {
-            if (currentView === 'card') {
-                document.querySelectorAll(config.cardCheckboxSelector).forEach(function(checkbox) {
-                    const index = checkbox.id.replace(config.cardCheckboxPrefix, '');
-                    checkbox.checked = true;
-                    setCardState(document.getElementById(`item-${index}`), true);
-                });
-            } else {
-                const selectAllTable = document.getElementById('selectAllTable');
-                if (selectAllTable) {
-                    selectAllTable.checked = true;
-                }
+            selectAllPageItems();
+        }
 
-                document.querySelectorAll(config.tableCheckboxSelector).forEach(function(checkbox) {
-                    const index = checkbox.id.replace(config.tableCheckboxPrefix, '');
-                    const cardCheckbox = document.getElementById(config.cardCheckboxPrefix + index);
-                    checkbox.checked = true;
-                    setRowState(checkbox.closest('tr'), true);
-                    if (cardCheckbox) {
-                        cardCheckbox.checked = true;
-                        setCardState(document.getElementById(`item-${index}`), true);
-                    }
-                });
+        function selectAllPageItems() {
+            document.querySelectorAll(config.cardCheckboxSelector).forEach(function(checkbox) {
+                const index = checkbox.id.replace(config.cardCheckboxPrefix, '');
+                setSelectionStateForIndex(index, true, false);
+            });
+
+            saveSelectedItems();
+            syncSelectAllTableState();
+            syncSelectionSummary();
+        }
+
+        function fetchAllSelectionItems() {
+            if (!config.selectionUrl) {
+                return Promise.resolve([]);
             }
 
-            syncSelectionSummary();
+            return fetch(config.selectionUrl, {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/json',
+                },
+                credentials: 'same-origin',
+            }).then(function(response) {
+                return response.json().then(function(data) {
+                    if (!response.ok) {
+                        const message = data && (data.error || data.message)
+                            ? data.error || data.message
+                            : 'Unable to load all matching items.';
+                        throw new Error(message);
+                    }
+
+                    return Array.isArray(data.items) ? data.items : [];
+                });
+            });
+        }
+
+        function selectAllFilteredItems() {
+            const selectAllButton = document.getElementById('selectAllDockBtn');
+            const originalLabel = selectAllButton ? selectAllButton.textContent : '';
+
+            if (selectAllButton) {
+                selectAllButton.disabled = true;
+                selectAllButton.textContent = 'Selecting...';
+            }
+
+            fetchAllSelectionItems()
+                .then(function(items) {
+                    setSelectedItems(items);
+                    syncSelectionSummary();
+                })
+                .catch(function(error) {
+                    console.error('Error selecting all matching items:', error);
+                    alert(error.message || 'Unable to select all matching items.');
+                })
+                .finally(function() {
+                    if (selectAllButton) {
+                        selectAllButton.textContent = originalLabel || 'Select all';
+                    }
+                    updateDockActionState();
+                });
         }
 
         function mergeCartItem(item) {
@@ -558,18 +1013,7 @@
         }
 
         function addSelectedToCart() {
-            const checkedItems = currentView === 'card'
-                ? document.querySelectorAll(`${config.cardCheckboxSelector}:checked`)
-                : document.querySelectorAll(`${config.tableCheckboxSelector}:checked`);
-
-            checkedItems.forEach(function(checkbox) {
-                const index = checkbox.id.replace(currentView === 'card' ? config.cardCheckboxPrefix : config.tableCheckboxPrefix, '');
-                const card = document.getElementById(`item-${index}`);
-                const row = checkbox.closest('tr');
-                const item = currentView === 'card'
-                    ? config.buildCartItemFromCard(index, card)
-                    : config.buildCartItemFromTable(index, row, card, document.getElementById(`tableDetails-${index}`));
-
+            getSelectedCheckboxes().forEach(function(item) {
                 mergeCartItem(item);
             });
 
@@ -580,21 +1024,113 @@
         function clearSelection() {
             document.querySelectorAll(config.cardCheckboxSelector).forEach(function(checkbox) {
                 const index = checkbox.id.replace(config.cardCheckboxPrefix, '');
-                checkbox.checked = false;
-                setCardState(document.getElementById(`item-${index}`), false);
+                setSelectionStateForIndex(index, false, false);
             });
 
-            document.querySelectorAll(config.tableCheckboxSelector).forEach(function(checkbox) {
-                checkbox.checked = false;
-                setRowState(checkbox.closest('tr'), false);
-            });
+            selectedItems = new Map();
+            saveSelectedItems();
+            syncSelectAllTableState();
+            syncSelectionSummary();
+        }
 
-            const selectAllTable = document.getElementById('selectAllTable');
-            if (selectAllTable) {
-                selectAllTable.checked = false;
+        function scrollToPageBoundary(position) {
+            const top = position === 'top' ? 0 : document.documentElement.scrollHeight;
+            window.scrollTo({
+                top: top,
+                behavior: 'smooth',
+            });
+        }
+
+        function initializeEdgeDocks() {
+            const leftDock = document.querySelector('[data-edge-dock="left"]');
+            const rightDock = document.querySelector('[data-edge-dock="right"]');
+            const selectVisibleDockBtn = document.getElementById('selectVisibleDockBtn');
+            const selectAllDockBtn = document.getElementById('selectAllDockBtn');
+            const clearSelectionDockBtn = document.getElementById('clearSelectionDockBtn');
+            const scrollTopDockBtn = document.getElementById('scrollTopDockBtn');
+            const scrollBottomDockBtn = document.getElementById('scrollBottomDockBtn');
+
+            if (selectVisibleDockBtn) {
+                selectVisibleDockBtn.addEventListener('click', function() {
+                    selectVisibleItems();
+                });
             }
 
-            syncSelectionSummary();
+            if (selectAllDockBtn) {
+                selectAllDockBtn.addEventListener('click', function() {
+                    selectAllFilteredItems();
+                });
+            }
+
+            if (clearSelectionDockBtn) {
+                clearSelectionDockBtn.addEventListener('click', function() {
+                    clearSelection();
+                });
+            }
+
+            if (scrollTopDockBtn) {
+                scrollTopDockBtn.addEventListener('click', function() {
+                    scrollToPageBoundary('top');
+                });
+            }
+
+            if (scrollBottomDockBtn) {
+                scrollBottomDockBtn.addEventListener('click', function() {
+                    scrollToPageBoundary('bottom');
+                });
+            }
+
+            [leftDock, rightDock].filter(Boolean).forEach(function(dock) {
+                dock.addEventListener('mouseenter', function() {
+                    clearEdgeDockHideTimer();
+                    dock.classList.add('is-visible');
+                });
+
+                dock.addEventListener('mouseleave', function() {
+                    scheduleEdgeDockHide();
+                });
+
+                dock.addEventListener('focusin', function() {
+                    clearEdgeDockHideTimer();
+                    dock.classList.add('is-visible');
+                });
+
+                dock.addEventListener('focusout', function() {
+                    scheduleEdgeDockHide();
+                });
+            });
+
+            document.addEventListener('mousemove', function(event) {
+                if (!window.matchMedia('(pointer: fine)').matches) {
+                    return;
+                }
+
+                if (event.clientX <= 56) {
+                    revealEdgeDock('left');
+                    return;
+                }
+
+                if (event.clientX >= window.innerWidth - 56) {
+                    revealEdgeDock('right');
+                    return;
+                }
+
+                scheduleEdgeDockHide();
+            });
+
+            window.addEventListener('scroll', function() {
+                updateScrollDockState();
+                revealEdgeDocksTemporarily();
+            }, { passive: true });
+
+            window.addEventListener('resize', function() {
+                updateScrollDockState();
+                updateDockActionState();
+            });
+
+            updateScrollDockState();
+            updateDockActionState();
+            scheduleEdgeDockHide();
         }
 
         function toggleDetails(index) {
@@ -637,16 +1173,8 @@
                 checkbox.checked = !checkbox.checked;
             }
 
-            const card = checkbox.closest(config.itemSelector);
             const index = checkboxId.replace(config.cardCheckboxPrefix, '');
-            const tableCheckbox = document.getElementById(config.tableCheckboxPrefix + index);
-
-            setCardState(card, checkbox.checked);
-
-            if (tableCheckbox) {
-                tableCheckbox.checked = checkbox.checked;
-                setRowState(tableCheckbox.closest('tr'), checkbox.checked);
-            }
+            setSelectionStateForIndex(index, checkbox.checked);
 
             syncSelectionSummary();
         }
@@ -756,12 +1284,7 @@
 
                 checkbox.addEventListener('change', function() {
                     const index = checkbox.id.replace(config.cardCheckboxPrefix, '');
-                    const tableCheckbox = document.getElementById(config.tableCheckboxPrefix + index);
-                    setCardState(document.getElementById(`item-${index}`), checkbox.checked);
-                    if (tableCheckbox) {
-                        tableCheckbox.checked = checkbox.checked;
-                        setRowState(tableCheckbox.closest('tr'), checkbox.checked);
-                    }
+                    setSelectionStateForIndex(index, checkbox.checked);
                     syncSelectionSummary();
                 });
             });
@@ -823,27 +1346,11 @@
                 toggleView('table');
             });
 
-            const selectAllBtn = document.getElementById('selectAllBtn');
-            if (selectAllBtn) {
-                selectAllBtn.addEventListener('click', function(event) {
-                    event.stopPropagation();
-                    selectVisibleItems();
-                });
-            }
-
             const addToCartBtn = document.getElementById('addToCartBtn');
             if (addToCartBtn) {
                 addToCartBtn.addEventListener('click', function(event) {
                     event.stopPropagation();
                     addSelectedToCart();
-                });
-            }
-
-            const deselectAllBtn = document.getElementById('deselectAllBtn');
-            if (deselectAllBtn) {
-                deselectAllBtn.addEventListener('click', function(event) {
-                    event.stopPropagation();
-                    clearSelection();
                 });
             }
 
@@ -872,14 +1379,9 @@
                     const isChecked = this.checked;
                     document.querySelectorAll(config.tableCheckboxSelector).forEach(function(checkbox) {
                         const index = checkbox.id.replace(config.tableCheckboxPrefix, '');
-                        const cardCheckbox = document.getElementById(config.cardCheckboxPrefix + index);
-                        checkbox.checked = isChecked;
-                        setRowState(checkbox.closest('tr'), isChecked);
-                        if (cardCheckbox) {
-                            cardCheckbox.checked = isChecked;
-                            setCardState(document.getElementById(`item-${index}`), isChecked);
-                        }
+                        setSelectionStateForIndex(index, isChecked, false);
                     });
+                    saveSelectedItems();
                     syncSelectionSummary();
                 });
             }
@@ -934,6 +1436,11 @@
             const confirmBulkFlipBtn = document.getElementById('confirmBulkFlipBtn');
             if (confirmBulkFlipBtn) {
                 confirmBulkFlipBtn.addEventListener('click', function() {
+                    if (activeBulkOperation) {
+                        setOperationStatus('A bulk explorer action is already running. Please wait for it to finish.', 'warning');
+                        return;
+                    }
+
                     if (cart.length === 0) {
                         alert('Your cart is empty.');
                         return;
@@ -945,7 +1452,11 @@
                         return;
                     }
 
-                    createJsonRequest(window.bulkFlipUrl, {
+                    if (!beginBulkOperation('bulk-flip', `Flipping ${cart.length} ${config.itemType}${cart.length === 1 ? '' : 's'}...`, 'Flipping...')) {
+                        return;
+                    }
+
+                    createJsonRequest(config.bulkFlipUrl, {
                         uniqueIDs: cart.map(function(item) {
                             return item.uid;
                         }),
@@ -955,14 +1466,14 @@
                     })
                         .then(function(data) {
                             $('#bulkFlipModal').modal('hide');
-                            alert(data.message);
                             if (data.results && data.results.success && data.results.success.length > 0) {
                                 emptyCart();
                             }
+                            finishBulkOperation(data.message || 'Bulk flip completed.', 'success');
                         })
                         .catch(function(error) {
                             console.error('Error during bulk flip:', error);
-                            alert('Error occurred during bulk flip operation.');
+                            finishBulkOperation(error.message || 'Error occurred during bulk flip operation.', 'error', true);
                         });
                 });
             }
@@ -970,6 +1481,15 @@
             document.querySelectorAll('.bulk-status-item').forEach(function(item) {
                 item.addEventListener('click', function(event) {
                     event.preventDefault();
+
+                    if (activeBulkOperation) {
+                        setOperationStatus('A bulk explorer action is already running. Please wait for it to finish.', 'warning');
+                        return;
+                    }
+
+                    if (this.getAttribute('aria-disabled') === 'true') {
+                        return;
+                    }
 
                     if (cart.length === 0) {
                         alert('Your cart is empty. Please add items to change their status.');
@@ -981,21 +1501,25 @@
                         return;
                     }
 
-                    createJsonRequest(window.bulkStatusUrl, {
+                    if (!beginBulkOperation('bulk-status', `Changing ${cart.length} ${config.itemType}${cart.length === 1 ? '' : 's'} to ${status}...`, 'Updating...')) {
+                        return;
+                    }
+
+                    createJsonRequest(config.bulkStatusUrl, {
                         uniqueIDs: cart.map(function(entry) {
                             return entry.uid;
                         }),
                         status: status,
                     })
                         .then(function(data) {
-                            alert(data.message);
                             if (data.results && data.results.success && data.results.success.length > 0) {
                                 emptyCart();
                             }
+                            finishBulkOperation(data.message || 'Bulk status change completed.', 'success');
                         })
                         .catch(function(error) {
                             console.error('Error during bulk status change:', error);
-                            alert('Error occurred during bulk status change operation.');
+                            finishBulkOperation(error.message || 'Error occurred during bulk status change operation.', 'error', true);
                         });
                 });
             });
@@ -1003,6 +1527,11 @@
             const removeFromTrayBtn = document.getElementById('removeFromTrayBtn');
             if (removeFromTrayBtn) {
                 removeFromTrayBtn.addEventListener('click', function() {
+                    if (activeBulkOperation) {
+                        setOperationStatus('A bulk explorer action is already running. Please wait for it to finish.', 'warning');
+                        return;
+                    }
+
                     if (cart.length === 0) {
                         alert('Your cart is empty. Please add items to remove from trays.');
                         return;
@@ -1012,22 +1541,26 @@
                         return;
                     }
 
-                    createJsonRequest(window.bulkRemoveFromTrayUrl, {
+                    if (!beginBulkOperation('bulk-remove-from-tray', `Removing ${cart.length} ${config.itemType}${cart.length === 1 ? '' : 's'} from trays...`, 'Removing...')) {
+                        return;
+                    }
+
+                    createJsonRequest(config.bulkRemoveFromTrayUrl, {
                         item_type: config.itemType,
                         uniqueIDs: cart.map(function(item) {
                             return item.uid;
                         }),
                     })
                         .then(function(data) {
-                            alert(data.message);
                             if (data.results && data.results.success && data.results.success.length > 0) {
                                 emptyCart();
                             }
+                            finishBulkOperation(data.message || 'Tray removal completed.', 'success', true);
                             window.location.reload();
                         })
                         .catch(function(error) {
                             console.error('Error during bulk remove from tray:', error);
-                            alert('Error occurred during bulk remove from tray operation.');
+                            finishBulkOperation(error.message || 'Error occurred during bulk remove from tray operation.', 'error', true);
                         });
                 });
             }
@@ -1038,7 +1571,10 @@
         updateCart();
         toggleView(currentView);
         initializeColumnControls();
+        bindPerPageControls();
         bindStaticEvents();
+        initializeEdgeDocks();
+        syncSelectionInputsFromState();
         syncSelectionSummary();
     }
 

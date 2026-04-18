@@ -317,11 +317,16 @@ The admin settings page manages:
 
 - theme behavior and accent color
 - displayed lab information
+- manual FlyBase release-aware dataset refresh
 - manual legacy Bloomington compatibility refresh
 - manual legacy Bloomington gene metadata refresh
 - manual FlyBase gene metadata refresh
 
-FlyBase is the primary external stock catalog. The legacy Bloomington refresh workflow remains available as a compatibility fallback during the BDSC migration, and it stores backup material under the repository data area.
+FlyBase is the primary external stock catalog. The FlyBase release sync action redownloads the current dataset bundle, updates local inspection outputs, and refreshes stock-derived gene metadata. The legacy Bloomington refresh workflow remains available as a compatibility fallback during the BDSC migration, and it stores backup material under the repository data area.
+
+FlyBase release refreshes also run automatically on the first day of each month at 1:30 AM. The legacy Bloomington compatibility refresh remains scheduled at 2:00 AM.
+
+Admin settings and the home dashboard now flag FlyBase sync health directly from the local manifest, including stale or failed refresh attempts.
 
 ## Launch And Handoff Checklist
 

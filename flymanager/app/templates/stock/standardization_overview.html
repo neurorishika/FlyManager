@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Stock and Cross Parent Reviewer{% endblock %}
+
+{% block head %}
+<style nonce="{{ csp_nonce }}">
+    .standardization-overview-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+
+    .standardization-overview-card {
+        padding: 18px;
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        background: var(--panel-background);
+        box-shadow: var(--surface-shadow);
+    }
+
+    .standardization-overview-label {
+        margin: 0 0 8px;
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        color: var(--muted-text);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .standardization-overview-value {
+        margin: 0;
+        font-size: clamp(1.05rem, 1rem + 0.4vw, 1.35rem);
+        line-height: 1.25;
+    }
+
+    .standardization-overview-copy {
+        margin: 8px 0 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .standardization-table td,
+    .standardization-table th {
+        vertical-align: top;
+    }
+
+    .standardization-status-pill,
+    .standardization-token-pill,
+    .standardization-recommendation-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
+        font-size: var(--font-size-sm);
+        margin: 0 8px 8px 0;
+        white-space: nowrap;
+    }
+
+    .standardization-status-pill.is-needs-review {
+        border-color: color-mix(in srgb, var(--warning-color) 45%, var(--border-color) 55%);
+    }
+
+    .standardization-status-pill.is-clean {
+        border-color: color-mix(in srgb, var(--success-color) 38%, var(--border-color) 62%);
+    }
+
+    .standardization-meta-copy {
+        margin: 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .standardization-genotype {
+        margin: 0;
+        max-width: 420px;
+        color: var(--text-color);
+        word-break: break-word;
+    }
+
+    .standardization-empty-state {
+        padding: 24px;
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
+    }
+
+    @media (max-width: 991px) {
+        .standardization-overview-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 767px) {
+        .standardization-overview-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="app-panel explorer-header mb-3">
+    <div>
+        <p class="app-kicker">Collection Review</p>
+        <h1 class="app-page-title">Stock and Cross Parent Reviewer</h1>
+        <p class="app-page-subtitle">Review stock genotypes and cross parents from one shared queue, surface unresolved or non-canonical tokens, and jump back to the source record when you need to edit the genotype.</p>
+    </div>
+    <div class="app-toolbar">
+        <a href="{{ url_for('stock.stock_explorer') }}" class="btn btn-outline-secondary">Open Stocks</a>
+        <a href="{{ url_for('cross.cross_explorer') }}" class="btn btn-outline-secondary">Open Crosses</a>
+    </div>
+</div>
+
+<div class="standardization-overview-grid">
+    <div class="standardization-overview-card">
+        <p class="standardization-overview-label">Review Targets</p>
+        <p class="standardization-overview-value">{{ summary.totalTargets }}</p>
+        <p class="standardization-overview-copy">{{ summary.stockTargets }} stocks and {{ summary.crossParentTargets }} cross parents.</p>
+    </div>
+    <div class="standardization-overview-card">
+        <p class="standardization-overview-label">Flagged Targets</p>
+        <p class="standardization-overview-value">{{ summary.flaggedTargets }}</p>
+        <p class="standardization-overview-copy">{{ summary.cleanTargets }} already clean under the current reviewer rules.</p>
+    </div>
+    <div class="standardization-overview-card">
+        <p class="standardization-overview-label">Open Review Issues</p>
+        <p class="standardization-overview-value">{{ summary.totalIssues }}</p>
+        <p class="standardization-overview-copy">{{ summary.totalUnresolved }} unresolved bare tokens and {{ summary.totalUnmodeled }} unmodeled allele-format tokens.</p>
+    </div>
+    <div class="standardization-overview-card">
+        <p class="standardization-overview-label">Suggested Replacements</p>
+        <p class="standardization-overview-value">{{ summary.targetsWithRecommendations }}</p>
+        <p class="standardization-overview-copy">Targets with at least one reviewed alias or FlyBase-backed canonical recommendation.</p>
+    </div>
+</div>
+
+{% with endpoint_name='main.standardization_reviewer', item_label='target', item_plural_label='targets' %}
+{% include 'explorer_pagination.html' %}
+{% endwith %}
+
+<div class="app-panel">
+    {% if review_rows %}
+    <div class="table-responsive">
+        <table class="table standardization-table">
+            <thead>
+                <tr>
+                    <th scope="col">Stock</th>
+                    <th scope="col">Subject</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Issues</th>
+                    <th scope="col">Recommended Replacements</th>
+                    <th scope="col">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in review_rows %}
+                <tr>
+                    <td>
+                        <p class="mb-1"><strong>{{ row.name or row.uniqueID }}</strong></p>
+                        <p class="standardization-meta-copy">{{ row.recordTypeLabel }} • {{ row.uniqueID }}{% if row.trayID and row.trayPosition %} • Tray {{ row.trayID }}-{{ row.trayPosition }}{% endif %}</p>
+                        <p class="standardization-meta-copy">{{ row.assignmentScopeLabel }} • {{ row.assignmentScopeDetail }}</p>
+                    </td>
+                    <td>
+                        <p class="mb-1"><strong>{{ row.subjectLabel }}</strong></p>
+                        <p class="standardization-genotype">{{ row.genotype or 'Unavailable' }}</p>
+                    </td>
+                    <td>
+                        {% if row.issueCount %}
+                        <span class="standardization-status-pill is-needs-review">Needs Review</span>
+                        <p class="standardization-meta-copy">{{ row.issueCount }} issue{% if row.issueCount != 1 %}s{% endif %}</p>
+                        {% else %}
+                        <span class="standardization-status-pill is-clean">Clean</span>
+                        <p class="standardization-meta-copy">No unmapped genotype tokens detected.</p>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.topTokens %}
+                            {% for token in row.topTokens %}
+                            <span class="standardization-token-pill">{{ token }}</span>
+                            {% endfor %}
+                            <p class="standardization-meta-copy">{{ row.unresolvedCount }} unresolved and {{ row.unmodeledCount }} unmodeled allele-format issue{% if row.issueCount != 1 %}s{% endif %}.</p>
+                        {% else %}
+                            <p class="standardization-meta-copy">No current review tokens.</p>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.recommendedReplacements %}
+                            {% for recommendation in row.recommendedReplacements %}
+                            <span class="standardization-recommendation-pill">{{ recommendation.from }} -> {{ recommendation.to }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <p class="standardization-meta-copy">No automatic canonical replacement suggested yet.</p>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ row.actionHref }}" class="btn btn-primary btn-sm">{{ row.actionLabel }}</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="standardization-empty-state">
+        <h2 class="h5 mb-2">No review targets available</h2>
+        <p class="mb-0">There are no accessible stocks or cross parents to review in this workspace.</p>
+    </div>
+    {% endif %}
+</div>
+
+{% with endpoint_name='main.standardization_reviewer', item_label='target', item_plural_label='targets' %}
+{% include 'explorer_pagination.html' %}
+{% endwith %}
+{% endblock %}

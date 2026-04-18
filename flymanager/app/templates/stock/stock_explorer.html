@@ -17,7 +17,9 @@
         <p class="app-page-subtitle">Scan the active stock collection, switch between card and table views, and assemble bulk actions without losing context.</p>
     </div>
     <div class="app-chip-row">
-        <span class="app-chip"><i class="fas fa-box"></i> {{ stocks|length }} visible stocks</span>
+        <span class="app-chip"><i class="fas fa-box"></i> {{ pagination.page_count }} loaded{% if not pagination.is_all %} of {{ pagination.total_items }} matching stocks{% else %} stocks{% endif %}</span>
+        <span class="app-chip"><i class="fas fa-hand-paper"></i> {{ scope_counts.maintain }} to maintain</span>
+        {% if scope_counts.assigned_out %}<span class="app-chip"><i class="fas fa-share-square"></i> {{ scope_counts.assigned_out }} assigned out</span>{% endif %}
         <span class="app-chip"><i class="fas fa-filter"></i> Filterable views</span>
     </div>
 </div>
@@ -29,7 +31,7 @@
             <h2 class="filter-panel-title">Stock Filter Bar</h2>
         </div>
         <div class="filter-panel-meta">
-            <span class="app-chip"><i class="fas fa-sliders-h"></i> {{ stocks|length }} results</span>
+            <span class="app-chip"><i class="fas fa-sliders-h"></i> {{ pagination.total_items }} results</span>
             <span class="app-chip filter-default-chip"><i class="fas fa-eye-slash"></i> Archived hidden by default</span>
         </div>
     </div>
@@ -39,7 +41,7 @@
 <div class="app-panel active-filter-panel">
     <div class="filter-summary-heading">
         <p class="app-kicker">Applied Filters</p>
-        <p class="active-filter-copy">{{ stocks|length }} result{% if stocks|length != 1 %}s{% endif %}</p>
+        <p class="active-filter-copy">{{ pagination.total_items }} result{% if pagination.total_items != 1 %}s{% endif %}</p>
     </div>
     <div class="active-filter-actions">
         <div class="app-chip-row">
@@ -52,6 +54,7 @@
             {% if filter_state.searchQuery %}<span class="app-chip">Search: {{ filter_state.searchQuery }}</span>{% endif %}
         </div>
         <form method="post" action="{{ url_for('stock.stock_explorer') }}">
+            <input type="hidden" name="per_page" value="{{ pagination.per_page_value }}">
             <button type="submit" name="clear_filters" class="btn btn-outline-secondary">Clear All</button>
         </form>
     </div>
@@ -60,7 +63,7 @@
 <div class="explorer-toolbar mb-3">
     <div class="app-toolbar">
         <a href="{{ url_for('stock.add_stock') }}" class="btn btn-success">Add New Stock</a>
-        <span class="explorer-results-meta">{{ stocks|length }} stock{% if stocks|length != 1 %}s{% endif %} in view</span>
+        <span class="explorer-results-meta">{% if pagination.total_items %}Showing {{ pagination.start_index }}-{{ pagination.end_index }} of {{ pagination.total_items }} stock{% if pagination.total_items != 1 %}s{% endif %}{% else %}0 stocks in view{% endif %}</span>
     </div>
     <div class="explorer-toolbar-controls">
         <details class="column-selector">
@@ -78,6 +81,7 @@
                 <div class="column-selector-grid">
                     <label class="column-selector-option"><input type="checkbox" data-column-toggle="series"> Series</label>
                     <label class="column-selector-option"><input type="checkbox" data-column-toggle="genotype"> Genotype</label>
+                    <label class="column-selector-option"><input type="checkbox" data-column-toggle="phenotype"> Phenotype</label>
                     <label class="column-selector-option"><input type="checkbox" data-column-toggle="type"> Type</label>
                     <label class="column-selector-option"><input type="checkbox" data-column-toggle="food"> Food</label>
                     <label class="column-selector-option"><input type="checkbox" data-column-toggle="species"> Species</label>
@@ -97,6 +101,33 @@
         </div>
     </div>
 </div>
+{% with endpoint_name='stock.stock_explorer', item_label='stock', item_plural_label='stocks' %}
+{% include 'explorer_pagination.html' %}
+{% endwith %}
+<div class="edge-dock edge-dock-left" data-edge-dock="left" aria-label="Selection controls">
+    <button type="button" id="selectVisibleDockBtn" class="edge-dock-action" title="Select every filtered result on this page" aria-label="Select all results on this page">
+        <i class="fas fa-check-square"></i>
+        <span class="edge-dock-label">Select visible</span>
+    </button>
+    <button type="button" id="selectAllDockBtn" class="edge-dock-action" title="Select every filtered result across all pages" aria-label="Select all results across all pages">
+        <i class="fas fa-check-double"></i>
+        <span class="edge-dock-label">Select all</span>
+    </button>
+    <button type="button" id="clearSelectionDockBtn" class="edge-dock-action" title="Clear the current selection" aria-label="Unselect all items">
+        <i class="fas fa-square"></i>
+        <span class="edge-dock-label">Unselect all</span>
+    </button>
+</div>
+<div class="edge-dock edge-dock-right" data-edge-dock="right" aria-label="Page navigation controls">
+    <button type="button" id="scrollTopDockBtn" class="edge-dock-action" title="Jump to the top of the page" aria-label="Scroll to top">
+        <i class="fas fa-arrow-up"></i>
+        <span class="edge-dock-label">Top</span>
+    </button>
+    <button type="button" id="scrollBottomDockBtn" class="edge-dock-action" title="Jump to the bottom of the page" aria-label="Scroll to bottom">
+        <i class="fas fa-arrow-down"></i>
+        <span class="edge-dock-label">Bottom</span>
+    </button>
+</div>
 <div class="stock-container">
     <div class="stock-items-grid" id="cardView">
         {% if not stocks %}
@@ -107,7 +138,7 @@
         </div>
         {% endif %}
         {% for stock in stocks %}
-        <div class="stock-item" data-status="{{ stock.Status }}" data-checkbox-id="stock{{ loop.index }}" id="item-{{ loop.index }}">
+        <div class="stock-item" data-status="{{ stock.Status }}" data-checkbox-id="stock{{ loop.index }}" id="item-{{ loop.index }}" data-source-type="{{ stock.StockSource or '' }}" data-source-id="{{ stock.SourceID or '' }}" data-source-collection="{{ stock.SourceCollection or '' }}" data-flybase-stock-id="{{ stock.FlyBaseStockID or '' }}" data-provider-url="{{ stock.providerURL or '' }}" data-provider-link-label="{{ stock.providerLinkLabel or '' }}" data-provider-link-kind="{{ stock.providerLinkKind or '' }}" data-provider-matches='{{ stock.ProviderMatches | tojson }}' data-provider-matches-loaded="{{ 'true' if stock.ProviderMatchesLoaded else 'false' }}" data-provider-matches-cached-at="{{ stock.ProviderMatchesCachedAt or '' }}" data-provider-matches-cached="{{ 'true' if stock.ProviderMatchesCached else 'false' }}" data-provider-matches-count-label="{{ stock.ProviderMatchesCountLabel or '' }}" data-provider-matches-status-label="{{ stock.ProviderMatchesStatusLabel or '' }}" data-provider-matches-primary-label="{{ stock.ProviderMatchesPrimaryLabel or '' }}">
             <div class="stock-item-header">
                 <div class="checkbox-and-badges">
                     <label class="stock-select-toggle" for="stock{{ loop.index }}">
@@ -115,6 +146,7 @@
                         <span>Select</span>
                     </label>
                     <div class="badges">
+                        <span class="badge badge-assignment badge-assignment-{{ stock.AssignmentScope }}">{{ stock.AssignmentScopeLabel }}</span>
                         <span class="badge badge-info">{{ stock.FoodType }}</span>
                         <span class="badge badge-secondary">{{ stock.Type }}</span>
                         <span class="badge badge-species">{{ stock.Species }}</span>
@@ -137,10 +169,25 @@
                     {% endif %}
                 </h5>
                 <p class="stock-item-genotype" title="{{ stock.Genotype }}"><strong>Genotype:</strong> {{ stock.Genotype }}</p>
+                    <p class="stock-item-submeta"><strong>Phenotype:</strong> {{ stock.PhenotypeGuess }} ({{ stock.PhenotypeConfidence|title }})</p>
+                <p class="stock-item-submeta"><strong>Responsibility:</strong> {{ stock.AssignmentScopeDetail }}</p>
                 <p class="stock-item-submeta"><strong>Provenance:</strong> {{ stock.Provenance }}</p>
+                {% if stock.ProviderMatchesLoaded %}
+                <div class="stock-provider-cache-summary">
+                    <p class="stock-provider-cache-primary"><strong>Provider Cache:</strong> {{ stock.ProviderMatchesCountLabel }}{% if stock.ProviderMatchesStatusLabel %} • {{ stock.ProviderMatchesStatusLabel }}{% endif %}</p>
+                    {% if stock.ProviderMatchesPrimaryLabel %}
+                    <p class="stock-provider-cache-secondary">Top match: {{ stock.ProviderMatchesPrimaryLabel }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
                 <p class="stock-item-submeta"><strong>Unique Identifier:</strong> <i>{{ stock.UniqueID }}</i></p>
             </div>
             <div class="stock-item-actions">
+                {% if stock.providerURL %}
+                <a href="{{ stock.providerURL }}" class="btn btn-outline-info btn-sm" target="_blank" rel="noopener noreferrer" title="{{ stock.providerLinkLabel or 'Open source link' }}">
+                    <i class="fas fa-external-link-alt"></i> Source Link
+                </a>
+                {% endif %}
                 <button type="button" class="btn btn-outline-secondary btn-sm expand-btn" data-action="toggle-details" data-index="{{ loop.index }}">
                     <i class="fas fa-chevron-down" id="expand-icon-{{ loop.index }}"></i> Details
                 </button>
@@ -154,7 +201,16 @@
             <div class="details is-hidden" id="details-{{ loop.index }}">
                 <div class="details-grid">
                     <div class="details-col">
+                        <p><strong>Source:</strong> {{ stock.StockSource or 'OTHER' }}{% if stock.SourceCollection %} / {{ stock.SourceCollection }}{% endif %}</p>
                         <p><strong>Source ID:</strong> {{ stock.SourceID }}</p>
+                        <p><strong>FlyBase Stock ID:</strong> {{ stock.FlyBaseStockID or 'Unavailable' }}</p>
+                        {% if stock.ProviderMatchesLoaded %}
+                        <p><strong>Provider Cache:</strong> {{ stock.ProviderMatchesCountLabel }}{% if stock.ProviderMatchesStatusLabel %} • {{ stock.ProviderMatchesStatusLabel }}{% endif %}</p>
+                        {% if stock.ProviderMatchesPrimaryLabel %}
+                        <p><strong>Top Cached Match:</strong> {{ stock.ProviderMatchesPrimaryLabel }}</p>
+                        {% endif %}
+                        {% endif %}
+                        <p><strong>Owner / Maintainer:</strong> {{ stock.OwnerUser }} / {{ stock.MaintainerUser }}</p>
                         <p><strong>Comments:</strong> {{ stock.Comments }}</p>
                         <p><strong>Creation Date:</strong> {{ stock.CreationDate }}</p>
                     </div>
@@ -177,6 +233,7 @@
                     <th class="sortable" data-sort="series" data-column-key="series">Series<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="name" data-column-key="name">Stock<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="genotype" data-column-key="genotype">Genotype<i class="fas fa-sort ml-1"></i></th>
+                    <th data-column-key="phenotype">Phenotype</th>
                     <th class="sortable" data-sort="type" data-column-key="type">Type<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="food" data-column-key="food">Food<i class="fas fa-sort ml-1"></i></th>
                     <th class="sortable" data-sort="species" data-column-key="species">Species<i class="fas fa-sort ml-1"></i></th>
@@ -189,13 +246,13 @@
             <tbody>
                 {% if not stocks %}
                 <tr>
-                    <td colspan="12">
+                    <td colspan="13">
                         <div class="explorer-empty-table-state">No stocks match the current filters.</div>
                     </td>
                 </tr>
                 {% endif %}
                 {% for stock in stocks %}
-                <tr class="stock-row explorer-data-row" data-status="{{ stock.Status }}" data-index="{{ loop.index }}">
+                <tr class="stock-row explorer-data-row" data-status="{{ stock.Status }}" data-index="{{ loop.index }}" data-source-type="{{ stock.StockSource or '' }}" data-source-id="{{ stock.SourceID or '' }}" data-provider-url="{{ stock.providerURL or '' }}" data-provider-matches-loaded="{{ 'true' if stock.ProviderMatchesLoaded else 'false' }}" data-provider-matches-count-label="{{ stock.ProviderMatchesCountLabel or '' }}" data-provider-matches-status-label="{{ stock.ProviderMatchesStatusLabel or '' }}" data-provider-matches-primary-label="{{ stock.ProviderMatchesPrimaryLabel or '' }}">
                     <td class="table-select-cell table-sticky-col table-sticky-select">
                         <input type="checkbox" id="stockTable{{ loop.index }}" class="stock-table-selection-checkbox">
                     </td>
@@ -218,16 +275,24 @@
                             <div class="table-primary table-clamp-2">{{ stock.Name }}</div>
                             <div class="table-secondary table-clamp-2">
                                 {% if stock.AltReference %}
-                                {{ stock.AltReference }}
+                                {{ stock.AltReference }} · {{ stock.AssignmentScopeDetail }}
                                 {% else %}
-                                {{ stock.Provenance }}
+                                {{ stock.Provenance }} · {{ stock.AssignmentScopeDetail }}
                                 {% endif %}
                             </div>
+                            {% if stock.ProviderMatchesLoaded %}
+                            <div class="table-secondary table-provider-cache">{{ stock.ProviderMatchesCountLabel }}{% if stock.ProviderMatchesStatusLabel %} • {{ stock.ProviderMatchesStatusLabel }}{% endif %}</div>
+                            {% endif %}
                         </div>
                     </td>
                     <td class="genotype-cell" data-column-key="genotype" title="{{ stock.Genotype }}">
                         <div class="table-genotype-wrap">
                             <div class="table-primary table-clamp-2">{{ stock.Genotype }}</div>
+                        </div>
+                    </td>
+                    <td data-column-key="phenotype" title="{{ stock.PhenotypeGuess }}">
+                        <div class="table-name-wrap">
+                            <div class="table-primary table-clamp-2">{{ stock.PhenotypeGuess }} ({{ stock.PhenotypeConfidence|title }})</div>
                         </div>
                     </td>
                     <td data-column-key="type"><span class="table-chip table-chip-muted">{{ stock.Type }}</span></td>
@@ -259,6 +324,11 @@
                             <button type="button" class="btn btn-outline-primary btn-sm" data-action="view-stock" data-unique-id="{{ stock.UniqueID }}" title="View Details">
                                 <i class="fas fa-eye"></i>
                             </button>
+                            {% if stock.providerURL %}
+                            <a href="{{ stock.providerURL }}" class="btn btn-outline-info btn-sm" target="_blank" rel="noopener noreferrer" title="{{ stock.providerLinkLabel or 'Open source link' }}">
+                                <i class="fas fa-external-link-alt"></i>
+                            </a>
+                            {% endif %}
                             <button type="button" class="btn btn-outline-secondary btn-sm" data-action="duplicate-stock" data-unique-id="{{ stock.UniqueID }}" title="Duplicate Stock">
                                 <i class="fas fa-clone"></i>
                             </button>
@@ -269,18 +339,28 @@
                     </td>
                 </tr>
                 <tr class="explorer-detail-row is-hidden" id="tableDetails-{{ loop.index }}" data-index="{{ loop.index }}">
-                    <td colspan="12">
+                    <td colspan="13">
                         <div class="explorer-detail-card">
                             <div class="explorer-detail-grid">
                                 <div class="explorer-detail-block">
                                     <p class="explorer-detail-label">Identifiers</p>
                                     <p><strong>Unique ID:</strong> {{ stock.UniqueID }}</p>
+                                    <p><strong>Source:</strong> {{ stock.StockSource or 'OTHER' }}{% if stock.SourceCollection %} / {{ stock.SourceCollection }}{% endif %}</p>
                                     <p><strong>Source ID:</strong> {{ stock.SourceID }}</p>
+                                    <p><strong>FlyBase Stock ID:</strong> {{ stock.FlyBaseStockID or 'Unavailable' }}</p>
+                                    {% if stock.ProviderMatchesLoaded %}
+                                    <p><strong>Provider Cache:</strong> {{ stock.ProviderMatchesCountLabel }}{% if stock.ProviderMatchesStatusLabel %} • {{ stock.ProviderMatchesStatusLabel }}{% endif %}</p>
+                                    {% if stock.ProviderMatchesPrimaryLabel %}
+                                    <p><strong>Top Cached Match:</strong> {{ stock.ProviderMatchesPrimaryLabel }}</p>
+                                    {% endif %}
+                                    {% endif %}
+                                    <p><strong>Owner / Maintainer:</strong> {{ stock.OwnerUser }} / {{ stock.MaintainerUser }}</p>
                                     <p><strong>Series:</strong> {{ stock.SeriesID }}{{ stock.ReplicateID }}</p>
                                 </div>
                                 <div class="explorer-detail-block">
                                     <p class="explorer-detail-label">Collection</p>
                                     <p><strong>Provenance:</strong> {{ stock.Provenance }}</p>
+                                    <p><strong>Phenotype:</strong> {{ stock.PhenotypeGuess }} ({{ stock.PhenotypeConfidence|title }})</p>
                                     <p><strong>Type:</strong> {{ stock.Type }}</p>
                                     <p><strong>Food:</strong> {{ stock.FoodType }}</p>
                                     <p><strong>Species:</strong> {{ stock.Species }}</p>
@@ -301,6 +381,26 @@
         </table>
     </div>
 </div>
+{% with endpoint_name='stock.stock_explorer', item_label='stock', item_plural_label='stocks' %}
+{% include 'explorer_pagination.html' %}
+{% endwith %}
+
+<div class="app-panel order-queue-panel">
+    <div class="order-queue-header">
+        <div>
+            <p class="app-kicker">Ordering Workflow</p>
+            <h2 class="filter-panel-title">Order Queue (<span id="orderQueueCount">0</span>)</h2>
+            <p class="order-queue-copy">Queue selected stocks, add order notes, open provider pages, and reverse-search FlyBase-backed candidates when a provider link is missing.</p>
+        </div>
+        <div class="order-queue-toolbar">
+            <button type="button" id="addSelectedToOrderQueueBtn" class="btn btn-primary">Queue Selected</button>
+            <button type="button" id="openAllProviderLinksBtn" class="btn btn-outline-info">Open Provider Links</button>
+            <button type="button" id="markQueuedOrderedBtn" class="btn btn-success">Mark Ordered</button>
+            <button type="button" id="clearOrderQueueBtn" class="btn btn-outline-secondary">Clear Queue</button>
+        </div>
+    </div>
+    <div id="orderQueueItems" class="order-queue-items"></div>
+</div>
 
 <div class="floating-cart-container">
     <div class="cart-header" data-cart-toggle>
@@ -308,12 +408,6 @@
         <div class="cart-header-actions">
             <button type="button" id="addToCartBtn" class="btn btn-link" title="Add selected to cart" data-cart-control>
                 <i class="fas fa-cart-plus"></i>
-            </button>
-            <button type="button" id="selectAllBtn" class="btn btn-link" title="Select visible" data-cart-control>
-                <i class="fas fa-check-square"></i>
-            </button>
-            <button type="button" id="deselectAllBtn" class="btn btn-link" title="Clear selection" data-cart-control>
-                <i class="fas fa-square"></i>
             </button>
             <button type="button" id="emptyCartBtn" class="btn btn-link" title="Empty Cart" data-cart-control>
                 <i class="fas fa-trash"></i>
@@ -446,6 +540,9 @@
     const bulkStatusUrl = "{{ url_for('flip.bulk_status_change_route') }}";
     const bulkRemoveFromTrayUrl = "{{ url_for('tray.bulk_remove_from_tray') }}";
     const deleteStockUrl = "{{ url_for('stock.delete_stock_permanently') }}";
+    const stockSelectionUrl = "{{ url_for('stock.stock_explorer_selection') }}";
+    const reverseSearchUrlBase = "{{ url_for('stock.reverse_search_stock', unique_id='UNIQUE_ID_PLACEHOLDER') }}";
+    const markOrderedUrl = "{{ url_for('stock.mark_ordered_stocks') }}";
     const filterStatus = "{{ filter_state.filterStatus }}";
 </script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/explorer_shared.js') }}"></script>

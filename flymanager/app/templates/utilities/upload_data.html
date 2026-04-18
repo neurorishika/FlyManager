@@ -4,29 +4,85 @@
 <div class="app-upload-shell">
     <div class="app-panel">
     <p class="app-kicker">Utilities</p>
-    <h1 class="app-page-title">Upload Data</h1>
-    <p class="app-page-subtitle">Import an Excel file to update records in bulk. Use this for structured updates rather than manual entry.</p>
+    <h1 class="app-page-title">Workbook Operations</h1>
+    <p class="app-page-subtitle">Export a workbook snapshot, import bulk changes, and keep an eye on FlyBase sync health while you are already in maintenance mode.</p>
+    <div class="app-chip-row mt-3">
+        <span class="app-chip"><i class="fas fa-lock"></i> Admin only</span>
+        <span class="app-chip"><i class="fas fa-file-excel"></i> Workbook import and export</span>
+        {% if flybase_reference_status %}
+        <span class="app-chip"><i class="fas fa-database"></i> FlyBase {{ flybase_reference_status.status_label }}</span>
+        {% endif %}
+    </div>
     
-    {% with messages = get_flashed_messages() %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-info" role="alert">
+        {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }} mt-3" role="alert">
                 {{ message }}
             </div>
         {% endfor %}
     {% endif %}
     {% endwith %}
-    
-    <form method="POST" action="{{ url_for('data.upload_data_route') }}" enctype="multipart/form-data" class="app-form-shell mt-4">
-        <div class="form-group">
-            <label for="file">Select Excel File (.xlsx):</label>
-            <input type="file" class="form-control-file" id="file" name="file" accept=".xlsx" required>
-            <small class="app-inline-note">Only Excel workbooks in .xlsx format are accepted.</small>
+
+    {% if flybase_reference_status %}
+        {% if flybase_reference_status.status_tone == 'danger' %}
+            {% set flybase_alert_class = 'alert-danger' %}
+        {% elif flybase_reference_status.status_tone == 'success' %}
+            {% set flybase_alert_class = 'alert-success' %}
+        {% else %}
+            {% set flybase_alert_class = 'alert-warning' %}
+        {% endif %}
+
+        <div class="alert {{ flybase_alert_class }} mt-3" role="alert">
+            <strong>FlyBase sync {{ flybase_reference_status.status_label|lower }}.</strong>
+            {{ flybase_reference_status.status_message }}
+            {% if flybase_reference_status.status_detail %}<br><span class="small">{{ flybase_reference_status.status_detail }}</span>{% endif %}
+            <div class="app-button-row mt-2">
+                <a href="{{ url_for('settings.admin_settings') }}" class="btn btn-outline-primary btn-sm">Open Admin Settings</a>
+            </div>
         </div>
-        <div class="app-button-row justify-content-end">
-            <button type="submit" class="btn btn-primary">Upload and Update Data</button>
+
+        <div class="app-inline-note mt-3">
+            <strong>Last release:</strong> {{ flybase_reference_status.release or 'Not yet synced' }}<br>
+            <strong>Last attempt:</strong> {{ flybase_reference_status.last_attempt_at or 'Unknown' }}<br>
+            <strong>Normalized ingestion:</strong> {{ flybase_reference_status.flybase_ingested_collection_count or 0 }} collections, {{ flybase_reference_status.flybase_ingested_documents or 0 }} documents<br>
+            <strong>Phenotype cache source:</strong> {{ flybase_reference_status.phenotype_cache_source_label or 'Unknown' }}<br>
+            <strong>Automatic refresh:</strong> 1st of each month at 1:30 AM
         </div>
-    </form>
+    {% endif %}
+    </div>
+
+    <div class="app-settings-grid mt-3">
+        <div class="app-panel">
+            <div class="app-action-card">
+                <div>
+                    <h2 class="app-section-title mb-0">Export Workbook</h2>
+                    <p class="app-inline-note mb-0">Generate a fresh Excel snapshot before large maintenance changes or handoff work.</p>
+                </div>
+                <div class="app-button-row justify-content-end">
+                    <a href="{{ url_for('data.download_data_route') }}" class="btn btn-outline-primary">Export Workbook Snapshot</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="app-panel">
+            <div class="app-action-card">
+                <div>
+                    <h2 class="app-section-title mb-0">Import Workbook</h2>
+                    <p class="app-inline-note mb-0">Import an Excel file to update records in bulk. Use this for structured updates rather than manual entry.</p>
+                </div>
+                <form method="POST" action="{{ url_for('data.upload_data_route') }}" enctype="multipart/form-data" class="app-form-shell">
+                    <div class="form-group mb-0">
+                        <label for="file">Select Excel File (.xlsx)</label>
+                        <input type="file" class="form-control-file" id="file" name="file" accept=".xlsx" required>
+                        <small class="app-inline-note">Only Excel workbooks in .xlsx format are accepted.</small>
+                    </div>
+                    <div class="app-button-row justify-content-end">
+                        <button type="submit" class="btn btn-primary">Upload and Update Data</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

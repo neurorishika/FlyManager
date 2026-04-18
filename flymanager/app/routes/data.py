@@ -10,11 +10,25 @@ from werkzeug.utils import secure_filename
 from flymanager.app import allowed_file, db  # Import helper from app context
 from flymanager.app.routes.auth import admin_required, login_required
 from flymanager.app.security import limiter
+from flymanager.app.services import flybase as flybase_service
 from flymanager.utils.converter import mongo_to_xls, xls_to_mongo
 from flymanager.utils.mongo import write_activity  # Import for logging
 
 # Define the Blueprint
 bp = Blueprint('data', __name__, url_prefix='/data') # url_prefix defined in app/__init__
+
+
+def _get_flybase_reference_status():
+    try:
+        return flybase_service.get_flybase_reference_status(
+            current_app._get_current_object()
+        )
+    except Exception as exc:
+        current_app.logger.warning(
+            'Unable to load FlyBase sync status for data operations page: %s',
+            exc,
+        )
+        return None
 
 @bp.route('/download')
 @login_required
@@ -131,4 +145,8 @@ def upload_data_route():
                      )
 
     # For GET request, just render the upload form
-    return render_template('utilities/upload_data.html', username=username)
+    return render_template(
+        'utilities/upload_data.html',
+        username=username,
+        flybase_reference_status=_get_flybase_reference_status(),
+    )

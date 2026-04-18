@@ -1,35 +1,589 @@
 # flymanager/app/routes/stock.py
+import hashlib
+import json
 import os
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 from urllib.parse import unquote
 
 from flask import (Blueprint, current_app, flash, jsonify, redirect,
-                   render_template, request, session, url_for)
+                   render_template, request, send_file, session, url_for)
 from fuzzywuzzy import fuzz
 
 from flymanager.app import db
 from flymanager.app.routes.auth import login_required
-from flymanager.app.routes.explorer_utils import (collect_unique_values,
-                                                  get_explorer_filter_state,
-                                                  set_flip_display_fields)
-from flymanager.app.security import (get_json_payload, limiter,
+from flymanager.app.routes.explorer_utils import (
+    collect_unique_values, get_explorer_filter_state,
+    get_explorer_pagination_state, paginate_explorer_records,
+    set_flip_display_fields)
+from flymanager.app.security import (csrf, get_json_payload, limiter,
                                      normalize_identifier_list,
                                      normalize_optional_text, parse_int_value,
                                      require_confirmation)
+from flymanager.app.services.stock_standardization import \
+    review_stock_standardization
 from flymanager.app.settings import DEFAULT_STOCK_PROPERTY_VALUES
 from flymanager.utils.genetics import qc_genotype
 from flymanager.utils.labels import generate_label_pdf
-from flymanager.utils.mongo import (add_metadata, add_to_stock, delete_stock,
-                                    edit_stock, get_eclosion_in, get_flip_in,
-                                    get_metadata, get_user_initials,
-                                    get_user_stocks, update_stock_vials,
-                                    write_activity)
-from flymanager.utils.stock_sources import (EXTERNAL_SOURCE_OPTIONS,
-                                            get_external_stock_record)
+from flymanager.utils.mongo import (OperationLockConflict, add_metadata,
+                                    add_to_stock, delete_stock, edit_stock,
+                                    get_accessible_stock,
+                                    get_accessible_stocks, get_direct_reports,
+                                    get_eclosion_in, get_flip_in, get_metadata,
+                                    get_user_initials, hold_operation_lock,
+                                    update_document_assignment,
+                                    update_stock_vials, write_activity)
+from flymanager.utils.mongo_records import current_timestamp
+from flymanager.utils.phenotypes.image_library import \
+    select_prediction_reference_images
+from flymanager.utils.phenotypes.predictor import (
+    build_stock_phenotype_cache, get_cached_stock_phenotype,
+    predict_individual_phenotype)
+from flymanager.utils.stock_sources import (
+    EXTERNAL_SOURCE_OPTIONS, build_stock_provider_metadata_from_context,
+    enrich_stock_source_context, find_external_stock_matches,
+    get_external_stock_record, resolve_stock_source_collection,
+    resolve_stock_source_type)
 from flymanager.utils.utils import clean_tagify_data, increment_replicate_id
 
 bp = Blueprint("stock", __name__)  # url_prefix is defined in app/__init__
+PROVIDER_MATCH_CACHE_FIELD = "ProviderMatchCache"
+PROVIDER_MATCH_CACHE_TTL = timedelta(hours=24)
+
+
+def _get_stock_reference_images(prediction):
+    return select_prediction_reference_images(
+        prediction,
+        base_dir=current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH"),
+    )
+
+
+def _decorate_prediction_for_view(prediction, *, image_limit=None):
+    decorated = {
+        **prediction,
+        "reference_images": select_prediction_reference_images(
+            prediction,
+            base_dir=current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH"),
+            limit=image_limit,
+        ),
+        "provenance_summary": prediction.get(
+            "provenance_summary",
+            {"counts": {}, "primary_basis": "unknown"},
+        ),
+        "viability_status": prediction.get("viability_status", "unknown"),
+        "fertility_status": prediction.get("fertility_status", "unknown"),
+        "lethal_alleles": prediction.get("lethal_alleles", []),
+        "sterile_alleles": prediction.get("sterile_alleles", []),
+        "stage_specific_effects": prediction.get("stage_specific_effects", []),
+        "epistasis_events": prediction.get("epistasis_events", []),
+    }
+    return decorated
+
+
+def _get_stock_phenotype_for_view(stock):
+    phenotype_cache = get_cached_stock_phenotype(stock)
+    raw_cache = stock.get("PhenotypeCache")
+    stale_cache_fallback = False
+    if not phenotype_cache and isinstance(raw_cache, dict):
+        genotype = str(stock.get("Genotype", "")).strip()
+        if genotype:
+            phenotype_cache = build_stock_phenotype_cache(genotype)
+            stale_cache_fallback = True
+    if phenotype_cache:
+        prediction = {**phenotype_cache["prediction"]}
+        if stale_cache_fallback:
+            existing_warnings = list(prediction.get("warnings", []))
+            existing_warnings.append(
+                "Displayed preview was recomputed live because the stored phenotype cache is stale. Refresh cache to persist the updated phenotype model."
+            )
+            prediction["warnings"] = existing_warnings
+        return {
+            **prediction,
+            "female_markers": prediction.get("female_markers", []),
+            "male_markers": prediction.get("male_markers", []),
+            "female_marker_labels": prediction.get("female_marker_labels", []),
+            "male_marker_labels": prediction.get("male_marker_labels", []),
+            "female_construct_annotation_labels": prediction.get("female_construct_annotation_labels", []),
+            "male_construct_annotation_labels": prediction.get("male_construct_annotation_labels", []),
+            "female_split_system_labels": prediction.get("female_split_system_labels", []),
+            "male_split_system_labels": prediction.get("male_split_system_labels", []),
+            "reference_images": _get_stock_reference_images(prediction),
+            "provenance_summary": prediction.get(
+                "provenance_summary",
+                {"counts": {}, "primary_basis": "unknown"},
+            ),
+            "viability_status": prediction.get("viability_status", "unknown"),
+            "fertility_status": prediction.get("fertility_status", "unknown"),
+            "lethal_alleles": prediction.get("lethal_alleles", []),
+            "sterile_alleles": prediction.get("sterile_alleles", []),
+            "stage_specific_effects": prediction.get("stage_specific_effects", []),
+            "epistasis_events": prediction.get("epistasis_events", []),
+            "cached_at": phenotype_cache.get("computedAt", ""),
+            "is_cached": not stale_cache_fallback,
+        }
+
+    return {
+        "best_guess_summary": "Phenotype cache not generated",
+        "best_guess_basis": "cache_missing",
+        "female_summary": "Refresh the cache from this record to generate a phenotype preview.",
+        "male_summary": None,
+        "female_construct_annotation_labels": [],
+        "male_construct_annotation_labels": [],
+        "female_split_system_labels": [],
+        "male_split_system_labels": [],
+        "female_markers": [],
+        "male_markers": [],
+        "female_marker_labels": [],
+        "male_marker_labels": [],
+        "shared_summary": None,
+        "female_only_labels": [],
+        "male_only_labels": [],
+        "reference_images": [],
+        "provenance_summary": {"counts": {}, "primary_basis": "unknown"},
+        "viability_status": "unknown",
+        "fertility_status": "unknown",
+        "lethal_alleles": [],
+        "sterile_alleles": [],
+        "stage_specific_effects": [],
+        "epistasis_events": [],
+        "warnings": [
+            "The stored phenotype cache is missing or stale for this genotype.",
+        ],
+        "confidence_label": "low",
+        "cached_at": "",
+        "is_cached": False,
+    }
+
+
+def _get_stock_phenotype_summary(stock):
+    phenotype_cache = get_cached_stock_phenotype(stock)
+    raw_cache = stock.get("PhenotypeCache")
+    if not phenotype_cache and isinstance(raw_cache, dict):
+        genotype = str(stock.get("Genotype", "")).strip()
+        if genotype:
+            phenotype_cache = build_stock_phenotype_cache(genotype)
+    if not phenotype_cache:
+        return {
+            "guess": "Refresh in record",
+            "confidence": "refresh required",
+        }
+
+    prediction = phenotype_cache["prediction"]
+    return {
+        "guess": prediction.get("best_guess_summary", "Phenotype unavailable"),
+        "confidence": prediction.get("confidence_label", "low"),
+    }
+
+
+def _stock_sort_key(stock):
+    tray_position = str(stock.get("TrayPosition", "0") or "0").strip()
+    try:
+        position_value = int(float(tray_position))
+    except (TypeError, ValueError):
+        position_value = 0
+
+    return (
+        str(stock.get("TrayID", "")),
+        position_value,
+        str(stock.get("Name", "")),
+        str(stock.get("UniqueID", "")),
+    )
+
+
+def _build_stock_standardization_overview_row(stock):
+    review = review_stock_standardization(stock.get("Genotype", ""), candidate_limit=0)
+    issues = list(review.get("issues") or [])
+    top_tokens = [issue.get("token", "") for issue in issues[:4] if issue.get("token")]
+    recommended_replacements = [
+        {
+            "from": issue.get("token", ""),
+            "to": issue.get("recommended_replacement", ""),
+        }
+        for issue in issues
+        if issue.get("token") and issue.get("recommended_replacement")
+    ]
+
+    return {
+        "uniqueID": str(stock.get("UniqueID", "")),
+        "name": str(stock.get("Name", "")),
+        "genotype": str(stock.get("Genotype", "")),
+        "trayID": str(stock.get("TrayID", "")),
+        "trayPosition": str(stock.get("TrayPosition", "")),
+        "assignmentScopeLabel": str(stock.get("AssignmentScopeLabel", "Maintain")),
+        "assignmentScopeDetail": str(stock.get("AssignmentScopeDetail", "Owned by you")),
+        "reviewable": bool(stock.get("ViewerCanEdit")),
+        "issueCount": int(review.get("issue_count") or 0),
+        "unresolvedCount": int((review.get("summary") or {}).get("unresolved_token", 0)),
+        "unmodeledCount": int((review.get("summary") or {}).get("standard_format_unmodeled", 0)),
+        "topTokens": top_tokens,
+        "recommendedReplacements": recommended_replacements[:3],
+    }
+
+
+@bp.route("/phenotype_image/<path:relative_path>")
+@login_required
+@limiter.limit("60 per minute")
+def phenotype_reference_image(relative_path):
+    library_root = Path(current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH", "")).resolve()
+    candidate_path = (library_root / relative_path).resolve()
+    try:
+        candidate_path.relative_to(library_root)
+    except ValueError:
+        return redirect(url_for("main.home"))
+    if not candidate_path.is_file():
+        return redirect(url_for("main.home"))
+    return send_file(candidate_path)
+
+
+def _get_phenotype_preview_metadata():
+    return {
+        "genesX": get_metadata("genesX", db),
+        "genes2": get_metadata("genes2nd", db),
+        "genes3": get_metadata("genes3rd", db),
+        "genes4": get_metadata("genes4th", db),
+    }
+
+
+def _normalize_preview_tagify_input(form_value):
+    raw_value = str(form_value or "").strip()
+    if not raw_value:
+        return []
+
+    if raw_value.startswith("["):
+        values = clean_tagify_data(raw_value)
+        if isinstance(values, list):
+            return [str(value).strip() for value in values if str(value).strip()]
+
+    return [segment.strip() for segment in raw_value.split("/") if segment.strip()]
+
+
+def _compose_preview_genotype_from_form(form):
+    chromosome_values = [
+        _normalize_preview_tagify_input(form.get("genotypeX")),
+        _normalize_preview_tagify_input(form.get("genotype2")),
+        _normalize_preview_tagify_input(form.get("genotype3")),
+        _normalize_preview_tagify_input(form.get("genotype4")),
+    ]
+    if not any(chromosome_values):
+        return ""
+
+    normalized_parts = ["/".join(values) if values else "+" for values in chromosome_values]
+    return "; ".join(normalized_parts)
+
+
+def _split_preview_genotype_for_form(genotype):
+    genotype_text = str(genotype or "").strip()
+    chromosome_parts = [part.strip() for part in genotype_text.split(";")] if genotype_text else []
+    chromosome_parts = (chromosome_parts + ["", "", "", ""])[:4]
+
+    return {
+        "genotypeX": [token.strip() for token in chromosome_parts[0].split("/") if token.strip()],
+        "genotype2": [token.strip() for token in chromosome_parts[1].split("/") if token.strip()],
+        "genotype3": [token.strip() for token in chromosome_parts[2].split("/") if token.strip()],
+        "genotype4": [token.strip() for token in chromosome_parts[3].split("/") if token.strip()],
+    }
+
+
+@bp.route("/phenotype_preview", methods=["GET", "POST"])
+@csrf.exempt
+@login_required
+@limiter.limit("30 per minute")
+def phenotype_preview():
+    genotype = ""
+    sex = "female"
+    prediction = None
+
+    if request.method == "POST" and request.is_json:
+        try:
+            payload = get_json_payload()
+        except ValueError as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 400
+
+        genotype = str(payload.get("genotype") or "").strip()
+        sex = str(payload.get("sex") or "female").strip().lower()
+        if sex not in {"male", "female"}:
+            return jsonify({"status": "error", "message": "Sex must be either 'male' or 'female'."}), 400
+
+        prediction = _decorate_prediction_for_view(
+            predict_individual_phenotype(genotype, sex),
+            image_limit=4,
+        )
+        return jsonify(
+            {
+                "status": "success",
+                "genotype": genotype,
+                "sex": sex,
+                "prediction": prediction,
+            }
+        )
+
+    if request.method == "POST":
+        genotype = _compose_preview_genotype_from_form(request.form)
+        if not genotype:
+            genotype = str(request.form.get("genotype") or "").strip()
+        sex = str(request.form.get("sex") or "female").strip().lower()
+    else:
+        genotype = str(request.args.get("genotype") or "").strip()
+        sex = str(request.args.get("sex") or "female").strip().lower()
+
+    if sex not in {"male", "female"}:
+        sex = "female"
+
+    if genotype:
+        prediction = _decorate_prediction_for_view(
+            predict_individual_phenotype(genotype, sex),
+            image_limit=4,
+        )
+
+    preview_metadata = _get_phenotype_preview_metadata()
+
+    return render_template(
+        "stock/phenotype_preview.html",
+        preview_genotype=genotype,
+        preview_genotype_parts=_split_preview_genotype_for_form(genotype),
+        preview_sex=sex,
+        preview_prediction=prediction,
+        genesX=preview_metadata["genesX"],
+        genes2=preview_metadata["genes2"],
+        genes3=preview_metadata["genes3"],
+        genes4=preview_metadata["genes4"],
+    )
+
+
+def _build_provider_match_cache_signature(stock, source_context):
+    signature_payload = {
+        "sourceType": source_context.get("sourceType", ""),
+        "sourceCollection": source_context.get("sourceCollection", ""),
+        "sourceID": str(stock.get("SourceID") or stock.get("sourceID") or "").strip(),
+        "flyBaseStockID": source_context.get("flyBaseStockID", ""),
+        "genotype": str(stock.get("Genotype") or stock.get("genotype") or "").strip(),
+        "rawGenotype": str(
+            stock.get("ExternalRawGenotype")
+            or stock.get("rawGenotype")
+            or ""
+        ).strip(),
+        "altReference": str(stock.get("AltReference") or stock.get("altReference") or "").strip(),
+        "providerURL": source_context.get("providerURL", ""),
+    }
+    serialized_payload = json.dumps(signature_payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized_payload.encode("utf-8")).hexdigest()
+
+
+def _parse_provider_match_cache_timestamp(timestamp_text):
+    normalized_text = str(timestamp_text or "").strip()
+    if not normalized_text:
+        return None
+
+    for timestamp_format in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(normalized_text, timestamp_format)
+        except ValueError:
+            continue
+
+    return None
+
+
+def _format_provider_match_cache_age(cached_at_text):
+    cached_at = _parse_provider_match_cache_timestamp(cached_at_text)
+    if cached_at is None:
+        return ""
+
+    age_delta = datetime.now() - cached_at
+    total_minutes = max(0, int(age_delta.total_seconds() // 60))
+    if total_minutes < 1:
+        return "just now"
+    if total_minutes < 60:
+        return f"{total_minutes}m ago"
+
+    total_hours = total_minutes // 60
+    if total_hours < 24:
+        return f"{total_hours}h ago"
+
+    total_days = total_hours // 24
+    if total_days < 7:
+        return f"{total_days}d ago"
+
+    total_weeks = total_days // 7
+    if total_weeks < 5:
+        return f"{total_weeks}w ago"
+
+    return cached_at.strftime("%Y-%m-%d")
+
+
+def _build_provider_match_preview(candidate):
+    if not isinstance(candidate, dict):
+        return ""
+
+    source_label = candidate.get("sourceCollection") or candidate.get("stockSource") or "Provider"
+    source_id = str(candidate.get("sourceID") or "").strip()
+    if source_id:
+        return f"{source_label} {source_id}"
+    return str(source_label)
+
+
+def _build_provider_match_metadata(candidates, *, cached, cached_at):
+    normalized_candidates = candidates if isinstance(candidates, list) else []
+    count = len(normalized_candidates)
+    age_label = _format_provider_match_cache_age(cached_at)
+    count_label = f"{count} cached match{'es' if count != 1 else ''}" if cached else f"{count} match{'es' if count != 1 else ''}"
+    status_label = ""
+    if cached and age_label:
+        status_label = f"Cached {age_label}"
+    elif cached:
+        status_label = "Cached"
+    elif age_label:
+        status_label = f"Updated {age_label}"
+    else:
+        status_label = "Updated"
+
+    primary_match = _build_provider_match_preview(normalized_candidates[0]) if normalized_candidates else ""
+    return {
+        "count": count,
+        "countLabel": count_label,
+        "statusLabel": status_label,
+        "ageLabel": age_label,
+        "primaryMatch": primary_match,
+    }
+
+
+def _build_provider_match_payload(candidates, *, cached, cached_at):
+    metadata = _build_provider_match_metadata(candidates, cached=cached, cached_at=cached_at)
+    return {
+        "candidates": candidates,
+        "count": len(candidates),
+        "cached": cached,
+        "cachedAt": cached_at,
+        "cacheCountLabel": metadata["countLabel"],
+        "cacheStatusLabel": metadata["statusLabel"],
+        "cacheAgeLabel": metadata["ageLabel"],
+        "primaryMatchLabel": metadata["primaryMatch"],
+    }
+
+
+def _build_provider_match_view_fields(cache_payload):
+    if cache_payload is None:
+        return {
+            "ProviderMatches": [],
+            "ProviderMatchesLoaded": False,
+            "ProviderMatchesCachedAt": "",
+            "ProviderMatchesCached": False,
+            "ProviderMatchesCount": 0,
+            "ProviderMatchesCountLabel": "",
+            "ProviderMatchesStatusLabel": "",
+            "ProviderMatchesAgeLabel": "",
+            "ProviderMatchesPrimaryLabel": "",
+        }
+
+    candidates = cache_payload.get("candidates") or []
+    cached = bool(cache_payload.get("cached"))
+    cached_at = str(cache_payload.get("cachedAt") or "")
+    metadata = _build_provider_match_metadata(
+        candidates,
+        cached=cached,
+        cached_at=cached_at,
+    )
+
+    return {
+        "ProviderMatches": candidates,
+        "ProviderMatchesLoaded": True,
+        "ProviderMatchesCachedAt": cached_at,
+        "ProviderMatchesCached": cached,
+        "ProviderMatchesCount": cache_payload.get("count", len(candidates)),
+        "ProviderMatchesCountLabel": cache_payload.get("cacheCountLabel", metadata["countLabel"]),
+        "ProviderMatchesStatusLabel": cache_payload.get("cacheStatusLabel", metadata["statusLabel"]),
+        "ProviderMatchesAgeLabel": cache_payload.get("cacheAgeLabel", metadata["ageLabel"]),
+        "ProviderMatchesPrimaryLabel": cache_payload.get("primaryMatchLabel", metadata["primaryMatch"]),
+    }
+
+
+def _get_valid_provider_match_cache(stock, source_context):
+    cache_payload = stock.get(PROVIDER_MATCH_CACHE_FIELD)
+    if not isinstance(cache_payload, dict):
+        return None
+
+    cached_candidates = cache_payload.get("candidates")
+    if not isinstance(cached_candidates, list):
+        return None
+
+    cached_at_text = str(cache_payload.get("cachedAt") or "")
+    cached_at = _parse_provider_match_cache_timestamp(cached_at_text)
+    if cached_at is None:
+        return None
+    if datetime.now() - cached_at > PROVIDER_MATCH_CACHE_TTL:
+        return None
+
+    expected_signature = _build_provider_match_cache_signature(stock, source_context)
+    if cache_payload.get("signature") != expected_signature:
+        return None
+
+    return _build_provider_match_payload(
+        cached_candidates,
+        cached=True,
+        cached_at=cached_at_text,
+    )
+
+
+def _store_provider_match_cache(stock, source_context, candidates):
+    timestamp = current_timestamp()
+    cache_payload = {
+        "signature": _build_provider_match_cache_signature(stock, source_context),
+        "candidates": candidates,
+        "count": len(candidates),
+        "cachedAt": timestamp,
+    }
+    db["stocks"].update_one(
+        {"UniqueID": stock["UniqueID"], "User": stock["User"]},
+        {"$set": {PROVIDER_MATCH_CACHE_FIELD: cache_payload}},
+    )
+    return _build_provider_match_payload(
+        candidates,
+        cached=False,
+        cached_at=timestamp,
+    )
+
+
+def _get_provider_match_payload(stock, *, refresh=False):
+    source_context = enrich_stock_source_context(stock)
+    if not refresh:
+        cached_payload = _get_valid_provider_match_cache(stock, source_context)
+        if cached_payload is not None:
+            return cached_payload
+
+    candidates = find_external_stock_matches(stock)
+    return _store_provider_match_cache(stock, source_context, candidates)
+
+
+@bp.route("/view/<unique_id>/refresh_phenotype", methods=["POST"])
+@login_required
+@limiter.limit("20 per hour")
+def refresh_stock_phenotype(unique_id):
+    username = session.get("username")
+
+    stock = get_accessible_stock(username, unique_id, db, annotate=True)
+    if not stock:
+        return redirect(url_for("stock.stock_explorer"))
+
+    owner_username = stock.get("User", "")
+    try:
+        with hold_operation_lock(
+            db,
+            key=f"record:phenotype-refresh:stock:{unique_id}",
+            actor=username,
+            label=f"Stock phenotype refresh {unique_id}",
+            ttl_seconds=300,
+            metadata={"route": "refresh_stock_phenotype", "uid": unique_id},
+            conflict_message=f"A phenotype refresh for stock {unique_id} is already running. Please wait for it to finish.",
+        ):
+            phenotype_cache = build_stock_phenotype_cache(stock.get("Genotype", ""))
+            db["stocks"].update_one(
+                {"UniqueID": unique_id, "User": owner_username},
+                {"$set": {"PhenotypeCache": phenotype_cache}},
+            )
+            write_activity(username, f"Refreshed phenotype cache for stock {unique_id}", db)
+    except OperationLockConflict as exc:
+        flash(str(exc), "warning")
+    return redirect(url_for("stock.view_stock", unique_id=unique_id))
 
 
 @bp.route("/explorer", methods=["GET", "POST"])
@@ -37,28 +591,14 @@ bp = Blueprint("stock", __name__)  # url_prefix is defined in app/__init__
 def stock_explorer():
     username = session.get("username")
     try:
-        stocks = get_user_stocks(username, db)
+        stocks = get_accessible_stocks(username, db, annotate=True)
         all_stocks_for_filters = list(stocks)
-        stocks = sorted(
-            stocks,
-            key=lambda x: (
-                str(x.get("TrayID", "")),
-                int(
-                    float(x.get("TrayPosition", "0") or "0")
-                ),  # Handle empty/non-numeric TrayPosition
-            ),
-        )
 
-        # Add derived fields
-        for stock in stocks:
-            stock["FlipIn"] = get_flip_in(stock)
-            set_flip_display_fields(
-                stock,
-                raw_value=stock["FlipIn"],
-                display_field="FlipInDisplay",
-            )
-
-            stock["EclosesIn"] = get_eclosion_in(stock)
+        scope_counts = {
+            "maintain": sum(1 for stock in all_stocks_for_filters if stock.get("AssignmentScope") != "assigned_out"),
+            "assigned_out": sum(1 for stock in all_stocks_for_filters if stock.get("AssignmentScope") == "assigned_out"),
+            "incoming": sum(1 for stock in all_stocks_for_filters if stock.get("AssignmentScope") == "incoming"),
+        }
 
         # Initial unique values for filters
         unique_values = collect_unique_values(
@@ -77,11 +617,15 @@ def stock_explorer():
         print(f"Error fetching stocks for explorer: {e}")
         stocks = []
         all_stocks_for_filters = []
+        scope_counts = {"maintain": 0, "assigned_out": 0, "incoming": 0}
         unique_values = {
             k: []
             for k in ["Type", "TrayID", "Status", "FoodType", "Provenance", "Species"]
         }
 
+    pagination_state = get_explorer_pagination_state(
+        session_key="stock_explorer_pagination",
+    )
     filter_state, redirect_response = get_explorer_filter_state(
         session_key="stock_filter_state",
         clear_endpoint="stock.stock_explorer",
@@ -99,6 +643,7 @@ def stock_explorer():
         return redirect_response
 
     filtered_stocks = _apply_stock_filters(stocks, filter_state)
+    filtered_stocks = sorted(filtered_stocks, key=_stock_sort_key)
 
     if filter_state:
         unique_values = collect_unique_values(
@@ -116,13 +661,62 @@ def stock_explorer():
             {"Status": lambda stock: stock.get("Status")},
         )["Status"]
 
+    pagination = paginate_explorer_records(
+        filtered_stocks,
+        page=pagination_state["page"],
+        per_page=pagination_state["per_page"],
+        per_page_value=pagination_state["per_page_value"],
+    )
+    pagination["per_page_options"] = pagination_state["per_page_options"]
+    page_stocks = pagination["items"]
+
+    for stock in page_stocks:
+        stock["FlipIn"] = get_flip_in(stock)
+        set_flip_display_fields(
+            stock,
+            raw_value=stock["FlipIn"],
+            display_field="FlipInDisplay",
+        )
+
+        stock["EclosesIn"] = get_eclosion_in(stock)
+        source_context = enrich_stock_source_context(stock)
+        stock["StockSource"] = stock.get("StockSource") or source_context["sourceType"]
+        stock["SourceCollection"] = stock.get("SourceCollection") or source_context["sourceCollection"]
+        stock["FlyBaseStockID"] = stock.get("FlyBaseStockID") or source_context["flyBaseStockID"]
+        stock.update(build_stock_provider_metadata_from_context(source_context))
+        stock.update(_build_provider_match_view_fields(_get_valid_provider_match_cache(stock, source_context)))
+        phenotype_summary = _get_stock_phenotype_summary(stock)
+        stock["PhenotypeGuess"] = phenotype_summary["guess"]
+        stock["PhenotypeConfidence"] = phenotype_summary["confidence"]
+
     return render_template(
         "stock/stock_explorer.html",
         username=username,
-        stocks=filtered_stocks,
+        stocks=page_stocks,
+        scope_counts=scope_counts,
         unique_values=unique_values,
         filter_state=filter_state,
+        pagination=pagination,
     )
+
+
+@bp.route("/explorer/selection", methods=["GET"])
+@login_required
+def stock_explorer_selection():
+    username = session.get("username")
+    stocks = get_accessible_stocks(username, db, annotate=False)
+    filter_state = session.get("stock_filter_state", {})
+    filtered_stocks = _apply_stock_filters(stocks, filter_state)
+    filtered_stocks = sorted(filtered_stocks, key=_stock_sort_key)
+
+    items = [_build_stock_selection_item(stock) for stock in filtered_stocks]
+    return jsonify({"count": len(items), "items": items})
+
+
+@bp.route("/standardization_overview", methods=["GET"])
+@login_required
+def stock_standardization_overview():
+    return redirect(url_for("main.standardization_reviewer"))
 
 
 def _apply_stock_filters(stocks, filters):
@@ -207,6 +801,26 @@ def _apply_stock_filters(stocks, filters):
     return filtered_stocks
 
 
+def _build_stock_selection_item(stock):
+    tray_id = str(stock.get("TrayID", "") or "").strip()
+    tray_position = str(stock.get("TrayPosition", "") or "").strip()
+
+    if tray_id and tray_position:
+        identifier = f"Tray {tray_id}-{tray_position}"
+    elif tray_id:
+        identifier = f"Tray {tray_id}"
+    else:
+        identifier = "Unassigned"
+
+    return {
+        "id": str(stock.get("UniqueID", "") or "").strip(),
+        "quantity": 1,
+        "identifier": identifier,
+        "name": str(stock.get("Name", "") or "").strip(),
+        "uid": str(stock.get("UniqueID", "") or "").strip(),
+    }
+
+
 @bp.route("/add", methods=["GET", "POST"])
 @bp.route(
     "/add/<source_stock_id>", methods=["GET", "POST"]
@@ -255,9 +869,7 @@ def add_stock(source_stock_id=None):
     if source_stock_id and request.method == "GET":
         print(f"Pre-filling form with source stock ID: {source_stock_id}")
         try:
-            stock = db["stocks"].find_one(
-                {"UniqueID": source_stock_id, "User": username}
-            )  # Ensure user owns source stock
+            stock = get_accessible_stock(username, source_stock_id, db)
             if stock:
                 # Prepare data for form pre-filling, increment replicate ID
                 stock_data = {
@@ -512,14 +1124,24 @@ def view_stock(unique_id):
 
     # Fetch stock data
     try:
-        stock = db["stocks"].find_one({"UniqueID": unique_id, "User": username})
+        stock = get_accessible_stock(username, unique_id, db, annotate=True)
         if not stock:
             flash(f"Stock {unique_id} not found.", "error")
             return redirect(url_for("stock.stock_explorer"))
 
+        owner_username = stock.get("User", "")
+        can_edit_record = bool(stock.get("ViewerCanEdit"))
+        direct_reports = get_direct_reports(username, db) if can_edit_record else []
+
         # Prepare data for template display
+        source_context = enrich_stock_source_context(stock)
+        resolved_source_type = source_context["sourceType"]
+        resolved_source_collection = source_context["sourceCollection"]
         stock_data = {
             "sourceID": stock.get("SourceID", ""),
+            "sourceType": resolved_source_type,
+            "sourceCollection": resolved_source_collection,
+            "flyBaseStockID": stock.get("FlyBaseStockID", "") or source_context["flyBaseStockID"],
             "uniqueID": stock.get("UniqueID", ""),
             "genotype": stock.get("Genotype", ""),
             "name": stock.get("Name", ""),
@@ -535,6 +1157,8 @@ def view_stock(unique_id):
             "species": stock.get("Species", ""),
             "comments": stock.get("Comments", ""),
             "provenance": stock.get("Provenance", ""),
+            "externalSupportStatus": stock.get("ExternalSupportStatus", ""),
+            "externalSupportReason": stock.get("ExternalSupportReason", ""),
             "trayID": stock.get("TrayID", ""),
             "trayPosition": stock.get("TrayPosition", ""),
             "creationDate": stock.get("CreationDate", ""),
@@ -552,7 +1176,29 @@ def view_stock(unique_id):
             "modificationLog": str(stock.get("ModificationLog", "")).replace(
                 "; ", "\n"
             ),
+            "ownerUser": stock.get("OwnerUser", owner_username),
+            "assignedTo": stock.get("AssignedTo", ""),
+            "maintainerUser": stock.get("MaintainerUser", owner_username),
+            "assignmentScopeLabel": stock.get("AssignmentScopeLabel", "Maintain"),
+            "assignmentScopeDetail": stock.get("AssignmentScopeDetail", "Owned by you"),
         }
+        cached_provider_matches = _get_valid_provider_match_cache(stock, source_context)
+        cached_provider_match_fields = _build_provider_match_view_fields(cached_provider_matches)
+        stock_data.update({
+            "providerURL": source_context["providerURL"],
+            "providerLinkLabel": source_context["providerLinkLabel"],
+            "providerLinkKind": source_context["providerLinkKind"],
+            "providerMatches": cached_provider_match_fields["ProviderMatches"],
+            "providerMatchesCachedAt": cached_provider_match_fields["ProviderMatchesCachedAt"],
+            "providerMatchesLoaded": cached_provider_match_fields["ProviderMatchesLoaded"],
+            "providerMatchesCached": cached_provider_match_fields["ProviderMatchesCached"],
+            "providerMatchesCount": cached_provider_match_fields["ProviderMatchesCount"],
+            "providerMatchesCountLabel": cached_provider_match_fields["ProviderMatchesCountLabel"],
+            "providerMatchesStatusLabel": cached_provider_match_fields["ProviderMatchesStatusLabel"],
+            "providerMatchesAgeLabel": cached_provider_match_fields["ProviderMatchesAgeLabel"],
+            "providerMatchesPrimaryLabel": cached_provider_match_fields["ProviderMatchesPrimaryLabel"],
+        })
+        stock_phenotype = _get_stock_phenotype_for_view(stock)
 
     except Exception as e:
         print(f"Error fetching stock {unique_id} for view: {e}")
@@ -561,6 +1207,9 @@ def view_stock(unique_id):
 
     if request.method == "POST":
         try:
+            if not can_edit_record:
+                raise ValueError("Only the owner can edit stock metadata.")
+
             # --- Process Genotype Inputs ---
             genesX_input = clean_tagify_data(request.form.get("genotypeX"))
             for gene in genesX_input:
@@ -659,6 +1308,7 @@ def view_stock(unique_id):
                     genes4=genes4,
                     species_list=species_list,
                     stock_data=stock_data,
+                    stock_phenotype=stock_phenotype,
                     error=error_message,
                 )
 
@@ -666,17 +1316,17 @@ def view_stock(unique_id):
             print(
                 f"Attempting to edit stock {unique_id} with changes: {changed_fields}"
             )
-            success = edit_stock(username, unique_id, db, changed_fields)
+            success = edit_stock(owner_username, unique_id, db, changed_fields)
 
             if success:
                 print(f"Stock {unique_id} edited successfully.")
                 # Update vials for the edited stock
                 try:
                     edited_stock = db["stocks"].find_one(
-                        {"UniqueID": unique_id, "User": username}
+                        {"UniqueID": unique_id, "User": owner_username}
                     )
                     if edited_stock:
-                        update_stock_vials(edited_stock, username, db)
+                        update_stock_vials(edited_stock, owner_username, db)
                         print(f"Vials updated for edited stock {unique_id}.")
                     else:
                         print(
@@ -725,8 +1375,180 @@ def view_stock(unique_id):
         genes4=genes4,
         species_list=species_list,
         stock_data=stock_data,
+        stock_phenotype=stock_phenotype,
+        can_edit_record=can_edit_record,
+        direct_reports=direct_reports,
         error=error_message,
     )
+
+
+@bp.route("/assign/<unique_id>", methods=["POST"])
+@login_required
+@limiter.limit("20 per hour")
+def assign_stock(unique_id):
+    username = session.get("username")
+    assignee = normalize_optional_text(
+        request.form.get("assignee"),
+        field_name="Assignee",
+        max_length=32,
+    )
+
+    stock = get_accessible_stock(username, unique_id, db, annotate=True)
+    if not stock or not stock.get("ViewerCanEdit"):
+        flash("Only the owner can update stock assignments.", "error")
+        return redirect(url_for("stock.view_stock", unique_id=unique_id))
+
+    success, error_message = update_document_assignment(
+        "stocks",
+        username,
+        unique_id,
+        assignee,
+        db,
+    )
+    if not success:
+        flash(error_message or "Unable to update stock assignment.", "error")
+    else:
+        if assignee:
+            flash(f"Stock {unique_id} assigned to {assignee}.", "success")
+        else:
+            flash(f"Stock {unique_id} returned to owner maintenance.", "success")
+        write_activity(username, f"Updated stock assignment for {unique_id}", db)
+
+    return redirect(url_for("stock.view_stock", unique_id=unique_id))
+
+
+@bp.route("/reverse_search/<unique_id>", methods=["GET"])
+@login_required
+def reverse_search_stock(unique_id):
+    username = session.get("username")
+    force_refresh = str(request.args.get("refresh", "")).strip().lower() in {"1", "true", "yes"}
+
+    try:
+        stock = get_accessible_stock(username, unique_id, db)
+        if not stock:
+            return jsonify({"error": "Stock not found."}), 404
+
+        payload = _get_provider_match_payload(stock, refresh=force_refresh)
+        return jsonify(payload)
+    except Exception as e:
+        current_app.logger.exception(
+            "Error reverse searching stock %s for %s: %s", unique_id, username, e
+        )
+        return jsonify({"error": "An internal error occurred while reverse searching providers."}), 500
+
+
+@bp.route("/review_standardization/<unique_id>", methods=["GET"])
+@login_required
+def review_stock_standardization_route(unique_id):
+    username = session.get("username")
+    requested_token = str(request.args.get("token") or "").strip()
+    requested_query = str(request.args.get("query") or "").strip()
+
+    try:
+        stock = get_accessible_stock(username, unique_id, db)
+        if not stock:
+            return jsonify({"error": "Stock not found."}), 404
+
+        token_search_overrides = {}
+        if requested_token and requested_query:
+            token_search_overrides[requested_token] = requested_query
+
+        payload = review_stock_standardization(
+            stock.get("Genotype", ""),
+            token_search_overrides=token_search_overrides,
+        )
+        payload.update(
+            {
+                "unique_id": str(stock.get("UniqueID") or unique_id),
+                "reviewable": bool(stock.get("ViewerCanEdit")),
+            }
+        )
+        return jsonify(payload)
+    except Exception as e:
+        current_app.logger.exception(
+            "Error reviewing stock standardization %s for %s: %s", unique_id, username, e
+        )
+        return jsonify({"error": "An internal error occurred while building the stock reviewer."}), 500
+
+
+@bp.route("/mark_ordered", methods=["POST"])
+@login_required
+@limiter.limit("20 per minute")
+def mark_ordered_stocks():
+    username = session.get("username")
+
+    try:
+        payload = get_json_payload()
+        order_items = payload.get("items", [])
+        if not isinstance(order_items, list):
+            return jsonify({"message": "items must be a list."}), 400
+        if not order_items:
+            return jsonify({"message": "At least one order queue item is required."}), 400
+        if len(order_items) > 100:
+            return jsonify({"message": "items cannot contain more than 100 entries."}), 400
+
+        results = {"success": [], "failed": []}
+
+        for raw_item in order_items:
+            try:
+                if not isinstance(raw_item, dict):
+                    raise ValueError("Each order queue item must be an object.")
+
+                uid = normalize_optional_text(raw_item.get("uid"), field_name="UID", max_length=64)
+                if not uid:
+                    raise ValueError("UID is required.")
+
+                order_note = normalize_optional_text(
+                    raw_item.get("note"),
+                    field_name="Order note",
+                    max_length=500,
+                )
+
+                stock = get_accessible_stock(username, uid, db)
+                if not stock:
+                    raise ValueError("Stock not found for this user.")
+
+                updates = {"Status": "Ordered"}
+                if order_note:
+                    existing_comments = str(stock.get("Comments", "") or "").strip()
+                    formatted_note = f"Order note: {order_note}"
+                    updates["Comments"] = (
+                        f"{formatted_note}; {existing_comments}"
+                        if existing_comments
+                        else formatted_note
+                    )
+
+                success = edit_stock(
+                    stock["User"],
+                    uid,
+                    db,
+                    updates,
+                    refresh_vials=False,
+                )
+                if not success:
+                    raise ValueError("Unable to update stock status.")
+
+                write_activity(username, f"Marked stock {uid} as Ordered from order queue", db)
+                results["success"].append({"uid": uid})
+            except Exception as item_error:
+                results["failed"].append(
+                    {
+                        "uid": raw_item.get("uid") if isinstance(raw_item, dict) else "",
+                        "reason": str(item_error),
+                    }
+                )
+
+        return jsonify(
+            {
+                "message": f'Order queue update completed. {len(results["success"])} successful, {len(results["failed"])} failed.',
+                "results": results,
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    except Exception as e:
+        current_app.logger.exception("Error marking queued stocks ordered for %s: %s", username, e)
+        return jsonify({"message": "An internal error occurred while updating ordered stocks."}), 500
 
 
 @bp.route("/get_internal/<internal_stock_id>", methods=["GET"])
@@ -739,7 +1561,7 @@ def get_internal_stock_data(internal_stock_id):
     username = session.get("username")  # Current user making the request
 
     try:
-        stock = db["stocks"].find_one({"UniqueID": internal_stock_id, "User": username})
+        stock = get_accessible_stock(username, internal_stock_id, db)
 
         if not stock:
             return jsonify({"error": "Stock not found."}), 404
@@ -962,7 +1784,7 @@ def generate_stock_labels():
             return redirect(url_for("stock.stock_explorer"))
 
         user_initials = get_user_initials(username, db)
-        all_stocks = get_user_stocks(username, db)  # Fetch all user stocks
+        all_stocks = get_accessible_stocks(username, db)  # Fetch all visible stocks
 
         # Filter and duplicate based on selection and quantities
         selected_stocks_data = []
@@ -1034,9 +1856,7 @@ def get_genotype_for_uid(unique_id):
         # Find stock by UniqueID - potentially across all users if needed by JS?
         # Original code checked username, let's keep that for now.
         username = session.get("username")
-        stock = db["stocks"].find_one(
-            {"UniqueID": unique_id, "User": username}, {"Genotype": 1}
-        )  # Fetch only Genotype
+        stock = get_accessible_stock(username, unique_id, db)
 
         if stock:
             return jsonify({"genotype": stock.get("Genotype", "")})
@@ -1074,11 +1894,11 @@ def get_uids_for_genotype(genotype_str):
             )
 
         # Find stocks matching the final genotype for the user
-        matching_stocks = db["stocks"].find(
-            {"Genotype": final_genotype, "User": username},
-            {"UniqueID": 1},  # Fetch only UniqueID
-        )
-        uid_list = [doc["UniqueID"] for doc in matching_stocks if "UniqueID" in doc]
+        uid_list = [
+            stock["UniqueID"]
+            for stock in get_accessible_stocks(username, db)
+            if stock.get("Genotype") == final_genotype and "UniqueID" in stock
+        ]
 
         return jsonify({"uids": uid_list})
 
@@ -1097,7 +1917,7 @@ def get_stock_data_for_uid(unique_id):
 
     try:
         # Find stock by UniqueID
-        stock = db["stocks"].find_one({"UniqueID": unique_id, "User": username})
+        stock = get_accessible_stock(username, unique_id, db)
 
         if stock:
             stock_data = {

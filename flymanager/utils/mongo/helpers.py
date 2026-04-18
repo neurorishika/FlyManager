@@ -1,8 +1,44 @@
 import datetime
+from threading import RLock
 
 from flask import url_for
 
 from flymanager.utils.utils import day_str_to_num
+
+_METADATA_TYPES = (
+    "types",
+    "food_types",
+    "provenances",
+    "genesX",
+    "genes2nd",
+    "genes3rd",
+    "genes4th",
+    "species",
+)
+_METADATA_CACHE = {}
+_METADATA_CACHE_LOCK = RLock()
+
+
+def _metadata_cache_key(metadata_type, db):
+    return str(getattr(db, "name", "")), metadata_type
+
+
+def _invalidate_metadata_cache(metadata_type, db):
+    with _METADATA_CACHE_LOCK:
+        _METADATA_CACHE.pop(_metadata_cache_key(metadata_type, db), None)
+
+
+def clear_metadata_cache():
+    with _METADATA_CACHE_LOCK:
+        _METADATA_CACHE.clear()
+
+
+def preload_metadata_cache(db, metadata_types=None):
+    selected_types = tuple(metadata_types or _METADATA_TYPES)
+    return {
+        metadata_type: get_metadata(metadata_type, db)
+        for metadata_type in selected_types
+    }
 
 # Metadata Management
 
@@ -21,20 +57,22 @@ def get_metadata(metadata_type, db):
     metadata: list
         A list of dictionaries representing the metadata.
     """
-    assert metadata_type in [
-        "types",
-        "food_types",
-        "provenances",
-        "genesX",
-        "genes2nd",
-        "genes3rd",
-        "genes4th",
-        "species",
-    ], "Invalid metadata type"
+    assert metadata_type in _METADATA_TYPES, "Invalid metadata type"
+    cache_key = _metadata_cache_key(metadata_type, db)
+
+    with _METADATA_CACHE_LOCK:
+        cached_values = _METADATA_CACHE.get(cache_key)
+    if cached_values is not None:
+        return list(cached_values)
+
     metadata_collection = db[metadata_type]
     metadata = list(metadata_collection.find())
-    values = [m["Value"] for m in metadata]
-    return values
+    values = tuple(m["Value"] for m in metadata)
+
+    with _METADATA_CACHE_LOCK:
+        _METADATA_CACHE[cache_key] = values
+
+    return list(values)
 
 
 def add_metadata(metadata_type, metadata_value, db):
@@ -53,16 +91,7 @@ def add_metadata(metadata_type, metadata_value, db):
     bool
         True if the metadata was added, False otherwise.
     """
-    assert metadata_type in [
-        "types",
-        "food_types",
-        "provenances",
-        "genesX",
-        "genes2nd",
-        "genes3rd",
-        "genes4th",
-        "species",
-    ], "Invalid metadata type"
+    assert metadata_type in _METADATA_TYPES, "Invalid metadata type"
 
     # Define the metadata collection
     metadata_collection = db[metadata_type]
@@ -75,6 +104,7 @@ def add_metadata(metadata_type, metadata_value, db):
     metadata_document = {"Value": metadata_value}
 
     metadata_collection.insert_one(metadata_document)
+    _invalidate_metadata_cache(metadata_type, db)
 
     return True
 
@@ -95,16 +125,7 @@ def delete_metadata(metadata_type, metadata_value, db):
     bool
         True if the metadata was deleted, False otherwise.
     """
-    assert metadata_type in [
-        "types",
-        "food_types",
-        "provenances",
-        "genesX",
-        "genes2nd",
-        "genes3rd",
-        "genes4th",
-        "species",
-    ], "Invalid metadata type"
+    assert metadata_type in _METADATA_TYPES, "Invalid metadata type"
 
     # Define the metadata collection
     metadata_collection = db[metadata_type]
@@ -114,6 +135,7 @@ def delete_metadata(metadata_type, metadata_value, db):
 
     # Check if any document was deleted
     if result.deleted_count > 0:
+        _invalidate_metadata_cache(metadata_type, db)
         return True
     else:
         return False
@@ -137,16 +159,7 @@ def edit_metadata(metadata_type, old_value, new_value, db):
     bool
         True if the metadata was updated, False otherwise.
     """
-    assert metadata_type in [
-        "types",
-        "food_types",
-        "provenances",
-        "genesX",
-        "genes2nd",
-        "genes3rd",
-        "genes4th",
-        "species",
-    ], "Invalid metadata type"
+    assert metadata_type in _METADATA_TYPES, "Invalid metadata type"
 
     # Define the metadata collection
     metadata_collection = db[metadata_type]
@@ -156,7 +169,11 @@ def edit_metadata(metadata_type, old_value, new_value, db):
         {"Value": old_value}, {"$set": {"Value": new_value}}
     )
 
-    return result.matched_count > 0
+    if result.matched_count > 0:
+        _invalidate_metadata_cache(metadata_type, db)
+        return True
+
+    return False
 
 
 # Flip Schedule Utilities
@@ -174,11 +191,13 @@ def get_flip_schedule(user, db):
     dict: A dictionary where the keys are dates and the values are lists of stocks/crosses to flip on those dates.
     """
     # Import locally to avoid circular imports
+    from flymanager.utils.mongo.access import (get_maintainable_crosses,
+                                               get_maintainable_stocks)
     from flymanager.utils.mongo.user_data import get_user_flip_days
 
     # Retrieve user's stocks and crosses
-    stocks = db["stocks"].find({"User": user})
-    crosses = db["crosses"].find({"User": user})
+    stocks = get_maintainable_stocks(user, db)
+    crosses = get_maintainable_crosses(user, db)
 
     # Remove ones with Status = "No longer maintained"
     stocks = [stock for stock in stocks if stock["Status"] != "No longer maintained"]
@@ -214,6 +233,7 @@ def get_flip_schedule(user, db):
             if closest_flip_day:
                 flip_date_str = closest_flip_day.strftime("%Y-%m-%d")
                 tray_info = f"{stock['TrayID']} - {stock['TrayPosition']}"
+                owner_note = f", owner: {stock['User']}" if stock.get("User") != user else ""
                 try:
                     # Try to generate URL - this will fail outside of request context
                     link = f"<a href='{url_for('stock.view_stock', unique_id=stock['UniqueID'])}'>{stock['Name']}</a>"
@@ -221,7 +241,7 @@ def get_flip_schedule(user, db):
                     # Fallback for scheduled tasks - just show the name without link
                     link = stock["Name"]
                 schedule.setdefault(flip_date_str, []).append(
-                    f"Stock: {link} (ID: {stock['UniqueID']}, {tray_info})"
+                    f"Stock: {link} (ID: {stock['UniqueID']}, {tray_info}{owner_note})"
                 )
             else:
                 print(
@@ -236,6 +256,7 @@ def get_flip_schedule(user, db):
             if closest_flip_day:
                 flip_date_str = closest_flip_day.strftime("%Y-%m-%d")
                 tray_info = f"{cross['TrayID']} - {cross['TrayPosition']}"
+                owner_note = f", owner: {cross['User']}" if cross.get("User") != user else ""
                 try:
                     # Try to generate URL - this will fail outside of request context
                     uid_url = url_for("cross.view_cross", unique_id=cross["UniqueID"])
@@ -244,7 +265,7 @@ def get_flip_schedule(user, db):
                     # Fallback for scheduled tasks - just show the name without link
                     link = cross["Name"]
                 schedule.setdefault(flip_date_str, []).append(
-                    f"Cross: {link} (ID: {cross['UniqueID']}, {tray_info})"
+                    f"Cross: {link} (ID: {cross['UniqueID']}, {tray_info}{owner_note})"
                 )
 
     # Sort the schedule by date

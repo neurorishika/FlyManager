@@ -5,67 +5,287 @@
     <div>
         <p class="app-kicker">Administration</p>
         <h1 class="app-page-title">Application Settings</h1>
-        <p class="app-page-subtitle">Manage theme behavior, lab details, and stock data maintenance from a single control panel.</p>
+        <p class="app-page-subtitle">Manage theme behavior, lab details, and FlyBase-first reference data maintenance from a single control panel.</p>
     </div>
     <div class="app-chip-row">
         <span class="app-chip"><i class="fas fa-cog"></i> Global configuration</span>
-        <span class="app-chip"><i class="fas fa-database"></i> Data maintenance tools</span>
+        <span class="app-chip"><i class="fas fa-database"></i> FlyBase-first data maintenance</span>
     </div>
 </div>
 
 <div class="app-settings-grid">
-    <div class="app-panel">
-        <form method="POST" class="app-form-shell">
-            <div class="app-form-section">
-                <div>
-                    <h2 class="app-form-section-title">Theme Settings</h2>
-                    <p class="app-form-section-copy">Control the default dark-mode behavior and the accent color used across the interface.</p>
-                </div>
-                <div class="form-group">
-                    <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" id="dark_mode" name="dark_mode" {% if settings.theme.dark_mode %}checked{% endif %}>
-                        <label class="custom-control-label" for="dark_mode">Dark Mode</label>
+    <div>
+        <div class="app-panel">
+            <form method="POST" class="app-form-shell">
+                <div class="app-form-section">
+                    <div>
+                        <h2 class="app-form-section-title">Theme Settings</h2>
+                        <p class="app-form-section-copy">Control the default dark-mode behavior and the accent color used across the interface.</p>
+                    </div>
+                    <div class="form-group">
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input" id="dark_mode" name="dark_mode" {% if settings.theme.dark_mode %}checked{% endif %}>
+                            <label class="custom-control-label" for="dark_mode">Dark Mode</label>
+                        </div>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="accent_color">Accent Color</label>
+                        <input type="color" class="form-control" id="accent_color" name="accent_color" value="{{ settings.theme.accent_color }}">
+                        <small class="app-inline-note">This color is used for highlights, buttons, and interface accents.</small>
                     </div>
                 </div>
-                <div class="form-group mb-0">
-                    <label for="accent_color">Accent Color</label>
-                    <input type="color" class="form-control" id="accent_color" name="accent_color" value="{{ settings.theme.accent_color }}">
-                    <small class="app-inline-note">This color is used for highlights, buttons, and interface accents.</small>
-                </div>
-            </div>
 
-            <div class="app-form-section">
-                <div>
-                    <h2 class="app-form-section-title">Lab Information</h2>
-                    <p class="app-form-section-copy">Keep the displayed lab and administrator details current for all users.</p>
+                <div class="app-form-section">
+                    <div>
+                        <h2 class="app-form-section-title">Lab Information</h2>
+                        <p class="app-form-section-copy">Keep the displayed lab and administrator details current for all users.</p>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="lab_name">Lab Name</label>
+                        <input type="text" class="form-control" id="lab_name" name="lab_name" value="{{ settings.lab_info.lab_name }}" required>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="admin_name">Administrator Name</label>
+                        <input type="text" class="form-control" id="admin_name" name="admin_name" value="{{ settings.lab_info.admin_name }}" required>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="admin_email">Administrator Email</label>
+                        <input type="email" class="form-control" id="admin_email" name="admin_email" value="{{ settings.lab_info.admin_email }}" required>
+                    </div>
                 </div>
-                <div class="form-group mb-0">
-                    <label for="lab_name">Lab Name</label>
-                    <input type="text" class="form-control" id="lab_name" name="lab_name" value="{{ settings.lab_info.lab_name }}" required>
-                </div>
-                <div class="form-group mb-0">
-                    <label for="admin_name">Administrator Name</label>
-                    <input type="text" class="form-control" id="admin_name" name="admin_name" value="{{ settings.lab_info.admin_name }}" required>
-                </div>
-                <div class="form-group mb-0">
-                    <label for="admin_email">Administrator Email</label>
-                    <input type="email" class="form-control" id="admin_email" name="admin_email" value="{{ settings.lab_info.admin_email }}" required>
-                </div>
-            </div>
 
-            <div class="app-button-row justify-content-end">
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-save"></i> Save Settings
-                </button>
-            </div>
-        </form>
+                <div class="app-button-row justify-content-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="app-panel mt-3">
+            <form method="POST" action="{{ url_for('settings.update_user_hierarchy') }}" class="app-form-shell">
+                <div class="app-form-section">
+                    <div>
+                        <h2 class="app-form-section-title">Reporting Hierarchy</h2>
+                        <p class="app-form-section-copy">Define who reports to whom so owners can delegate fly maintenance down a chain of command.</p>
+                    </div>
+
+                    {% if user_profiles %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Initials</th>
+                                    <th>Reports To</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for profile in user_profiles %}
+                                <tr>
+                                    <td>{{ profile.Username }}</td>
+                                    <td>{{ profile.Initials or '—' }}</td>
+                                    <td>
+                                        {% if profile.Username == 'admin' %}
+                                        <span class="text-muted">Root administrator</span>
+                                        {% else %}
+                                        <select class="form-control" name="manager__{{ profile.Username }}">
+                                            <option value="">No manager</option>
+                                            {% for manager_username in manager_options %}
+                                                {% if manager_username != profile.Username %}
+                                                <option value="{{ manager_username }}" {% if profile.ReportsTo == manager_username %}selected{% endif %}>{{ manager_username }}</option>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">No users found.</p>
+                    {% endif %}
+                </div>
+
+                <div class="app-button-row justify-content-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-project-diagram"></i> Save Hierarchy
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <div class="app-panel">
         <div class="app-form-section">
+            <div class="app-form-section">
+                <div>
+                    <h2 class="app-form-section-title">FlyBase Reference Data</h2>
+                    <p class="app-form-section-copy">Primary external data maintenance lives here: refresh the latest FlyBase release, regenerate stock-derived metadata, and keep the legacy Bloomington fallback only as needed.</p>
+                </div>
+            </div>
+
+            {% if flybase_reference_status.status_tone == 'danger' %}
+            {% set flybase_alert_class = 'alert-danger' %}
+            {% elif flybase_reference_status.status_tone == 'success' %}
+            {% set flybase_alert_class = 'alert-success' %}
+            {% else %}
+            {% set flybase_alert_class = 'alert-warning' %}
+            {% endif %}
+
+            <div class="alert {{ flybase_alert_class }}" role="alert">
+                <strong>FlyBase sync health:</strong> {{ flybase_reference_status.status_label }}<br>
+                {{ flybase_reference_status.status_message }}
+                {% if flybase_reference_status.status_detail %}<br><span class="small">{{ flybase_reference_status.status_detail }}</span>{% endif %}
+                {% if flybase_reference_status.last_error %}<br><span class="small">Last error: {{ flybase_reference_status.last_error }}</span>{% endif %}
+            </div>
+
+            <div class="app-inline-note">
+                {% if flybase_reference_status.has_sync %}
+                <strong>Last synced release:</strong> {{ flybase_reference_status.release or 'Unknown' }}<br>
+                <strong>Last completed sync:</strong> {{ flybase_reference_status.synced_at or 'Unknown' }}<br>
+                <strong>Last attempted refresh:</strong> {{ flybase_reference_status.last_attempt_at or 'Unknown' }}<br>
+                {% if flybase_reference_status.days_since_sync is not none %}<strong>Sync age:</strong> {{ flybase_reference_status.days_since_sync }} day{% if flybase_reference_status.days_since_sync != 1 %}s{% endif %}<br>{% endif %}
+                <strong>Latest sync result:</strong> {{ flybase_reference_status.downloaded_count }} downloaded, {{ flybase_reference_status.skipped_count }} reused, {{ flybase_reference_status.total_files }} files tracked{% if flybase_reference_status.supported_rows is not none %}, {{ flybase_reference_status.supported_rows }} compatible stock rows harvested{% endif %}<br>
+                <strong>Normalized ingestion:</strong> {{ flybase_reference_status.flybase_ingested_collection_count or 0 }} collections, {{ flybase_reference_status.flybase_ingested_documents or 0 }} documents refreshed<br>
+                <strong>Phenotype cache source:</strong> {{ flybase_reference_status.phenotype_cache_source_label or 'Unknown' }}<br>
+                <strong>Balancer reference:</strong> {{ flybase_reference_status.balancer_count or 0 }} balancers{% if flybase_reference_status.balancer_markdown_exists %}, report present{% endif %}<br>
+                <strong>Examination report:</strong> {% if flybase_reference_status.examination_exists %}present{% else %}not generated yet{% endif %}
+                {% else %}
+                <strong>Status:</strong> No FlyBase release sync manifest has been recorded yet.<br>
+                {% if flybase_reference_status.last_attempt_at %}<strong>Last attempted refresh:</strong> {{ flybase_reference_status.last_attempt_at }}<br>{% endif %}
+                <strong>Next step:</strong> Run the primary FlyBase release sync once to establish the local manifest and examination report.
+                {% endif %}
+                <br>
+                <strong>Automatic FlyBase refresh:</strong> 1st of each month at 1:30 AM
+            </div>
+
+            {% set curation = flybase_reference_status.unresolved_token_report or {} %}
+            {% if curation %}
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1">Unresolved Token Curation</h6>
+                    <p class="text-muted mb-0">Current Bloomington-package audit split into ambiguous FlyBase aliases versus tokens that still look unknown.</p>
+                </div>
+                {% if curation.error %}
+                <small class="text-danger">Unable to generate unresolved-token curation report: {{ curation.error }}</small>
+                {% else %}
+                <div class="app-inline-note mb-0">
+                    <strong>Ambiguous unresolved:</strong> {{ curation.ambiguous_unresolved_total or 0 }} occurrences across {{ curation.ambiguous_unresolved_unique or 0 }} unique tokens<br>
+                    <strong>Unknown unresolved:</strong> {{ curation.unknown_unresolved_total or 0 }} occurrences across {{ curation.unknown_unresolved_unique or 0 }} unique tokens<br>
+                    <strong>Report file:</strong> {% if flybase_reference_status.curation_report_exists %}present{% else %}not generated yet{% endif %}
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <h6 class="mb-2">Top Ambiguous Tokens</h6>
+                        {% if curation.top_ambiguous_unresolved_tokens %}
+                        <ul class="mb-0 pl-3">
+                            {% for token, count in curation.top_ambiguous_unresolved_tokens[:8] %}
+                            <li><code>{{ token }}</code> <span class="text-muted">({{ count }})</span></li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="text-muted mb-0">None in the latest audit.</p>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 mt-3 mt-md-0">
+                        <h6 class="mb-2">Top Unknown Tokens</h6>
+                        {% if curation.top_unknown_unresolved_tokens %}
+                        <ul class="mb-0 pl-3">
+                            {% for token, count in curation.top_unknown_unresolved_tokens[:8] %}
+                            <li><code>{{ token }}</code> <span class="text-muted">({{ count }})</span></li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="text-muted mb-0">None in the latest audit.</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% set ingestion_collections = flybase_reference_status.flybase_ingestion_collections or {} %}
+            {% if ingestion_collections or flybase_reference_status.balancer_count or flybase_reference_status.phenotype_cache_summary %}
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1">Reference Ingestion Summary</h6>
+                    <p class="text-muted mb-0">Manifest-backed summary of the normalized Mongo refresh, balancer reference refresh, and the runtime phenotype cache artifact.</p>
+                </div>
+                <div class="app-inline-note mb-0">
+                    <strong>Phenotype cache source:</strong> {{ flybase_reference_status.phenotype_cache_source_label or 'Unknown' }}
+                    {% if flybase_reference_status.phenotype_cache_summary %}
+                    <br><strong>Cache contents:</strong> {{ flybase_reference_status.phenotype_cache_summary.cached_alleles or 0 }} allele markers, {{ flybase_reference_status.phenotype_cache_summary.cached_constructs or 0 }} construct annotations, {{ flybase_reference_status.phenotype_cache_summary.cached_split_genotypes or 0 }} split-system genotypes
+                    {% endif %}
+                    {% if flybase_reference_status.balancer_count or flybase_reference_status.balancer_markdown_exists or flybase_reference_status.balancer_json_exists %}
+                    <br><strong>Balancer refresh:</strong> {{ flybase_reference_status.balancer_count or 0 }} balancers parsed{% if flybase_reference_status.balancer_markdown_exists %}, markdown report present{% endif %}{% if flybase_reference_status.balancer_json_exists %}, JSON payload present{% endif %}
+                    {% endif %}
+                </div>
+                {% if ingestion_collections %}
+                <div class="row mt-2">
+                    <div class="col-md-12">
+                        <h6 class="mb-2">Mongo Collection Refresh Counts</h6>
+                        <ul class="mb-0 pl-3">
+                            {% for collection_name, inserted_count in ingestion_collections.items()|sort %}
+                            <li><code>{{ collection_name }}</code> <span class="text-muted">({{ inserted_count }})</span></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1">Primary FlyBase Release Sync</h6>
+                    <p class="text-muted mb-0">Redownload the latest FlyBase release-aware dataset bundle, write the local manifest, refresh the examination report, and regenerate FlyBase stock gene metadata.</p>
+                </div>
+                <form method="POST" action="{{ url_for('settings.refresh_flybase_reference_data') }}" data-confirm-message="This will discover the latest FlyBase release, redownload the configured FlyBase datasets, regenerate the local report files, and refresh FlyBase stock gene metadata. Continue?" data-progress-form data-progress-message="Refreshing the FlyBase reference bundle and rebuilding dependent data..." data-progress-duplicate-message="A FlyBase reference refresh is already running." data-progress-label="Refreshing...">
+                    <button type="submit" class="btn btn-primary" data-progress-label="Refreshing...">
+                        <i class="fas fa-cloud-download-alt"></i> Refresh FlyBase Release Data
+                    </button>
+                </form>
+                <small class="text-muted">This is the primary catalog refresh path for stocks, allele tables, phenotype tables, construct descriptions, and related FlyBase datasets.</small>
+            </div>
+
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1">FlyBase Gene Metadata Only</h6>
+                    <p class="text-muted mb-0">Refresh autocomplete gene metadata from the current local FlyBase stocks dump without redownloading the release bundle.</p>
+                </div>
+                <form method="POST" action="{{ url_for('settings.update_flybase_gene_metadata') }}" data-confirm-message="This will scan the current FlyBase stocks dump and refresh compatible chromosome fields in autocomplete metadata. Continue?" data-progress-form data-progress-message="Refreshing FlyBase gene metadata from the local bundle..." data-progress-duplicate-message="A FlyBase gene metadata refresh is already running." data-progress-label="Refreshing...">
+                    <button type="submit" class="btn btn-primary" data-progress-label="Refreshing...">
+                        <i class="fas fa-dna"></i> Refresh FlyBase Genes Only
+                    </button>
+                </form>
+                <small class="text-muted">Use this when the FlyBase data files are already current and you only need to rebuild gene collections.</small>
+            </div>
+
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1">Phenotype Cache Backfill</h6>
+                    <p class="text-muted mb-0">Scan every user-owned stock and cross and backfill any missing or stale phenotype caches in one pass.</p>
+                </div>
+                <form method="POST" action="{{ url_for('settings.backfill_all_phenotype_cache') }}" data-confirm-message="This will scan all user-owned stocks and crosses and backfill missing or stale phenotype caches across the entire database. Continue?" data-progress-form data-progress-message="Backfilling phenotype caches for all users..." data-progress-duplicate-message="A global phenotype cache backfill is already running." data-progress-label="Backfilling...">
+                    <button type="submit" class="btn btn-primary" data-progress-label="Backfilling...">
+                        <i class="fas fa-sync-alt"></i> Backfill All Phenotype Caches
+                    </button>
+                </form>
+                <small class="text-muted">This is intended for bulk repair after phenotype cache changes or for importing older records that predate cached previews.</small>
+            </div>
+
+            <div class="app-inline-note">
+                <strong>Primary stock catalog:</strong> FlyBase<br>
+                <strong>Release handling:</strong> The sync action discovers the current FlyBase release before downloading files<br>
+                <strong>Generated outputs:</strong> Dataset manifest, examination report, unresolved-token curation report, balancer reference files, and chromosome gene collections
+            </div>
+
             <div>
-                <h2 class="app-form-section-title">External Reference Data</h2>
-                <p class="app-form-section-copy">Run manual maintenance jobs for FlyBase-first stock metadata and the remaining legacy Bloomington compatibility data.</p>
+                <h2 class="app-form-section-title">Legacy Compatibility Data</h2>
+                <p class="app-form-section-copy">Keep these only while BDSC still has edge cases that rely on the old Bloomington-specific normalization path.</p>
             </div>
 
             <div class="app-action-card">
@@ -73,8 +293,8 @@
                     <h6 class="mb-1">Legacy Bloomington CSV</h6>
                     <p class="text-muted mb-0">Refresh the legacy Bloomington compatibility dataset used as a fallback during the BDSC migration.</p>
                 </div>
-                <form method="POST" action="{{ url_for('settings.update_bloomington_stock') }}" onsubmit="return confirm('This will back up the legacy Bloomington CSV, download the latest version, and update legacy gene metadata. Continue?')">
-                    <button type="submit" class="btn btn-primary">
+                <form method="POST" action="{{ url_for('settings.update_bloomington_stock') }}" data-confirm-message="This will back up the legacy Bloomington CSV, download the latest version, and update legacy gene metadata. Continue?" data-progress-form data-progress-message="Refreshing the legacy Bloomington compatibility dataset..." data-progress-duplicate-message="The legacy Bloomington CSV refresh is already running." data-progress-label="Refreshing...">
+                    <button type="submit" class="btn btn-secondary" data-progress-label="Refreshing...">
                         <i class="fas fa-download"></i> Refresh Legacy Bloomington CSV
                     </button>
                 </form>
@@ -86,31 +306,18 @@
                     <h6 class="mb-1">Legacy Bloomington Gene Metadata</h6>
                     <p class="text-muted mb-0">Update autocomplete gene metadata from the existing legacy Bloomington CSV.</p>
                 </div>
-                <form method="POST" action="{{ url_for('settings.update_gene_metadata') }}" onsubmit="return confirm('This will update gene metadata from the current legacy Bloomington CSV. Continue?')">
-                    <button type="submit" class="btn btn-secondary">
+                <form method="POST" action="{{ url_for('settings.update_gene_metadata') }}" data-confirm-message="This will update gene metadata from the current legacy Bloomington CSV. Continue?" data-progress-form data-progress-message="Refreshing legacy Bloomington gene metadata..." data-progress-duplicate-message="The legacy Bloomington gene metadata refresh is already running." data-progress-label="Refreshing...">
+                    <button type="submit" class="btn btn-secondary" data-progress-label="Refreshing...">
                         <i class="fas fa-dna"></i> Refresh Legacy Bloomington Genes
                     </button>
                 </form>
                 <small class="text-muted">Uses the current legacy bloomington.csv file to update gene collections.</small>
             </div>
 
-            <div class="app-action-card">
-                <div>
-                    <h6 class="mb-1">Primary FlyBase Gene Metadata</h6>
-                    <p class="text-muted mb-0">Update gene autocomplete metadata from compatible FlyBase stock records.</p>
-                </div>
-                <form method="POST" action="{{ url_for('settings.update_flybase_gene_metadata') }}" onsubmit="return confirm('This will scan the FlyBase stocks dump and add compatible chromosome fields to autocomplete metadata. Continue?')">
-                    <button type="submit" class="btn btn-secondary">
-                        <i class="fas fa-dna"></i> Seed Genes from FlyBase
-                    </button>
-                </form>
-                <small class="text-muted">Uses compatible Dmel stock genotypes from the primary FlyBase catalog to expand the chromosome gene lists.</small>
-            </div>
-
             <div class="app-inline-note">
+                <strong>Automatic FlyBase refresh:</strong> 1st of each month at 1:30 AM<br>
                 <strong>Automatic legacy refresh:</strong> 1st of each month at 2:00 AM<br>
                 <strong>Backups:</strong> Stored in data/backup/ and cleaned up after 12 months<br>
-                <strong>Primary stock catalog:</strong> FlyBase<br>
                 <strong>Gene collections:</strong> X chromosome, 2nd, 3rd, and 4th chromosome genes
             </div>
         </div>

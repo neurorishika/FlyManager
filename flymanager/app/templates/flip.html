@@ -392,8 +392,12 @@
                         <select class="form-control" id="scanSource">
                             <option value="server">Server Scanner</option>
                             <option value="client-input">Browser Input / Keyboard Scanner</option>
+                            {% if enable_camera_scanner %}
                             <option value="camera">Camera Scanner</option>
+                            {% endif %}
+                            {% if enable_client_serial_scanner %}
                             <option value="client-serial">Client Serial Scanner (Chrome or Edge)</option>
+                            {% endif %}
                         </select>
                         <p id="scanSourceHint" class="flip-scan-hint">Server mode works regardless of the user's browser because the reader stays attached to the server machine.</p>
                     </div>

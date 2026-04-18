@@ -16,6 +16,7 @@ from flymanager.utils.mongo_records import (apply_updates_to_owned_document,
                                             get_owned_document,
                                             prune_vial_schedule,
                                             require_fields)
+from flymanager.utils.phenotypes.predictor import build_stock_phenotype_cache
 
 
 def add_to_stock(user, properties, db):
@@ -70,6 +71,7 @@ def add_to_stock(user, properties, db):
         optional_properties=OPTIONAL_STOCK_PROPERTIES,
         base_document={
             "Genotype": genotype,
+            "PhenotypeCache": build_stock_phenotype_cache(genotype),
             "Name": properties["Name"],
             "TrayID": "",
             "TrayPosition": "",
@@ -187,12 +189,18 @@ def edit_stock(user, uid, db, updates, log_activity=True, refresh_vials=True):
         True if the stock was updated, False if not found.
     """
 
+    prepared_updates = dict(updates)
+    if "Genotype" in prepared_updates:
+        prepared_updates["PhenotypeCache"] = build_stock_phenotype_cache(
+            prepared_updates["Genotype"]
+        )
+
     success, current_stock = apply_updates_to_owned_document(
         "stocks",
         user,
         uid,
         db,
-        updates,
+        prepared_updates,
         log_activity=log_activity,
     )
 

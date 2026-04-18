@@ -1,5 +1,56 @@
 {% extends 'base.html' %}
 
+{% block head %}
+<style nonce="{{ csp_nonce }}">
+    .offspring-phenotype-cell {
+        min-width: 260px;
+    }
+
+    .offspring-phenotype-images {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    .offspring-phenotype-image-card {
+        width: 84px;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+        background: color-mix(in srgb, var(--card-bg) 94%, white 6%);
+        box-shadow: none;
+    }
+
+    .offspring-phenotype-image-card img {
+        display: block;
+        width: 100%;
+        height: 56px;
+        object-fit: cover;
+    }
+
+    .offspring-phenotype-image-card-body {
+        padding: 0.35rem 0.45rem 0.4rem;
+        line-height: 1.2;
+    }
+
+    .offspring-phenotype-image-title {
+        display: block;
+        font-size: 0.72rem;
+        font-weight: 700;
+        line-height: 1.15;
+    }
+
+    .offspring-phenotype-image-source {
+        display: block;
+        margin-top: 0.1rem;
+        color: var(--muted-text);
+        font-size: 0.68rem;
+        line-height: 1.15;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="app-panel app-page-header">
     <div>
@@ -20,11 +71,167 @@
     </div>
     {% endif %}
 
-    <form method="POST" action="{{ url_for('cross.view_cross', unique_id=cross_data.uniqueID) }}" class="app-form-shell">
+    <div class="app-inline-note mb-3">
+        Best-guess parent and offspring phenotypes are derived from the current marker model. These are sorting-oriented predictions, not exhaustive organismal phenotype calls.
+    </div>
+
+    <div class="app-button-row mb-3 align-items-center">
+        <span class="app-inline-note mb-0">{% if phenotype_cache_meta.is_cached %}Phenotype cache refreshed {{ phenotype_cache_meta.cached_at }}{% else %}Phenotype cache missing or stale{% endif %}</span>
+        <form method="POST" action="{{ url_for('cross.refresh_cross_phenotype', unique_id=cross_data.uniqueID) }}" class="mb-0" data-progress-form data-progress-message="Refreshing this cross phenotype cache..." data-progress-duplicate-message="This cross phenotype refresh is already in progress." data-progress-label="Refreshing...">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Refresh Cache</button>
+        </form>
+    </div>
+
+    {% if phenotype_cache_meta.simulation_summary %}
+    <div class="form-row mb-3">
+        <div class="col-md-6 mb-3">
+            <div class="app-panel h-100">
+                <p class="app-kicker">Enhanced Simulator</p>
+                <h2 class="app-form-section-title">Sortable Outcome Summary</h2>
+                <div class="small text-muted mb-2">Raw classes {{ phenotype_cache_meta.simulation_summary.raw_class_count }} · Viable {{ phenotype_cache_meta.simulation_summary.viable_class_count }} · Pruned {{ phenotype_cache_meta.simulation_summary.pruned_class_count }}</div>
+                <div class="small text-muted mb-1">Viable fraction: {{ (phenotype_cache_meta.simulation_summary.viable_fraction * 100)|round(1) }}%</div>
+                <div class="small text-muted mb-1">High-confidence sortable fraction: {{ (phenotype_cache_meta.simulation_summary.confident_sortable_fraction * 100)|round(1) }}%</div>
+                <div class="small text-muted mb-1">Low-confidence sorting fraction: {{ (phenotype_cache_meta.simulation_summary.low_confidence_sorting_fraction * 100)|round(1) }}%</div>
+                <div class="small text-muted mb-1">Estimated sortable targets per vial: {{ phenotype_cache_meta.simulation_summary.estimated_sortable_targets_per_vial }}</div>
+                {% if phenotype_cache_meta.simulation_summary.best_sortable_class %}
+                <div class="app-inline-note mt-2 mb-0">
+                    <strong>Best sortable class:</strong> {{ phenotype_cache_meta.simulation_summary.best_sortable_class.phenotype_summary }}
+                    ({{ phenotype_cache_meta.simulation_summary.best_sortable_class.sex }}, {{ phenotype_cache_meta.simulation_summary.best_sortable_class.viable_probability_percent|round(1) }}% of viable offspring)
+                    {% if phenotype_cache_meta.simulation_summary.best_sortable_class.identifiability.selection_instructions %}
+                    <div class="small text-muted mt-1">{{ phenotype_cache_meta.simulation_summary.best_sortable_class.identifiability.selection_instructions }}</div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="app-panel h-100">
+                <p class="app-kicker">Cross Direction</p>
+                <h2 class="app-form-section-title">Reciprocal Evaluation</h2>
+                {% if phenotype_cache_meta.direction_evaluation %}
+                <div class="small text-muted mb-2">
+                    Recommended direction:
+                    {% if phenotype_cache_meta.direction_evaluation.recommended_direction == 'forward' %}
+                    current male × female order
+                    {% elif phenotype_cache_meta.direction_evaluation.recommended_direction == 'reverse' %}
+                    swap the parent order
+                    {% else %}
+                    either order
+                    {% endif %}
+                </div>
+                <div class="small text-muted mb-1">Forward score: {{ phenotype_cache_meta.direction_evaluation.forward.score }}</div>
+                <div class="small text-muted mb-2">Reverse score: {{ phenotype_cache_meta.direction_evaluation.reverse.score }}</div>
+                {% for line in phenotype_cache_meta.direction_evaluation.rationale %}
+                <div class="small text-muted mb-1">{{ line }}</div>
+                {% endfor %}
+                {% for line in phenotype_cache_meta.direction_evaluation.operational_notes %}
+                <div class="small text-muted mb-1">{{ line }}</div>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="app-inline-note mb-3">
+        <strong>Owner:</strong> {{ cross_data.ownerUser }}
+        <span class="mx-2">•</span>
+        <strong>Maintainer:</strong> {{ cross_data.maintainerUser }}
+        <span class="mx-2">•</span>
+        <strong>Your view:</strong> {{ cross_data.assignmentScopeLabel }} ({{ cross_data.assignmentScopeDetail }})
+    </div>
+
+    {% if can_edit_record %}
+    <form method="POST" action="{{ url_for('cross.assign_cross', unique_id=cross_data.uniqueID) }}" class="app-form-shell mb-3">
+        <div class="app-form-section">
+            <div>
+                <h2 class="app-form-section-title">Maintenance Assignment</h2>
+                <p class="app-form-section-copy">Assign this cross to one of your direct reports or return it to owner maintenance.</p>
+            </div>
+            <div class="app-button-row align-items-end">
+                <div class="form-group mb-0 flex-grow-1">
+                    <label for="assignee">Assign Maintenance To</label>
+                    <select class="form-control" id="assignee" name="assignee">
+                        <option value="">Maintain myself</option>
+                        {% for report_username in direct_reports %}
+                        <option value="{{ report_username }}" {% if cross_data.assignedTo == report_username %}selected{% endif %}>{{ report_username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Update Assignment</button>
+            </div>
+        </div>
+    </form>
+    {% endif %}
+
+    <form id="crossViewForm" method="POST" action="{{ url_for('cross.view_cross', unique_id=cross_data.uniqueID) }}" class="app-form-shell">
         <div class="app-form-section">
             <div>
                 <h2 class="app-form-section-title">Species & Parents</h2>
                 <p class="app-form-section-copy">Inspect the male and female inputs and confirm the species pairing.</p>
+            </div>
+            <div class="form-row mb-3">
+                <div class="form-group col-md-6">
+                    <label>Male phenotype preview</label>
+                    <div class="app-view-value multiline">{{ parent_phenotypes.male.summary }}</div>
+                    <div class="small text-muted">{{ parent_phenotypes.male.confidence_label|title }} confidence{% if parent_phenotypes.male.warnings %} · {{ parent_phenotypes.male.warnings|join(' · ') }}{% endif %}</div>
+                    <div class="small text-muted mt-1">Viability: {{ parent_phenotypes.male.viability_status|replace('_', ' ')|title }} · Fertility: {{ parent_phenotypes.male.fertility_status|replace('_', ' ')|title }}</div>
+                    {% if parent_phenotypes.male.construct_annotation_labels %}
+                    <div class="small text-muted mt-2">Construct annotations: {{ parent_phenotypes.male.construct_annotation_labels|join(' · ') }}</div>
+                    {% endif %}
+                    {% if parent_phenotypes.male.split_system_labels %}
+                    <div class="small text-muted mt-1">Split systems: {{ parent_phenotypes.male.split_system_labels|join(' · ') }}</div>
+                    {% endif %}
+                    {% if parent_phenotypes.male.reference_images %}
+                    <div class="form-row mt-2">
+                        {% for image in parent_phenotypes.male.reference_images %}
+                        <div class="col-md-4 mb-2">
+                            <div class="card h-100">
+                                <img class="card-img-top" src="{{ url_for('stock.phenotype_reference_image', relative_path=image.relative_path) }}" alt="Reference image for {{ image.display_label }}" style="height: 120px; object-fit: cover;">
+                                <div class="card-body p-2">
+                                    <div><strong>{{ image.display_label }}</strong></div>
+                                    <div class="small text-muted">{{ image.source_name or image.source_collection|replace('_', ' ') }}</div>
+                                    {% if image.provenance %}
+                                    <div class="small text-muted">{{ image.provenance }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="form-group col-md-6">
+                    <label>Female phenotype preview</label>
+                    <div class="app-view-value multiline">{{ parent_phenotypes.female.summary }}</div>
+                    <div class="small text-muted">{{ parent_phenotypes.female.confidence_label|title }} confidence{% if parent_phenotypes.female.warnings %} · {{ parent_phenotypes.female.warnings|join(' · ') }}{% endif %}</div>
+                    <div class="small text-muted mt-1">Viability: {{ parent_phenotypes.female.viability_status|replace('_', ' ')|title }} · Fertility: {{ parent_phenotypes.female.fertility_status|replace('_', ' ')|title }}</div>
+                    {% if parent_phenotypes.female.construct_annotation_labels %}
+                    <div class="small text-muted mt-2">Construct annotations: {{ parent_phenotypes.female.construct_annotation_labels|join(' · ') }}</div>
+                    {% endif %}
+                    {% if parent_phenotypes.female.split_system_labels %}
+                    <div class="small text-muted mt-1">Split systems: {{ parent_phenotypes.female.split_system_labels|join(' · ') }}</div>
+                    {% endif %}
+                    {% if parent_phenotypes.female.reference_images %}
+                    <div class="form-row mt-2">
+                        {% for image in parent_phenotypes.female.reference_images %}
+                        <div class="col-md-4 mb-2">
+                            <div class="card h-100">
+                                <img class="card-img-top" src="{{ url_for('stock.phenotype_reference_image', relative_path=image.relative_path) }}" alt="Reference image for {{ image.display_label }}" style="height: 120px; object-fit: cover;">
+                                <div class="card-body p-2">
+                                    <div><strong>{{ image.display_label }}</strong></div>
+                                    <div class="small text-muted">{{ image.source_name or image.source_collection|replace('_', ' ') }}</div>
+                                    {% if image.provenance %}
+                                    <div class="small text-muted">{{ image.provenance }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
             </div>
             <div class="form-row mb-3">
                 <div class="col-12">
@@ -59,7 +266,7 @@
                 <div class="form-group col-md-9">
                     <label for="maleGenotype">Male Genotype:</label>
                     <div class="input-group">
-                        <input type="text" id="maleGenotype" name="maleGenotype" class="form-control tag-input" disabled>
+                        <input type="text" id="maleGenotype" name="maleGenotype" class="form-control tag-input">
                         <div class="input-group-append">
                             <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
                         </div>
@@ -82,7 +289,7 @@
                 <div class="form-group col-md-9">
                     <label for="femaleGenotype">Female Genotype:</label>
                     <div class="input-group">
-                        <input type="text" id="femaleGenotype" name="femaleGenotype" class="form-control tag-input" disabled>
+                        <input type="text" id="femaleGenotype" name="femaleGenotype" class="form-control tag-input">
                         <div class="input-group-append">
                             <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
                         </div>
@@ -120,7 +327,7 @@
                 <div class="form-group col-md-6">
                     <label for="foodType">Food Type:</label>
                     <div class="input-group">
-                        <input type="text" id="foodType" name="foodType" class="form-control tag-input" disabled>
+                        <input type="text" id="foodType" name="foodType" class="form-control tag-input">
                         <div class="input-group-append">
                             <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
                         </div>
@@ -236,20 +443,78 @@
 
             <div class="mt-4">
                 <h4>Predicted Offspring Genotypes</h4>
+                {% if not predicted_offspring %}
+                <div class="app-inline-note mb-3">Refresh the phenotype cache to populate offspring phenotype predictions for this cross.</div>
+                {% endif %}
                 <table class="table table-bordered">
                     <thead>
                         <tr>
                             <th>Genotype</th>
                             <th>Sex</th>
+                            <th>Phenotype</th>
+                            <th>Confidence</th>
                             <th>Frequency (%)</th>
+                            <th>Viable Pool (%)</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for offspring in predicted_offspring %}
-                        <tr>
-                            <td>{{ offspring[0] }}</td>
-                            <td>{{ offspring[1] }}</td>
-                            <td>{{ (offspring[2] * 100) | round(2) }}%</td>
+                        <tr{% if offspring.pruned %} class="table-warning"{% endif %}>
+                            <td>{{ offspring.genotype }}</td>
+                            <td>{{ offspring.sex }}</td>
+                            <td class="offspring-phenotype-cell">
+                                <div>{{ offspring.phenotype_summary }}</div>
+                                {% if offspring.pruned %}
+                                <div class="small text-danger mt-1"><strong>Pruned from viable pool.</strong></div>
+                                {% endif %}
+                                {% if offspring.phenotype.warnings %}
+                                <div class="small text-muted">{{ offspring.phenotype.warnings|join(' · ') }}</div>
+                                {% endif %}
+                                {% if offspring.prune_reasons %}
+                                <div class="small text-muted mt-1">Prune reasons: {{ offspring.prune_reasons|join(' · ') }}</div>
+                                {% endif %}
+                                {% if offspring.phenotype.construct_annotation_labels %}
+                                <div class="small text-muted mt-1">Construct annotations: {{ offspring.phenotype.construct_annotation_labels|join(' · ') }}</div>
+                                {% endif %}
+                                {% if offspring.phenotype.split_system_labels %}
+                                <div class="small text-muted mt-1">Split systems: {{ offspring.phenotype.split_system_labels|join(' · ') }}</div>
+                                {% endif %}
+                                <div class="small text-muted mt-1">Viability: {{ offspring.phenotype.viability_status|replace('_', ' ')|title }} · Fertility: {{ offspring.phenotype.fertility_status|replace('_', ' ')|title }}</div>
+                                {% if offspring.identifiability %}
+                                <div class="small text-muted mt-1">Sortability: {{ offspring.identifiability.label }}{% if offspring.identifiability.distinguishing_features %} · Distinguish by {{ offspring.identifiability.distinguishing_features|join(', ') }}{% endif %}</div>
+                                {% endif %}
+                                {% if offspring.identifiability and offspring.identifiability.selection_instructions %}
+                                <div class="small text-muted mt-1">Sort instruction: {{ offspring.identifiability.selection_instructions }}</div>
+                                {% endif %}
+                                {% if offspring.identifiability and offspring.identifiability.exclusion_features %}
+                                <div class="small text-muted mt-1">Exclude siblings with {{ offspring.identifiability.exclusion_features|join(', ') }}</div>
+                                {% endif %}
+                                {% if offspring.identifiability and offspring.identifiability.low_confidence_features %}
+                                <div class="small text-muted mt-1">Low-confidence sort cues: {{ offspring.identifiability.low_confidence_features|join(', ') }}</div>
+                                {% endif %}
+                                {% if offspring.identifiability and offspring.identifiability.warnings %}
+                                <div class="small text-muted mt-1">{{ offspring.identifiability.warnings|join(' · ') }}</div>
+                                {% endif %}
+                                {% if offspring.yield_estimate.expected_targets_per_vial %}
+                                <div class="small text-muted mt-1">Estimated targets per vial: {{ offspring.yield_estimate.expected_targets_per_vial }} · {{ offspring.yield_estimate.yield_label|title }} yield · {{ offspring.yield_estimate.recommended_parallel_vials }} parallel vials</div>
+                                {% endif %}
+                                {% if offspring.phenotype.reference_images %}
+                                <div class="offspring-phenotype-images">
+                                    {% for image in offspring.phenotype.reference_images %}
+                                    <div class="offspring-phenotype-image-card">
+                                        <img src="{{ url_for('stock.phenotype_reference_image', relative_path=image.relative_path) }}" alt="Reference image for {{ image.display_label }}">
+                                        <div class="offspring-phenotype-image-card-body">
+                                            <span class="offspring-phenotype-image-title">{{ image.display_label }}</span>
+                                            <span class="offspring-phenotype-image-source">{{ image.source_name or image.source_collection|replace('_', ' ') }}</span>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>{{ offspring.phenotype_confidence|title }}</td>
+                            <td>{{ offspring.probability_percent }}%</td>
+                            <td>{{ offspring.viable_probability_percent }}%</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -258,7 +523,9 @@
 
             <div class="app-button-row justify-content-end">
                 <a href="{{ url_for('cross.cross_explorer') }}" class="btn btn-secondary">Back to Crosses</a>
+                {% if can_edit_record %}
                 <button type="submit" class="btn btn-success">Save Changes</button>
+                {% endif %}
             </div>
         </div>
     </form>
@@ -266,37 +533,61 @@
 {% endblock %}
 
 {% block scripts %}
-<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3"></script>
-<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.polyfills.min.js"></script>
-<link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.31.3/dist/tagify.css" rel="stylesheet" type="text/css" />
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.min.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.polyfills.min.js') }}"></script>
+<link href="{{ url_for('static', filename='vendor/tagify/tagify.css') }}" rel="stylesheet" type="text/css" />
 <script nonce="{{ csp_nonce }}">
     document.addEventListener("DOMContentLoaded", function() {
 
     const crossData = {{ cross_data | tojson }};
+    const canEditRecord = {{ 'true' if can_edit_record else 'false' }};
+
+    function getTagifyValues(instance, fallback) {
+        return instance ? instance.value.map(item => item.value) : fallback;
+    }
+
+    function createTagifyInstance(selector, existingInstance, config, values, readonly) {
+        const input = document.querySelector(selector);
+        input.disabled = false;
+        input.removeAttribute('disabled');
+
+        if (existingInstance) {
+            existingInstance.destroy();
+        }
+        input.value = '';
+
+        const instance = new Tagify(input, {
+            ...config,
+            readonly: readonly,
+        });
+
+        if (values && values.length) {
+            instance.addTags(values);
+        }
+
+        return instance;
+    }
     
     // Initialize Tagify for Male and Female Genotypes
-    let tagifyMaleGenotype = new Tagify(document.querySelector('#maleGenotype'), {
+    let tagifyMaleGenotype = createTagifyInstance('#maleGenotype', null, {
         whitelist: {{ genotypes | tojson }},
         maxTags: 1,
-        readonly: true,
         delimiters: null
-    });
+    }, [], true);
 
-    let tagifyFemaleGenotype = new Tagify(document.querySelector('#femaleGenotype'), {
+    let tagifyFemaleGenotype = createTagifyInstance('#femaleGenotype', null, {
         whitelist: {{ genotypes | tojson }},
         maxTags: 1,
-        readonly: true,
         delimiters: null
-    });
+    }, [], true);
 
-    let tagifyFoodType = new Tagify(document.querySelector('#foodType'), {
+    let tagifyFoodType = createTagifyInstance('#foodType', null, {
         whitelist: {{ food_types | tojson }},
-        maxTags: 1,
-        readonly: true
-    });
+        maxTags: 1
+    }, [], true);
 
-    // Disable all input fields by default
-    document.querySelectorAll('input, textarea, select').forEach(input => {
+    // Disable all edit-form input fields by default
+    document.querySelectorAll('#crossViewForm input:not(.tag-input), #crossViewForm textarea, #crossViewForm select').forEach(input => {
         input.disabled = true;
     });
 
@@ -373,41 +664,39 @@
 
     // Make fields editable when "Edit" button is clicked
     const editButtons = document.querySelectorAll('.input-group-append button');
+    if (!canEditRecord) {
+        editButtons.forEach(button => {
+            button.disabled = true;
+        });
+    }
+
     editButtons.forEach(button => {
         button.addEventListener('click', function() {
+            if (!canEditRecord) {
+                return;
+            }
+
             const inputField = this.closest('.input-group').querySelector('input, textarea, select');
 
             if (inputField && inputField.classList.contains('tag-input')) {
         
                 if (inputField.id === 'maleGenotype') {
-                    inputField.disabled = false;
-                    // Re-create Tagify with edit enabled
-                    tagifyMaleGenotype.destroy();
-                    tagifyMaleGenotype = new Tagify(inputField, {
+                    tagifyMaleGenotype = createTagifyInstance('#maleGenotype', tagifyMaleGenotype, {
                         whitelist: {{ genotypes | tojson }},
                         maxTags: 1,
-                        readonly: false,
                         delimiters: null
-                    });
+                    }, getTagifyValues(tagifyMaleGenotype, [crossData.maleGenotype]), false);
                 } else if (inputField.id === 'femaleGenotype') {
-                    inputField.disabled = false;
-                    // Re-create Tagify with edit enabled
-                    tagifyFemaleGenotype.destroy();
-                    tagifyFemaleGenotype = new Tagify(inputField, {
+                    tagifyFemaleGenotype = createTagifyInstance('#femaleGenotype', tagifyFemaleGenotype, {
                         whitelist: {{ genotypes | tojson }},
                         maxTags: 1,
-                        readonly: false,
                         delimiters: null
-                    });
+                    }, getTagifyValues(tagifyFemaleGenotype, [crossData.femaleGenotype]), false);
                 } else if (inputField.id === 'foodType') {
-                    inputField.disabled = false;
-                    // Re-create Tagify with edit enabled
-                    tagifyFoodType.destroy();
-                    tagifyFoodType = new Tagify(inputField, {
+                    tagifyFoodType = createTagifyInstance('#foodType', tagifyFoodType, {
                         whitelist: {{ food_types | tojson }},
-                        maxTags: 1,
-                        readonly: false
-                    });
+                        maxTags: 1
+                    }, getTagifyValues(tagifyFoodType, [crossData.foodType]), false);
                 }
 
             } else {
@@ -419,12 +708,16 @@
     });
 
     // Confirm before submitting the form
-    document.querySelector('form').addEventListener('submit', function(event) {
+    document.getElementById('crossViewForm').addEventListener('submit', function(event) {
+        if (!canEditRecord) {
+            return;
+        }
+
         if (!confirm('Are you sure you want to submit the changes?')) {
             event.preventDefault();  // Prevent form submission if user cancels
         } else {
             // Re-enable all input fields before submitting
-            document.querySelectorAll('input, textarea, select').forEach(input => {
+            document.querySelectorAll('#crossViewForm input, #crossViewForm textarea, #crossViewForm select').forEach(input => {
                 input.disabled = false;
             });
         }

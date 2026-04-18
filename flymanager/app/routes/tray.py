@@ -6,11 +6,16 @@ from flymanager.app.routes.auth import login_required
 from flymanager.app.security import (get_json_payload, limiter,
                                      normalize_identifier_list,
                                      normalize_optional_text, parse_int_value)
-from flymanager.utils.mongo import (add_tray, calculate_required_vials,
-                                    delete_tray, get_database, get_tray,
-                                    get_tray_occupancy, get_user_crosses,
-                                    get_user_stocks, get_user_trays,
-                                    move_item_to_tray, update_tray,
+from flymanager.utils.mongo import (OperationLockConflict, add_tray,
+                                    calculate_required_vials, delete_tray,
+                                    get_accessible_crosses,
+                                    get_accessible_stock,
+                                    get_accessible_stocks, get_accessible_tray,
+                                    get_accessible_trays, get_direct_reports,
+                                    get_tray, get_tray_occupancy,
+                                    hold_operation_locks, move_item_to_tray,
+                                    record_operation_lock_keys,
+                                    update_document_assignment, update_tray,
                                     write_activity)
 
 # Create blueprint
@@ -26,26 +31,82 @@ def tray_management():
     
     user = session.get('username')
     
-    # Get user's trays
-    trays = get_user_trays(user, db)
-    
-    # Get all stocks and crosses for this user (for moving items)
-    stocks = get_user_stocks(user, db)
-    crosses = get_user_crosses(user, db)
-    
-    # Filter out stocks and crosses that are no longer maintained
-    stocks = [stock for stock in stocks if stock["Status"] != "No longer maintained"]
-    crosses = [cross for cross in crosses if cross["Status"] != "No longer maintained"]
+    trays = get_accessible_trays(user, db)
+    direct_reports = get_direct_reports(user, db)
+
+    for tray in trays:
+        occupancy = get_tray_occupancy(tray.get("User", user), tray["TrayID"], db)
+        tray["OccupiedStarts"] = len(
+            [item for item in occupancy.values() if item.get("type") != "blocked"]
+        )
+        tray["BlockedCells"] = len(
+            [item for item in occupancy.values() if item.get("type") == "blocked"]
+        )
     
     # Render the tray management page
     return render_template(
         'tray/tray_management.html', 
         trays=trays,
-        stocks=stocks,
-        crosses=crosses,
+        direct_reports=direct_reports,
         page_title="Tray Management",
         username=user
     )
+
+
+@bp.route('/assign_tray/<tray_id>', methods=['POST'])
+@login_required
+@limiter.limit('20 per hour')
+def assign_tray_route(tray_id):
+    user = session.get('username')
+    assignee = normalize_optional_text(
+        request.form.get('assignee'),
+        field_name='Assignee',
+        max_length=32,
+    )
+
+    tray = get_tray(user, tray_id, db)
+    if not tray:
+        flash('Only the tray owner can update tray assignments.', 'error')
+        return redirect(url_for('tray.tray_management'))
+
+    assignment_targets = []
+    for collection_name in ('stocks', 'crosses'):
+        for document in db[collection_name].find({'User': user, 'TrayID': tray['TrayID']}):
+            if document.get('Status') == 'No longer maintained':
+                continue
+            assignment_targets.append((collection_name, document['UniqueID']))
+
+    if not assignment_targets:
+        flash(f"Tray {tray['TrayID']} has no active stocks or crosses to assign.", 'error')
+        return redirect(url_for('tray.tray_management'))
+
+    updated_count = 0
+    for collection_name, unique_id in assignment_targets:
+        success, error_message = update_document_assignment(
+            collection_name,
+            user,
+            unique_id,
+            assignee,
+            db,
+        )
+        if not success:
+            flash(error_message or f'Unable to update assignments for tray {tray["TrayID"]}.', 'error')
+            return redirect(url_for('tray.tray_management'))
+        updated_count += 1
+
+    if assignee:
+        flash(
+            f"Assigned {updated_count} tray item{'s' if updated_count != 1 else ''} in {tray['TrayID']} to {assignee}.",
+            'success',
+        )
+    else:
+        flash(
+            f"Returned {updated_count} tray item{'s' if updated_count != 1 else ''} in {tray['TrayID']} to owner maintenance.",
+            'success',
+        )
+
+    write_activity(user, f"Updated tray assignments for {tray['TrayID']}", db)
+    return redirect(url_for('tray.tray_management'))
 
 @bp.route('/tray/<tray_id>')
 @login_required
@@ -58,12 +119,13 @@ def view_tray(tray_id):
     user = session.get('username')
     
     # Get tray and its occupancy
-    tray = get_tray(user, tray_id, db)
+    tray = get_accessible_tray(user, tray_id, db)
     if not tray:
         flash(f"Tray {tray_id} not found", "error")
         return redirect(url_for('tray.tray_management'))
     
-    occupancy = get_tray_occupancy(user, tray_id, db)
+    tray_owner = tray.get('User', user)
+    occupancy = get_tray_occupancy(tray_owner, tray['TrayID'], db)
     occupied_positions = sorted(
         (
             (position, item)
@@ -74,8 +136,14 @@ def view_tray(tray_id):
     )
     
     # Get all stocks and crosses for this user (for moving items)
-    stocks = get_user_stocks(user, db)
-    crosses = get_user_crosses(user, db)
+    stocks = [
+        stock for stock in get_accessible_stocks(user, db)
+        if stock.get('User') == tray_owner
+    ]
+    crosses = [
+        cross for cross in get_accessible_crosses(user, db)
+        if cross.get('User') == tray_owner
+    ]
     
     # Filter out stocks and crosses that are no longer maintained
     stocks = [stock for stock in stocks if stock["Status"] != "No longer maintained"]
@@ -95,6 +163,7 @@ def view_tray(tray_id):
         occupied_positions=occupied_positions,
         stocks=stocks,
         crosses=crosses,
+        owner_can_edit=tray_owner == user,
         page_title=f"Tray: {tray['TrayID']} - {tray['Name']}",
         username=user
     )
@@ -133,7 +202,7 @@ def add_tray_route():
             # Log activity
             write_activity(user, f"Added new tray with TrayID: {tray_id}", db)
             flash(f"Tray {tray_id} added successfully", "success")
-            return redirect(url_for('tray.view_tray', tray_id=tray_id))
+            return redirect(url_for('tray.view_tray', tray_id=result))
         else:
             flash(f"Failed to add tray: {result}", "error")
             return redirect(url_for('tray.tray_management'))
@@ -179,7 +248,7 @@ def edit_tray_route(tray_id):
             # Log activity
             write_activity(user, f"Updated tray with TrayID: {tray_id}", db)
             flash(f"Tray {tray_id} updated successfully", "success")
-            return redirect(url_for('tray.view_tray', tray_id=tray_id))
+            return redirect(url_for('tray.view_tray', tray_id=tray['UniqueID']))
         else:
             flash(f"Failed to update tray", "error")
     
@@ -288,11 +357,22 @@ def bulk_remove_from_tray():
     
     user = session.get('username')
     success_count = 0
-    
-    for item_id in unique_ids:
-        # Use move_item_to_tray with empty tray_id and position to remove from tray
-        if move_item_to_tray(user, item_type, item_id, '', '', db):
-            success_count += 1
+
+    try:
+        with hold_operation_locks(
+            db,
+            keys=record_operation_lock_keys(unique_ids),
+            actor=user,
+            label="Bulk remove from tray",
+            ttl_seconds=900,
+            metadata={"route": "bulk_remove_from_tray", "uid_count": len(unique_ids), "item_type": item_type},
+            conflict_message="Another request is already updating one or more selected records. Please wait for it to finish before retrying the tray removal.",
+        ):
+            for item_id in unique_ids:
+                if move_item_to_tray(user, item_type, item_id, '', '', db):
+                    success_count += 1
+    except OperationLockConflict as exc:
+        return jsonify({"success": False, "message": str(exc), "results": {"success": [], "failed": unique_ids}}), 409
     
     if success_count > 0:
         write_activity(
@@ -326,12 +406,12 @@ def get_tray_occupancy_api(tray_id):
     user = session.get('username')
     
     # Get tray data
-    tray = get_tray(user, tray_id, db)
+    tray = get_accessible_tray(user, tray_id, db)
     if not tray:
         return jsonify({"success": False, "message": "Tray not found"})
         
     # Get occupancy data
-    occupancy = get_tray_occupancy(user, tray_id, db)
+    occupancy = get_tray_occupancy(tray.get('User', user), tray['TrayID'], db)
     
     # Return the data
     return jsonify({

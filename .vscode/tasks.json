@@ -119,6 +119,640 @@
 			],
 			"isBackground": false,
 			"group": "test"
+		},
+		{
+			"label": "pytest phenotype experiments",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_experiments.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest flybase admin and phenotype experiments",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_experiments.py",
+				"tests/test_flybase_admin.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest flybase admin and phenotype experiments",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_experiments.py",
+				"tests/test_flybase_admin.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest flybase admin and phenotype experiments",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_experiments.py",
+				"tests/test_flybase_admin.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest phenotype cache ui tests",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_flybase_admin.py",
+				"tests/test_security.py",
+				"tests/test_phenotype_backfill.py",
+				"-q"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "profile stock cross routes",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"temp/profile_route_timings.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "inspect stock cross ownership counts",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-c",
+				"from flymanager.app import db; from collections import Counter; print('stocks_total', db['stocks'].count_documents({})); print('crosses_total', db['crosses'].count_documents({})); print('stocks_by_user', Counter(doc.get('User','') for doc in db['stocks'].find({}, {'User':1,'_id':0}))); print('crosses_by_user', Counter(doc.get('User','') for doc in db['crosses'].find({}, {'User':1,'_id':0}))); print('stocks_assigned', Counter(doc.get('AssignedTo','') for doc in db['stocks'].find({'AssignedTo': {'$exists': True, '$ne': ''}}, {'AssignedTo':1,'_id':0}))); print('crosses_assigned', Counter(doc.get('AssignedTo','') for doc in db['crosses'].find({'AssignedTo': {'$exists': True, '$ne': ''}}, {'AssignedTo':1,'_id':0})))"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "profile stock cross routes",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"temp/profile_route_timings.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "profile stock cross routes",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"temp/profile_route_timings.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "measure flybase stocks rows",
+			"type": "shell",
+			"command": "wc",
+			"args": [
+				"-l",
+				"data/flybase/stocks_FB2026_01.tsv"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "profile stock cross routes",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"temp/profile_route_timings.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "profile stock cross routes",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"temp/profile_route_timings.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "pytest performance fixes",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_stock_sources.py",
+				"tests/test_phenotype_routes.py",
+				"tests/test_mongo_performance_helpers.py",
+				"-q"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "pytest performance fixes",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_stock_sources.py",
+				"tests/test_phenotype_routes.py",
+				"tests/test_mongo_performance_helpers.py",
+				"-q"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "profile stock cross routes",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"temp/profile_route_timings.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "benchmark stock cross routes after fixes",
+			"type": "shell",
+			"command": "/bin/zsh",
+			"args": [
+				"-lc",
+				"cd /Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager && /Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python - <<'PY'\nimport os\nimport time\nos.environ.setdefault('ENABLE_SCHEDULER', '0')\nos.environ.setdefault('MAIL_SUPPRESS_SEND', '1')\nos.environ.setdefault('SECRET_KEY', 'benchmark-secret-key')\nfrom flymanager.app import create_app, db\nfrom flymanager.app.routes.stock import _get_stock_phenotype_summary\nfrom flymanager.utils.mongo import get_accessible_stock, get_accessible_stocks, get_accessible_crosses, get_metadata\nfrom flymanager.utils.stock_sources import enrich_stock_source_context\n\napp = create_app()\nusers = sorted(user['Username'] for user in db['users'].find({}, {'Username': 1, '_id': 0}) if user.get('Username'))\ncounts = []\nfor user in users:\n    stocks = get_accessible_stocks(user, db, annotate=False)\n    crosses = get_accessible_crosses(user, db, annotate=False)\n    counts.append((len(stocks) + len(crosses), user, len(stocks), len(crosses)))\n_, username, stock_count, cross_count = max(counts)\nprint('PROFILE_USER', username, 'stocks', stock_count, 'crosses', cross_count)\n\nstocks = get_accessible_stocks(username, db, annotate=True)\nstock_id = stocks[0]['UniqueID'] if stocks else None\nstock = stocks[0] if stocks else None\n\ndef timed(label, fn):\n    start = time.perf_counter()\n    result = fn()\n    duration = (time.perf_counter() - start) * 1000\n    print(f'{label}: {duration:.3f} ms')\n    return result\n\nif stock is not None:\n    timed('enrich_stock_source_context first', lambda: enrich_stock_source_context(stock))\n    timed('enrich_stock_source_context second', lambda: enrich_stock_source_context(stock))\n    timed('stock_view metadata genes2nd first', lambda: get_metadata('genes2nd', db))\n    timed('stock_view metadata genes2nd second', lambda: get_metadata('genes2nd', db))\n    timed('stock_view metadata genes3rd first', lambda: get_metadata('genes3rd', db))\n    timed('stock_view metadata genes3rd second', lambda: get_metadata('genes3rd', db))\n    timed('stock phenotype summary', lambda: _get_stock_phenotype_summary(stock))\n\nwith app.test_client() as client:\n    with client.session_transaction() as sess:\n        sess['username'] = username\n    if stock_id:\n        timed('GET /stock/explorer', lambda: client.get('/stock/explorer'))\n        timed(f'GET /stock/view/{stock_id}', lambda: client.get(f'/stock/view/{stock_id}'))\n    timed('GET /cross/cross_explorer', lambda: client.get('/cross/cross_explorer'))\nPY"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "benchmark after fixes",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"temp/benchmark_after_fixes.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "pytest startup warm caches",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_mongo_performance_helpers.py",
+				"tests/test_stock_sources.py",
+				"tests/test_phenotype_routes.py",
+				"-q"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "pytest phase0 phase1 ingestion",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phase0_phase1_ingestion.py",
+				"-q"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$pytest"
+			],
+			"group": "test"
+		},
+		{
+			"label": "pytest phase0 phase1 ingestion rerun",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phase0_phase1_ingestion.py",
+				"-q"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$pytest"
+			],
+			"group": "test"
+		},
+		{
+			"label": "pytest phase0 phase1 ingestion final",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phase0_phase1_ingestion.py",
+				"-q"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$pytest"
+			],
+			"group": "test"
+		},
+		{
+			"label": "pytest phenotype experiments after ingestion work",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_experiments.py",
+				"-q"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$pytest"
+			],
+			"group": "test"
+		},
+		{
+			"label": "pytest phase4 crossing",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_crossing_simulator.py",
+				"tests/test_phenotype_experiments.py",
+				"-q",
+				"-rA"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest phase4 crossing",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_crossing_simulator.py",
+				"tests/test_phenotype_experiments.py",
+				"-q",
+				"-rA"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest phase4 crossing",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_crossing_simulator.py",
+				"tests/test_phenotype_experiments.py",
+				"-q",
+				"-rA"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest phase4 constraints",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_constraints.py",
+				"-q",
+				"-rA"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest cross view integration",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_crossing_simulator.py",
+				"tests/test_phenotype_routes.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest cross view integration rerun",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_crossing_simulator.py",
+				"tests/test_phenotype_routes.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest cross view integration final",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_crossing_simulator.py",
+				"tests/test_phenotype_routes.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest stock reviewer focused",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_experiments.py",
+				"-k",
+				"standardization",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest stock standardization overview",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_routes.py",
+				"-q",
+				"-k",
+				"stock_explorer_route_shows_best_guess_phenotype or stock_standardization_overview_route_summarizes_accessible_stocks or stock_standardization_overview_paginates_second_page"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest stock standardization combined",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_experiments.py",
+				"tests/test_phenotype_routes.py",
+				"-q",
+				"-k",
+				"standardization"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest stale cache fix",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_experiments.py",
+				"tests/test_phenotype_routes.py",
+				"tests/test_phenotype_backfill.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest stale cache fix rerun",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_experiments.py",
+				"tests/test_phenotype_routes.py",
+				"tests/test_phenotype_backfill.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest home backfill fix",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_backfill.py",
+				"tests/test_phenotype_routes.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest home backfill fix rerun",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_backfill.py",
+				"tests/test_phenotype_routes.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest stock standardization fix",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_experiments.py",
+				"tests/test_phenotype_routes.py",
+				"-q",
+				"-k",
+				"standardization"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest stock standardization fix rerun",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_experiments.py",
+				"tests/test_phenotype_routes.py",
+				"-q",
+				"-k",
+				"standardization"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest phenotype sandbox routes",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_routes.py",
+				"-q",
+				"-k",
+				"stock_explorer_route_shows_best_guess_phenotype or standalone_phenotype_preview_route_renders_prediction or standalone_phenotype_preview_route_accepts_tagify_form or standalone_phenotype_preview_route_returns_json"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest phenotype sandbox routes rerun",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_routes.py",
+				"-q",
+				"-k",
+				"stock_explorer_route_shows_best_guess_phenotype or standalone_phenotype_preview_route_renders_prediction or standalone_phenotype_preview_route_accepts_tagify_form or standalone_phenotype_preview_route_returns_json"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest phenotype routes full",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_routes.py",
+				"-q"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest reviewer relocation",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_routes.py::test_standardization_reviewer_route_summarizes_stocks_and_cross_parents",
+				"tests/test_phenotype_routes.py::test_standardization_reviewer_paginates_second_page",
+				"tests/test_security.py::test_home_page_renders_dashboard_command_sections",
+				"-rA"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest reviewer relocation rerun",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_routes.py::test_standardization_reviewer_route_summarizes_stocks_and_cross_parents",
+				"tests/test_phenotype_routes.py::test_standardization_reviewer_paginates_second_page",
+				"tests/test_security.py::test_home_page_renders_dashboard_command_sections",
+				"-rA"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest reviewer ui cleanup",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_routes.py::test_stock_view_route_renders_phenotype_preview",
+				"tests/test_phenotype_routes.py::test_stock_explorer_route_shows_best_guess_phenotype",
+				"-rA"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "pytest reviewer ui cleanup rerun",
+			"type": "shell",
+			"command": "/Users/neurorishika/Projects/Rockefeller/Ruta/FlyManager/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"tests/test_phenotype_routes.py::test_stock_view_route_renders_phenotype_preview",
+				"tests/test_phenotype_routes.py::test_stock_explorer_route_shows_best_guess_phenotype",
+				"-rA"
+			],
+			"isBackground": false,
+			"group": "test"
 		}
 	]
 }

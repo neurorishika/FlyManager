@@ -6,6 +6,8 @@ from flask import current_app, jsonify
 
 from flymanager.app import active_threads, db, socketio
 # Import get_available_ports from its utility location
+from flymanager.utils.mongo.access import (get_accessible_cross,
+                                           get_accessible_stock)
 from flymanager.utils.scanner import get_available_ports
 
 # Note: MIN_FLIP_DIFFERENCE is defined in app/__init__.py
@@ -43,11 +45,11 @@ def _build_cross_payload(cross):
 def lookup_uid_result(username, uid, database=None):
     """Resolve a scanned UID to a stock or cross payload for the current user."""
     active_db = database or db
-    stock = active_db['stocks'].find_one({'UniqueID': uid, 'User': username})
+    stock = get_accessible_stock(username, uid, active_db)
     if stock:
         return 'stock', _build_stock_payload(stock)
 
-    cross = active_db['crosses'].find_one({'UniqueID': uid, 'User': username})
+    cross = get_accessible_cross(username, uid, active_db)
     if cross:
         return 'cross', _build_cross_payload(cross)
 
@@ -193,4 +195,5 @@ def stop_scan_service(thread_id):
         print(f"Stop request for non-existent or already stopped thread ID: {thread_id}")
         return jsonify({'success': False, 'message': 'Scanning thread not found or already stopped.'}), 404
         print(f"Stop request for non-existent or already stopped thread ID: {thread_id}")
+        return jsonify({'success': False, 'message': 'Scanning thread not found or already stopped.'}), 404
         return jsonify({'success': False, 'message': 'Scanning thread not found or already stopped.'}), 404

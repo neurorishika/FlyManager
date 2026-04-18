@@ -21,8 +21,8 @@
             {% if trays %}
             <div class="app-panel">
                 <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
-                    <h2 class="app-section-title mb-0">Your Trays</h2>
-                    <div class="app-inline-note">Open a tray to edit layout, drag items, or review occupancy.</div>
+                    <h2 class="app-section-title mb-0">Accessible Trays</h2>
+                    <div class="app-inline-note">Owned trays can be edited and assigned. Shared trays open in view mode for maintenance work.</div>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-striped align-middle mb-0">
@@ -30,34 +30,66 @@
                             <tr>
                                 <th>Tray ID</th>
                                 <th>Name</th>
+                                <th>Owner</th>
                                 <th>Size</th>
                                 <th>Capacity</th>
+                                <th>Occupancy</th>
+                                <th>Assignment</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for tray in trays %}
                             <tr>
-                                <td><strong>{{ tray.TrayID }}</strong></td>
+                                <td>
+                                    <strong>{{ tray.TrayID }}</strong>
+                                    <div class="app-inline-note">{{ tray.TrayScopeLabel }}</div>
+                                </td>
                                 <td>{{ tray.Name }}</td>
+                                <td>{{ tray.OwnerUser }}</td>
                                 <td>{{ tray.Rows }} x {{ tray.Columns }}</td>
                                 <td>{{ tray.Rows * tray.Columns }} positions</td>
+                                <td>{{ tray.OccupiedStarts }} items, {{ tray.BlockedCells }} blocked</td>
+                                <td>
+                                    {% if tray.ViewerCanEdit and direct_reports %}
+                                    <form method="POST" action="{{ url_for('tray.assign_tray_route', tray_id=tray.UniqueID) }}" class="app-button-row flex-wrap justify-content-start">
+                                        <select class="form-control form-control-sm" name="assignee" style="min-width: 180px;">
+                                            <option value="">Maintain myself</option>
+                                            {% for report_username in direct_reports %}
+                                            <option value="{{ report_username }}">{{ report_username }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-share-square"></i> Assign Tray
+                                        </button>
+                                    </form>
+                                    {% elif tray.ViewerCanEdit %}
+                                    <span class="app-inline-note">No direct reports available.</span>
+                                    {% else %}
+                                    <span class="app-inline-note">Visible through assigned tray contents.</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     <div class="app-button-row">
-                                        <a href="{{ url_for('tray.view_tray', tray_id=tray.TrayID) }}" class="btn btn-sm btn-info">
+                                        <a href="{{ url_for('tray.view_tray', tray_id=tray.UniqueID) }}" class="btn btn-sm btn-info">
                                             <i class="fas fa-eye"></i> View
                                         </a>
-                                        <a href="{{ url_for('tray.edit_tray_route', tray_id=tray.TrayID) }}" class="btn btn-sm btn-warning">
+                                        {% if tray.ViewerCanEdit %}
+                                        <a href="{{ url_for('tray.edit_tray_route', tray_id=tray.UniqueID) }}" class="btn btn-sm btn-warning">
                                             <i class="fas fa-edit"></i> Edit
                                         </a>
+                                        {% endif %}
+                                        {% if tray.ViewerCanEdit %}
                                         <button
                                             type="button"
                                             class="btn btn-sm btn-danger tray-delete-trigger"
+                                            data-tray-key="{{ tray.UniqueID }}"
                                             data-tray-id="{{ tray.TrayID }}"
                                             data-tray-name="{{ tray.Name }}"
                                         >
                                             <i class="fas fa-trash"></i> Delete
                                         </button>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>
@@ -106,12 +138,12 @@
 <script nonce="{{ csp_nonce }}">
     document.querySelectorAll('.tray-delete-trigger').forEach(button => {
         button.addEventListener('click', function() {
-            confirmDelete(this.dataset.trayId, this.dataset.trayName);
+            confirmDelete(this.dataset.trayKey, this.dataset.trayId, this.dataset.trayName);
         });
     });
 
-    function confirmDelete(trayId, trayName) {
-        document.getElementById('deleteForm').action = "{{ url_for('tray.delete_tray_route', tray_id='') }}" + trayId;
+    function confirmDelete(trayKey, trayId, trayName) {
+        document.getElementById('deleteForm').action = "{{ url_for('tray.delete_tray_route', tray_id='') }}" + trayKey;
         document.getElementById('deleteTrayName').textContent = trayId + " - " + trayName;
         $('#deleteModal').modal('show');
     }

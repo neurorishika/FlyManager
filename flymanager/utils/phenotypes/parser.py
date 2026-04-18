@@ -4,12 +4,14 @@ from flymanager.utils.phenotypes.construct_markers import \
     extract_construct_marker_symbols
 from flymanager.utils.phenotypes.visual_markers import (BALANCER_ALIASES,
                                                         BALANCER_MARKERS,
-                                                        KNOWN_BALANCER_SYMBOLS)
+                                                        KNOWN_BALANCER_SYMBOLS,
+                                                        get_balancer_metadata)
 
 GROUP_PAIRS = {"{": "}", "[": "]", "(": ")"}
 CONSTRUCT_PREFIXES = ("P{", "PBac{", "Mi{", "TI{", "M{")
-ALLELE_RE = re.compile(r"^(?P<gene>[A-Za-z0-9.+*_-]+)\[(?P<allele>[^\]]+)\]$")
+ALLELE_RE = re.compile(r"^(?P<gene>[A-Za-z0-9.+*()_-]+)\[(?P<allele>[^\]]+)\]$")
 KNOWN_BALANCERS = KNOWN_BALANCER_SYMBOLS
+BALANCER_MATCH_ORDER = tuple(sorted(KNOWN_BALANCERS, key=len, reverse=True))
 
 
 def tokenize_gene_package(package_str):
@@ -57,7 +59,7 @@ def _is_balancer(token):
     if token in KNOWN_BALANCERS:
         return True
     if token.startswith("In("):
-        return any(symbol in token for symbol in KNOWN_BALANCERS)
+        return any(symbol in token for symbol in BALANCER_MATCH_ORDER)
     return False
 
 
@@ -66,7 +68,7 @@ def _normalize_balancer_symbol(token):
         return BALANCER_ALIASES[token]
     if token in KNOWN_BALANCERS:
         return token
-    for symbol in KNOWN_BALANCERS:
+    for symbol in BALANCER_MATCH_ORDER:
         if symbol in token:
             return BALANCER_ALIASES.get(symbol, symbol)
     return token
@@ -108,11 +110,13 @@ def parse_gene_package(package_str):
 
         if _is_balancer(token):
             symbol = _normalize_balancer_symbol(token)
+            metadata = get_balancer_metadata(symbol) or {}
             result["balancers"].append(
                 {
                     "token": token,
                     "symbol": symbol,
-                    "default_markers": BALANCER_MARKERS.get(symbol, []),
+                    "default_markers": metadata.get("default_markers", BALANCER_MARKERS.get(symbol, [])),
+                    "metadata": metadata,
                 }
             )
             continue

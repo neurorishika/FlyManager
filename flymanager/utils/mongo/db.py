@@ -48,6 +48,16 @@ def get_database(client):
     return client[db_name]
 
 
+def ensure_mongo_indexes(db):
+    """Create the indexes used by stock/cross access patterns."""
+    db["stocks"].create_index([("User", 1), ("UniqueID", 1)], name="stocks_user_uid")
+    db["stocks"].create_index([("AssignedTo", 1), ("UniqueID", 1)], name="stocks_assigned_uid")
+    db["crosses"].create_index([("User", 1), ("UniqueID", 1)], name="crosses_user_uid")
+    db["crosses"].create_index([("AssignedTo", 1), ("UniqueID", 1)], name="crosses_assigned_uid")
+    db["operation_locks"].create_index("key", unique=True, name="operation_locks_key")
+    db["operation_locks"].create_index("expires_at", expireAfterSeconds=0, name="operation_locks_expires_at")
+
+
 def ping_database(db):
     """Return True when the MongoDB connection is healthy, else False."""
     try:
@@ -77,6 +87,11 @@ def reset_database(db):
     
     for collection in collections:
         db.create_collection(collection)
+
+    from flymanager.utils.mongo.helpers import clear_metadata_cache
+
+    clear_metadata_cache()
+    ensure_mongo_indexes(db)
 
 def uid_exists(uid, db):
     """

@@ -34,10 +34,14 @@ window.initializeExplorer({
     duplicateAction: 'duplicate-cross',
     viewUrlBase: viewCrossUrlBase,
     duplicateUrlBase: addCrossUrlBase,
+    selectionUrl: crossSelectionUrl,
     deleteUrl: deleteCrossUrl,
+    bulkFlipUrl: bulkFlipUrl,
+    bulkStatusUrl: bulkStatusUrl,
+    bulkRemoveFromTrayUrl: bulkRemoveFromTrayUrl,
     requiredTableColumns: ['tray', 'name', 'status', 'flipin', 'actions'],
-    defaultTableColumns: ['male', 'female', 'species', 'food', 'eclose'],
-    compactTableColumns: ['male', 'female'],
+    defaultTableColumns: ['male', 'female', 'phenotype', 'species', 'food', 'eclose'],
+    compactTableColumns: ['male', 'female', 'phenotype'],
     selectionMessage: function(count) {
         return count > 0
             ? `Ready to add ${count} selected cross${count === 1 ? '' : 'es'} to the cart or continue selecting more.`

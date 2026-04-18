@@ -14,7 +14,7 @@
 </div>
 
 <div class="app-panel">
-    <form action="{{ url_for('tray.edit_tray_route', tray_id=tray.TrayID) }}" method="POST" class="app-form-grid">
+    <form action="{{ url_for('tray.edit_tray_route', tray_id=tray.UniqueID) }}" method="POST" class="app-form-grid">
         <div class="form-group mb-0">
             <label for="tray_id">Tray ID</label>
             <input type="text" class="form-control" id="tray_id" name="tray_id"
@@ -52,7 +52,7 @@
         </div>
 
         <div class="app-button-row justify-content-end">
-            <a href="{{ url_for('tray.view_tray', tray_id=tray.TrayID) }}" class="btn btn-secondary">Cancel</a>
+            <a href="{{ url_for('tray.view_tray', tray_id=tray.UniqueID) }}" class="btn btn-secondary">Cancel</a>
             <button type="submit" class="btn btn-warning">
                 <i class="fas fa-save"></i> Save Changes
             </button>

@@ -1,4 +1,5 @@
 <form method="post" action="{{ url_for('cross.cross_explorer') }}" class="explorer-filter-form">
+    <input type="hidden" name="per_page" value="{{ pagination.per_page_value }}">
     <div class="filter-row filter-row-primary">
         <div class="filter-col filter-col-search">
             <label class="filter-label" for="searchQuery">Search</label>

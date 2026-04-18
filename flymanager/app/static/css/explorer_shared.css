@@ -188,6 +188,91 @@
     margin-bottom: 0;
 }
 
+.explorer-operation-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 0.8rem 0.95rem;
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent 18%);
+    background: color-mix(in srgb, var(--card-bg) 88%, var(--bg-color) 12%);
+    color: var(--text-color);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.explorer-operation-status::before {
+    content: '';
+    width: 0.95rem;
+    height: 0.95rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--muted-text) 55%, transparent 45%);
+    flex: 0 0 auto;
+}
+
+.explorer-operation-status[data-tone="progress"]::before {
+    border: 2px solid color-mix(in srgb, var(--accent-color) 30%, transparent 70%);
+    border-top-color: var(--accent-color);
+    background: transparent;
+    animation: explorer-spin 0.8s linear infinite;
+}
+
+.explorer-operation-status[data-tone="success"] {
+    border-color: color-mix(in srgb, #1f9d55 34%, var(--border-color) 66%);
+    background: color-mix(in srgb, #1f9d55 12%, var(--card-bg) 88%);
+}
+
+.explorer-operation-status[data-tone="success"]::before {
+    background: #1f9d55;
+}
+
+.explorer-operation-status[data-tone="warning"] {
+    border-color: color-mix(in srgb, #d97706 36%, var(--border-color) 64%);
+    background: color-mix(in srgb, #d97706 12%, var(--card-bg) 88%);
+}
+
+.explorer-operation-status[data-tone="warning"]::before {
+    background: #d97706;
+}
+
+.explorer-operation-status[data-tone="error"] {
+    border-color: color-mix(in srgb, #dc2626 38%, var(--border-color) 62%);
+    background: color-mix(in srgb, #dc2626 12%, var(--card-bg) 88%);
+}
+
+.explorer-operation-status[data-tone="error"]::before {
+    background: #dc2626;
+}
+
+.explorer-operation-status-modal {
+    margin-top: 16px;
+}
+
+.explorer-inline-spinner {
+    width: 0.95rem;
+    height: 0.95rem;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, 0.34);
+    border-top-color: rgba(255, 255, 255, 0.95);
+    animation: explorer-spin 0.8s linear infinite;
+    flex: 0 0 auto;
+}
+
+.btn.is-busy {
+    pointer-events: none;
+}
+
+@keyframes explorer-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .cross-item h5,
 .stock-item h5 {
     margin: 0 0 5px;

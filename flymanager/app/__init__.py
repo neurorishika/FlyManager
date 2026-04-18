@@ -22,10 +22,12 @@ from flask_session import Session as FlaskSession
 from flymanager.app.security import (add_security_headers, csrf,
                                      generate_csp_nonce, limiter,
                                      parse_allowed_origins)
-from flymanager.utils.mongo import (create_mongo_client, get_all_users,
-                                    get_database, get_flip_schedule,
-                                    get_settings, get_user_email,
-                                    ping_database)
+from flymanager.utils.mongo import (create_mongo_client, ensure_mongo_indexes,
+                                    get_all_users, get_database,
+                                    get_flip_schedule, get_settings,
+                                    get_user_email, ping_database,
+                                    preload_metadata_cache)
+from flymanager.utils.stock_sources import preload_flybase_stock_indexes
 
 # Load environment variables
 load_dotenv()
@@ -37,6 +39,7 @@ active_threads = {}  # For QR Scanner
 
 # --- Extension Instances ---
 db = get_database(create_mongo_client())
+ensure_mongo_indexes(db)
 mail = Mail()
 socketio = SocketIO(async_mode=os.getenv("SOCKETIO_ASYNC_MODE", "threading"))
 scheduler = APScheduler()
@@ -130,6 +133,10 @@ def create_app():
     )
     app.config["SESSION_COOKIE_SECURE"] = secure_cookie_enabled
     app.config["UPLOAD_FOLDER"] = os.getenv("UPLOAD_FOLDER", "data/uploads")
+    app.config["PHENOTYPE_IMAGE_LIBRARY_PATH"] = os.getenv(
+        "FLYMANAGER_PHENOTYPE_IMAGE_LIBRARY_PATH",
+        os.path.abspath(os.path.join(app.root_path, "..", "..", "data", "phenotype_images")),
+    )
     app.config["MAX_CONTENT_LENGTH"] = int(
         os.getenv("MAX_UPLOAD_SIZE_BYTES", str(8 * 1024 * 1024))
     )
@@ -187,9 +194,22 @@ def create_app():
     # --- Make settings available to all templates ---
     @app.context_processor
     def inject_settings():
+        flybase_sync_indicator = None
+        if session.get("username") == "admin":
+            try:
+                from flymanager.app.services import flybase as flybase_service
+
+                flybase_sync_indicator = flybase_service.get_flybase_reference_status(app)
+            except Exception as exc:
+                app.logger.warning(
+                    "Unable to load FlyBase sync indicator for template context: %s",
+                    exc,
+                )
+
         return dict(
             settings=get_settings(db),
             csp_nonce=generate_csp_nonce(),
+            flybase_sync_indicator=flybase_sync_indicator,
         )
 
     @app.before_request
@@ -210,9 +230,27 @@ def create_app():
         app.register_blueprint(tray.bp, url_prefix="/tray")
         app.register_blueprint(settings.bp)
 
+        if env_flag("WARM_PAGE_CACHES_ON_STARTUP", True):
+            try:
+                preload_metadata_cache(db)
+            except Exception as exc:
+                app.logger.warning(
+                    "Unable to preload metadata cache during startup: %s",
+                    exc,
+                )
+
+            try:
+                preload_flybase_stock_indexes()
+            except Exception as exc:
+                app.logger.warning(
+                    "Unable to preload FlyBase stock indexes during startup: %s",
+                    exc,
+                )
+
         # --- Import Services (to ensure they are loaded) ---
         from flymanager.app.services import bloomington as bloomington_service
         from flymanager.app.services import email as email_service
+        from flymanager.app.services import flybase as flybase_service
         from flymanager.app.services import scanner as scanner_service
         from flymanager.app.services import scheduler as scheduler_service
 
@@ -226,6 +264,17 @@ def create_app():
                 hour=8,
                 minute=0,
                 args=[app],  # Pass the app instance to the scheduled function
+                replace_existing=True,
+            )
+            # Add monthly FlyBase reference refresh job (1st day of each month at 1:30 AM)
+            scheduler.add_job(
+                id="monthly_flybase_reference_refresh_job",
+                func=flybase_service.update_flybase_reference_data,
+                trigger="cron",
+                day=1,
+                hour=1,
+                minute=30,
+                args=[app],
                 replace_existing=True,
             )
             # Add monthly legacy Bloomington compatibility refresh job (1st day of each month at 2 AM)

@@ -395,6 +395,48 @@
             margin-left: 4px;
         }
 
+        .header-status-badge,
+        .dropdown-status-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 7px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            line-height: 1;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            background: rgba(255, 255, 255, 0.18);
+            color: var(--header-text);
+        }
+
+        .header-status-badge.tone-warning,
+        .dropdown-status-badge.tone-warning {
+            background: rgba(255, 207, 92, 0.22);
+            border-color: rgba(255, 207, 92, 0.42);
+            color: #6b4a00;
+        }
+
+        .header-status-badge.tone-danger,
+        .dropdown-status-badge.tone-danger {
+            background: rgba(255, 132, 132, 0.2);
+            border-color: rgba(255, 132, 132, 0.42);
+            color: #7c1212;
+        }
+
+        .dropdown-item-with-badge {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .dropdown-item-with-badge > span:first-child {
+            min-width: 0;
+        }
+
         .theme-toggle {
             cursor: pointer;
             margin-right: 0;
@@ -710,6 +752,69 @@
             background: color-mix(in srgb, var(--bg-color) 82%, var(--card-bg) 18%);
         }
 
+        .app-form-progress {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 0.7rem 0.9rem;
+            border-radius: 12px;
+            border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent 22%);
+            background: color-mix(in srgb, var(--card-bg) 90%, var(--bg-color) 10%);
+            color: var(--text-color);
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+        }
+
+        .app-form-progress::before,
+        .app-inline-spinner {
+            content: '';
+            width: 0.95rem;
+            height: 0.95rem;
+            border-radius: 999px;
+            flex: 0 0 auto;
+        }
+
+        .app-form-progress[data-tone="progress"]::before,
+        .app-inline-spinner {
+            border: 2px solid color-mix(in srgb, var(--accent-color) 28%, transparent 72%);
+            border-top-color: var(--accent-color);
+            background: transparent;
+            animation: app-inline-spin 0.8s linear infinite;
+        }
+
+        .app-form-progress[data-tone="success"] {
+            border-color: color-mix(in srgb, #1f9d55 34%, var(--border-color) 66%);
+            background: color-mix(in srgb, #1f9d55 12%, var(--card-bg) 88%);
+        }
+
+        .app-form-progress[data-tone="success"]::before {
+            background: #1f9d55;
+        }
+
+        .app-form-progress[data-tone="warning"] {
+            border-color: color-mix(in srgb, #d97706 36%, var(--border-color) 64%);
+            background: color-mix(in srgb, #d97706 12%, var(--card-bg) 88%);
+        }
+
+        .app-form-progress[data-tone="warning"]::before {
+            background: #d97706;
+        }
+
+        .app-progress-submit {
+            pointer-events: none;
+        }
+
+        @keyframes app-inline-spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
         .app-form-grid {
             display: grid;
             gap: 16px;
@@ -1001,8 +1106,11 @@
     <header class="header{% if not session.get('username') %} is-hidden{% endif %}">
         {% set current_endpoint = request.endpoint or '' %}
         {% set current_user = session.get('username', '') %}
+        {% set show_flybase_issue_badge = current_user == 'admin' and flybase_sync_indicator and flybase_sync_indicator.status_tone != 'success' %}
         {% if current_endpoint in ['main.home', 'main.index'] %}
             {% set current_section_label = 'Dashboard' %}
+        {% elif current_endpoint == 'main.standardization_reviewer' %}
+            {% set current_section_label = 'Reviewer' %}
         {% elif current_endpoint == 'flip.flip_schedule_display' %}
             {% set current_section_label = 'Schedule' %}
         {% elif current_endpoint.startswith('flip.') %}
@@ -1068,8 +1176,17 @@
                             <button class="btn header-action-button dropdown-toggle" type="button" id="headerToolsMenu" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                 <i class="fas fa-sliders-h"></i>
                                 <span>Tools</span>
+                                {% if show_flybase_issue_badge %}
+                                <span class="header-status-badge tone-{{ flybase_sync_indicator.status_tone }}" title="FlyBase sync {{ flybase_sync_indicator.status_label|lower }}">1</span>
+                                {% endif %}
                             </button>
                             <div class="dropdown-menu dropdown-menu-right" aria-labelledby="headerToolsMenu">
+                                <a class="dropdown-item" href="{{ url_for('stock.phenotype_preview') }}">
+                                    <i class="fas fa-flask"></i> Phenotype Sandbox
+                                </a>
+                                <a class="dropdown-item" href="{{ url_for('main.standardization_reviewer') }}">
+                                    <i class="fas fa-stethoscope"></i> Genotype reviewer
+                                </a>
                                 <a class="dropdown-item" href="{{ url_for('main.user_guide') }}">
                                     <i class="fas fa-book"></i> User guide
                                 </a>
@@ -1081,8 +1198,11 @@
                                 <a class="dropdown-item" href="{{ url_for('data.upload_data_route') }}">
                                     <i class="fas fa-file-import"></i> Import workbook
                                 </a>
-                                <a class="dropdown-item" href="{{ url_for('settings.admin_settings') }}">
-                                    <i class="fas fa-cog"></i> Admin settings
+                                <a class="dropdown-item dropdown-item-with-badge" href="{{ url_for('settings.admin_settings') }}">
+                                    <span><i class="fas fa-cog"></i> Admin settings</span>
+                                    {% if show_flybase_issue_badge %}
+                                    <span class="dropdown-status-badge tone-{{ flybase_sync_indicator.status_tone }}">{{ flybase_sync_indicator.status_label }}</span>
+                                    {% endif %}
                                 </a>
                                 {% endif %}
                                 <div class="dropdown-divider"></div>
@@ -1105,6 +1225,10 @@
                     <a href="{{ url_for('flip.flip_schedule_display') }}" class="header-nav-link{% if current_endpoint == 'flip.flip_schedule_display' %} is-active{% endif %}">
                         <i class="far fa-calendar-alt"></i>
                         <span>Schedule</span>
+                    </a>
+                    <a href="{{ url_for('main.standardization_reviewer') }}" class="header-nav-link{% if current_endpoint == 'main.standardization_reviewer' %} is-active{% endif %}">
+                        <i class="fas fa-stethoscope"></i>
+                        <span>Reviewer</span>
                     </a>
                     <a href="{{ url_for('stock.stock_explorer') }}" class="header-nav-link{% if current_endpoint.startswith('stock.') %} is-active{% endif %}">
                         <i class="fas fa-box-open"></i>
@@ -1157,6 +1281,10 @@
 
         if (originalFetch) {
             window.fetch = function(resource, options = {}) {
+                if (typeof resource === 'undefined' || resource === null) {
+                    return Promise.reject(new TypeError('Fetch resource is required.'));
+                }
+
                 const requestUrl = typeof resource === 'string' ? resource : resource.url;
                 const method = String(
                     options.method || (typeof Request !== 'undefined' && resource instanceof Request ? resource.method : 'GET')
@@ -1188,6 +1316,72 @@
             const form = event.target;
             if (!(form instanceof HTMLFormElement)) {
                 return;
+            }
+
+            if (form.hasAttribute('data-progress-form')) {
+                const confirmMessage = form.dataset.confirmMessage;
+
+                if (form.dataset.submitting === 'true') {
+                    event.preventDefault();
+                    let statusNode = form.querySelector('[data-form-progress-status]');
+                    if (!statusNode) {
+                        statusNode = document.createElement('div');
+                        statusNode.className = 'app-form-progress';
+                        statusNode.setAttribute('data-form-progress-status', '');
+                        statusNode.setAttribute('role', 'status');
+                        statusNode.setAttribute('aria-live', 'polite');
+                        form.appendChild(statusNode);
+                    }
+                    statusNode.dataset.tone = 'warning';
+                    statusNode.textContent = form.dataset.progressDuplicateMessage || 'This action is already in progress. Please wait.';
+                    statusNode.classList.remove('is-hidden');
+                    return;
+                }
+
+                if (confirmMessage && !window.confirm(confirmMessage)) {
+                    event.preventDefault();
+                    return;
+                }
+
+                form.dataset.submitting = 'true';
+                form.setAttribute('aria-busy', 'true');
+
+                let statusNode = form.querySelector('[data-form-progress-status]');
+                if (!statusNode) {
+                    statusNode = document.createElement('div');
+                    statusNode.className = 'app-form-progress';
+                    statusNode.setAttribute('data-form-progress-status', '');
+                    statusNode.setAttribute('role', 'status');
+                    statusNode.setAttribute('aria-live', 'polite');
+                    form.appendChild(statusNode);
+                }
+
+                statusNode.dataset.tone = 'progress';
+                statusNode.textContent = form.dataset.progressMessage || 'Working...';
+                statusNode.classList.remove('is-hidden');
+
+                const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
+                const submitButtons = Array.from(form.querySelectorAll('button[type="submit"], input[type="submit"]'));
+                submitButtons.forEach(function(button) {
+                    if (!(button instanceof HTMLElement)) {
+                        return;
+                    }
+                    if (!button.dataset.defaultLabel) {
+                        button.dataset.defaultLabel = button.tagName === 'INPUT' ? button.value : button.innerHTML;
+                    }
+                    button.disabled = true;
+                    button.classList.add('app-progress-submit');
+                });
+
+                if (submitter) {
+                    const pendingLabel = submitter.dataset.progressLabel || form.dataset.progressLabel || 'Working...';
+                    if (submitter.tagName === 'INPUT') {
+                        submitter.value = pendingLabel;
+                    } else {
+                        submitter.innerHTML = `<span class="app-inline-spinner" aria-hidden="true"></span><span>${pendingLabel}</span>`;
+                    }
+                    submitter.setAttribute('aria-busy', 'true');
+                }
             }
 
             if ((form.method || 'get').toLowerCase() !== 'post') {
