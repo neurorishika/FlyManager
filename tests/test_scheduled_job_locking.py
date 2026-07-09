@@ -1,8 +1,13 @@
 """Tests for the distributed-lock wrapper around APScheduler cron jobs.
 
-Loaded via the real package import (unlike test_background_jobs.py) because
-run_locked_scheduled_job lives in flymanager.app.__init__ and is exercised
-with a fake app + in-memory lock collection, not a live Mongo connection.
+Loaded via the real package import (unlike test_background_jobs.py, which
+uses importlib to load its target module directly and avoid the package
+__init__). Importing run_locked_scheduled_job from flymanager.app therefore
+runs flymanager/app/__init__.py's module-level setup, which requires a
+reachable MongoDB at import time -- same as most of this test suite. Within
+the tests themselves, a fake app object (_FakeApp/_FakeAppContext) and an
+in-memory lock collection are used to exercise the wrapper without needing a
+full Flask request/app-context push.
 """
 import logging
 
