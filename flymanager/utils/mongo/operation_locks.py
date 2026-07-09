@@ -229,7 +229,14 @@ def start_background_job(
     _cleanup_expired_locks(collection)
 
     existing = collection.find_one({"key": job_key})
-    if existing and existing.get("status") in _ACTIVE_JOB_STATUSES:
+    if existing and (
+        existing.get("status") in _ACTIVE_JOB_STATUSES
+        or "status" not in existing
+    ):
+        # A record with no "status" field is a plain hold_operation_lock(s)
+        # mutex (e.g. a cron job's distributed lock), not a finished job
+        # record - it's still actively held and must block, the same as an
+        # active queued/running job would.
         raise OperationLockConflict(
             _build_conflict_message(existing, conflict_message)
         )

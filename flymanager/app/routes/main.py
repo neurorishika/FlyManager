@@ -14,11 +14,12 @@ from flymanager.app.services import flybase as flybase_service
 from flymanager.app.services.scheduler import schedule_daily_flip_reminders
 from flymanager.app.services.stock_standardization import \
     review_stock_standardization
-from flymanager.utils.mongo import (get_accessible_crosses,
+from flymanager.utils.mongo import (OperationLockConflict,
+                                    get_accessible_crosses,
                                     get_accessible_stocks, get_flip_in,
                                     get_flip_schedule, get_settings,
                                     get_tray_occupancy, get_user_activities,
-                                    get_user_trays)
+                                    get_user_trays, hold_operation_lock)
 from flymanager.utils.utils import get_datetime_from_str
 
 bp = Blueprint('main', __name__)  # Remove url_prefix to handle root URL
@@ -1058,9 +1059,20 @@ def standardization_reviewer():
 @admin_required
 @limiter.limit("2 per hour")
 def test_send_reminder_route():
+    app = current_app._get_current_object()
     try:
-        schedule_daily_flip_reminders(current_app._get_current_object())
+        with hold_operation_lock(
+            db,
+            key="maintenance:daily-flip-reminder",
+            actor=session.get("username"),
+            label="Daily flip reminder",
+            ttl_seconds=1800,
+            conflict_message="The daily flip reminder is already running (scheduled or manual). Please wait for it to finish before retrying.",
+        ):
+            schedule_daily_flip_reminders(app)
         return jsonify({"status": "success"})
+    except OperationLockConflict as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 409
     except Exception as e:
         current_app.logger.exception("Error triggering test reminder: %s", e)
         return jsonify({"status": "error"}), 500

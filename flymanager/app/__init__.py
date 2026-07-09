@@ -102,12 +102,17 @@ def run_locked_scheduled_job(app, *, key, label, ttl_seconds, func):
     scaled to more than one replica. A lock conflict is a routine, expected
     skip (another replica already grabbed this tick), logged and swallowed
     rather than raised, so APScheduler never records it as a job failure.
+
+    `key` should be the same lock/job key used by any admin "run now" route
+    for the same underlying task (e.g. "maintenance:flybase-reference-refresh"),
+    so a scheduled run and a manually-triggered run of the same work can
+    never overlap.
     """
     with app.app_context():
         try:
             with hold_operation_lock(
                 db,
-                key=f"cron:{key}",
+                key=key,
                 actor="scheduler",
                 label=label,
                 ttl_seconds=ttl_seconds,
@@ -303,7 +308,7 @@ def create_app():
                 id="daily_flip_reminder_job",
                 func=functools.partial(
                     run_locked_scheduled_job,
-                    key="daily_flip_reminder",
+                    key="maintenance:daily-flip-reminder",
                     label="Daily flip reminder",
                     ttl_seconds=1800,
                     func=scheduler_service.schedule_daily_flip_reminders,
@@ -321,7 +326,7 @@ def create_app():
                 id="monthly_flybase_reference_refresh_job",
                 func=functools.partial(
                     run_locked_scheduled_job,
-                    key="monthly_flybase_reference_refresh",
+                    key="maintenance:flybase-reference-refresh",
                     label="Monthly FlyBase reference refresh",
                     ttl_seconds=3600,
                     func=flybase_service.update_flybase_reference_data,
@@ -340,7 +345,7 @@ def create_app():
                 id="monthly_bloomington_update_job",
                 func=functools.partial(
                     run_locked_scheduled_job,
-                    key="monthly_bloomington_update",
+                    key="maintenance:bloomington-stock-refresh",
                     label="Monthly Bloomington compatibility refresh",
                     ttl_seconds=3600,
                     func=bloomington_service.update_bloomington_stock_data,

@@ -60,7 +60,7 @@ def test_run_locked_scheduled_job_skips_when_already_locked(app, db, monkeypatch
     monkeypatch.setattr("flymanager.app.db", db)
     calls = []
 
-    with hold_operation_lock(db, key="cron:test_job", actor="scheduler", label="Test Job"):
+    with hold_operation_lock(db, key="test_job", actor="scheduler", label="Test Job"):
         with caplog.at_level(logging.INFO):
             run_locked_scheduled_job(
                 app, key="test_job", label="Test Job", ttl_seconds=60,
@@ -91,7 +91,7 @@ def test_run_locked_scheduled_job_different_keys_do_not_block_each_other(app, db
     monkeypatch.setattr("flymanager.app.db", db)
     calls = []
 
-    with hold_operation_lock(db, key="cron:job_a", actor="scheduler", label="Job A"):
+    with hold_operation_lock(db, key="job_a", actor="scheduler", label="Job A"):
         run_locked_scheduled_job(
             app, key="job_b", label="Job B", ttl_seconds=60,
             func=lambda a: calls.append("job_b"),
@@ -103,7 +103,7 @@ def test_run_locked_scheduled_job_different_keys_do_not_block_each_other(app, db
 def test_run_locked_scheduled_job_never_raises_operation_lock_conflict(app, db, monkeypatch):
     monkeypatch.setattr("flymanager.app.db", db)
 
-    with hold_operation_lock(db, key="cron:test_job", actor="scheduler", label="Test Job"):
+    with hold_operation_lock(db, key="test_job", actor="scheduler", label="Test Job"):
         try:
             run_locked_scheduled_job(
                 app, key="test_job", label="Test Job", ttl_seconds=60,

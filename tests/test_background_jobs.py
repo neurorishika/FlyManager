@@ -39,6 +39,17 @@ def test_start_background_job_conflicts_while_active(db):
         ol.start_background_job(db, key=key, actor="bob", label="Test job again")
 
 
+def test_start_background_job_conflicts_with_an_active_plain_mutex_lock(db):
+    # A hold_operation_lock(s) mutex (e.g. a cron job's distributed lock,
+    # used by flymanager.app.run_locked_scheduled_job) has no "status"
+    # field - it must still block a start_background_job attempt under the
+    # same key, the same as an active queued/running job would. Regression
+    # test for a bug where such a lock was silently deleted and replaced.
+    with ol.hold_operation_lock(db, key="maintenance:shared-key", actor="scheduler", label="Cron job"):
+        with pytest.raises(ol.OperationLockConflict):
+            ol.start_background_job(db, key="maintenance:shared-key", actor="alice", label="Manual trigger")
+
+
 def test_start_background_job_allows_rerun_after_it_finished(db):
     key = ol.start_background_job(db, key="job:1", actor="alice", label="Test job")
     ol.mark_job_running(db, key)
