@@ -151,7 +151,8 @@ def mongo_to_xls(db, file_path):
         df = pd.DataFrame(documents)
 
         # Remove the "_id" field
-        df = df.drop(columns=["_id"])
+        if "_id" in df.columns:
+            df = df.drop(columns=["_id"])
         
         # Save the DataFrame to the Excel file
         df.to_excel(writer, sheet_name=collection_name, index=False)
@@ -162,7 +163,8 @@ def mongo_to_xls(db, file_path):
     for username in usernames:
         stock_df = pd.DataFrame(list(db["stocks"].find({"User": username})))
         # Remove the "_id" field
-        stock_df = stock_df.drop(columns=["_id"])
+        if "_id" in stock_df.columns:
+            stock_df = stock_df.drop(columns=["_id"])
         stock_df.to_excel(writer, sheet_name=username + "_Stock", index=False)
 
     # Process cross data
@@ -171,7 +173,8 @@ def mongo_to_xls(db, file_path):
     for username in usernames:
         cross_df = pd.DataFrame(list(db["crosses"].find({"User": username})))
         # Remove the "_id" field
-        cross_df = cross_df.drop(columns=["_id"])
+        if "_id" in cross_df.columns:
+            cross_df = cross_df.drop(columns=["_id"])
         cross_df.to_excel(writer, sheet_name=username + "_Cross", index=False)
     
     # Save the Excel file

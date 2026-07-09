@@ -76,6 +76,9 @@ def _iter_tsv_rows(file_path):
                 continue
             if len(row) < len(headers) and headers and headers[0] == "":
                 row = row[1:]
+            # Skip junk rows (e.g. Windows EOF \x1a) that sneak past the empty-row guard
+            if len(row) == 1 and (not row[0].strip() or (row[0].strip() and all(ord(c) < 32 for c in row[0]))):
+                continue
             yield row, header_index
 
 

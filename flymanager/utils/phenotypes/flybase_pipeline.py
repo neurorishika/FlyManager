@@ -278,10 +278,6 @@ def compute_flybase_pipeline_signature(data_dir=None):
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))
 
 
-def _desired_source_kind(db=None):
-    return "mongo_ingest" if db is not None else "files"
-
-
 def _stock_occurrence_indexes(stocks_path):
     allele_counter = Counter()
     gene_counter = Counter()
@@ -1152,28 +1148,75 @@ def build_flybase_phenotype_cache(data_dir=None, cache_path=None, force=False, d
     }
 
 
+def _empty_flybase_phenotype_cache_payload():
+    return {
+        "cache_version": PHENOTYPE_EVIDENCE_CACHE_VERSION,
+        "generated_at": "",
+        "source_signature": "",
+        "source_kind": "files",
+        "source_files": {},
+        "allele_markers": {},
+        "marker_alias_index": {},
+        "ambiguous_marker_aliases": {},
+        "construct_annotations": {},
+        "split_systems": {},
+        "allele_consequences": {},
+        "summary": {},
+        "available": False,
+    }
+
+
 def get_flybase_phenotype_cache(data_dir=None, cache_path=None, db=None):
+    """Read-only accessor for the FlyBase phenotype evidence index.
+
+    This never parses the raw FlyBase source files. The index is only ever
+    (re)built by an explicit admin refresh action (build_flybase_phenotype_cache
+    with force=True). If it hasn't been built yet, or the on-disk cache is
+    stale relative to the current source files, lookups just degrade to empty
+    results instead of blocking a request on a multi-minute parse.
+    """
     data_dir = resolve_flybase_data_dir(data_dir)
     cache_path = resolve_flybase_phenotype_cache_path(data_dir, cache_path)
     cache_key = str(cache_path)
-    signature = compute_flybase_pipeline_signature(data_dir)
-    desired_source_kind = _desired_source_kind(db)
 
     cached_payload = _IN_MEMORY_CACHE.get(cache_key)
-    if (
-        cached_payload
-        and cached_payload.get("source_signature") == signature
-        and cached_payload.get("source_kind", "files") == desired_source_kind
-    ):
+    if cached_payload:
         return cached_payload
 
-    report = build_flybase_phenotype_cache(
-        data_dir=data_dir,
-        cache_path=cache_path,
-        db=db,
-    )
-    del report
-    return _IN_MEMORY_CACHE[cache_key]
+    if cache_path.exists():
+        try:
+            cached_payload = json.loads(cache_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            cached_payload = None
+        if (
+            isinstance(cached_payload, dict)
+            and cached_payload.get("cache_version") == PHENOTYPE_EVIDENCE_CACHE_VERSION
+        ):
+            cached_payload.setdefault("available", True)
+            _IN_MEMORY_CACHE[cache_key] = cached_payload
+            return cached_payload
+
+    return _empty_flybase_phenotype_cache_payload()
+
+
+def flybase_phenotype_cache_status(data_dir=None, cache_path=None):
+    """Cheap staleness check for the FlyBase evidence index (no parsing).
+
+    Returns whether an index has ever been built, and whether the source
+    files have changed since it was last built.
+    """
+    data_dir = resolve_flybase_data_dir(data_dir)
+    cache_path = resolve_flybase_phenotype_cache_path(data_dir, cache_path)
+    current_signature = compute_flybase_pipeline_signature(data_dir)
+
+    cache = get_flybase_phenotype_cache(data_dir=data_dir, cache_path=cache_path)
+    built = bool(cache.get("available"))
+    stale = (not built) or (cache.get("source_signature") != current_signature)
+    return {
+        "built": built,
+        "stale": stale,
+        "generated_at": cache.get("generated_at", ""),
+    }
 
 
 def clear_flybase_phenotype_cache(cache_path=None):

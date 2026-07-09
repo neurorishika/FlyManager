@@ -6,6 +6,13 @@ def _normalize_text(value):
     return str(value or "").strip()
 
 
+def _normalize_dimension(value, default=10):
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
 def annotate_tray_access(tray, viewer):
     annotated = dict(tray)
     owner = _normalize_text(tray.get("User"))
@@ -15,6 +22,8 @@ def annotate_tray_access(tray, viewer):
             "ViewerCanEdit": owner == viewer,
             "TrayScope": "owned" if owner == viewer else "shared",
             "TrayScopeLabel": "Owned" if owner == viewer else f"Owned by {owner}",
+            "Rows": _normalize_dimension(tray.get("Rows")),
+            "Columns": _normalize_dimension(tray.get("Columns")),
         }
     )
     return annotated
@@ -199,9 +208,11 @@ def get_tray(user, tray_id, db):
     """
     trays_collection = db["trays"]
     tray = trays_collection.find_one({"User": user, "UniqueID": tray_id})
+    if not tray:
+        tray = trays_collection.find_one({"User": user, "TrayID": tray_id})
     if tray:
-        return tray
-    tray = trays_collection.find_one({"User": user, "TrayID": tray_id})
+        tray["Rows"] = _normalize_dimension(tray.get("Rows"))
+        tray["Columns"] = _normalize_dimension(tray.get("Columns"))
     return tray
 
 

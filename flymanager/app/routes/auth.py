@@ -15,6 +15,10 @@ from flymanager.utils.mongo import (add_user, consume_password_reset_token,
                                     get_user_email, get_user_stocks,
                                     update_cross_vials, update_stock_vials,
                                     verify_user_password, write_activity)
+from flymanager.utils.phenotypes.flybase_pipeline import \
+    flybase_phenotype_cache_status
+from flymanager.utils.phenotypes.predictor import (get_cached_cross_phenotype,
+                                                    get_cached_stock_phenotype)
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -74,6 +78,38 @@ def admin_required(f):
     return decorated_function
 
 
+def _flash_phenotype_cache_staleness_warnings(username, stocks, crosses):
+    """Nudge the user, at login, if any phenotype data needs an explicit refresh.
+
+    Phenotype predictions are computed once and persisted; they're never
+    silently recomputed on a page view. This is the one place that surfaces
+    "you might want to refresh" instead, without blocking anything.
+    """
+    stale_stock_count = sum(
+        1 for stock in stocks if get_cached_stock_phenotype(stock, strict=True) is None
+    )
+    stale_cross_count = sum(
+        1 for cross in crosses if get_cached_cross_phenotype(cross, strict=True) is None
+    )
+    stale_total = stale_stock_count + stale_cross_count
+    if stale_total:
+        flash(
+            f"{stale_total} of your records have outdated phenotype predictions. "
+            "Refresh them from Settings when convenient.",
+            "info",
+        )
+
+    if username == "admin":
+        evidence_status = flybase_phenotype_cache_status()
+        if evidence_status["stale"]:
+            state = "missing" if not evidence_status["built"] else "out of date"
+            flash(
+                f"The FlyBase phenotype evidence index is {state}. "
+                "Rebuild it from Settings to keep phenotype predictions accurate.",
+                "warning",
+            )
+
+
 @bp.route("/login", methods=["POST", "GET"])
 @limiter.limit("20 per minute")
 def login():
@@ -94,6 +130,7 @@ def login():
                 session["username"] = username
                 session.permanent = True
                 rotate_session_identifier()
+                stocks, crosses = [], []
                 try:
                     stocks = get_user_stocks(username, db)
                     for stock in stocks:
@@ -107,6 +144,13 @@ def login():
                 except Exception as e:
                     current_app.logger.exception(
                         "Error updating post-login state for %s: %s", username, e
+                    )
+
+                try:
+                    _flash_phenotype_cache_staleness_warnings(username, stocks, crosses)
+                except Exception as e:
+                    current_app.logger.exception(
+                        "Error checking phenotype cache staleness for %s: %s", username, e
                     )
 
                 return redirect(url_for("main.home"))

@@ -3,7 +3,7 @@ import hashlib
 import json
 import os
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -49,7 +49,6 @@ from flymanager.utils.utils import clean_tagify_data, increment_replicate_id
 
 bp = Blueprint("stock", __name__)  # url_prefix is defined in app/__init__
 PROVIDER_MATCH_CACHE_FIELD = "ProviderMatchCache"
-PROVIDER_MATCH_CACHE_TTL = timedelta(hours=24)
 
 
 def _get_stock_reference_images(prediction):
@@ -82,22 +81,9 @@ def _decorate_prediction_for_view(prediction, *, image_limit=None):
 
 
 def _get_stock_phenotype_for_view(stock):
-    phenotype_cache = get_cached_stock_phenotype(stock)
-    raw_cache = stock.get("PhenotypeCache")
-    stale_cache_fallback = False
-    if not phenotype_cache and isinstance(raw_cache, dict):
-        genotype = str(stock.get("Genotype", "")).strip()
-        if genotype:
-            phenotype_cache = build_stock_phenotype_cache(genotype)
-            stale_cache_fallback = True
+    phenotype_cache = get_cached_stock_phenotype(stock, strict=False)
     if phenotype_cache:
         prediction = {**phenotype_cache["prediction"]}
-        if stale_cache_fallback:
-            existing_warnings = list(prediction.get("warnings", []))
-            existing_warnings.append(
-                "Displayed preview was recomputed live because the stored phenotype cache is stale. Refresh cache to persist the updated phenotype model."
-            )
-            prediction["warnings"] = existing_warnings
         return {
             **prediction,
             "female_markers": prediction.get("female_markers", []),
@@ -120,7 +106,7 @@ def _get_stock_phenotype_for_view(stock):
             "stage_specific_effects": prediction.get("stage_specific_effects", []),
             "epistasis_events": prediction.get("epistasis_events", []),
             "cached_at": phenotype_cache.get("computedAt", ""),
-            "is_cached": not stale_cache_fallback,
+            "is_cached": True,
         }
 
     return {
@@ -157,12 +143,7 @@ def _get_stock_phenotype_for_view(stock):
 
 
 def _get_stock_phenotype_summary(stock):
-    phenotype_cache = get_cached_stock_phenotype(stock)
-    raw_cache = stock.get("PhenotypeCache")
-    if not phenotype_cache and isinstance(raw_cache, dict):
-        genotype = str(stock.get("Genotype", "")).strip()
-        if genotype:
-            phenotype_cache = build_stock_phenotype_cache(genotype)
+    phenotype_cache = get_cached_stock_phenotype(stock, strict=False)
     if not phenotype_cache:
         return {
             "guess": "Refresh in record",
@@ -507,10 +488,7 @@ def _get_valid_provider_match_cache(stock, source_context):
         return None
 
     cached_at_text = str(cache_payload.get("cachedAt") or "")
-    cached_at = _parse_provider_match_cache_timestamp(cached_at_text)
-    if cached_at is None:
-        return None
-    if datetime.now() - cached_at > PROVIDER_MATCH_CACHE_TTL:
+    if _parse_provider_match_cache_timestamp(cached_at_text) is None:
         return None
 
     expected_signature = _build_provider_match_cache_signature(stock, source_context)

@@ -1,0 +1,103 @@
+# Portainer stack file for Synology NAS deployment
+#
+# Prerequisites:
+#   1. Build and push the image from your dev machine:
+#        docker build -t YOUR_DOCKERHUB_USER/flymanager:latest .
+#        docker push YOUR_DOCKERHUB_USER/flymanager:latest
+#
+#   2. On your Synology, create the data directories:
+#        /volume1/docker/flymanager/data/uploads
+#        /volume1/docker/flymanager/data/backup
+#        /volume1/docker/flymanager/flask_session
+#        /volume1/docker/flymanager/generated_labels
+#        /volume1/docker/flymanager/backups
+#
+#   3. In Portainer → Stacks → Add Stack, paste this file and
+#      fill in the environment variables listed below.
+#
+# After deploying, set up a Reverse Proxy rule in Synology DSM:
+#   Control Panel → Application Portal → Reverse Proxy
+#   Source: https  your-nas-domain.com  443
+#   Destination: http  localhost  12754
+#
+# Required environment variables to set in Portainer:
+#   SECRET_KEY          — long random string, e.g. from: openssl rand -hex 32
+#   FLYMANAGER_ADMIN_USERNAME
+#   FLYMANAGER_ADMIN_PASSWORD
+#   FLYMANAGER_ADMIN_INITIALS
+#   APP_IMAGE           — e.g. YOUR_DOCKERHUB_USER/flymanager:latest
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: flymanager-mongodb
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:12753:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test:
+        ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    image: ${APP_IMAGE:?Set APP_IMAGE to your pushed Docker image, e.g. yourdockerhubuser/flymanager:latest}
+    container_name: flymanager-app
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY to a long random string}
+      MONGO_URI: mongodb://mongodb:27017
+      MONGO_DB_NAME: flymanager
+      APP_HOST: 0.0.0.0
+      APP_PORT: "5234"
+      FLASK_DEBUG: "0"
+      WAIT_FOR_MONGO: "1"
+      WAIT_FOR_MONGO_TIMEOUT: "60"
+      ENABLE_SCHEDULER: "1"
+      SOCKETIO_ASYNC_MODE: threading
+      UPLOAD_FOLDER: data/uploads
+      SESSION_FILE_DIR: /tmp/flymanager/flask_session
+      MAX_UPLOAD_SIZE_BYTES: "8388608"
+      TRUST_PROXY_HEADERS: "1"
+      SESSION_COOKIE_SECURE: "0"
+      SESSION_COOKIE_SAMESITE: Lax
+      SESSION_LIFETIME_SECONDS: "3600"
+      ORG_ABV: ${ORG_ABV:-RU}
+      FLYMANAGER_ADMIN_USERNAME: ${FLYMANAGER_ADMIN_USERNAME:-}
+      FLYMANAGER_ADMIN_PASSWORD: ${FLYMANAGER_ADMIN_PASSWORD:-}
+      FLYMANAGER_ADMIN_INITIALS: ${FLYMANAGER_ADMIN_INITIALS:-}
+      SMTP_SERVER: ${SMTP_SERVER:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SENDER: ${SMTP_SENDER:-}
+      MAIL_SUPPRESS_SEND: ${MAIL_SUPPRESS_SEND:-1}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+    ports:
+      - "0.0.0.0:12754:5234"
+    volumes:
+      - /volume1/docker/flymanager/data:/app/data
+      - /volume1/docker/flymanager/flask_session:/tmp/flymanager/flask_session
+      - /volume1/docker/flymanager/generated_labels:/app/flymanager/app/static/generated_labels
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5234/health/ready', timeout=5)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  mongo_data:

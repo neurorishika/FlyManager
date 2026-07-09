@@ -80,13 +80,7 @@ def _get_cross_phenotype_for_view(cross):
             "operational_notes": list(direction_evaluation.get("operational_notes") or []),
         }
 
-    raw_cache = cross.get("PhenotypeCache")
-    phenotype_cache = get_cached_cross_phenotype(cross)
-    if not phenotype_cache and isinstance(raw_cache, dict):
-        male_genotype = str(cross.get("MaleGenotype", "")).strip()
-        female_genotype = str(cross.get("FemaleGenotype", "")).strip()
-        if male_genotype and female_genotype:
-            phenotype_cache = build_cross_phenotype_cache(male_genotype, female_genotype)
+    phenotype_cache = get_cached_cross_phenotype(cross, strict=False)
     if phenotype_cache:
         parent_phenotypes = phenotype_cache["parentPhenotypes"]
         normalized_parent_phenotypes = {
@@ -241,13 +235,7 @@ def _get_cross_phenotype_for_view(cross):
 
 
 def _get_cross_phenotype_summary(cross):
-    phenotype_cache = get_cached_cross_phenotype(cross)
-    raw_cache = cross.get("PhenotypeCache")
-    if not phenotype_cache and isinstance(raw_cache, dict):
-        male_genotype = str(cross.get("MaleGenotype", "")).strip()
-        female_genotype = str(cross.get("FemaleGenotype", "")).strip()
-        if male_genotype and female_genotype:
-            phenotype_cache = build_cross_phenotype_cache(male_genotype, female_genotype)
+    phenotype_cache = get_cached_cross_phenotype(cross, strict=False)
     if not phenotype_cache:
         return "Refresh in record"
     return phenotype_cache["parentPhenotypes"].get("summary", "Phenotype unavailable")

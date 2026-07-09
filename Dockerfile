@@ -20,4 +20,4 @@ RUN chmod +x docker/app-entrypoint.sh
 EXPOSE 5234
 
 ENTRYPOINT ["./docker/app-entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:5234", "--workers", "1", "--threads", "8", "--worker-class", "gthread", "flymanager.app.wsgi:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5234", "--workers", "1", "--threads", "12", "--worker-class", "gthread", "--timeout", "300", "--access-logfile", "-", "--error-logfile", "-", "flymanager.app.wsgi:app"]

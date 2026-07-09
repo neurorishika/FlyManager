@@ -422,16 +422,30 @@ def build_stock_phenotype_cache(genotype):
     }
 
 
-def get_cached_stock_phenotype(record):
+def get_cached_stock_phenotype(record, strict=True):
+    """Return the stored phenotype cache for a stock, if present.
+
+    strict=True (the default, used by the explicit backfill/refresh paths)
+    also requires the cache version and FlyBase pipeline signature to match
+    the current pipeline, forcing a recompute of anything out of date.
+
+    strict=False (used by ordinary read paths, e.g. explorer/view pages)
+    serves whatever prediction is stored regardless of version/signature
+    drift, so viewing a record never triggers a live recompute. Only the
+    genotype match is still checked, since that's a correctness guard
+    (has this record actually changed genotype since it was cached), not a
+    staleness policy.
+    """
     cache = record.get("PhenotypeCache")
     genotype = str(record.get("Genotype", ""))
 
     if not isinstance(cache, dict):
         return None
-    if cache.get("version") != PHENOTYPE_CACHE_VERSION:
-        return None
-    if cache.get("pipelineSignature") and str(cache.get("pipelineSignature", "")) != compute_flybase_pipeline_signature():
-        return None
+    if strict:
+        if cache.get("version") != PHENOTYPE_CACHE_VERSION:
+            return None
+        if cache.get("pipelineSignature") and str(cache.get("pipelineSignature", "")) != compute_flybase_pipeline_signature():
+            return None
     if str(cache.get("genotype", "")) != genotype:
         return None
     if not isinstance(cache.get("prediction"), dict):
@@ -509,17 +523,22 @@ def build_cross_phenotype_cache(male_genotype, female_genotype):
     }
 
 
-def get_cached_cross_phenotype(record):
+def get_cached_cross_phenotype(record, strict=True):
+    """Return the stored phenotype cache for a cross, if present.
+
+    See get_cached_stock_phenotype for the meaning of strict.
+    """
     cache = record.get("PhenotypeCache")
     male_genotype = str(record.get("MaleGenotype", ""))
     female_genotype = str(record.get("FemaleGenotype", ""))
 
     if not isinstance(cache, dict):
         return None
-    if cache.get("version") != PHENOTYPE_CACHE_VERSION:
-        return None
-    if cache.get("pipelineSignature") and str(cache.get("pipelineSignature", "")) != compute_flybase_pipeline_signature():
-        return None
+    if strict:
+        if cache.get("version") != PHENOTYPE_CACHE_VERSION:
+            return None
+        if cache.get("pipelineSignature") and str(cache.get("pipelineSignature", "")) != compute_flybase_pipeline_signature():
+            return None
     if str(cache.get("maleGenotype", "")) != male_genotype:
         return None
     if str(cache.get("femaleGenotype", "")) != female_genotype:
