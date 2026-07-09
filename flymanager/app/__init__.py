@@ -303,6 +303,13 @@ def create_app():
 
         # --- Initialize Scheduler ---
         if env_flag("ENABLE_SCHEDULER", True) and not scheduler.running:
+            # Each job below shares its lock key with its matching admin
+            # "run now" route. For the two monthly jobs, an admin-triggered
+            # run leaves a succeeded/failed history record under that key
+            # until its TTL expires; if the monthly cron tick lands while
+            # that history record is still present, it will see the key as
+            # taken and skip the tick (logged, not an error) -- expected,
+            # since the data was just refreshed manually.
             # Add scheduled job using the function from services
             scheduler.add_job(
                 id="daily_flip_reminder_job",

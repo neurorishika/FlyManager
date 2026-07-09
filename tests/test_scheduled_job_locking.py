@@ -15,7 +15,7 @@ import pytest
 
 from flymanager.app import run_locked_scheduled_job
 from flymanager.utils.mongo.operation_locks import (
-    OperationLockConflict, hold_operation_lock)
+    OperationLockConflict, hold_operation_lock, start_background_job)
 
 
 class _FakeAppContext:
@@ -98,6 +98,25 @@ def test_run_locked_scheduled_job_different_keys_do_not_block_each_other(app, db
         )
 
     assert calls == ["job_b"]
+
+
+def test_run_locked_scheduled_job_skips_when_a_manual_job_holds_the_same_key(app, db, monkeypatch, caplog):
+    # Symmetric to test_run_locked_scheduled_job_skips_when_already_locked:
+    # a manually-triggered admin job (start_background_job, used by the RQ
+    # queue) holding the shared key must also block a scheduled run of the
+    # same task, not just the other way around.
+    monkeypatch.setattr("flymanager.app.db", db)
+    calls = []
+    start_background_job(db, key="maintenance:shared-key", actor="alice", label="Manual trigger")
+
+    with caplog.at_level(logging.INFO):
+        run_locked_scheduled_job(
+            app, key="maintenance:shared-key", label="Shared Job", ttl_seconds=60,
+            func=lambda a: calls.append(a),
+        )
+
+    assert calls == []
+    assert any("maintenance:shared-key" in message for message in caplog.messages)
 
 
 def test_run_locked_scheduled_job_never_raises_operation_lock_conflict(app, db, monkeypatch):
