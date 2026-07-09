@@ -195,21 +195,37 @@ def create_app():
     @app.context_processor
     def inject_settings():
         flybase_sync_indicator = None
-        if session.get("username") == "admin":
-            try:
-                from flymanager.app.services import flybase as flybase_service
+        has_active_background_jobs = False
+        username = session.get("username")
+        if username:
+            if username == "admin":
+                try:
+                    from flymanager.app.services import flybase as flybase_service
 
-                flybase_sync_indicator = flybase_service.get_flybase_reference_status(app)
+                    flybase_sync_indicator = flybase_service.get_flybase_reference_status(app)
+                except Exception as exc:
+                    app.logger.warning(
+                        "Unable to load FlyBase sync indicator for template context: %s",
+                        exc,
+                    )
+            try:
+                from flymanager.utils.mongo import list_recent_jobs
+
+                actor = None if username == "admin" else username
+                has_active_background_jobs = any(
+                    job.get("status") in ("queued", "running")
+                    for job in list_recent_jobs(db, actor=actor, limit=20)
+                )
             except Exception as exc:
                 app.logger.warning(
-                    "Unable to load FlyBase sync indicator for template context: %s",
-                    exc,
+                    "Unable to check for active background jobs: %s", exc
                 )
 
         return dict(
             settings=get_settings(db),
             csp_nonce=generate_csp_nonce(),
             flybase_sync_indicator=flybase_sync_indicator,
+            has_active_background_jobs=has_active_background_jobs,
         )
 
     @app.before_request
@@ -218,8 +234,8 @@ def create_app():
 
     with app.app_context():
         # --- Import and Register Blueprints ---
-        from flymanager.app.routes import (auth, cross, data, flip, main,
-                                           settings, stock, tray)
+        from flymanager.app.routes import (auth, cross, data, flip, jobs,
+                                           main, settings, stock, tray)
 
         app.register_blueprint(main.bp)
         app.register_blueprint(auth.bp)
@@ -229,6 +245,7 @@ def create_app():
         app.register_blueprint(data.bp, url_prefix="/data")
         app.register_blueprint(tray.bp, url_prefix="/tray")
         app.register_blueprint(settings.bp)
+        app.register_blueprint(jobs.bp)
 
         if env_flag("WARM_PAGE_CACHES_ON_STARTUP", True):
             try:

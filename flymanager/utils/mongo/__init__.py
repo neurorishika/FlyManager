@@ -36,9 +36,16 @@ from flymanager.utils.mongo.helpers import (add_metadata, delete_metadata,
                                             get_flip_schedule, get_metadata,
                                             preload_metadata_cache)
 from flymanager.utils.mongo.operation_locks import (OperationLockConflict,
+                                                    get_job_status,
                                                     hold_operation_lock,
                                                     hold_operation_locks,
-                                                    record_operation_lock_keys)
+                                                    list_recent_jobs,
+                                                    mark_job_failed,
+                                                    mark_job_running,
+                                                    mark_job_succeeded,
+                                                    record_operation_lock_keys,
+                                                    start_background_job,
+                                                    update_job_progress)
 # Settings functions
 from flymanager.utils.mongo.settings import get_settings, update_settings
 # Stock functions
@@ -73,6 +80,13 @@ __all__ = [
     "hold_operation_lock",
     "hold_operation_locks",
     "record_operation_lock_keys",
+    "start_background_job",
+    "mark_job_running",
+    "update_job_progress",
+    "mark_job_succeeded",
+    "mark_job_failed",
+    "get_job_status",
+    "list_recent_jobs",
     # Access helpers
     "get_accessible_stock",
     "get_accessible_stocks",

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="app-panel app-page-header">
+    <div>
+        <p class="app-kicker">Background Jobs</p>
+        <h1 class="app-page-title">{{ "All Background Jobs" if is_admin else "Your Background Jobs" }}</h1>
+        <p class="app-page-subtitle">
+            Heavy maintenance actions (exports, phenotype/provider cache refreshes, FlyBase and Bloomington data
+            updates) run in the background instead of blocking the page. This lists recent runs and their results.
+        </p>
+    </div>
+</div>
+
+<div class="app-panel">
+    {% if jobs %}
+    <div class="table-responsive">
+        <table class="table table-striped align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Job</th>
+                    {% if is_admin %}<th>Started by</th>{% endif %}
+                    <th>Status</th>
+                    <th>Started</th>
+                    <th>Finished</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in jobs %}
+                <tr>
+                    <td>{{ job.label or job.key }}</td>
+                    {% if is_admin %}<td>{{ job.actor }}</td>{% endif %}
+                    <td>
+                        <span class="badge badge-{{ 'success' if job.status == 'succeeded' else 'danger' if job.status == 'failed' else 'info' }}">
+                            {{ job.status }}
+                        </span>
+                    </td>
+                    <td>{{ job.started_at or job.created_at or '—' }}</td>
+                    <td>{{ job.finished_at or '—' }}</td>
+                    <td>
+                        {% if job.status == 'failed' %}
+                            <span class="text-danger">{{ job.error }}</span>
+                        {% elif job.result and job.result.message %}
+                            {{ job.result.message }}
+                            {% if job.metadata.route == 'download_data_route' and job.result.download_filename %}
+                                <br><a href="{{ url_for('data.download_data_file_route', job_key=job.key) }}">Download export</a>
+                            {% endif %}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="app-page-subtitle mb-0">No background jobs have run yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

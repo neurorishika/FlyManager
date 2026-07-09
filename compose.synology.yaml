@@ -1,5 +1,11 @@
 # Portainer stack file for Synology NAS deployment
 #
+# Heavy admin actions (Excel export, phenotype/provider cache backfills,
+# FlyBase/Bloomington data refreshes) run in a separate "worker" container
+# via Redis-backed RQ, so they never block the web app. The worker uses the
+# same image as the app, just with a different entrypoint/command - no
+# separate build/push step needed for it.
+#
 # Prerequisites:
 #   1. Build and push the image from your dev machine:
 #        docker build -t YOUR_DOCKERHUB_USER/flymanager:latest .
@@ -8,6 +14,7 @@
 #   2. On your Synology, create the data directories:
 #        /volume1/docker/flymanager/data/uploads
 #        /volume1/docker/flymanager/data/backup
+#        /volume1/docker/flymanager/data/job_exports
 #        /volume1/docker/flymanager/flask_session
 #        /volume1/docker/flymanager/generated_labels
 #        /volume1/docker/flymanager/backups
@@ -44,17 +51,34 @@ services:
       retries: 10
       start_period: 10s
 
-  app:
+  redis:
+    image: redis:7-alpine
+    container_name: flymanager-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  app: &app
     image: ${APP_IMAGE:?Set APP_IMAGE to your pushed Docker image, e.g. yourdockerhubuser/flymanager:latest}
     container_name: flymanager-app
     restart: unless-stopped
     depends_on:
       mongodb:
         condition: service_healthy
-    environment:
+      redis:
+        condition: service_healthy
+    environment: &app-environment
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY to a long random string}
       MONGO_URI: mongodb://mongodb:27017
       MONGO_DB_NAME: flymanager
+      REDIS_URL: redis://redis:6379/0
       APP_HOST: 0.0.0.0
       APP_PORT: "5234"
       FLASK_DEBUG: "0"
@@ -82,7 +106,7 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
     ports:
       - "0.0.0.0:12754:5234"
-    volumes:
+    volumes: &app-volumes
       - /volume1/docker/flymanager/data:/app/data
       - /volume1/docker/flymanager/flask_session:/tmp/flymanager/flask_session
       - /volume1/docker/flymanager/generated_labels:/app/flymanager/app/static/generated_labels
@@ -99,5 +123,24 @@ services:
       retries: 10
       start_period: 20s
 
+  worker:
+    <<: *app
+    container_name: flymanager-worker
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *app-environment
+      ENABLE_SCHEDULER: "0"
+    ports: []
+    volumes: *app-volumes
+    entrypoint: ["./docker/worker-entrypoint.sh"]
+    command: ["python", "-m", "flymanager.app.worker"]
+    healthcheck:
+      disable: true
+
 volumes:
   mongo_data:
+  redis_data:

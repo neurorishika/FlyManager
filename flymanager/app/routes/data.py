@@ -1,4 +1,3 @@
-import io
 import os
 from datetime import datetime  # Added import
 
@@ -8,11 +7,15 @@ from werkzeug.utils import secure_filename
 
 # Import necessary components from app context and utils
 from flymanager.app import allowed_file, db  # Import helper from app context
+from flymanager.app.jobs import enqueue_job
+from flymanager.app.jobs import tasks as job_tasks
+from flymanager.app.jobs.tasks import EXPORT_SUBDIR
 from flymanager.app.routes.auth import admin_required, login_required
 from flymanager.app.security import limiter
 from flymanager.app.services import flybase as flybase_service
-from flymanager.utils.converter import mongo_to_xls, xls_to_mongo
-from flymanager.utils.mongo import write_activity  # Import for logging
+from flymanager.utils.converter import xls_to_mongo
+from flymanager.utils.mongo import (OperationLockConflict, get_job_status,
+                                    write_activity)  # Import for logging
 
 # Define the Blueprint
 bp = Blueprint('data', __name__, url_prefix='/data') # url_prefix defined in app/__init__
@@ -35,35 +38,53 @@ def _get_flybase_reference_status():
 @admin_required
 @limiter.limit('10 per hour')
 def download_data_route():
-    """Generates and downloads an Excel file of the user's data."""
+    """Starts a background export of all data to Excel; the file is fetched via
+    download_data_file_route once the job (visible in the jobs banner /
+    Settings > Jobs) finishes."""
     username = session.get("username")
-    output = io.BytesIO()
+    key = f"maintenance:excel-export:user:{username}"
 
     try:
-        # Generate Excel file in memory using the utility function
-        # Pass db, output buffer, and username
-        mongo_to_xls(db, output)
-        output.seek(0) # Rewind the buffer
-
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        download_name = f'fly_manager_data_{username}_{timestamp}.xlsx'
-
-        # Log activity
-        write_activity(username, 'Downloaded data to Excel', db)
-
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=download_name
+        enqueue_job(
+            db,
+            key=key,
+            actor=username,
+            label="Excel data export",
+            func=job_tasks.task_export_excel,
+            kwargs={"key": key, "username": username},
+            ttl_seconds=1800,
+            metadata={"route": "download_data_route"},
+            conflict_message="An Excel export for you is already running. Please wait for it to finish.",
         )
-    except Exception as e:
-        current_app.logger.exception("Error generating Excel download for %s: %s", username, e)
-        import traceback
-        traceback.print_exc()
-        flash(f"An error occurred while generating the Excel file: {e}", "error")
-        # Redirect to a page where flash message can be seen, e.g., home or data upload page
-        return redirect(url_for('.upload_data_route')) # Redirect to upload page within the same blueprint
+    except OperationLockConflict as exc:
+        flash(str(exc), "warning")
+        return redirect(url_for('.upload_data_route'))
+
+    flash("Generating your Excel export in the background - it'll be ready to download shortly.", "info")
+    return redirect(url_for('.upload_data_route'))
+
+
+@bp.route('/download/<path:job_key>/file')
+@login_required
+@admin_required
+def download_data_file_route(job_key):
+    """Serves the file produced by a finished Excel export job."""
+    job = get_job_status(db, job_key)
+    if not job or not job.get("result") or not job["result"].get("download_filename"):
+        flash("That export isn't ready yet (or has expired). Please start a new one.", "warning")
+        return redirect(url_for('.upload_data_route'))
+
+    file_path = os.path.join(EXPORT_SUBDIR, job["result"]["download_filename"])
+    if not os.path.exists(file_path):
+        flash("That export file is no longer available. Please start a new one.", "warning")
+        return redirect(url_for('.upload_data_route'))
+
+    return send_file(
+        file_path,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=job["result"]["download_filename"],
+    )
 
 
 @bp.route('/upload', methods=['GET', 'POST'])

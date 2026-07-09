@@ -58,6 +58,21 @@ class _InMemoryOperationLockCollection:
                 return dict(document)
         return None
 
+    def find(self, query=None, projection=None):
+        del projection
+        return [
+            dict(document)
+            for document in self._documents
+            if self._matches(document, query or {})
+        ]
+
+    def update_one(self, query, update):
+        for document in self._documents:
+            if self._matches(document, query):
+                document.update(update.get("$set", {}))
+                return
+        raise KeyError("No matching operation lock document to update")
+
     def delete_many(self, query):
         self._documents = [
             document for document in self._documents
@@ -70,6 +85,10 @@ class _InMemoryOperationLockCollection:
             document_value = document.get(key)
             if isinstance(value, dict):
                 if "$lte" in value and not (document_value <= value["$lte"]):
+                    return False
+                if "$ne" in value and document_value == value["$ne"]:
+                    return False
+                if "$in" in value and document_value not in value["$in"]:
                     return False
                 continue
             if document_value != value:
@@ -164,3 +183,147 @@ def hold_operation_locks(
 
 def record_operation_lock_keys(unique_ids):
     return [f"record-mutation:{uid}" for uid in _normalize_lock_keys(unique_ids)]
+
+
+# --- Background job tracking -------------------------------------------------
+#
+# A background job is just an operation lock document that isn't deleted the
+# moment the work finishes. The same "key" that used to be a pure mutex now
+# doubles as a job-status record: created with status="queued" when the route
+# enqueues it, updated to "running"/"succeeded"/"failed" by the worker, and
+# left in place (browsable as job history) until its TTL expires and the
+# normal _cleanup_expired_locks sweep removes it.
+
+JOB_STATUS_QUEUED = "queued"
+JOB_STATUS_RUNNING = "running"
+JOB_STATUS_SUCCEEDED = "succeeded"
+JOB_STATUS_FAILED = "failed"
+
+_ACTIVE_JOB_STATUSES = (JOB_STATUS_QUEUED, JOB_STATUS_RUNNING)
+
+DEFAULT_JOB_HISTORY_TTL_SECONDS = 60 * 60 * 48  # 48 hours
+
+
+def start_background_job(
+    db,
+    *,
+    key,
+    actor,
+    label,
+    ttl_seconds=DEFAULT_JOB_HISTORY_TTL_SECONDS,
+    metadata=None,
+    conflict_message=None,
+):
+    """Create a queued job record, or raise OperationLockConflict if one is already active.
+
+    Returns the job's key (equal to the RQ job id the caller should use), so
+    the same string threads through the queue, the status document, and the
+    polling endpoint.
+    """
+    normalized_keys = _normalize_lock_keys([key])
+    if not normalized_keys:
+        raise ValueError("A non-empty job key is required")
+    job_key = normalized_keys[0]
+
+    collection = _get_operation_lock_collection(db)
+    _cleanup_expired_locks(collection)
+
+    existing = collection.find_one({"key": job_key})
+    if existing and existing.get("status") in _ACTIVE_JOB_STATUSES:
+        raise OperationLockConflict(
+            _build_conflict_message(existing, conflict_message)
+        )
+
+    # A finished job record can still be sitting here (kept for history); a
+    # fresh run replaces it outright rather than erroring on the unique key.
+    if existing:
+        collection.delete_many({"key": job_key})
+
+    now = _utcnow()
+    collection.insert_one(
+        {
+            "key": job_key,
+            "token": uuid4().hex,
+            "actor": actor,
+            "label": label,
+            "metadata": metadata or {},
+            "status": JOB_STATUS_QUEUED,
+            "progress": None,
+            "result": None,
+            "error": None,
+            "created_at": now,
+            "started_at": None,
+            "finished_at": None,
+            "expires_at": now + timedelta(seconds=max(int(ttl_seconds), 1)),
+        }
+    )
+    return job_key
+
+
+def mark_job_running(db, key):
+    _get_operation_lock_collection(db).update_one(
+        {"key": key},
+        {"$set": {"status": JOB_STATUS_RUNNING, "started_at": _utcnow()}},
+    )
+
+
+def update_job_progress(db, key, *, current=None, total=None, message=None):
+    _get_operation_lock_collection(db).update_one(
+        {"key": key},
+        {
+            "$set": {
+                "progress": {
+                    "current": current,
+                    "total": total,
+                    "message": message,
+                }
+            }
+        },
+    )
+
+
+def mark_job_succeeded(db, key, *, result=None):
+    _get_operation_lock_collection(db).update_one(
+        {"key": key},
+        {
+            "$set": {
+                "status": JOB_STATUS_SUCCEEDED,
+                "result": result,
+                "error": None,
+                "finished_at": _utcnow(),
+            }
+        },
+    )
+
+
+def mark_job_failed(db, key, *, error):
+    _get_operation_lock_collection(db).update_one(
+        {"key": key},
+        {
+            "$set": {
+                "status": JOB_STATUS_FAILED,
+                "error": str(error),
+                "finished_at": _utcnow(),
+            }
+        },
+    )
+
+
+def get_job_status(db, key):
+    collection = _get_operation_lock_collection(db)
+    _cleanup_expired_locks(collection)
+    document = collection.find_one({"key": key})
+    if not document or "status" not in document:
+        return None
+    return document
+
+
+def list_recent_jobs(db, *, actor=None, limit=50):
+    collection = _get_operation_lock_collection(db)
+    _cleanup_expired_locks(collection)
+    query = {"status": {"$in": list(_ACTIVE_JOB_STATUSES + (JOB_STATUS_SUCCEEDED, JOB_STATUS_FAILED))}}
+    if actor:
+        query["actor"] = actor
+    documents = [doc for doc in collection.find(query) if "status" in doc]
+    documents.sort(key=lambda doc: doc.get("created_at") or _utcnow(), reverse=True)
+    return documents[:limit]

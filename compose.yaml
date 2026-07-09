@@ -15,7 +15,21 @@ services:
       retries: 10
       start_period: 10s
 
-  app:
+  redis:
+    image: redis:7-alpine
+    container_name: flymanager-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  app: &app
     build:
       context: .
       dockerfile: Dockerfile
@@ -24,11 +38,14 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - ${FLYMANAGER_ENV_FILE:-.env}
-    environment:
+    environment: &app-environment
       MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017}
       MONGO_DB_NAME: ${MONGO_DB_NAME:-flymanager}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       APP_HOST: 0.0.0.0
       APP_PORT: ${APP_PORT:-5234}
       FLASK_DEBUG: ${FLASK_DEBUG:-0}
@@ -44,7 +61,7 @@ services:
       - "5234"
     ports:
       - "${APP_PUBLISHED_HOST:-127.0.0.1}:${APP_PORT:-5234}:5234"
-    volumes:
+    volumes: &app-volumes
       - ./data:/app/data
       - ./flask_session:/tmp/flymanager/flask_session
       - ./flymanager/app/static/generated_labels:/app/flymanager/app/static/generated_labels
@@ -61,5 +78,25 @@ services:
       retries: 10
       start_period: 20s
 
+  worker:
+    <<: *app
+    container_name: flymanager-worker
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *app-environment
+      ENABLE_SCHEDULER: "0"
+    ports: []
+    expose: []
+    volumes: *app-volumes
+    entrypoint: ["./docker/worker-entrypoint.sh"]
+    command: ["python", "-m", "flymanager.app.worker"]
+    healthcheck:
+      disable: true
+
 volumes:
   mongo_data:
+  redis_data:
