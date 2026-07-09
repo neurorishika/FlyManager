@@ -4,6 +4,7 @@ Flask application factory module.
 Creates and configures the Flask application.
 """
 
+import functools
 import os
 import re
 import secrets
@@ -22,10 +23,11 @@ from flask_session import Session as FlaskSession
 from flymanager.app.security import (add_security_headers, csrf,
                                      generate_csp_nonce, limiter,
                                      parse_allowed_origins)
-from flymanager.utils.mongo import (create_mongo_client, ensure_mongo_indexes,
-                                    get_all_users, get_database,
-                                    get_flip_schedule, get_settings,
-                                    get_user_email, ping_database,
+from flymanager.utils.mongo import (OperationLockConflict, create_mongo_client,
+                                    ensure_mongo_indexes, get_all_users,
+                                    get_database, get_flip_schedule,
+                                    get_settings, get_user_email,
+                                    hold_operation_lock, ping_database,
                                     preload_metadata_cache)
 from flymanager.utils.stock_sources import preload_flybase_stock_indexes
 
@@ -91,6 +93,29 @@ def abbreviate_species_name(value):
             return f"D. {species[:3]}"
 
     return text
+
+
+def run_locked_scheduled_job(app, *, key, label, ttl_seconds, func):
+    """Run a scheduled job under a Mongo-backed distributed lock.
+
+    Guards APScheduler cron jobs against double-firing if the app is ever
+    scaled to more than one replica. A lock conflict is a routine, expected
+    skip (another replica already grabbed this tick), logged and swallowed
+    rather than raised, so APScheduler never records it as a job failure.
+    """
+    with app.app_context():
+        try:
+            with hold_operation_lock(
+                db,
+                key=f"cron:{key}",
+                actor="scheduler",
+                label=label,
+                ttl_seconds=ttl_seconds,
+                conflict_message=f"{label} is already running on another instance; skipping.",
+            ):
+                func(app)
+        except OperationLockConflict as exc:
+            app.logger.info("Skipped scheduled job %s: %s", key, exc)
 
 
 # --- Application Factory ---
@@ -276,34 +301,58 @@ def create_app():
             # Add scheduled job using the function from services
             scheduler.add_job(
                 id="daily_flip_reminder_job",
-                func=scheduler_service.schedule_daily_flip_reminders,
+                func=functools.partial(
+                    run_locked_scheduled_job,
+                    key="daily_flip_reminder",
+                    label="Daily flip reminder",
+                    ttl_seconds=1800,
+                    func=scheduler_service.schedule_daily_flip_reminders,
+                ),
                 trigger="cron",
                 hour=8,
                 minute=0,
                 args=[app],  # Pass the app instance to the scheduled function
                 replace_existing=True,
+                max_instances=1,
+                coalesce=True,
             )
             # Add monthly FlyBase reference refresh job (1st day of each month at 1:30 AM)
             scheduler.add_job(
                 id="monthly_flybase_reference_refresh_job",
-                func=flybase_service.update_flybase_reference_data,
+                func=functools.partial(
+                    run_locked_scheduled_job,
+                    key="monthly_flybase_reference_refresh",
+                    label="Monthly FlyBase reference refresh",
+                    ttl_seconds=3600,
+                    func=flybase_service.update_flybase_reference_data,
+                ),
                 trigger="cron",
                 day=1,
                 hour=1,
                 minute=30,
                 args=[app],
                 replace_existing=True,
+                max_instances=1,
+                coalesce=True,
             )
             # Add monthly legacy Bloomington compatibility refresh job (1st day of each month at 2 AM)
             scheduler.add_job(
                 id="monthly_bloomington_update_job",
-                func=bloomington_service.update_bloomington_stock_data,
+                func=functools.partial(
+                    run_locked_scheduled_job,
+                    key="monthly_bloomington_update",
+                    label="Monthly Bloomington compatibility refresh",
+                    ttl_seconds=3600,
+                    func=bloomington_service.update_bloomington_stock_data,
+                ),
                 trigger="cron",
                 day=1,
                 hour=2,
                 minute=0,
                 args=[app],
                 replace_existing=True,
+                max_instances=1,
+                coalesce=True,
             )
             scheduler.start()
             app.logger.info("Scheduler started.")
