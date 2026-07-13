@@ -1,5 +1,9 @@
 # FlyManager backup schedule example
 # Adjust /opt/flymanager and BACKUP_OFFSITE_DIR for your host.
+#
+# Routine/scheduled MongoDB backups now run from the in-stack
+# mongo-backup Compose service (see BACKUP_AND_RECOVERY.md) instead of a
+# host cron entry. scripts/mongo-backup.sh remains available for manual,
+# on-demand backups (e.g. immediately before a deploy).
 
-0 * * * * cd /opt/flymanager && COMPOSE_ARGS="-f compose.yaml -f compose.production.yaml" BACKUP_OFFSITE_DIR=/srv/flymanager-backups ./scripts/mongo-backup.sh >> /opt/flymanager/backups/logs/mongo-backup.log 2>&1
 15 2 * * * cd /opt/flymanager && COMPOSE_ARGS="-f compose.yaml -f compose.production.yaml" BACKUP_OFFSITE_DIR=/srv/flymanager-backups ./scripts/state-backup.sh >> /opt/flymanager/backups/logs/state-backup.log 2>&1
