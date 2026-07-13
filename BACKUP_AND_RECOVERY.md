@@ -68,9 +68,10 @@ new, initially-empty secondary that syncs from the existing primary.
    full initial sync from the primary).
 6. Verify `/health/ready` and a few representative UI reads.
 
-Rehearse this once against a restored copy of your data (see the Restore
-Drill section below) before running it against the real production stack,
-so the migration procedure isn't tried for the first time on production.
+Rehearse this once against a restored copy of your data (see the
+"Recovery Drill Procedure" section below) before running it against the
+real production stack, so the migration procedure isn't tried for the
+first time on production.
 
 ## What Gets Protected
 
