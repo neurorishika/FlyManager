@@ -34,6 +34,44 @@ FlyManager currently uses a two-part backup model:
 
 You need both archive types for a full recovery.
 
+## Replica Set
+
+The Compose stacks (`compose.yaml` and `compose.synology.yaml`) run a
+2-member Mongo replica set: `mongodb` (priority 2, preferred primary) and
+`mongodb2` (priority 1, secondary). A one-shot `mongo-init` service runs
+`rs.initiate()` idempotently on first startup (it checks `rs.status()`
+first and does nothing if the set already exists).
+
+### Verifying replica set health
+
+```bash
+docker compose exec mongodb mongosh --quiet --eval 'rs.status().members.map(m => ({name: m.name, stateStr: m.stateStr}))'
+```
+
+Expect one `PRIMARY` and one `SECONDARY`.
+
+### Migrating an existing single-instance deployment
+
+If you're upgrading a deployment that already has real data in the
+`mongodb` service's `mongo_data` volume (as opposed to a fresh install),
+follow this procedure. It does not move, copy, or reformat any existing
+data - it only changes the mongod process's replication mode and adds a
+new, initially-empty secondary that syncs from the existing primary.
+
+1. Take a manual Mongo backup first as a safety net: `./scripts/mongo-backup.sh`
+2. Stop the stack: `docker compose down` (the `mongo_data` volume persists - do not add `-v`)
+3. Pull the updated `compose.yaml`/`compose.synology.yaml`
+4. Start the stack: `docker compose up -d`
+5. Verify `rs.status()` (see above) shows `mongodb` as `PRIMARY` with your
+   existing data intact, and `mongodb2` reaching `SECONDARY` state (this
+   can take a while on a large database - the secondary is performing a
+   full initial sync from the primary).
+6. Verify `/health/ready` and a few representative UI reads.
+
+Rehearse this once against a restored copy of your data (see the Restore
+Drill section below) before running it against the real production stack,
+so the migration procedure isn't tried for the first time on production.
+
 ## What Gets Protected
 
 ### MongoDB archive scope
@@ -106,6 +144,12 @@ Operationally, this is a strong single-host backup posture, but not synchronous 
 
 ### Mongo backup
 
+**Routine, scheduled backups now come from the in-stack `mongo-backup`
+Compose service** (see "Backup Container" below), not from this script's
+systemd timer or cron entry (both retired). This script remains the tool
+for manual, on-demand backups - for example immediately before a deploy
+(see "Pre-Upgrade Backup Procedure" below).
+
 Script: [scripts/mongo-backup.sh](scripts/mongo-backup.sh)
 
 Purpose:
@@ -137,6 +181,45 @@ Important behavior:
 
 - restore uses `mongorestore --drop`
 - this replaces the current database contents with the contents of the archive
+
+### Backup container
+
+Service: `mongo-backup` in `compose.yaml` / `compose.synology.yaml`.
+Script: [scripts/container-mongo-backup.sh](scripts/container-mongo-backup.sh).
+
+Purpose:
+
+- run on a loop (every `MONGO_BACKUP_INTERVAL_SECONDS`, default 21600 = 6
+  hours) inside the Compose network, with no host-level scheduler
+  dependency
+- `mongodump --oplog --archive --gzip` directly against `mongodb:27017`
+  (requires the replica set from the "Replica Set" section above -
+  `--oplog` only works against a real replica-set member)
+- write a `.sha256` checksum alongside each archive
+- prune local archives in the `mongo_backups` volume older than
+  `BACKUP_KEEP_DAYS` (default 14)
+- optionally push the archive and checksum off-site via `rclone`, if
+  `RCLONE_REMOTE` is set
+- optionally ping a healthcheck.io dead-man's-switch URL on success, if
+  `HEALTHCHECK_UUID` is set
+
+Configuring off-site push and heartbeat monitoring:
+
+1. Run `rclone config` to create a remote (see rclone's docs for your
+   provider - Google Drive, S3, Backblaze B2, etc.)
+2. Save the resulting config to the path pointed at by
+   `RCLONE_CONFIG_PATH` (default `./scripts/rclone.conf` - **never commit
+   a real config with credentials**; the tracked file at that path is a
+   placeholder template only)
+3. Set `RCLONE_REMOTE` in `.env` to the remote name and path, e.g.
+   `gdrive:flymanager-backups`
+4. Create a check in healthcheck.io (cron-style, matching your backup
+   interval) and set `HEALTHCHECK_UUID` in `.env` to its UUID
+5. Restart the `mongo-backup` service and confirm a successful ping is
+   recorded in healthcheck.io after the next backup cycle
+
+Until these are configured, the off-site push and heartbeat steps are
+silent no-ops - local backups with checksums and retention still run.
 
 ### State backup
 
@@ -504,6 +587,20 @@ Prove that:
 - state archives are usable
 - Mongo archives are usable
 - the documented restore order produces a working system
+
+### Automated drill tooling
+
+[scripts/mongo-restore-drill.sh](scripts/mongo-restore-drill.sh) automates
+steps 1-7 below against a fully disposable scratch container (never the
+live stack):
+
+```bash
+./scripts/mongo-restore-drill.sh path/to/backup.archive.gz
+```
+
+It restores the archive into a throwaway `mongod` container, prints
+per-collection document counts across every restored database, and always
+removes the scratch container afterward (even on failure).
 
 ### Drill steps
 
