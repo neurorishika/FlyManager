@@ -18,8 +18,19 @@
 #        /volume1/docker/flymanager/flask_session
 #        /volume1/docker/flymanager/generated_labels
 #        /volume1/docker/flymanager/backups
+#        /volume1/docker/flymanager/scripts
 #
-#   3. In Portainer → Stacks → Add Stack, paste this file and
+#   3. Upload these two repo files into /volume1/docker/flymanager/scripts/
+#      on the NAS (e.g. via File Station or scp) - there is no git checkout
+#      on the NAS in the Portainer deployment model, so these must be
+#      copied in manually and re-copied whenever they change:
+#        scripts/container-mongo-backup.sh
+#        scripts/rclone.conf (copy from scripts/rclone.conf.example and
+#          fill in real rclone remote credentials once you're ready to
+#          enable off-site backup push - leave it as the unmodified
+#          example content, renamed to rclone.conf, until then)
+#
+#   4. In Portainer → Stacks → Add Stack, paste this file and
 #      fill in the environment variables listed below.
 #
 # After deploying, set up a Reverse Proxy rule in Synology DSM:
@@ -102,8 +113,8 @@ services:
         condition: service_completed_successfully
     volumes:
       - mongo_backups:/backups
-      - ./scripts/container-mongo-backup.sh:/usr/local/bin/container-mongo-backup.sh:ro
-      - ${RCLONE_CONFIG_PATH:-./scripts/rclone.conf}:/config/rclone/rclone.conf:ro
+      - /volume1/docker/flymanager/scripts/container-mongo-backup.sh:/usr/local/bin/container-mongo-backup.sh:ro
+      - ${RCLONE_CONFIG_PATH:-/volume1/docker/flymanager/scripts/rclone.conf}:/config/rclone/rclone.conf:ro
     environment:
       MONGO_HOST: mongodb
       MONGO_PORT: "27017"
