@@ -175,3 +175,4 @@ flymanager/app/static/generated_labels/*
 
 # temporary files created by editors
 temp/
+scripts/rclone.conf

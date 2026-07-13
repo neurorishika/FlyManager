@@ -91,6 +91,36 @@ services:
           });
         }'
 
+  mongo-backup:
+    image: rclone/rclone:latest
+    container_name: flymanager-mongo-backup
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
+    volumes:
+      - mongo_backups:/backups
+      - ./scripts/container-mongo-backup.sh:/usr/local/bin/container-mongo-backup.sh:ro
+      - ${RCLONE_CONFIG_PATH:-./scripts/rclone.conf}:/config/rclone/rclone.conf:ro
+    environment:
+      MONGO_HOST: mongodb
+      MONGO_PORT: "27017"
+      BACKUP_DIR: /backups
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-}
+      HEALTHCHECK_UUID: ${HEALTHCHECK_UUID:-}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        apk add --no-cache mongodb-tools bash curl > /dev/null 2>&1 &&
+        chmod +x /usr/local/bin/container-mongo-backup.sh || true &&
+        /usr/local/bin/container-mongo-backup.sh &&
+        while true; do sleep "${MONGO_BACKUP_INTERVAL_SECONDS:-21600}"; /usr/local/bin/container-mongo-backup.sh; done
+    healthcheck:
+      disable: true
+
   redis:
     image: redis:7-alpine
     container_name: flymanager-redis
@@ -188,4 +218,5 @@ services:
 volumes:
   mongo_data:
   mongo_data2:
+  mongo_backups:
   redis_data:
