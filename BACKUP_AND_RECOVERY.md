@@ -603,6 +603,12 @@ It restores the archive into a throwaway `mongod` container, prints
 per-collection document counts across every restored database, and always
 removes the scratch container afterward (even on failure).
 
+### Drill log
+
+| Date | Archive | Sanity result | Approx. RTO | Issues |
+|---|---|---|---|---|
+| 2026-07-13 | `flymanager_mongodb_20260713T142634Z.archive.gz` (test data: 2 stocks, 1 cross in `flymanager_drill_test`) | Counts matched exactly (stocks: 2, crosses: 1) | 2.153s total (`time` output: 0.08s user 0.06s system 6% cpu 2.153 total) | None |
+
 ### Drill steps
 
 1. Prepare an isolated host or disposable copy of the repo.
