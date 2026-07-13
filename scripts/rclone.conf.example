@@ -1,5 +1,6 @@
-# Placeholder rclone config. Replace with a real remote before relying on
-# off-site backup pushes - see BACKUP_AND_RECOVERY.md's "Backup container"
+# Placeholder rclone config template. Copy this file to scripts/rclone.conf
+# (which is gitignored) and edit that copy with a real remote before relying
+# on off-site backup pushes - see BACKUP_AND_RECOVERY.md's "Backup container"
 # section for how to generate one (`rclone config`) and where to point
 # RCLONE_CONFIG_PATH / RCLONE_REMOTE.
 #

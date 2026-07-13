@@ -208,10 +208,13 @@ Configuring off-site push and heartbeat monitoring:
 
 1. Run `rclone config` to create a remote (see rclone's docs for your
    provider - Google Drive, S3, Backblaze B2, etc.)
-2. Save the resulting config to the path pointed at by
-   `RCLONE_CONFIG_PATH` (default `./scripts/rclone.conf` - **never commit
-   a real config with credentials**; the tracked file at that path is a
-   placeholder template only)
+2. Copy [scripts/rclone.conf.example](scripts/rclone.conf.example) to the
+   path pointed at by `RCLONE_CONFIG_PATH` (default `./scripts/rclone.conf`)
+   and save the resulting config into that copy - **never commit a real
+   config with credentials**; `scripts/rclone.conf` itself is gitignored
+   (not tracked), so filling it in with real credentials is safe, while
+   `scripts/rclone.conf.example` (the tracked template, no credentials)
+   remains available for reference
 3. Set `RCLONE_REMOTE` in `.env` to the remote name and path, e.g.
    `gdrive:flymanager-backups`
 4. Create a check in healthcheck.io (cron-style, matching your backup
@@ -641,8 +644,11 @@ removes the scratch container afterward (even on failure).
 
 ### Ubuntu
 
-- use cron or systemd timers
-- use the versioned templates under `deploy/cron/` and `deploy/systemd/` as the starting point
+- state backups still use cron or systemd timers - use the versioned
+  templates under `deploy/cron/` and `deploy/systemd/` as the starting point
+- routine Mongo backups no longer use a host-level cron entry or systemd
+  timer - they come from the in-stack `mongo-backup` Compose service (see
+  "Backup container" above), which requires no host-level scheduler
 
 ### AWS and GCP
 
@@ -659,8 +665,6 @@ removes the scratch container afterward (even on failure).
 - [scripts/state-restore.sh](scripts/state-restore.sh)
 - [.env.example](.env.example)
 - [deploy/cron/flymanager-backups.crontab.example](deploy/cron/flymanager-backups.crontab.example)
-- [deploy/systemd/flymanager-mongo-backup.service](deploy/systemd/flymanager-mongo-backup.service)
-- [deploy/systemd/flymanager-mongo-backup.timer](deploy/systemd/flymanager-mongo-backup.timer)
 - [deploy/systemd/flymanager-state-backup.service](deploy/systemd/flymanager-state-backup.service)
 - [deploy/systemd/flymanager-state-backup.timer](deploy/systemd/flymanager-state-backup.timer)
 
