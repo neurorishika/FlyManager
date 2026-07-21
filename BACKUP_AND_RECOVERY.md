@@ -611,6 +611,7 @@ removes the scratch container afterward (even on failure).
 | Date | Archive | Sanity result | Approx. RTO | Issues |
 |---|---|---|---|---|
 | 2026-07-13 | `flymanager_mongodb_20260713T142634Z.archive.gz` (test data: 2 stocks, 1 cross in `flymanager_drill_test`) | Counts matched exactly (stocks: 2, crosses: 1) | 2.153s total (`time` output: 0.08s user 0.06s system 6% cpu 2.153 total) | None |
+| 2026-07-21 | `pre-migration-20260721T195941Z.archive.gz` (real production data, taken from `flymanager-mongodb` on the live Synology stack ahead of the Phase 2 migration, `sha256: c88c70e2...`) | 882,763 documents restored, 0 failures. All 18 collection counts matched the source exactly (stocks: 101, crosses: 24, users: 2, settings: 1, activity: 4055, flybase_phenotypes: 398958, flybase_allele_genes: 305332, genes2nd: 118792, genes3rd: 42647, genesX: 9523, genes4th: 3289, provenances: 17, types: 14, food_types: 3, species: 2, trays: 2, operation_locks: 1, balancer_definitions: 0) | ~9s total restore time | None. Archive downloaded off the NAS via `ssh ... cat \| shasum -a 256` (checksum matched); a second copy retained off-NAS in addition to the original. |
 
 ### Drill steps
 
