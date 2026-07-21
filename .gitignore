@@ -176,3 +176,6 @@ flymanager/app/static/generated_labels/*
 # temporary files created by editors
 temp/
 scripts/rclone.conf
+
+# keep data/phenotypes_images
+!data/phenotype_images
