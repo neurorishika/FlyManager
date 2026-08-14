@@ -1,4 +1,4 @@
-from flask import (Blueprint, current_app, flash, jsonify, redirect,
+from flask import (Blueprint, abort, current_app, flash, jsonify, redirect,
                    render_template, request, session, url_for)
 
 from flymanager.app import db
@@ -13,6 +13,8 @@ from flymanager.utils.mongo import (OperationLockConflict, get_settings,
                                     update_settings,
                                     update_user_reporting_manager,
                                     write_activity)
+from flymanager.utils.mongo.cache_force_refresh import (
+    CACHE_FORCE_REFRESH_PHRASES, check_force_refresh_cooldown)
 
 bp = Blueprint("settings", __name__)
 
@@ -196,25 +198,46 @@ def backfill_all_phenotype_cache():
     )
 
 
-@bp.route("/settings/refresh-all-provider-caches", methods=["POST"])
+@bp.route("/settings/force-recompute-cache/<cache_key>", methods=["POST"])
 @login_required
 @admin_required
-@limiter.limit("1 per hour")
-def refresh_all_provider_caches():
+@limiter.limit("2 per hour")
+def force_recompute_cache(cache_key):
     username = session.get("username")
-    redirect_to = request.referrer or url_for("main.home")
+    redirect_to = url_for("settings.admin_settings")
+
+    if cache_key not in CACHE_FORCE_REFRESH_PHRASES:
+        abort(404)
+
+    expected_phrase = CACHE_FORCE_REFRESH_PHRASES[cache_key]
+    submitted_phrase = (request.form.get("confirmPhrase") or "").strip()
+    if submitted_phrase != expected_phrase:
+        flash(
+            f'Confirmation phrase did not match. Type exactly: "{expected_phrase}"',
+            "error",
+        )
+        return redirect(redirect_to)
+
+    allowed, retry_after = check_force_refresh_cooldown(cache_key, db)
+    if not allowed:
+        flash(
+            f"A forced full recompute of the {cache_key} cache already ran recently. "
+            f"Next allowed at {retry_after}.",
+            "error",
+        )
+        return redirect(redirect_to)
 
     return _enqueue_or_flash_conflict(
         redirect_to=redirect_to,
-        started_message="Provider cache refresh for all stocks started in the background.",
-        key="maintenance:provider-cache-refresh:all-stocks",
+        started_message=f"Forced full recompute of the {cache_key} cache started in the background.",
+        key=f"maintenance:force-cache-refresh:{cache_key}",
         actor=username,
-        label="Global provider cache refresh",
-        func=job_tasks.task_refresh_provider_caches,
-        task_kwargs={"username": username},
+        label=f"Force recompute {cache_key} cache",
+        func=job_tasks.task_force_recompute_cache,
+        task_kwargs={"username": username, "cache_key": cache_key},
         ttl_seconds=3600,
-        metadata={"route": "refresh_all_provider_caches", "scope": "all_stocks"},
-        conflict_message="A global provider cache refresh is already running. Please wait for it to finish before retrying.",
+        metadata={"route": "force_recompute_cache", "cache_key": cache_key},
+        conflict_message=f"A forced recompute of the {cache_key} cache is already running.",
     )
 
 

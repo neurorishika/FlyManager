@@ -197,29 +197,6 @@ def task_backfill_phenotype_cache(key, username, *, users, scope_label):
     _run(key, work)
 
 
-def task_refresh_provider_caches(key, username):
-    def work(app, db):
-        from flymanager.app.routes.stock import (PROVIDER_MATCH_CACHE_FIELD,
-                                                  backfill_stock_provider_match_cache)
-
-        summary = backfill_stock_provider_match_cache(db["stocks"], force=True)
-
-        candidate_matches = sum(
-            (doc.get(PROVIDER_MATCH_CACHE_FIELD) or {}).get("count", 0) or 0
-            for doc in db["stocks"].find({}, {f"{PROVIDER_MATCH_CACHE_FIELD}.count": 1})
-        )
-
-        message = (
-            "Provider cache refresh complete for all stocks: "
-            f"{summary['updated']} refreshed, {candidate_matches} candidate matches cached, "
-            f"{summary['errors']} errors, {summary['scanned']} scanned total."
-        )
-        write_activity(username, "Refreshed provider match cache for all stocks", db)
-        return {"message": message, "summary": {**summary, "candidate_matches": candidate_matches}}
-
-    _run(key, work)
-
-
 def task_update_bloomington_stock(key, username):
     def work(app, db):
         from flymanager.app.services import bloomington as bloomington_service
