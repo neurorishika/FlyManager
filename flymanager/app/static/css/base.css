@@ -54,3 +54,9 @@ a.btn {
     color: var(--text-color);
     text-decoration: none;
 }
+
+@media (max-width: 767px) {
+    body {
+        font-size: clamp(0.88rem, 0.84rem + 0.3vw, 0.96rem);
+    }
+}
