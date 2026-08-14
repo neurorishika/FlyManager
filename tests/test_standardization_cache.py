@@ -50,6 +50,11 @@ class FakeCollection:
     def update_one(self, selector, update):
         self.updated.append((selector, update))
 
+    def bulk_write(self, operations, ordered=True):
+        del ordered
+        for operation in operations:
+            self.updated.append((operation._filter, operation._doc))
+
 
 # --- search short-circuit -------------------------------------------------
 

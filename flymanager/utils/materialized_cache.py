@@ -16,6 +16,10 @@ supply its field name, a ``cache_getter`` (returns the still-valid cache or
 new materialized cache is a handful of lines, not a copied backfill loop.
 """
 
+from pymongo import UpdateOne
+
+_BULK_WRITE_CHUNK_SIZE = 500
+
 
 def normalize_users(users):
     if not users:
@@ -76,6 +80,13 @@ def backfill_materialized_cache(collection, *, cache_field, cache_getter, cache_
         "skipped_valid": 0,
     }
 
+    pending_operations = []
+
+    def flush():
+        if pending_operations:
+            collection.bulk_write(list(pending_operations), ordered=False)
+            pending_operations.clear()
+
     for record in collection.find(query, projection):
         if not record_matches_users(record, users):
             continue
@@ -89,9 +100,14 @@ def backfill_materialized_cache(collection, *, cache_field, cache_getter, cache_
         if dry_run:
             continue
 
-        collection.update_one(
-            cache_selector_builder(record),
-            {"$set": {cache_field: cache_builder(record)}},
+        pending_operations.append(
+            UpdateOne(
+                cache_selector_builder(record),
+                {"$set": {cache_field: cache_builder(record)}},
+            )
         )
+        if len(pending_operations) >= _BULK_WRITE_CHUNK_SIZE:
+            flush()
 
+    flush()
     return summary
