@@ -518,19 +518,19 @@
         <div class="stock-source-grid">
             <div class="stock-source-cell">
                 <p class="stock-summary-label">Source</p>
-                <p>{{ stock_data.sourceType or 'OTHER' }}{% if stock_data.sourceCollection %} / {{ stock_data.sourceCollection }}{% endif %}</p>
+                <p id="sourceDisplay">{{ stock_data.sourceType or 'OTHER' }}{% if stock_data.sourceCollection %} / {{ stock_data.sourceCollection }}{% endif %}</p>
             </div>
             <div class="stock-source-cell">
                 <p class="stock-summary-label">Source ID</p>
-                <p>{{ stock_data.sourceID or 'Unavailable' }}</p>
+                <p id="sourceIdDisplay">{{ stock_data.sourceID or 'Unavailable' }}</p>
             </div>
             <div class="stock-source-cell">
                 <p class="stock-summary-label">FlyBase Stock ID</p>
-                <p>{{ stock_data.flyBaseStockID or 'Unavailable' }}</p>
+                <p id="flyBaseStockIdDisplay">{{ stock_data.flyBaseStockID or 'Unavailable' }}</p>
             </div>
             <div class="stock-source-cell">
                 <p class="stock-summary-label">Support Status</p>
-                <p>{{ stock_data.externalSupportStatus or 'manual' }}</p>
+                <p id="supportStatusDisplay">{{ stock_data.externalSupportStatus or 'manual' }}</p>
             </div>
         </div>
         <div id="providerMatchesPanel" class="stock-match-results is-hidden"></div>
@@ -843,6 +843,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const stockData = {{ stock_data | tojson }};
     const canEditRecord = {{ 'true' if can_edit_record else 'false' }};
     const reverseSearchUrl = "{{ url_for('stock.reverse_search_stock', unique_id=stock_data.uniqueID) }}";
+    const applyProviderMatchUrl = "{{ url_for('stock.apply_provider_match', unique_id=stock_data.uniqueID) }}";
     const standardizationReviewUrl = "{{ url_for('stock.review_stock_standardization_route', unique_id=stock_data.uniqueID) }}";
     const editableFields = document.querySelectorAll('[data-editable="true"]');
     const form = document.getElementById('stockViewForm');
@@ -1015,6 +1016,53 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
+    function applyProviderMatch(candidateIndex, candidate, statusNote, confirmed) {
+        return fetch(applyProviderMatchUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ candidateIndex: candidateIndex, confirm: !!confirmed }),
+        })
+            .then(response => response.json().then(body => ({ status: response.status, body })))
+            .then(({ status, body }) => {
+                if (status !== 200) {
+                    statusNote.textContent = body.error || 'Unable to apply this match.';
+                    return;
+                }
+                if (body.requiresConfirmation) {
+                    const summary = Object.entries(body.diff)
+                        .map(([field, change]) => `${field}: "${change.current}" -> "${change.candidate}"`)
+                        .join('; ');
+                    statusNote.textContent = `This will change ${summary}. Click Apply again to confirm.`;
+                    statusNote.dataset.pendingCandidateIndex = String(candidateIndex);
+                    return;
+                }
+                if (!body.applied) {
+                    statusNote.textContent = body.message || 'Nothing to apply.';
+                    return;
+                }
+                if ('StockSource' in body.fields || 'SourceCollection' in body.fields) {
+                    const sourceType = body.fields.StockSource || document.getElementById('sourceDisplay').dataset.rawSourceType || 'OTHER';
+                    const sourceCollection = body.fields.SourceCollection || '';
+                    document.getElementById('sourceDisplay').textContent = sourceCollection
+                        ? `${sourceType} / ${sourceCollection}`
+                        : sourceType;
+                }
+                if ('SourceID' in body.fields) {
+                    document.getElementById('sourceIdDisplay').textContent = body.fields.SourceID || 'Unavailable';
+                }
+                if ('FlyBaseStockID' in body.fields) {
+                    document.getElementById('flyBaseStockIdDisplay').textContent = body.fields.FlyBaseStockID || 'Unavailable';
+                }
+                if ('ExternalSupportStatus' in body.fields) {
+                    document.getElementById('supportStatusDisplay').textContent = body.fields.ExternalSupportStatus || 'manual';
+                }
+                statusNote.textContent = 'Match applied.';
+            })
+            .catch(() => {
+                statusNote.textContent = 'An error occurred while applying this match.';
+            });
+    }
+
     function renderProviderMatches(candidates, options) {
         const config = options || {};
         providerMatchesPanel.innerHTML = '';
@@ -1028,7 +1076,7 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
 
-        candidates.forEach(candidate => {
+        candidates.forEach((candidate, candidateIndex) => {
             const item = document.createElement('div');
             item.className = 'stock-match-item';
 
@@ -1045,10 +1093,27 @@ document.addEventListener("DOMContentLoaded", function() {
             reasons.className = 'stock-match-copy';
             reasons.textContent = (candidate.matchReasons || []).join(' • ');
 
+            const statusNote = document.createElement('p');
+            statusNote.className = 'stock-match-copy';
+
             meta.appendChild(title);
             meta.appendChild(subtitle);
             meta.appendChild(reasons);
+            meta.appendChild(statusNote);
             item.appendChild(meta);
+
+            if (canEditRecord) {
+                const applyBtn = document.createElement('button');
+                applyBtn.type = 'button';
+                applyBtn.className = 'btn btn-outline-primary btn-sm';
+                applyBtn.textContent = 'Apply';
+                applyBtn.addEventListener('click', () => {
+                    const pendingIndex = statusNote.dataset.pendingCandidateIndex;
+                    const isConfirming = pendingIndex === String(candidateIndex);
+                    applyProviderMatch(candidateIndex, candidate, statusNote, isConfirming);
+                });
+                item.appendChild(applyBtn);
+            }
 
             if (candidate.providerURL) {
                 const link = document.createElement('a');
