@@ -59,6 +59,8 @@ def ensure_mongo_indexes(db):
     db["crosses"].create_index([("AssignedTo", 1), ("UniqueID", 1)], name="crosses_assigned_uid")
     db["crosses"].create_index([("User", 1), ("Status", 1), ("TrayID", 1)], name="crosses_user_status_tray")
     db["crosses"].create_index([("AssignedTo", 1), ("Status", 1), ("TrayID", 1)], name="crosses_assigned_status_tray")
+    db["crosses"].create_index([("User", 1), ("MaleUniqueID", 1)], name="crosses_user_male_uid")
+    db["crosses"].create_index([("User", 1), ("FemaleUniqueID", 1)], name="crosses_user_female_uid")
 
     db["users"].create_index([("Username", 1)], name="users_username")
     db["users"].create_index([("ReportsTo", 1)], name="users_reports_to")
