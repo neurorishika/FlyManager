@@ -12,7 +12,11 @@ from pymongo import ReturnDocument
 
 
 def _matches(record, query):
+    if "$or" in query:
+        return any(_matches(record, clause) for clause in query["$or"])
     for key, value in (query or {}).items():
+        if key == "$or":
+            continue
         if isinstance(value, dict) and "$in" in value:
             if record.get(key) not in value["$in"]:
                 return False

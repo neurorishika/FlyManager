@@ -67,3 +67,18 @@ def test_aggregate_match_addfields_convert_sort_skip_limit():
     ]
     result = list(db["stocks"].aggregate(pipeline))
     assert [doc["UniqueID"] for doc in result] == ["s3", "s2"]
+
+
+def test_find_supports_or_query():
+    db = FakeDatabase({
+        "trays": [
+            {"UniqueID": "t1", "User": "bob", "TrayID": "T1"},
+            {"UniqueID": "t2", "User": "carol", "TrayID": "T2"},
+            {"UniqueID": "t3", "User": "dave", "TrayID": "T3"},
+        ]
+    })
+    result = list(db["trays"].find({"$or": [
+        {"User": "bob", "TrayID": "T1"},
+        {"User": "dave", "TrayID": "T3"},
+    ]}))
+    assert sorted(t["UniqueID"] for t in result) == ["t1", "t3"]

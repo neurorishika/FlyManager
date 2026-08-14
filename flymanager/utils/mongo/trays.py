@@ -136,14 +136,18 @@ def get_accessible_trays(user, db):
     accessible_items = list(get_accessible_stocks(user, db)) + list(
         get_accessible_crosses(user, db)
     )
-    for item in accessible_items:
-        owner = _normalize_text(item.get("User"))
-        tray_id = _normalize_text(item.get("TrayID"))
-        if not owner or not tray_id:
-            continue
-        tray = trays_collection.find_one({"User": owner, "TrayID": tray_id})
-        if tray:
-            trays.append(tray)
+    backfill_pairs = {
+        (_normalize_text(item.get("User")), _normalize_text(item.get("TrayID")))
+        for item in accessible_items
+        if _normalize_text(item.get("User")) and _normalize_text(item.get("TrayID"))
+    }
+    if backfill_pairs:
+        backfill_query = {
+            "$or": [
+                {"User": owner, "TrayID": tray_id} for owner, tray_id in backfill_pairs
+            ]
+        }
+        trays.extend(trays_collection.find(backfill_query))
 
     deduped_trays = _dedupe_trays(trays)
     deduped_trays.sort(
