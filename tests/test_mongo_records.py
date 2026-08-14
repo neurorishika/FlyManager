@@ -2,6 +2,8 @@ import datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from pymongo import ReturnDocument
+
 from flymanager.utils.mongo_records import (apply_updates_to_owned_document,
                                             build_existing_vial_timeline,
                                             build_initial_vial_timeline,
@@ -36,6 +38,20 @@ class FakeCollection:
                 record.update(update.get("$set", {}))
                 return SimpleNamespace(matched_count=1)
         return SimpleNamespace(matched_count=0)
+
+    def find_one_and_update(self, query, update, return_document="AFTER"):
+        # `return_document` may be the literal string "AFTER" or the real
+        # pymongo.ReturnDocument.AFTER enum member; check both forms.
+        return_after = return_document in ("AFTER", ReturnDocument.AFTER)
+        for record in self.database.data.get(self.name, []):
+            if all(record.get(key) == value for key, value in query.items()):
+                if not return_after:
+                    before = dict(record)
+                    record.update(update.get("$set", {}))
+                    return before
+                record.update(update.get("$set", {}))
+                return dict(record)
+        return None
 
     def delete_one(self, query):
         records = self.database.data.get(self.name, [])
