@@ -155,12 +155,18 @@ class FakeCollection:
             self._records.append(dict(document))
         return SimpleNamespace(inserted_ids=list(range(len(documents))))
 
-    def update_one(self, query, update):
+    def update_one(self, query, update, upsert=False):
         for record in self._records:
             if _matches(record, query):
                 record.update(update.get("$set", {}))
-                return SimpleNamespace(matched_count=1, modified_count=1)
-        return SimpleNamespace(matched_count=0, modified_count=0)
+                return SimpleNamespace(matched_count=1, modified_count=1, upserted_id=None)
+        if upsert:
+            # Insert a new document with the update
+            new_doc = dict(query)
+            new_doc.update(update.get("$set", {}))
+            self._records.append(new_doc)
+            return SimpleNamespace(matched_count=0, modified_count=0, upserted_id=len(self._records))
+        return SimpleNamespace(matched_count=0, modified_count=0, upserted_id=None)
 
     def find_one_and_update(self, query, update, return_document="AFTER"):
         # `return_document` may be the literal string "AFTER" or the real
