@@ -92,15 +92,25 @@
         color: var(--tray-text-muted);
     }
 
+    .tray-board-status-row {
+        min-height: 2.4rem;
+        display: flex;
+        align-items: center;
+    }
+
     .tray-board-status {
         display: inline-flex;
         align-items: center;
+        max-width: 100%;
         padding: 0.55rem 0.8rem;
         border-radius: 999px;
         background: var(--tray-chip-bg);
         color: var(--tray-chip-text);
         font-size: 0.88rem;
         font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .tray-board-status.is-active {
@@ -348,7 +358,6 @@
                                 <h2 class="app-section-title mb-0">Tray Layout</h2>
                                 <div class="app-inline-note">Drag from the side rail or grab an occupied cell to reposition it in the tray.</div>
                             </div>
-                            <div class="tray-board-status" id="dragStatus">Ready to place or move items.</div>
                         </div>
                         <div class="card-body">
                             <div class="tray-guidance-banner">
@@ -399,6 +408,10 @@
                                         <div class="legend-color legend-blocked"></div>
                                         <span>Blocked</span>
                                     </div>
+                                </div>
+
+                                <div class="tray-board-status-row mt-3">
+                                    <div class="tray-board-status" id="dragStatus">Ready to place or move items.</div>
                                 </div>
                             </div>
                         </div>
@@ -639,12 +652,18 @@
 
 <!-- CSS Styles for Tray Visualization -->
 <style nonce="{{ csp_nonce }}">
+    #trayContainer {
+        min-width: 0;
+        overflow-x: auto;
+    }
+
     .tray-grid {
         display: grid;
         grid-template-rows: repeat({{ tray.Rows }}, 1fr);
-        grid-template-columns: repeat({{ tray.Columns }}, 1fr);
+        grid-template-columns: repeat({{ tray.Columns }}, minmax(0, 1fr));
         gap: 6px;
         margin: auto;
+        min-width: 0;
         border: 1px solid var(--tray-border-soft);
         border-radius: 22px;
         padding: 10px;
@@ -658,6 +677,7 @@
         color: var(--text-color);
         padding: 8px;
         min-height: 62px;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         justify-content: center;
