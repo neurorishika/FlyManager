@@ -6,19 +6,41 @@ sort/skip/limit cursor chaining, a small aggregate() covering the stages this
 codebase's aggregation pipelines use) so later tests don't redefine it.
 """
 import copy
+import re
 from types import SimpleNamespace
 
 from pymongo import ReturnDocument
 
 
+def _matches_operator_clause(actual, clause):
+    for operator, operand in clause.items():
+        if operator == "$in":
+            if actual not in operand:
+                return False
+        elif operator == "$nin":
+            if actual in operand:
+                return False
+        elif operator == "$ne":
+            if actual == operand:
+                return False
+        elif operator == "$regex":
+            if actual is None or not re.search(operand, str(actual)):
+                return False
+        else:
+            raise NotImplementedError(f"Unsupported query operator: {operator}")
+    return True
+
+
 def _matches(record, query):
+    if "$and" in query:
+        return all(_matches(record, clause) for clause in query["$and"])
     if "$or" in query:
         return any(_matches(record, clause) for clause in query["$or"])
     for key, value in (query or {}).items():
-        if key == "$or":
+        if key in ("$or", "$and"):
             continue
-        if isinstance(value, dict) and "$in" in value:
-            if record.get(key) not in value["$in"]:
+        if isinstance(value, dict) and any(k.startswith("$") for k in value):
+            if not _matches_operator_clause(record.get(key), value):
                 return False
         elif record.get(key) != value:
             return False

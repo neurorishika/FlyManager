@@ -8,6 +8,35 @@ from flymanager.utils.mongo.operation_locks import OperationLockConflict
 from flymanager.utils.phenotypes.image_library import \
     select_phenotype_reference_images
 from flymanager.utils.phenotypes.predictor import PHENOTYPE_CACHE_VERSION
+from tests.mongo_fakes import FakeDatabase
+
+
+def _stock_explorer_fake_db(records):
+    """stock_explorer/stock_explorer_selection now query `db` directly
+    (Task 12 - deterministic filtering/pagination pushed into Mongo), so
+    tests seed a FakeDatabase instead of patching get_accessible_stocks.
+    """
+    seeded = []
+    for record in records:
+        record = dict(record)
+        record.setdefault("User", "admin")
+        record.setdefault("AssignedTo", "")
+        seeded.append(record)
+    return FakeDatabase({"stocks": seeded})
+
+
+def _cross_explorer_fake_db(records):
+    """cross_explorer/cross_explorer_selection now query `db` directly
+    (Task 12 - deterministic filtering/pagination pushed into Mongo), so
+    tests seed a FakeDatabase instead of patching get_accessible_crosses.
+    """
+    seeded = []
+    for record in records:
+        record = dict(record)
+        record.setdefault("User", "admin")
+        record.setdefault("AssignedTo", "")
+        seeded.append(record)
+    return FakeDatabase({"crosses": seeded})
 
 
 def _settings_payload():
@@ -555,7 +584,9 @@ def test_stock_explorer_route_shows_best_guess_phenotype(monkeypatch):
         with client.session_transaction() as sess:
             sess["username"] = "admin"
 
-        with patch("flymanager.app.routes.stock.get_accessible_stocks", return_value=[stock_record]), patch(
+        with patch(
+            "flymanager.app.routes.stock.db", _stock_explorer_fake_db([stock_record])
+        ), patch(
             "flymanager.app.routes.stock.get_flip_in", return_value="5 days"
         ), patch(
             "flymanager.app.routes.stock.get_eclosion_in", return_value="2 days"
@@ -614,7 +645,9 @@ def test_stock_explorer_route_recomputes_stale_cache_summary(monkeypatch):
         with client.session_transaction() as sess:
             sess["username"] = "admin"
 
-        with patch("flymanager.app.routes.stock.get_accessible_stocks", return_value=[stock_record]), patch(
+        with patch(
+            "flymanager.app.routes.stock.db", _stock_explorer_fake_db([stock_record])
+        ), patch(
             "flymanager.app.routes.stock.get_flip_in", return_value="5 days"
         ), patch(
             "flymanager.app.routes.stock.get_eclosion_in", return_value="2 days"
@@ -643,7 +676,9 @@ def test_stock_explorer_reuses_source_context_for_provider_metadata(monkeypatch)
         with client.session_transaction() as sess:
             sess["username"] = "admin"
 
-        with patch("flymanager.app.routes.stock.get_accessible_stocks", return_value=[stock_record]), patch(
+        with patch(
+            "flymanager.app.routes.stock.db", _stock_explorer_fake_db([stock_record])
+        ), patch(
             "flymanager.app.routes.stock.get_flip_in", return_value="5 days"
         ), patch(
             "flymanager.app.routes.stock.get_eclosion_in", return_value="2 days"
@@ -673,7 +708,9 @@ def test_stock_explorer_paginates_second_page(monkeypatch):
         with client.session_transaction() as sess:
             sess["username"] = "admin"
 
-        with patch("flymanager.app.routes.stock.get_accessible_stocks", return_value=stocks), patch(
+        with patch(
+            "flymanager.app.routes.stock.db", _stock_explorer_fake_db(stocks)
+        ), patch(
             "flymanager.app.routes.stock.get_flip_in", return_value="5 days"
         ), patch(
             "flymanager.app.routes.stock.get_eclosion_in", return_value="2 days"
@@ -696,7 +733,9 @@ def test_stock_explorer_supports_fifty_per_page(monkeypatch):
         with client.session_transaction() as sess:
             sess["username"] = "admin"
 
-        with patch("flymanager.app.routes.stock.get_accessible_stocks", return_value=stocks), patch(
+        with patch(
+            "flymanager.app.routes.stock.db", _stock_explorer_fake_db(stocks)
+        ), patch(
             "flymanager.app.routes.stock.get_flip_in", return_value="5 days"
         ), patch(
             "flymanager.app.routes.stock.get_eclosion_in", return_value="2 days"
@@ -723,7 +762,9 @@ def test_stock_explorer_selection_returns_all_filtered_items(monkeypatch):
             sess["username"] = "admin"
             sess["stock_filter_state"] = {"filterFoodType": "Molasses"}
 
-        with patch("flymanager.app.routes.stock.get_accessible_stocks", return_value=[stock_two, stock_one]):
+        with patch(
+            "flymanager.app.routes.stock.db", _stock_explorer_fake_db([stock_two, stock_one])
+        ):
             response = client.get("/stock/explorer/selection")
 
     data = response.get_json()
@@ -1345,7 +1386,9 @@ def test_cross_explorer_route_shows_parent_phenotype_summary(monkeypatch):
         with client.session_transaction() as sess:
             sess["username"] = "admin"
 
-        with patch("flymanager.app.routes.cross.get_accessible_crosses", return_value=[cross_record]), patch(
+        with patch(
+            "flymanager.app.routes.cross.db", _cross_explorer_fake_db([cross_record])
+        ), patch(
             "flymanager.app.routes.cross.get_flip_in", return_value="5 days"
         ), patch(
             "flymanager.app.routes.cross.get_eclosion_in", return_value="2 days"
@@ -1366,7 +1409,9 @@ def test_cross_explorer_supports_all_page_size(monkeypatch):
         with client.session_transaction() as sess:
             sess["username"] = "admin"
 
-        with patch("flymanager.app.routes.cross.get_accessible_crosses", return_value=crosses), patch(
+        with patch(
+            "flymanager.app.routes.cross.db", _cross_explorer_fake_db(crosses)
+        ), patch(
             "flymanager.app.routes.cross.get_flip_in", return_value="5 days"
         ), patch(
             "flymanager.app.routes.cross.get_eclosion_in", return_value="2 days"
@@ -1389,7 +1434,9 @@ def test_cross_explorer_supports_hundred_per_page(monkeypatch):
         with client.session_transaction() as sess:
             sess["username"] = "admin"
 
-        with patch("flymanager.app.routes.cross.get_accessible_crosses", return_value=crosses), patch(
+        with patch(
+            "flymanager.app.routes.cross.db", _cross_explorer_fake_db(crosses)
+        ), patch(
             "flymanager.app.routes.cross.get_flip_in", return_value="5 days"
         ), patch(
             "flymanager.app.routes.cross.get_eclosion_in", return_value="2 days"
@@ -1416,7 +1463,9 @@ def test_cross_explorer_selection_returns_all_filtered_items(monkeypatch):
             sess["username"] = "admin"
             sess["filter_state"] = {"filterFoodType": "Molasses"}
 
-        with patch("flymanager.app.routes.cross.get_accessible_crosses", return_value=[cross_two, cross_one]):
+        with patch(
+            "flymanager.app.routes.cross.db", _cross_explorer_fake_db([cross_two, cross_one])
+        ):
             response = client.get("/cross/cross_explorer/selection")
 
     data = response.get_json()

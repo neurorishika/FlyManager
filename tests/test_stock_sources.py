@@ -9,6 +9,7 @@ from unittest.mock import ANY, MagicMock, patch
 import pandas as pd
 
 from flymanager.app import create_app
+from tests.mongo_fakes import FakeDatabase
 from flymanager.utils.stock_sources import (
     _load_flybase_stock_indexes, build_external_stock_provider_link,
     build_stock_provider_metadata,
@@ -1273,8 +1274,11 @@ def test_stock_explorer_embeds_cached_provider_matches(monkeypatch):
             sess["username"] = "admin"
 
         with patch(
-            "flymanager.app.routes.stock.get_accessible_stocks",
-            return_value=[stock],
+            # stock_explorer now queries `db` directly (Task 12 -
+            # deterministic filtering/pagination pushed into Mongo), so this
+            # seeds a FakeDatabase instead of patching get_accessible_stocks.
+            "flymanager.app.routes.stock.db",
+            FakeDatabase({"stocks": [{**stock, "AssignedTo": stock.get("AssignedTo", "")}]}),
         ), patch(
             "flymanager.app.routes.stock._get_valid_provider_match_cache",
             return_value={

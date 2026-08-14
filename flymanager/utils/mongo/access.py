@@ -80,6 +80,59 @@ def get_accessible_documents(collection_name, user, db, annotate=False, projecti
     return documents
 
 
+def get_accessible_documents_page(
+    collection_name, user, db, *, mongo_filter=None, skip=0, limit=None, projection=None,
+):
+    """Query, sort, and paginate accessible documents at the database level.
+
+    ``mongo_filter`` covers only deterministic (non-fuzzy) filters - callers
+    that also need fuzzy free-text search should pass ``limit=None`` to get
+    every matching document (still filtered + projected server-side) and
+    apply the fuzzy filter + pagination themselves afterward.
+
+    Sorts by TrayID, then TrayPosition (parsed numerically, matching
+    ``_stock_sort_key``'s tie-break order), then Name, then UniqueID.
+
+    Access annotation (``annotate_document_access``) runs before
+    ``projection`` is applied, so a projection strictly limits the final
+    field set to exactly the requested names (dropping any annotation-only
+    fields not explicitly requested), matching a real Mongo projection.
+
+    Returns (items, total_count).
+    """
+    owner_scope = {"$or": [{"User": user}, {"AssignedTo": user}]}
+    combined_filter = {"$and": [owner_scope, mongo_filter or {}]}
+
+    total_count = db[collection_name].count_documents(combined_filter)
+
+    pipeline = [
+        {"$match": combined_filter},
+        {"$addFields": {
+            "_sortTrayPosition": {
+                "$convert": {"input": "$TrayPosition", "to": "double", "onError": 0, "onNull": 0}
+            },
+        }},
+        {"$sort": {"TrayID": 1, "_sortTrayPosition": 1, "Name": 1, "UniqueID": 1}},
+    ]
+    if skip:
+        pipeline.append({"$skip": skip})
+    if limit is not None:
+        pipeline.append({"$limit": limit})
+
+    items = list(db[collection_name].aggregate(pipeline))
+    for document in items:
+        document.pop("_sortTrayPosition", None)
+    annotated = [annotate_document_access(document, user) for document in items]
+
+    if projection:
+        annotated = [
+            {field: document.get(field) for field in projection if field in document}
+            for document in annotated
+        ]
+
+    return annotated, total_count
+
+
 def get_maintainable_documents(collection_name, user, db, annotate=False):
     documents = get_accessible_documents(collection_name, user, db, annotate=True)
     maintainable_documents = [

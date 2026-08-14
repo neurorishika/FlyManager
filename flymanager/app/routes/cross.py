@@ -1,4 +1,5 @@
 import datetime
+import math
 
 from flask import (Blueprint, current_app, flash, jsonify, redirect,
                    render_template, request, session, url_for)
@@ -7,7 +8,7 @@ from fuzzywuzzy import fuzz
 from flymanager.app import db
 from flymanager.app.routes.auth import login_required
 from flymanager.app.routes.explorer_utils import (
-    collect_unique_values, get_explorer_filter_state,
+    _build_page_display, collect_unique_values, get_explorer_filter_state,
     get_explorer_pagination_state, paginate_explorer_records,
     set_flip_display_fields)
 from flymanager.app.security import (get_json_payload, limiter,
@@ -19,7 +20,9 @@ from flymanager.utils.labels import generate_label_pdf
 from flymanager.utils.mongo import (OperationLockConflict, add_metadata,
                                     add_to_cross, edit_cross,
                                     get_accessible_cross,
-                                    get_accessible_crosses, get_all_genotypes,
+                                    get_accessible_crosses,
+                                    get_accessible_documents_page,
+                                    get_all_genotypes,
                                     get_direct_reports, get_eclosion_in,
                                     get_flip_in, get_metadata,
                                     get_user_initials, hold_operation_lock,
@@ -247,27 +250,6 @@ def _get_cross_phenotype_summary(cross):
 def cross_explorer():
     username = session.get("username")
 
-    crosses = get_accessible_crosses(username, db, annotate=True)
-    all_crosses_for_filters = list(crosses)
-
-    scope_counts = {
-        "maintain": sum(1 for cross in all_crosses_for_filters if cross.get("AssignmentScope") != "assigned_out"),
-        "assigned_out": sum(1 for cross in all_crosses_for_filters if cross.get("AssignmentScope") == "assigned_out"),
-        "incoming": sum(1 for cross in all_crosses_for_filters if cross.get("AssignmentScope") == "incoming"),
-    }
-
-    # Extract unique values for filtering from all crosses (unfiltered)
-    unique_values = collect_unique_values(
-        all_crosses_for_filters,
-        {
-            "MaleSpecies": lambda cross: cross.get("MaleSpecies", "D. melanogaster"),
-            "FemaleSpecies": lambda cross: cross.get("FemaleSpecies", "D. melanogaster"),
-            "TrayID": lambda cross: cross.get("TrayID"),
-            "Status": lambda cross: cross.get("Status"),
-            "FoodType": lambda cross: cross.get("FoodType"),
-        },
-    )
-
     pagination_state = get_explorer_pagination_state(
         session_key="cross_explorer_pagination",
     )
@@ -286,34 +268,52 @@ def cross_explorer():
     if redirect_response is not None:
         return redirect_response
 
-    filtered_crosses = _apply_cross_filters(crosses, filter_state)
-    filtered_crosses = sorted(
-        filtered_crosses,
-        key=lambda cross: (
-            str(cross.get("TrayID", "")),
-            int(float(cross.get("TrayPosition", "0") or "0")),
-        ),
-    )
+    filter_state = filter_state or {}
+    search_query = filter_state.get("searchQuery")
+    mongo_filter = _build_cross_mongo_filter(filter_state)
 
-    if filter_state:
-        unique_values = collect_unique_values(
-            filtered_crosses,
-            {
-                "TrayID": lambda cross: cross.get("TrayID"),
-                "FoodType": lambda cross: cross.get("FoodType"),
-            },
+    try:
+        scope_counts = _compute_cross_scope_counts(username, db)
+        unique_values = _compute_cross_unique_values(username, db, filter_state)
+
+        if search_query:
+            # Fuzzy search can't be expressed as a Mongo query - fetch every
+            # deterministically-filtered + projected candidate, then apply
+            # the fuzzy filter, sort, and pagination in Python exactly as
+            # the original route did, just over a far smaller candidate set.
+            candidates, _ = get_accessible_documents_page(
+                "crosses", username, db, mongo_filter=mongo_filter, limit=None,
+            )
+            filtered_crosses = _apply_cross_search(candidates, search_query)
+            filtered_crosses = sorted(filtered_crosses, key=_cross_sort_key)
+            pagination = paginate_explorer_records(
+                filtered_crosses,
+                page=pagination_state["page"],
+                per_page=pagination_state["per_page"],
+                per_page_value=pagination_state["per_page_value"],
+            )
+        else:
+            per_page = pagination_state["per_page"]
+            skip = (pagination_state["page"] - 1) * per_page if per_page else 0
+            page_items, total_count = get_accessible_documents_page(
+                "crosses", username, db, mongo_filter=mongo_filter,
+                skip=skip, limit=per_page,
+            )
+            pagination = _build_pagination_from_db_page(
+                page_items, total_count, pagination_state,
+            )
+    except Exception as e:
+        print(f"Error fetching crosses for explorer: {e}")
+        scope_counts = {"maintain": 0, "assigned_out": 0, "incoming": 0}
+        unique_values = {
+            k: []
+            for k in ["MaleSpecies", "FemaleSpecies", "TrayID", "Status", "FoodType"]
+        }
+        pagination = paginate_explorer_records(
+            [], page=1, per_page=pagination_state["per_page"],
+            per_page_value=pagination_state["per_page_value"],
         )
-        unique_values["Status"] = collect_unique_values(
-            all_crosses_for_filters,
-            {"Status": lambda cross: cross.get("Status")},
-        )["Status"]
 
-    pagination = paginate_explorer_records(
-        filtered_crosses,
-        page=pagination_state["page"],
-        per_page=pagination_state["per_page"],
-        per_page_value=pagination_state["per_page_value"],
-    )
     pagination["per_page_options"] = pagination_state["per_page_options"]
     page_crosses = pagination["items"]
 
@@ -334,23 +334,177 @@ def cross_explorer():
     )
 
 
+_CROSS_SELECTION_PROJECTION = {
+    "UniqueID", "User", "AssignedTo", "Name", "TrayID", "TrayPosition",
+    "Status", "MaleSpecies", "FemaleSpecies", "FoodType", "Comments",
+}
+
+
 @bp.route("/cross_explorer/selection", methods=["GET"])
 @login_required
 def cross_explorer_selection():
     username = session.get("username")
-    crosses = get_accessible_crosses(username, db, annotate=False)
     filter_state = session.get("filter_state", {})
-    filtered_crosses = _apply_cross_filters(crosses, filter_state)
-    filtered_crosses = sorted(
-        filtered_crosses,
-        key=lambda cross: (
-            str(cross.get("TrayID", "")),
-            int(float(cross.get("TrayPosition", "0") or "0")),
-        ),
+    mongo_filter = _build_cross_mongo_filter(filter_state)
+    candidates, _ = get_accessible_documents_page(
+        "crosses", username, db, mongo_filter=mongo_filter,
+        limit=None, projection=_CROSS_SELECTION_PROJECTION,
     )
+    search_query = filter_state.get("searchQuery")
+    filtered_crosses = (
+        _apply_cross_search(candidates, search_query) if search_query else candidates
+    )
+    filtered_crosses = sorted(filtered_crosses, key=_cross_sort_key)
 
     items = [_build_cross_selection_item(cross) for cross in filtered_crosses]
     return jsonify({"count": len(items), "items": items})
+
+
+def _cross_sort_key(cross):
+    tray_position = str(cross.get("TrayPosition", "0") or "0").strip()
+    try:
+        position_value = int(float(tray_position))
+    except (TypeError, ValueError):
+        position_value = 0
+    return (str(cross.get("TrayID", "")), position_value)
+
+
+def _build_cross_mongo_filter(filters):
+    """Translate the explorer's deterministic filter fields into a Mongo
+    query. Excludes searchQuery - that stays a Python fuzzy post-filter
+    (see Task 12 rationale: fuzz.partial_ratio can't be expressed as a
+    Mongo query without changing which records match).
+    """
+    no_longer_maintained_status = "No longer maintained"
+    clauses = []
+
+    filter_male_species = filters.get("filterMaleSpecies")
+    if filter_male_species:
+        clauses.append({"MaleSpecies": filter_male_species})
+
+    filter_female_species = filters.get("filterFemaleSpecies")
+    if filter_female_species:
+        clauses.append({"FemaleSpecies": filter_female_species})
+
+    filter_tray_id = filters.get("filterTrayID")
+    if filter_tray_id:
+        clauses.append({"TrayID": filter_tray_id})
+
+    filter_status = filters.get("filterStatus")
+    if filter_status == no_longer_maintained_status:
+        clauses.append({"Status": no_longer_maintained_status})
+    elif filter_status:
+        clauses.append({"Status": filter_status})
+    else:
+        clauses.append({"Status": {"$ne": no_longer_maintained_status}})
+
+    filter_food_type = filters.get("filterFoodType")
+    if filter_food_type:
+        clauses.append({"FoodType": filter_food_type})
+
+    if not clauses:
+        return {}
+    if len(clauses) == 1:
+        return clauses[0]
+    return {"$and": clauses}
+
+
+def _apply_cross_search(crosses, search_query):
+    """The fuzzy-match half of the original _apply_cross_filters - unchanged
+    matching logic, just split out so it can run standalone on an
+    already-deterministically-filtered candidate list.
+    """
+    def match(cross):
+        search_fields = [
+            cross.get("Name", ""),
+            cross.get("TrayID", ""),
+            cross.get("TrayPosition", ""),
+            cross.get("Comments", ""),
+        ]
+        search_string = " ".join(str(field) for field in search_fields)
+        return fuzz.partial_ratio(search_string, search_query) > 80
+
+    return [cross for cross in crosses if match(cross)]
+
+
+def _compute_cross_scope_counts(username, db):
+    owner_scope = {"$or": [{"User": username}, {"AssignedTo": username}]}
+    assigned_out_filter = {
+        "$and": [owner_scope, {"User": username}, {"AssignedTo": {"$nin": ["", username]}}]
+    }
+    incoming_filter = {
+        "$and": [owner_scope, {"AssignedTo": username}, {"User": {"$ne": username}}]
+    }
+    total = db["crosses"].count_documents(owner_scope)
+    assigned_out = db["crosses"].count_documents(assigned_out_filter)
+    incoming = db["crosses"].count_documents(incoming_filter)
+    return {
+        "maintain": total - assigned_out,
+        "assigned_out": assigned_out,
+        "incoming": incoming,
+    }
+
+
+def _compute_cross_unique_values(username, db, filter_state):
+    owner_scope = {"$or": [{"User": username}, {"AssignedTo": username}]}
+    mongo_filter = _build_cross_mongo_filter(filter_state) if filter_state else {}
+    combined = {"$and": [owner_scope, mongo_filter]} if mongo_filter else owner_scope
+
+    unique_values = {
+        field: db["crosses"].distinct(field, combined)
+        for field in ("MaleSpecies", "FemaleSpecies", "TrayID", "FoodType")
+    }
+    unique_values["Status"] = db["crosses"].distinct("Status", owner_scope)
+    return unique_values
+
+
+def _build_pagination_from_db_page(items, total_count, pagination_state):
+    """Build the same pagination dict shape as paginate_explorer_records,
+    but from a page that MongoDB already sliced via skip/limit - total_count
+    comes from count_documents, not len(all_records).
+    """
+    per_page = pagination_state["per_page"]
+    if per_page is None:
+        return {
+            "items": items,
+            "page": 1,
+            "page_count": len(items),
+            "per_page": None,
+            "per_page_value": pagination_state["per_page_value"],
+            "total_items": total_count,
+            "total_pages": 1,
+            "start_index": 1 if total_count else 0,
+            "end_index": total_count,
+            "has_previous": False,
+            "has_next": False,
+            "previous_page": None,
+            "next_page": None,
+            "page_numbers": [{"type": "page", "value": 1}],
+            "is_all": True,
+        }
+
+    total_pages = max(1, math.ceil(total_count / per_page))
+    current_page = min(max(1, pagination_state["page"]), total_pages)
+    start_offset = (current_page - 1) * per_page
+    start_index = start_offset + 1 if total_count else 0
+    end_index = start_offset + len(items)
+    return {
+        "items": items,
+        "page": current_page,
+        "page_count": len(items),
+        "per_page": per_page,
+        "per_page_value": pagination_state["per_page_value"],
+        "total_items": total_count,
+        "total_pages": total_pages,
+        "start_index": start_index,
+        "end_index": end_index,
+        "has_previous": current_page > 1,
+        "has_next": current_page < total_pages,
+        "previous_page": current_page - 1 if current_page > 1 else None,
+        "next_page": current_page + 1 if current_page < total_pages else None,
+        "page_numbers": _build_page_display(total_pages, current_page),
+        "is_all": False,
+    }
 
 
 def _apply_cross_filters(crosses, filters):

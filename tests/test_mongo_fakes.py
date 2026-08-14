@@ -69,6 +69,31 @@ def test_aggregate_match_addfields_convert_sort_skip_limit():
     assert [doc["UniqueID"] for doc in result] == ["s3", "s2"]
 
 
+def test_find_supports_and_query():
+    db = FakeDatabase({
+        "stocks": [
+            {"UniqueID": "s1", "User": "alice", "Status": "Healthy"},
+            {"UniqueID": "s2", "User": "alice", "Status": "Sick"},
+            {"UniqueID": "s3", "User": "bob", "Status": "Healthy"},
+        ]
+    })
+    result = list(db["stocks"].find({"$and": [{"User": "alice"}, {"Status": "Healthy"}]}))
+    assert [doc["UniqueID"] for doc in result] == ["s1"]
+
+
+def test_find_supports_ne_nin_and_regex_operators():
+    db = FakeDatabase({
+        "stocks": [
+            {"UniqueID": "s1", "Status": "Healthy", "AssignedTo": "", "Provenance": "Bloomington/12345"},
+            {"UniqueID": "s2", "Status": "No longer maintained", "AssignedTo": "bob", "Provenance": "Other/x"},
+            {"UniqueID": "s3", "Status": "Sick", "AssignedTo": "alice", "Provenance": "Bloomington"},
+        ]
+    })
+    assert sorted(doc["UniqueID"] for doc in db["stocks"].find({"Status": {"$ne": "No longer maintained"}})) == ["s1", "s3"]
+    assert sorted(doc["UniqueID"] for doc in db["stocks"].find({"AssignedTo": {"$nin": ["", "alice"]}})) == ["s2"]
+    assert sorted(doc["UniqueID"] for doc in db["stocks"].find({"Provenance": {"$regex": "^Bloomington(/|$)"}})) == ["s1", "s3"]
+
+
 def test_find_supports_or_query():
     db = FakeDatabase({
         "trays": [

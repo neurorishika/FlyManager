@@ -1,7 +1,9 @@
 # flymanager/app/routes/stock.py
 import hashlib
 import json
+import math
 import os
+import re
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -14,7 +16,7 @@ from fuzzywuzzy import fuzz
 from flymanager.app import db
 from flymanager.app.routes.auth import login_required
 from flymanager.app.routes.explorer_utils import (
-    collect_unique_values, get_explorer_filter_state,
+    _build_page_display, collect_unique_values, get_explorer_filter_state,
     get_explorer_pagination_state, paginate_explorer_records,
     set_flip_display_fields)
 from flymanager.app.security import (csrf, get_json_payload, limiter,
@@ -28,6 +30,7 @@ from flymanager.utils.genetics import qc_genotype
 from flymanager.utils.labels import generate_label_pdf
 from flymanager.utils.mongo import (OperationLockConflict, add_metadata,
                                     add_to_stock, edit_stock,
+                                    get_accessible_documents_page,
                                     get_accessible_stock,
                                     get_accessible_stocks, get_direct_reports,
                                     get_eclosion_in, get_flip_in, get_metadata,
@@ -569,39 +572,6 @@ def refresh_stock_phenotype(unique_id):
 @login_required
 def stock_explorer():
     username = session.get("username")
-    try:
-        stocks = get_accessible_stocks(username, db, annotate=True)
-        all_stocks_for_filters = list(stocks)
-
-        scope_counts = {
-            "maintain": sum(1 for stock in all_stocks_for_filters if stock.get("AssignmentScope") != "assigned_out"),
-            "assigned_out": sum(1 for stock in all_stocks_for_filters if stock.get("AssignmentScope") == "assigned_out"),
-            "incoming": sum(1 for stock in all_stocks_for_filters if stock.get("AssignmentScope") == "incoming"),
-        }
-
-        # Initial unique values for filters
-        unique_values = collect_unique_values(
-            all_stocks_for_filters,
-            {
-                "Type": lambda stock: stock.get("Type"),
-                "TrayID": lambda stock: stock.get("TrayID"),
-                "Status": lambda stock: stock.get("Status"),
-                "FoodType": lambda stock: stock.get("FoodType"),
-                "Provenance": lambda stock: str(stock.get("Provenance", "")).split("/")[0],
-                "Species": lambda stock: stock.get("Species"),
-            },
-        )
-
-    except Exception as e:
-        print(f"Error fetching stocks for explorer: {e}")
-        stocks = []
-        all_stocks_for_filters = []
-        scope_counts = {"maintain": 0, "assigned_out": 0, "incoming": 0}
-        unique_values = {
-            k: []
-            for k in ["Type", "TrayID", "Status", "FoodType", "Provenance", "Species"]
-        }
-
     pagination_state = get_explorer_pagination_state(
         session_key="stock_explorer_pagination",
     )
@@ -621,31 +591,52 @@ def stock_explorer():
     if redirect_response is not None:
         return redirect_response
 
-    filtered_stocks = _apply_stock_filters(stocks, filter_state)
-    filtered_stocks = sorted(filtered_stocks, key=_stock_sort_key)
+    filter_state = filter_state or {}
+    search_query = filter_state.get("searchQuery")
+    mongo_filter = _build_stock_mongo_filter(filter_state)
 
-    if filter_state:
-        unique_values = collect_unique_values(
-            filtered_stocks,
-            {
-                "Type": lambda stock: stock.get("Type"),
-                "TrayID": lambda stock: stock.get("TrayID"),
-                "FoodType": lambda stock: stock.get("FoodType"),
-                "Provenance": lambda stock: str(stock.get("Provenance", "")).split("/")[0],
-                "Species": lambda stock: stock.get("Species"),
-            },
+    try:
+        scope_counts = _compute_stock_scope_counts(username, db)
+        unique_values = _compute_stock_unique_values(username, db, filter_state)
+
+        if search_query:
+            # Fuzzy search can't be expressed as a Mongo query - fetch every
+            # deterministically-filtered + projected candidate, then apply
+            # the fuzzy filter, sort, and pagination in Python exactly as
+            # the original route did, just over a far smaller candidate set.
+            candidates, _ = get_accessible_documents_page(
+                "stocks", username, db, mongo_filter=mongo_filter, limit=None,
+            )
+            filtered_stocks = _apply_stock_search(candidates, search_query)
+            filtered_stocks = sorted(filtered_stocks, key=_stock_sort_key)
+            pagination = paginate_explorer_records(
+                filtered_stocks,
+                page=pagination_state["page"],
+                per_page=pagination_state["per_page"],
+                per_page_value=pagination_state["per_page_value"],
+            )
+        else:
+            per_page = pagination_state["per_page"]
+            skip = (pagination_state["page"] - 1) * per_page if per_page else 0
+            page_items, total_count = get_accessible_documents_page(
+                "stocks", username, db, mongo_filter=mongo_filter,
+                skip=skip, limit=per_page,
+            )
+            pagination = _build_pagination_from_db_page(
+                page_items, total_count, pagination_state,
+            )
+    except Exception as e:
+        print(f"Error fetching stocks for explorer: {e}")
+        scope_counts = {"maintain": 0, "assigned_out": 0, "incoming": 0}
+        unique_values = {
+            k: []
+            for k in ["Type", "TrayID", "Status", "FoodType", "Provenance", "Species"]
+        }
+        pagination = paginate_explorer_records(
+            [], page=1, per_page=pagination_state["per_page"],
+            per_page_value=pagination_state["per_page_value"],
         )
-        unique_values["Status"] = collect_unique_values(
-            all_stocks_for_filters,
-            {"Status": lambda stock: stock.get("Status")},
-        )["Status"]
 
-    pagination = paginate_explorer_records(
-        filtered_stocks,
-        page=pagination_state["page"],
-        per_page=pagination_state["per_page"],
-        per_page_value=pagination_state["per_page_value"],
-    )
     pagination["per_page_options"] = pagination_state["per_page_options"]
     page_stocks = pagination["items"]
 
@@ -679,13 +670,27 @@ def stock_explorer():
     )
 
 
+_STOCK_SELECTION_PROJECTION = {
+    "UniqueID", "User", "AssignedTo", "Name", "TrayID", "TrayPosition",
+    "Status", "Type", "FoodType", "Provenance", "Species",
+    "SourceID", "Genotype", "AltReference", "SeriesID", "Comments",
+}
+
+
 @bp.route("/explorer/selection", methods=["GET"])
 @login_required
 def stock_explorer_selection():
     username = session.get("username")
-    stocks = get_accessible_stocks(username, db, annotate=False)
     filter_state = session.get("stock_filter_state", {})
-    filtered_stocks = _apply_stock_filters(stocks, filter_state)
+    mongo_filter = _build_stock_mongo_filter(filter_state)
+    candidates, _ = get_accessible_documents_page(
+        "stocks", username, db, mongo_filter=mongo_filter,
+        limit=None, projection=_STOCK_SELECTION_PROJECTION,
+    )
+    search_query = filter_state.get("searchQuery")
+    filtered_stocks = (
+        _apply_stock_search(candidates, search_query) if search_query else candidates
+    )
     filtered_stocks = sorted(filtered_stocks, key=_stock_sort_key)
 
     items = [_build_stock_selection_item(stock) for stock in filtered_stocks]
@@ -696,6 +701,161 @@ def stock_explorer_selection():
 @login_required
 def stock_standardization_overview():
     return redirect(url_for("main.standardization_reviewer"))
+
+
+def _build_stock_mongo_filter(filters):
+    """Translate the explorer's deterministic filter fields into a Mongo
+    query. Excludes searchQuery - that stays a Python fuzzy post-filter
+    (see Task 12 rationale: fuzz.partial_ratio can't be expressed as a
+    Mongo query without changing which records match).
+    """
+    no_longer_maintained_status = "No longer maintained"
+    clauses = []
+
+    filter_type = filters.get("filterType")
+    if filter_type:
+        clauses.append({"Type": filter_type})
+
+    filter_tray_id = filters.get("filterTrayID")
+    if filter_tray_id:
+        clauses.append({"TrayID": filter_tray_id})
+
+    filter_status = filters.get("filterStatus")
+    if filter_status == no_longer_maintained_status:
+        clauses.append({"Status": no_longer_maintained_status})
+    elif filter_status:
+        clauses.append({"Status": filter_status})
+    else:
+        clauses.append({"Status": {"$ne": no_longer_maintained_status}})
+
+    filter_food_type = filters.get("filterFoodType")
+    if filter_food_type:
+        clauses.append({"FoodType": filter_food_type})
+
+    filter_provenance = filters.get("filterProvenance")
+    if filter_provenance:
+        # Provenance is stored as "Source/detail"; the filter matches on the
+        # prefix before the first slash, same as the original Python filter.
+        clauses.append({"Provenance": {"$regex": f"^{re.escape(filter_provenance)}(/|$)"}})
+
+    filter_species = filters.get("filterSpecies")
+    if filter_species:
+        clauses.append({"Species": filter_species})
+
+    if not clauses:
+        return {}
+    if len(clauses) == 1:
+        return clauses[0]
+    return {"$and": clauses}
+
+
+def _apply_stock_search(stocks, search_query):
+    """The fuzzy-match half of the original _apply_stock_filters - unchanged
+    matching logic, just split out so it can run standalone on an
+    already-deterministically-filtered candidate list.
+    """
+    sq_lower = search_query.lower()
+
+    def match(stock):
+        search_fields = [
+            stock.get("SourceID", ""),
+            stock.get("Genotype", ""),
+            stock.get("Name", ""),
+            stock.get("AltReference", ""),
+            stock.get("SeriesID", ""),
+            stock.get("TrayID", ""),
+            stock.get("TrayPosition", ""),
+            stock.get("Comments", ""),
+        ]
+        search_string = " ".join(str(field) for field in search_fields if field).lower()
+        return fuzz.partial_ratio(search_string, sq_lower) > 80
+
+    return [s for s in stocks if match(s)]
+
+
+def _compute_stock_scope_counts(username, db):
+    owner_scope = {"$or": [{"User": username}, {"AssignedTo": username}]}
+    assigned_out_filter = {
+        "$and": [owner_scope, {"User": username}, {"AssignedTo": {"$nin": ["", username]}}]
+    }
+    incoming_filter = {
+        "$and": [owner_scope, {"AssignedTo": username}, {"User": {"$ne": username}}]
+    }
+    total = db["stocks"].count_documents(owner_scope)
+    assigned_out = db["stocks"].count_documents(assigned_out_filter)
+    incoming = db["stocks"].count_documents(incoming_filter)
+    return {
+        "maintain": total - assigned_out,
+        "assigned_out": assigned_out,
+        "incoming": incoming,
+    }
+
+
+def _compute_stock_unique_values(username, db, filter_state):
+    owner_scope = {"$or": [{"User": username}, {"AssignedTo": username}]}
+    mongo_filter = _build_stock_mongo_filter(filter_state) if filter_state else {}
+    combined = {"$and": [owner_scope, mongo_filter]} if mongo_filter else owner_scope
+
+    unique_values = {
+        field: db["stocks"].distinct(field, combined)
+        for field in ("Type", "TrayID", "FoodType", "Species")
+    }
+    unique_values["Status"] = db["stocks"].distinct("Status", owner_scope)
+    unique_values["Provenance"] = sorted({
+        str(value).split("/")[0]
+        for value in db["stocks"].distinct("Provenance", combined)
+        if value
+    })
+    return unique_values
+
+
+def _build_pagination_from_db_page(items, total_count, pagination_state):
+    """Build the same pagination dict shape as paginate_explorer_records,
+    but from a page that MongoDB already sliced via skip/limit - total_count
+    comes from count_documents, not len(all_records).
+    """
+    per_page = pagination_state["per_page"]
+    if per_page is None:
+        return {
+            "items": items,
+            "page": 1,
+            "page_count": len(items),
+            "per_page": None,
+            "per_page_value": pagination_state["per_page_value"],
+            "total_items": total_count,
+            "total_pages": 1,
+            "start_index": 1 if total_count else 0,
+            "end_index": total_count,
+            "has_previous": False,
+            "has_next": False,
+            "previous_page": None,
+            "next_page": None,
+            "page_numbers": [{"type": "page", "value": 1}],
+            "is_all": True,
+        }
+
+    total_pages = max(1, math.ceil(total_count / per_page))
+    current_page = min(max(1, pagination_state["page"]), total_pages)
+    start_offset = (current_page - 1) * per_page
+    start_index = start_offset + 1 if total_count else 0
+    end_index = start_offset + len(items)
+    return {
+        "items": items,
+        "page": current_page,
+        "page_count": len(items),
+        "per_page": per_page,
+        "per_page_value": pagination_state["per_page_value"],
+        "total_items": total_count,
+        "total_pages": total_pages,
+        "start_index": start_index,
+        "end_index": end_index,
+        "has_previous": current_page > 1,
+        "has_next": current_page < total_pages,
+        "previous_page": current_page - 1 if current_page > 1 else None,
+        "next_page": current_page + 1 if current_page < total_pages else None,
+        "page_numbers": _build_page_display(total_pages, current_page),
+        "is_all": False,
+    }
 
 
 def _apply_stock_filters(stocks, filters):
