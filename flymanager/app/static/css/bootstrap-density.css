@@ -1,0 +1,359 @@
+.form-control, .form-control:disabled, .form-control[readonly] {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    transition: border-color 0.3s ease;
+    border-radius: 12px;
+    min-height: 44px;
+    box-shadow: none;
+}
+
+.form-control:focus {
+    border-color: color-mix(in srgb, var(--header-bg) 55%, var(--border-color) 45%);
+    box-shadow: 0 0 0 0.18rem color-mix(in srgb, var(--header-bg) 18%, transparent 82%);
+}
+
+.tagify {
+    --tags-disabled-bg: var(--border-color);
+    --tags-border-color: var(--border-color);
+    --tags-hover-border-color: color-mix(in srgb, var(--border-color) 60%, var(--text-color) 40%);
+    --tags-focus-border-color: var(--header-bg);
+    --tag-bg: color-mix(in srgb, var(--text-color) 14%, var(--card-bg) 86%);
+    --tag-hover: color-mix(in srgb, var(--text-color) 24%, var(--card-bg) 76%);
+    --tag-text-color: var(--text-color);
+    --tag-text-color--edit: var(--text-color);
+    --tag-remove-btn-color: var(--text-color);
+    --input-color: var(--text-color);
+    --placeholder-color: var(--muted-text);
+    --placeholder-color-focus: var(--muted-text);
+}
+
+label {
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+
+.btn-primary {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.btn-primary:hover {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    opacity: 0.8;
+}
+
+/* Follow the accent color for the "primary"/"info" outline and solid
+   info buttons instead of Bootstrap's default blue/teal. */
+.btn-primary:focus,
+.btn-primary.focus {
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--accent-color) 45%, transparent 55%);
+}
+
+.btn-outline-primary,
+.btn-outline-info {
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus,
+.btn-outline-primary:active,
+.btn-outline-primary.active,
+.btn-outline-info:hover,
+.btn-outline-info:focus,
+.btn-outline-info:active,
+.btn-outline-info.active {
+    color: var(--header-text);
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.btn-outline-primary:focus,
+.btn-outline-primary.focus,
+.btn-outline-info:focus,
+.btn-outline-info.focus {
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--accent-color) 45%, transparent 55%);
+}
+
+.btn-info {
+    color: var(--header-text);
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.btn-info:hover {
+    color: var(--header-text);
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    opacity: 0.8;
+}
+
+.btn-info:focus,
+.btn-info.focus {
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--accent-color) 45%, transparent 55%);
+}
+
+/* "Edit" actions get a deeper accent tint so they stay visibly
+   distinct from "View"/primary buttons while still following the
+   app's color scheme instead of Bootstrap's default yellow. */
+.btn-warning {
+    color: var(--header-text);
+    background-color: color-mix(in srgb, var(--accent-color) 78%, black 22%);
+    border-color: color-mix(in srgb, var(--accent-color) 78%, black 22%);
+}
+
+.btn-warning:hover {
+    color: var(--header-text);
+    background-color: color-mix(in srgb, var(--accent-color) 78%, black 22%);
+    border-color: color-mix(in srgb, var(--accent-color) 78%, black 22%);
+    opacity: 0.8;
+}
+
+.btn-warning:focus,
+.btn-warning.focus {
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--accent-color) 45%, transparent 55%);
+}
+
+.btn-outline-warning {
+    color: color-mix(in srgb, var(--accent-color) 78%, black 22%);
+    border-color: color-mix(in srgb, var(--accent-color) 78%, black 22%);
+}
+
+.btn-outline-warning:hover,
+.btn-outline-warning:focus,
+.btn-outline-warning:active,
+.btn-outline-warning.active {
+    color: var(--header-text);
+    background-color: color-mix(in srgb, var(--accent-color) 78%, black 22%);
+    border-color: color-mix(in srgb, var(--accent-color) 78%, black 22%);
+}
+
+/* Theme the success/secondary buttons so they follow the app's
+   surface + status tokens instead of Bootstrap's raw defaults
+   (#28a745 green, #6c757d grey), which clash with the rest of the
+   palette and read as low-contrast in dark mode. */
+.btn-success {
+    color: var(--header-text);
+    background-color: var(--success-color);
+    border-color: var(--success-color);
+}
+
+.btn-success:hover,
+.btn-success:focus,
+.btn-success:active,
+.btn-success.active {
+    color: var(--header-text);
+    background-color: color-mix(in srgb, var(--success-color) 82%, black 18%);
+    border-color: color-mix(in srgb, var(--success-color) 82%, black 18%);
+}
+
+.btn-success:focus,
+.btn-success.focus {
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--success-color) 45%, transparent 55%);
+}
+
+.btn-outline-secondary {
+    color: var(--muted-text);
+    border-color: var(--border-color);
+}
+
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus,
+.btn-outline-secondary:active,
+.btn-outline-secondary.active {
+    color: var(--text-color);
+    background-color: color-mix(in srgb, var(--text-color) 12%, var(--card-bg) 88%);
+    border-color: color-mix(in srgb, var(--text-color) 24%, var(--border-color) 76%);
+}
+
+.btn-outline-secondary:disabled,
+.btn-outline-secondary.disabled {
+    color: color-mix(in srgb, var(--muted-text) 60%, transparent 40%);
+    border-color: var(--border-color);
+    background-color: transparent;
+}
+
+.btn-outline-secondary:focus,
+.btn-outline-secondary.focus {
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--text-color) 20%, transparent 80%);
+}
+
+/* Theme every pagination control (explorer lists, home panels, etc.)
+   to follow the app accent color and the light/dark surface tokens
+   instead of Bootstrap's default blue-on-white. */
+.page-link {
+    color: var(--accent-color);
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+.page-link:hover,
+.page-link:focus {
+    color: var(--accent-color);
+    background-color: color-mix(in srgb, var(--accent-color) 12%, var(--card-bg) 88%);
+    border-color: color-mix(in srgb, var(--accent-color) 45%, var(--border-color) 55%);
+}
+
+.page-link:focus {
+    box-shadow: 0 0 0 0.18rem color-mix(in srgb, var(--accent-color) 20%, transparent 80%);
+}
+
+.page-item.active .page-link {
+    color: var(--header-text);
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.page-item.disabled .page-link {
+    color: var(--muted-text);
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+/* Theme Bootstrap tabs and switches so they follow the surface/accent
+   tokens instead of the default white-card/blue-toggle look, which
+   reads as a stray light panel in dark mode. */
+.nav-tabs {
+    border-bottom-color: var(--border-color);
+}
+
+.nav-tabs .nav-link {
+    color: var(--muted-text);
+    border-color: transparent;
+}
+
+.nav-tabs .nav-link:hover,
+.nav-tabs .nav-link:focus {
+    color: var(--accent-color);
+    border-color: var(--border-color) var(--border-color) var(--border-color);
+}
+
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-item.show .nav-link {
+    color: var(--accent-color);
+    background-color: var(--card-bg);
+    border-color: var(--border-color) var(--border-color) var(--card-bg);
+}
+
+.custom-control-input:checked ~ .custom-control-label::before {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.custom-control-input:focus ~ .custom-control-label::before {
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--accent-color) 25%, transparent 75%);
+}
+
+.custom-control-input:focus:not(:checked) ~ .custom-control-label::before {
+    border-color: color-mix(in srgb, var(--accent-color) 55%, var(--border-color) 45%);
+}
+
+.custom-control-label::before {
+    background-color: var(--bg-color);
+    border-color: var(--border-color);
+}
+
+.btn {
+    border-radius: 12px;
+    font-weight: 600;
+    min-height: 42px;
+    padding: 0.6rem 1rem;
+}
+
+.btn-sm {
+    min-height: 34px;
+    padding: 0.4rem 0.75rem;
+    border-radius: 10px;
+}
+
+.input-group > .form-control:not(:last-child) {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.input-group-append .btn,
+.input-group > .btn {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+    border-radius: 18px;
+    box-shadow: var(--surface-shadow);
+}
+
+.card-header {
+    background-color: transparent;
+    border-bottom-color: var(--border-color);
+}
+
+.nav-item .dropdown-menu {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+.nav-item .dropdown-item {
+    color: var(--text-color);
+}
+
+.nav-item .dropdown-item:hover {
+    background-color: var(--header-bg);
+    color: var(--header-text);
+}
+
+.table {
+    color: var(--text-color);
+}
+
+.alert {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+    border-radius: 14px;
+}
+
+.modal-content {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+}
+
+.modal-dialog {
+    margin: 1rem auto;
+}
+
+.alert-info {
+    background-color: color-mix(in srgb, var(--accent-color) 12%, transparent 88%);
+    border-color: color-mix(in srgb, var(--accent-color) 12%, transparent 88%);
+    color: var(--text-color);
+}
+
+/* "Info" badges (e.g. Ordered status, vials-needed counts) follow the
+   accent color instead of Bootstrap's default teal — it isn't a
+   danger/warning signal, just an informational label. */
+.badge-info {
+    background-color: var(--accent-color);
+    color: var(--header-text);
+}
+
+.breadcrumb {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+}
+
+.table-responsive {
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 767px) {
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+}
