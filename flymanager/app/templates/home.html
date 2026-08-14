@@ -5,7 +5,7 @@
 {% block head %}
 <style nonce="{{ csp_nonce }}">
     {% for tray in tray_heatmaps %}
-    {% if tray.columns >= 1 and tray.columns <= 20 %}
+    {% if tray.columns >= 1 %}
     #tray-heatmap-{{ loop.index }} .tray-mini-row { --home-grid-columns: {{ tray.columns }}; }
     {% endif %}
     {% endfor %}

@@ -1,13 +1,13 @@
     .dashboard-shell {
         display: grid;
-        gap: 18px;
+        gap: var(--space-lg);
         min-width: 0;
     }
 
     .dashboard-hero {
         position: relative;
         overflow: hidden;
-        padding: clamp(22px, 3vw, 34px);
+        padding: clamp(var(--space-xl), 3vw, var(--space-2xl));
         border-radius: 28px;
         border: 1px solid color-mix(in srgb, var(--header-bg) 16%, var(--panel-border) 84%);
         background:
@@ -34,21 +34,21 @@
         z-index: 1;
         display: grid;
         grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
-        gap: 22px;
+        gap: var(--space-xl);
         align-items: start;
     }
 
     .hero-brand {
         display: flex;
         align-items: flex-start;
-        gap: 16px;
+        gap: var(--space-lg);
     }
 
     .hero-logo {
         width: 78px;
         height: 78px;
         border-radius: 24px;
-        padding: 12px;
+        padding: var(--space-md);
         background: rgba(255, 255, 255, 0.72);
         box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
         backdrop-filter: blur(14px);
@@ -66,24 +66,24 @@
     }
 
     .hero-subtitle {
-        margin: 12px 0 0;
+        margin: var(--space-md) 0 0;
         color: var(--muted-text);
-        font-size: clamp(0.96rem, 0.92rem + 0.2vw, 1.08rem);
+        font-size: var(--font-size-lg);
         max-width: 56ch;
     }
 
     .hero-meta {
-        margin-top: 18px;
+        margin-top: var(--space-lg);
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: var(--space-md);
     }
 
     .hero-chip {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        padding: 0.5rem 0.8rem;
+        gap: var(--space-sm);
+        padding: var(--space-sm) var(--space-lg);
         border-radius: 999px;
         background: color-mix(in srgb, var(--card-bg) 80%, white 20%);
         border: 1px solid color-mix(in srgb, var(--header-bg) 14%, var(--border-color) 86%);
@@ -95,11 +95,11 @@
 
     .hero-snapshot {
         display: grid;
-        gap: 14px;
+        gap: var(--space-lg);
     }
 
     .snapshot-card {
-        padding: 18px;
+        padding: var(--space-lg);
         border-radius: 22px;
         background: color-mix(in srgb, var(--card-bg) 86%, white 14%);
         border: 1px solid color-mix(in srgb, var(--header-bg) 14%, var(--border-color) 86%);
@@ -109,11 +109,11 @@
     .snapshot-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
+        gap: var(--space-md);
     }
 
     .snapshot-metric {
-        padding: 12px 14px;
+        padding: var(--space-md) var(--space-lg);
         border-radius: 16px;
         background: color-mix(in srgb, var(--bg-color) 62%, var(--card-bg) 38%);
         border: 1px solid var(--border-color);
@@ -130,14 +130,14 @@
 
     .snapshot-label {
         display: block;
-        margin-top: 6px;
+        margin-top: var(--space-sm);
         color: var(--muted-text);
         font-size: var(--font-size-sm);
     }
 
     .snapshot-activity {
         display: grid;
-        gap: 6px;
+        gap: var(--space-sm);
     }
 
     .snapshot-activity strong {
@@ -155,14 +155,14 @@
     .dashboard-grid {
         display: grid;
         grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr);
-        gap: 18px;
+        gap: var(--space-lg);
         align-items: start;
         min-width: 0;
     }
 
     .dashboard-column {
         display: grid;
-        gap: 18px;
+        gap: var(--space-lg);
         min-width: 0;
     }
 
@@ -171,7 +171,7 @@
         border: 1px solid var(--panel-border);
         border-radius: 22px;
         box-shadow: var(--surface-shadow);
-        padding: clamp(18px, 2vw, 24px);
+        padding: clamp(var(--space-lg), 2vw, var(--space-xl));
         min-width: 0;
     }
 
@@ -179,9 +179,9 @@
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        gap: 14px;
+        gap: var(--space-lg);
         flex-wrap: wrap;
-        margin-bottom: 16px;
+        margin-bottom: var(--space-lg);
     }
 
     .panel-header h3,
@@ -190,8 +190,16 @@
         line-height: 1.1;
     }
 
+    /* Panel titles are card-level labels, not document headings a user
+       navigates by; demote their visual weight to reclaim vertical space
+       while keeping the semantic <h3> for accessibility. */
+    .panel-header h3 {
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+    }
+
     .panel-copy {
-        margin: 6px 0 0;
+        margin: var(--space-sm) 0 0;
         color: var(--muted-text);
         max-width: 64ch;
         font-size: var(--font-size-sm);
@@ -199,21 +207,21 @@
 
     .section-stack {
         display: grid;
-        gap: 14px;
+        gap: var(--space-lg);
     }
 
     .quick-actions {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
+        gap: var(--space-md);
     }
 
     .action-card {
         position: relative;
         overflow: hidden;
         display: grid;
-        gap: 10px;
-        padding: 18px;
+        gap: var(--space-md);
+        padding: var(--space-lg);
         border-radius: 18px;
         border: 1px solid color-mix(in srgb, var(--header-bg) 18%, var(--border-color) 82%);
         background: linear-gradient(160deg, color-mix(in srgb, var(--card-bg) 92%, white 8%), color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%));
@@ -236,7 +244,7 @@
         border-radius: 14px;
         background: color-mix(in srgb, var(--header-bg) 14%, white 86%);
         color: var(--accent-color);
-        font-size: 1rem;
+        font-size: var(--font-size-lg);
     }
 
     .action-card,
@@ -247,7 +255,7 @@
     }
 
     .action-card strong {
-        font-size: 1rem;
+        font-size: var(--font-size-lg);
         line-height: 1.2;
         color: var(--text-color);
     }
@@ -260,18 +268,18 @@
     .insight-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 12px;
+        gap: var(--space-md);
     }
 
     .insight-card {
-        padding: 16px;
+        padding: var(--space-lg);
         border-radius: 18px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 68%, var(--card-bg) 32%);
         min-height: 122px;
         display: grid;
         align-content: start;
-        gap: 8px;
+        gap: var(--space-sm);
     }
 
     .insight-value {
@@ -283,7 +291,7 @@
     }
 
     .insight-label {
-        font-size: 0.95rem;
+        font-size: var(--font-size-lg);
         font-weight: 700;
     }
 
@@ -295,23 +303,23 @@
     .trend-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 12px;
+        gap: var(--space-md);
     }
 
     .trend-card {
-        padding: 16px;
+        padding: var(--space-lg);
         border-radius: 18px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 72%, var(--card-bg) 28%);
         display: grid;
-        gap: 10px;
+        gap: var(--space-md);
     }
 
     .trend-head {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        gap: 12px;
+        gap: var(--space-md);
     }
 
     .trend-head h4 {
@@ -370,11 +378,11 @@
     .sub-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
+        gap: var(--space-md);
     }
 
     .compact-card {
-        padding: 16px;
+        padding: var(--space-lg);
         border-radius: 18px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 74%, var(--card-bg) 26%);
@@ -383,16 +391,16 @@
     .flybase-health-grid {
         display: grid;
         grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
-        gap: 12px;
+        gap: var(--space-md);
     }
 
     .flybase-health-card {
-        padding: 16px;
+        padding: var(--space-lg);
         border-radius: 18px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 74%, var(--card-bg) 26%);
         display: grid;
-        gap: 10px;
+        gap: var(--space-md);
     }
 
     .flybase-health-card h4 {
@@ -417,8 +425,8 @@
     .flybase-status-pill {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        padding: 0.45rem 0.75rem;
+        gap: var(--space-sm);
+        padding: var(--space-sm) var(--space-md);
         border-radius: 999px;
         border: 1px solid var(--border-color);
         font-size: var(--font-size-sm);
@@ -452,30 +460,30 @@
     .flybase-health-meta {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: var(--space-md);
         color: var(--muted-text);
         font-size: var(--font-size-sm);
     }
 
     .compact-card h4 {
-        margin: 0 0 12px;
+        margin: 0 0 var(--space-md);
     }
 
     .metric-list {
         display: grid;
-        gap: 10px;
+        gap: var(--space-md);
     }
 
     .tray-heatmap-strip,
     .queue-strip,
     .queue-list {
         display: grid;
-        gap: 12px;
+        gap: var(--space-md);
     }
 
     .tray-heatmap-card,
     .queue-card {
-        padding: 15px 16px;
+        padding: var(--space-lg);
         border-radius: 18px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
@@ -485,7 +493,7 @@
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        gap: 10px;
+        gap: var(--space-md);
     }
 
     .tray-heatmap-head h4,
@@ -497,21 +505,21 @@
     .queue-context {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: var(--space-md);
         color: var(--muted-text);
         font-size: var(--font-size-sm);
     }
 
     .tray-mini-grid {
         display: grid;
-        gap: 3px;
-        margin-top: 10px;
+        gap: var(--space-2xs);
+        margin-top: var(--space-md);
     }
 
     .tray-mini-row {
         display: grid;
         grid-template-columns: repeat(var(--home-grid-columns), minmax(0, 1fr));
-        gap: 3px;
+        gap: var(--space-2xs);
     }
 
     .tray-mini-cell {
@@ -552,27 +560,27 @@
     }
 
     .tray-legend {
-        margin-top: 12px;
+        margin-top: var(--space-md);
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: var(--space-md);
         color: var(--muted-text);
         font-size: var(--font-size-sm);
     }
 
     .queue-panel,
     .tray-heatmap-panel {
-        margin-top: 2px;
+        margin-top: var(--space-2xs);
     }
 
     .queue-strip {
         display: grid;
         grid-auto-flow: column;
         grid-auto-columns: minmax(250px, 280px);
-        gap: 12px;
+        gap: var(--space-md);
         overflow-x: auto;
         overscroll-behavior-x: contain;
-        padding-bottom: 6px;
+        padding-bottom: var(--space-sm);
         scrollbar-width: thin;
         scroll-snap-type: x proximity;
         min-width: 0;
@@ -580,9 +588,9 @@
     }
 
     .queue-card {
-        padding: 13px;
+        padding: var(--space-lg);
         display: grid;
-        gap: 10px;
+        gap: var(--space-md);
         scroll-snap-align: start;
         min-height: 0;
         min-width: 0;
@@ -592,13 +600,13 @@
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        gap: 10px;
+        gap: var(--space-md);
     }
 
     .queue-topline {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: var(--space-sm);
         align-items: center;
     }
 
@@ -612,13 +620,13 @@
         background: color-mix(in srgb, var(--header-bg) 16%, white 84%);
         color: var(--accent-color);
         font-weight: 800;
-        font-size: 0.82rem;
+        font-size: var(--font-size-base);
         flex: 0 0 auto;
     }
 
     .queue-body {
         display: grid;
-        gap: 5px;
+        gap: var(--space-xs);
     }
 
     .queue-body p {
@@ -628,13 +636,13 @@
     }
 
     .queue-context {
-        gap: 8px;
-        font-size: 0.72rem;
+        gap: var(--space-sm);
+        font-size: var(--font-size-xs);
     }
 
     .queue-actions {
         display: flex;
-        gap: 8px;
+        gap: var(--space-sm);
         flex-wrap: wrap;
     }
 
@@ -646,10 +654,10 @@
         display: grid;
         grid-auto-flow: column;
         grid-auto-columns: minmax(200px, 220px);
-        gap: 12px;
+        gap: var(--space-md);
         overflow-x: auto;
         overscroll-behavior-x: contain;
-        padding-bottom: 6px;
+        padding-bottom: var(--space-sm);
         scrollbar-width: thin;
         scroll-snap-type: x proximity;
         min-width: 0;
@@ -657,7 +665,7 @@
     }
 
     .tray-heatmap-card {
-        padding: 13px;
+        padding: var(--space-lg);
         scroll-snap-align: start;
         min-height: 0;
         min-width: 0;
@@ -669,9 +677,9 @@
     }
 
     .tray-heatmap-title p {
-        margin: 4px 0 0;
+        margin: var(--space-xs) 0 0;
         color: var(--muted-text);
-        font-size: 0.76rem;
+        font-size: var(--font-size-sm);
         line-height: 1.35;
     }
 
@@ -680,15 +688,15 @@
     }
 
     .tray-heatmap-meta {
-        gap: 8px;
-        margin-top: 8px;
-        font-size: 0.72rem;
+        gap: var(--space-sm);
+        margin-top: var(--space-sm);
+        font-size: var(--font-size-xs);
     }
 
     .tray-legend-item {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--space-sm);
     }
 
     .tray-legend-swatch {
@@ -721,13 +729,13 @@
     .metric-row {
         display: flex;
         justify-content: space-between;
-        gap: 12px;
+        gap: var(--space-md);
         align-items: baseline;
         font-size: var(--font-size-sm);
     }
 
     .metric-row strong {
-        font-size: 1rem;
+        font-size: var(--font-size-lg);
     }
 
     .metric-muted {
@@ -740,26 +748,26 @@
     .schedule-list,
     .activity-list {
         display: grid;
-        gap: 12px;
+        gap: var(--space-md);
     }
 
     .status-row {
         display: grid;
-        gap: 8px;
+        gap: var(--space-sm);
     }
 
     .status-heading {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
+        gap: var(--space-md);
         font-size: var(--font-size-sm);
     }
 
     .status-tag {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: var(--space-sm);
         font-weight: 700;
     }
 
@@ -796,7 +804,7 @@
     .attention-card,
     .schedule-card,
     .activity-card {
-        padding: 15px 16px;
+        padding: var(--space-lg);
         border-radius: 18px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
@@ -805,7 +813,7 @@
     .suggestion-card {
         display: grid;
         grid-template-columns: auto minmax(0, 1fr) auto;
-        gap: 14px;
+        gap: var(--space-lg);
         align-items: start;
     }
 
@@ -833,7 +841,7 @@
     .schedule-card p,
     .activity-card p,
     .upcoming-card p {
-        margin: 6px 0 0;
+        margin: var(--space-sm) 0 0;
         color: var(--muted-text);
         font-size: var(--font-size-sm);
     }
@@ -842,15 +850,15 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
+        gap: var(--space-md);
         flex-wrap: wrap;
-        margin-bottom: 16px;
+        margin-bottom: var(--space-lg);
     }
 
     .attention-filters {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: var(--space-sm);
     }
 
     .filter-chip {
@@ -858,7 +866,7 @@
         background: transparent;
         color: var(--text-color);
         border-radius: 999px;
-        padding: 0.45rem 0.8rem;
+        padding: var(--space-sm) var(--space-lg);
         font-size: var(--font-size-sm);
         font-weight: 700;
         min-height: 0;
@@ -877,9 +885,9 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
+        gap: var(--space-md);
         flex-wrap: wrap;
-        margin-top: 14px;
+        margin-top: var(--space-lg);
     }
 
     .panel-pagination-copy {
@@ -899,15 +907,15 @@
     .attention-card {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        gap: 14px;
+        gap: var(--space-lg);
         align-items: start;
     }
 
     .attention-meta {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 8px;
+        gap: var(--space-sm);
+        margin-bottom: var(--space-sm);
     }
 
     .attention-pill,
@@ -916,9 +924,9 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0.32rem 0.68rem;
+        padding: var(--space-xs) var(--space-md);
         border-radius: 999px;
-        font-size: 0.74rem;
+        font-size: var(--font-size-sm);
         font-weight: 800;
         letter-spacing: 0.06em;
         text-transform: uppercase;
@@ -951,13 +959,13 @@
 
     .attention-body {
         display: grid;
-        gap: 4px;
+        gap: var(--space-xs);
     }
 
     .attention-context {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: var(--space-md);
         color: var(--muted-text);
         font-size: var(--font-size-sm);
     }
@@ -965,12 +973,12 @@
     .attention-actions {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: var(--space-sm);
         justify-content: flex-end;
     }
 
     .attention-empty {
-        padding: 20px;
+        padding: var(--space-xl);
         border: 1px dashed var(--border-color);
         border-radius: 18px;
         text-align: center;
@@ -982,7 +990,7 @@
     .activity-card,
     .upcoming-card {
         display: grid;
-        gap: 6px;
+        gap: var(--space-sm);
     }
 
     .schedule-head,
@@ -991,13 +999,13 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 12px;
+        gap: var(--space-md);
         flex-wrap: wrap;
     }
 
     .schedule-time,
     .activity-time {
-        font-size: 0.78rem;
+        font-size: var(--font-size-sm);
         text-transform: uppercase;
         letter-spacing: 0.06em;
         color: var(--muted-text);
@@ -1013,16 +1021,16 @@
     .week-chart {
         display: grid;
         grid-template-columns: repeat(7, minmax(0, 1fr));
-        gap: 12px;
+        gap: var(--space-md);
         align-items: end;
         min-height: 200px;
-        margin-top: 10px;
+        margin-top: var(--space-md);
     }
 
     .day-bar {
         display: grid;
         justify-items: center;
-        gap: 8px;
+        gap: var(--space-sm);
     }
 
     .bar-shell {
@@ -1033,7 +1041,7 @@
         background: linear-gradient(180deg, color-mix(in srgb, var(--bg-color) 74%, var(--card-bg) 26%), color-mix(in srgb, var(--card-bg) 86%, transparent 14%));
         display: flex;
         align-items: flex-end;
-        padding: 8px;
+        padding: var(--space-sm);
     }
 
     .bar {
@@ -1058,40 +1066,40 @@
 
     .mini-grid {
         display: grid;
-        gap: 12px;
+        gap: var(--space-md);
     }
 
     .mini-section {
-        padding-top: 2px;
+        padding-top: var(--space-2xs);
     }
 
     .mini-section + .mini-section {
         border-top: 1px solid var(--border-color);
-        padding-top: 14px;
+        padding-top: var(--space-lg);
     }
 
     .activity-date {
         justify-self: start;
         background: var(--header-bg);
         color: var(--header-text);
-        margin-bottom: 2px;
+        margin-bottom: var(--space-2xs);
     }
 
     .empty-copy {
         color: var(--muted-text);
-        padding: 6px 0 2px;
+        padding: var(--space-sm) 0 var(--space-2xs);
     }
 
     .dashboard-link {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: var(--space-sm);
         font-size: var(--font-size-sm);
         font-weight: 700;
     }
 
     .dashboard-link i {
-        font-size: 0.82rem;
+        font-size: var(--font-size-base);
     }
 
     @media (max-width: 1199px) {
@@ -1124,7 +1132,7 @@
     @media (max-width: 767px) {
         .dashboard-hero {
             border-radius: 22px;
-            padding: 20px;
+            padding: var(--space-xl);
         }
 
         .hero-brand {
@@ -1162,13 +1170,13 @@
         }
 
         .week-chart {
-            gap: 8px;
+            gap: var(--space-sm);
             min-height: 160px;
         }
 
         .bar-shell {
             min-height: 112px;
-            padding: 6px;
+            padding: var(--space-sm);
         }
 
         .queue-strip {
