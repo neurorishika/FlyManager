@@ -1333,9 +1333,6 @@
                 <h4>Admin Scope</h4>
                 <p class="panel-copy">Refresh everyone at once from the dashboard when you need to rebuild missing or stale phenotype caches across the entire database.</p>
                 <div class="app-button-row justify-content-end">
-                    <form method="POST" action="{{ url_for('settings.refresh_all_provider_caches') }}" class="mb-0" data-confirm-message="This will rerun provider match caching for every stock in the database. Continue?" data-progress-form data-progress-message="Refreshing provider caches for all stocks..." data-progress-duplicate-message="A global provider cache refresh is already running." data-progress-label="Refreshing...">
-                        <button type="submit" class="btn btn-outline-primary btn-sm" data-progress-label="Refreshing...">Refresh All Provider Caches</button>
-                    </form>
                     <form method="POST" action="{{ url_for('settings.backfill_all_phenotype_cache') }}" class="mb-0" data-confirm-message="This will scan all user-owned stocks and crosses and backfill missing or stale phenotype caches across the entire database. Continue?" data-progress-form data-progress-message="Backfilling phenotype caches for all users..." data-progress-duplicate-message="A global phenotype cache backfill is already running." data-progress-label="Backfilling...">
                         <button type="submit" class="btn btn-outline-primary btn-sm" data-progress-label="Backfilling...">Backfill All Phenotype Caches</button>
                     </form>

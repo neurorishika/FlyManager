@@ -277,6 +277,54 @@
                 <small class="text-muted">This is intended for bulk repair after phenotype cache changes or for importing older records that predate cached previews.</small>
             </div>
 
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1">Force Full Recompute: Phenotype Cache</h6>
+                    <p class="text-muted mb-0">Rebuilds every stock and cross phenotype cache unconditionally, even entries that are already valid. Targeted rebuild (above) already covers routine edits and FlyBase refreshes automatically — use this only when the cached data itself is suspected wrong (e.g. after a bug fix to the phenotype predictor). Limited to once every 24 hours.</p>
+                </div>
+                <form method="POST" action="{{ url_for('settings.force_recompute_cache', cache_key='phenotype') }}" data-confirm-message="This forces a full recompute of every phenotype cache entry, even ones that are already valid. This is rarely needed and can take a long time on a large database. Continue?" data-progress-form data-progress-message="Forcing full phenotype cache recompute..." data-progress-duplicate-message="A forced phenotype cache recompute is already running." data-progress-label="Recomputing...">
+                    <div class="mb-2">
+                        <label class="form-label" for="phenotypeForceConfirmPhrase">Type <code>FORCE RECOMPUTE PHENOTYPE</code> to confirm</label>
+                        <input type="text" class="form-control" id="phenotypeForceConfirmPhrase" name="confirmPhrase" autocomplete="off" required>
+                    </div>
+                    <button type="submit" class="btn btn-outline-danger" data-progress-label="Recomputing...">
+                        <i class="fas fa-exclamation-triangle"></i> Force Full Recompute (Phenotype)
+                    </button>
+                </form>
+            </div>
+
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1">Force Full Recompute: Standardization Cache</h6>
+                    <p class="text-muted mb-0">Rebuilds every stock and cross standardization cache unconditionally, even entries that are already valid. Use this only when the cached data itself is suspected wrong. Limited to once every 24 hours.</p>
+                </div>
+                <form method="POST" action="{{ url_for('settings.force_recompute_cache', cache_key='standardization') }}" data-confirm-message="This forces a full recompute of every standardization cache entry, even ones that are already valid. This is rarely needed and can take a long time on a large database. Continue?" data-progress-form data-progress-message="Forcing full standardization cache recompute..." data-progress-duplicate-message="A forced standardization cache recompute is already running." data-progress-label="Recomputing...">
+                    <div class="mb-2">
+                        <label class="form-label" for="standardizationForceConfirmPhrase">Type <code>FORCE RECOMPUTE STANDARDIZATION</code> to confirm</label>
+                        <input type="text" class="form-control" id="standardizationForceConfirmPhrase" name="confirmPhrase" autocomplete="off" required>
+                    </div>
+                    <button type="submit" class="btn btn-outline-danger" data-progress-label="Recomputing...">
+                        <i class="fas fa-exclamation-triangle"></i> Force Full Recompute (Standardization)
+                    </button>
+                </form>
+            </div>
+
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1">Force Full Recompute: Provider Match Cache</h6>
+                    <p class="text-muted mb-0">Rebuilds every stock's provider match cache unconditionally, even entries that are already valid. Targeted rebuild already covers routine edits and FlyBase refreshes automatically. Limited to once every 24 hours.</p>
+                </div>
+                <form method="POST" action="{{ url_for('settings.force_recompute_cache', cache_key='provider_match') }}" data-confirm-message="This forces a full recompute of every provider match cache entry, even ones that are already valid. This is rarely needed and can take a long time on a large database. Continue?" data-progress-form data-progress-message="Forcing full provider match cache recompute..." data-progress-duplicate-message="A forced provider match cache recompute is already running." data-progress-label="Recomputing...">
+                    <div class="mb-2">
+                        <label class="form-label" for="providerMatchForceConfirmPhrase">Type <code>FORCE RECOMPUTE PROVIDER MATCH</code> to confirm</label>
+                        <input type="text" class="form-control" id="providerMatchForceConfirmPhrase" name="confirmPhrase" autocomplete="off" required>
+                    </div>
+                    <button type="submit" class="btn btn-outline-danger" data-progress-label="Recomputing...">
+                        <i class="fas fa-exclamation-triangle"></i> Force Full Recompute (Provider Match)
+                    </button>
+                </form>
+            </div>
+
             <div class="app-inline-note">
                 <strong>Primary stock catalog:</strong> FlyBase<br>
                 <strong>Release handling:</strong> The sync action discovers the current FlyBase release before downloading files<br>
