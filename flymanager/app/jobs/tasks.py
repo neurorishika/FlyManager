@@ -6,6 +6,7 @@ so RQ can enqueue them by reference. Every task follows the same shape:
 mark the job running, do the work, mark it succeeded/failed - the actual
 business logic is unchanged from what used to live inline in the route.
 """
+import logging
 import os
 from datetime import datetime
 
@@ -227,7 +228,7 @@ def task_update_flybase_gene_metadata(key, username):
     _run(key, work)
 
 
-def _rebuild_caches_after_flybase_refresh(db):
+def _rebuild_caches_after_flybase_refresh(db, app=None):
     """Run all five materialized-cache backfills at force=False after a FlyBase
     reference-data refresh. Each wrapper is isolated in its own try/except so
     one failing doesn't block the others; force=False means the cost is
@@ -257,6 +258,14 @@ def _rebuild_caches_after_flybase_refresh(db):
         try:
             results[label] = run()
         except Exception:
+            if app is not None:
+                app.logger.exception(
+                    "Cache rebuild wrapper %s failed after FlyBase refresh", label
+                )
+            else:
+                logging.getLogger(__name__).exception(
+                    "Cache rebuild wrapper %s failed after FlyBase refresh", label
+                )
             results[label] = {"error": True}
     return results
 
@@ -319,7 +328,7 @@ def task_refresh_flybase_reference_data(key, username):
             1 for item in report["download_report"]["results"] if item.get("status") == "skipped"
         )
 
-        cache_rebuild = _rebuild_caches_after_flybase_refresh(db)
+        cache_rebuild = _rebuild_caches_after_flybase_refresh(db, app=app)
         rebuild_summary = ", ".join(
             f"{label} failed" if "error" in result else f"{label}: {result.get('updated', 0)} updated"
             for label, result in cache_rebuild.items()

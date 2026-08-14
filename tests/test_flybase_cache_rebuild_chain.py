@@ -60,3 +60,29 @@ def test_rebuild_caches_after_flybase_refresh_isolates_wrapper_failures():
     assert results["stock_phenotype"] == {"error": True}
     cross_phenotype.assert_called_once()
     assert results["cross_phenotype"]["scanned"] == 0
+
+
+def test_rebuild_caches_after_flybase_refresh_logs_wrapper_exceptions(caplog):
+    db = FakeDatabase({"stocks": [], "crosses": []})
+
+    with patch(
+        "flymanager.utils.phenotypes.backfill.backfill_stock_phenotype_cache",
+        side_effect=RuntimeError("boom"),
+    ), patch(
+        "flymanager.utils.phenotypes.backfill.backfill_cross_phenotype_cache",
+        return_value={"scanned": 0, "updated": 0, "skipped_valid": 0},
+    ), patch(
+        "flymanager.app.services.standardization_backfill.backfill_stock_standardization_cache",
+        return_value={"scanned": 0, "updated": 0, "skipped_valid": 0},
+    ), patch(
+        "flymanager.app.services.standardization_backfill.backfill_cross_standardization_cache",
+        return_value={"scanned": 0, "updated": 0, "skipped_valid": 0},
+    ), patch(
+        "flymanager.app.routes.stock.backfill_stock_provider_match_cache",
+        return_value={"scanned": 0, "updated": 0, "skipped_valid": 0, "errors": 0},
+    ):
+        with caplog.at_level("ERROR", logger="flymanager.app.jobs.tasks"):
+            results = _rebuild_caches_after_flybase_refresh(db)
+
+    assert results["stock_phenotype"] == {"error": True}
+    assert any("stock_phenotype" in record.getMessage() for record in caplog.records)
