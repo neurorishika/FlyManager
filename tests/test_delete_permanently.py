@@ -35,7 +35,7 @@ def test_empty_uids_returns_empty_without_querying():
     assert deleted == [] and skipped == []
 
 
-def test_issues_one_find_and_one_delete_many_regardless_of_count():
+def test_issues_one_find_and_one_delete_many_regardless_of_count(monkeypatch):
     db = _stocks_db()
     collection = db["stocks"]
     counts = {"find": 0, "delete_many": 0, "find_one": 0}
@@ -48,7 +48,10 @@ def test_issues_one_find_and_one_delete_many_regardless_of_count():
                 return orig(self, *args, **kwargs)
             return spy
 
-        setattr(collection.__class__, method, make_spy(method, original))
+        # monkeypatch.setattr on the class (shared across every test file
+        # that imports tests.mongo_fakes) auto-restores the original method
+        # after this test, unlike a manual setattr with no matching restore.
+        monkeypatch.setattr(collection.__class__, method, make_spy(method, original))
 
     delete_owned_documents_if_status(
         "stocks", "alice", ["s1", "s2", "s3"], db, required_status="No longer maintained",
