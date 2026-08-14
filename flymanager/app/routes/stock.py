@@ -512,6 +512,43 @@ def _build_provider_match_cache_envelope(stock, source_context, candidates):
     }
 
 
+def _provider_match_cache_getter(record):
+    source_context = enrich_stock_source_context(record)
+    cache_payload = record.get(PROVIDER_MATCH_CACHE_FIELD)
+    if _is_provider_match_cache_entry_valid(cache_payload, record, source_context):
+        return cache_payload
+    return None
+
+
+def _provider_match_cache_builder(record):
+    source_context = enrich_stock_source_context(record)
+    candidates = find_external_stock_matches(record)
+    return _build_provider_match_cache_envelope(record, source_context, candidates)
+
+
+def backfill_stock_provider_match_cache(collection, *, users=None, dry_run=False, force=False):
+    from flymanager.utils.materialized_cache import backfill_materialized_cache
+
+    return backfill_materialized_cache(
+        collection,
+        cache_field=PROVIDER_MATCH_CACHE_FIELD,
+        cache_getter=_provider_match_cache_getter,
+        cache_builder=_provider_match_cache_builder,
+        cache_selector_builder=lambda record: {
+            "UniqueID": record["UniqueID"], "User": record["User"],
+        },
+        projection={
+            "_id": 1, "UniqueID": 1, "User": 1, "AssignedTo": 1,
+            "SourceID": 1, "StockSource": 1, "SourceCollection": 1,
+            "FlyBaseStockID": 1, "Genotype": 1, "ExternalRawGenotype": 1,
+            "AltReference": 1, "Provenance": 1, PROVIDER_MATCH_CACHE_FIELD: 1,
+        },
+        users=users,
+        dry_run=dry_run,
+        force=force,
+    )
+
+
 def _get_valid_provider_match_cache(stock, source_context):
     cache_payload = stock.get(PROVIDER_MATCH_CACHE_FIELD)
     if not _is_provider_match_cache_entry_valid(cache_payload, stock, source_context):

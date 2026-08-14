@@ -199,36 +199,23 @@ def task_backfill_phenotype_cache(key, username, *, users, scope_label):
 
 def task_refresh_provider_caches(key, username):
     def work(app, db):
-        from flymanager.app.routes.stock import _get_provider_match_payload
+        from flymanager.app.routes.stock import (PROVIDER_MATCH_CACHE_FIELD,
+                                                  backfill_stock_provider_match_cache)
 
-        summary = {"scanned": 0, "refreshed": 0, "errors": 0, "candidate_matches": 0}
-        projection = {
-            "UniqueID": 1, "User": 1, "SourceID": 1, "StockSource": 1,
-            "SourceCollection": 1, "FlyBaseStockID": 1, "Genotype": 1,
-            "ExternalRawGenotype": 1, "AltReference": 1, "Provenance": 1,
-        }
-        for stock in db["stocks"].find({}, projection):
-            if not stock.get("UniqueID") or not stock.get("User"):
-                continue
-            summary["scanned"] += 1
-            try:
-                payload = _get_provider_match_payload(stock, refresh=True)
-            except Exception:
-                summary["errors"] += 1
-                app.logger.exception(
-                    "Error refreshing provider cache for stock %s", stock.get("UniqueID"),
-                )
-                continue
-            summary["refreshed"] += 1
-            summary["candidate_matches"] += int(payload.get("count") or 0)
+        summary = backfill_stock_provider_match_cache(db["stocks"], force=True)
+
+        candidate_matches = sum(
+            (doc.get(PROVIDER_MATCH_CACHE_FIELD) or {}).get("count", 0) or 0
+            for doc in db["stocks"].find({}, {PROVIDER_MATCH_CACHE_FIELD: 1})
+        )
 
         message = (
             "Provider cache refresh complete for all stocks: "
-            f"{summary['refreshed']} refreshed, {summary['candidate_matches']} candidate matches cached, "
+            f"{summary['updated']} refreshed, {candidate_matches} candidate matches cached, "
             f"{summary['errors']} errors, {summary['scanned']} scanned total."
         )
         write_activity(username, "Refreshed provider match cache for all stocks", db)
-        return {"message": message, "summary": summary}
+        return {"message": message, "summary": {**summary, "candidate_matches": candidate_matches}}
 
     _run(key, work)
 
