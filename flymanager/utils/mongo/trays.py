@@ -302,46 +302,24 @@ def update_tray(user, tray_id, updates, db):
     return False
 
 
-def get_tray_occupancy(user, tray_id, db):
+def _build_occupancy(stocks, crosses, parent_stock_map):
     """
-    Get the current occupancy of a tray.
+    Pure computation of a tray's occupancy map from already-fetched stocks,
+    crosses, and a map of parent UniqueID -> stock document.
 
     Parameters:
-    user: str
-        The username of the user.
-    tray_id: str
-        The TrayID of the tray.
-    db: pymongo.database.Database
-        The MongoDB database instance.
+    stocks: list
+        Stock documents for a single tray.
+    crosses: list
+        Cross documents for a single tray.
+    parent_stock_map: dict
+        Map of stock UniqueID -> stock document, covering the male/female
+        parents referenced by `crosses`.
 
     Returns:
     dict
         Dictionary of occupied and blocked positions with stock/cross info
     """
-    # Get stocks and crosses in this tray
-    stocks_collection = db["stocks"]
-    crosses_collection = db["crosses"]
-
-    stocks = list(stocks_collection.find({"User": user, "TrayID": tray_id}))
-    crosses = list(crosses_collection.find({"User": user, "TrayID": tray_id}))
-
-    # Batch-resolve male/female parent stocks for all crosses in one query
-    parent_ids = {
-        parent_id
-        for cross in crosses
-        for parent_id in (cross.get("MaleUniqueID"), cross.get("FemaleUniqueID"))
-        if parent_id
-    }
-    parent_stock_map = {}
-    if parent_ids:
-        parent_stock_map = {
-            stock["UniqueID"]: stock
-            for stock in stocks_collection.find(
-                {"User": user, "UniqueID": {"$in": list(parent_ids)}}
-            )
-        }
-
-    # Create occupancy map
     occupancy = {}
 
     # Add stocks to occupancy map
@@ -429,6 +407,116 @@ def get_tray_occupancy(user, tray_id, db):
                 }
 
     return occupancy
+
+
+def get_tray_occupancy(user, tray_id, db):
+    """
+    Get the current occupancy of a tray.
+
+    Parameters:
+    user: str
+        The username of the user.
+    tray_id: str
+        The TrayID of the tray.
+    db: pymongo.database.Database
+        The MongoDB database instance.
+
+    Returns:
+    dict
+        Dictionary of occupied and blocked positions with stock/cross info
+    """
+    # Get stocks and crosses in this tray
+    stocks_collection = db["stocks"]
+    crosses_collection = db["crosses"]
+
+    stocks = list(stocks_collection.find({"User": user, "TrayID": tray_id}))
+    crosses = list(crosses_collection.find({"User": user, "TrayID": tray_id}))
+
+    # Batch-resolve male/female parent stocks for all crosses in one query
+    parent_ids = {
+        parent_id
+        for cross in crosses
+        for parent_id in (cross.get("MaleUniqueID"), cross.get("FemaleUniqueID"))
+        if parent_id
+    }
+    parent_stock_map = {}
+    if parent_ids:
+        parent_stock_map = {
+            stock["UniqueID"]: stock
+            for stock in stocks_collection.find(
+                {"User": user, "UniqueID": {"$in": list(parent_ids)}}
+            )
+        }
+
+    return _build_occupancy(stocks, crosses, parent_stock_map)
+
+
+def get_tray_occupancies_bulk(trays, db):
+    """
+    Compute occupancy for many trays in 3 queries total instead of ~2 per tray.
+
+    Parameters:
+    trays: list
+        Tray documents, each with at least `User`, `TrayID`, `UniqueID`.
+    db: pymongo.database.Database
+        The MongoDB database instance.
+
+    Returns:
+    dict
+        Map of tray UniqueID -> occupancy dict (see `_build_occupancy`).
+    """
+    owner_tray_pairs = {
+        (_normalize_text(tray.get("User")), _normalize_text(tray.get("TrayID")))
+        for tray in trays
+        if _normalize_text(tray.get("User")) and _normalize_text(tray.get("TrayID"))
+    }
+    if not owner_tray_pairs:
+        return {}
+
+    or_clauses = [{"User": owner, "TrayID": tray_id} for owner, tray_id in owner_tray_pairs]
+    all_stocks = list(db["stocks"].find({"$or": or_clauses}))
+    all_crosses = list(db["crosses"].find({"$or": or_clauses}))
+
+    parent_ids_by_owner = {}
+    for cross in all_crosses:
+        owner = _normalize_text(cross.get("User"))
+        for parent_id in (cross.get("MaleUniqueID"), cross.get("FemaleUniqueID")):
+            if parent_id:
+                parent_ids_by_owner.setdefault(owner, set()).add(parent_id)
+
+    parent_stock_map_by_owner = {}
+    for owner, parent_ids in parent_ids_by_owner.items():
+        parent_stock_map_by_owner[owner] = {
+            stock["UniqueID"]: stock
+            for stock in db["stocks"].find(
+                {"User": owner, "UniqueID": {"$in": list(parent_ids)}}
+            )
+        }
+
+    stocks_by_pair = {}
+    for stock in all_stocks:
+        key = (_normalize_text(stock.get("User")), _normalize_text(stock.get("TrayID")))
+        stocks_by_pair.setdefault(key, []).append(stock)
+
+    crosses_by_pair = {}
+    for cross in all_crosses:
+        key = (_normalize_text(cross.get("User")), _normalize_text(cross.get("TrayID")))
+        crosses_by_pair.setdefault(key, []).append(cross)
+
+    occupancies_by_pair = {
+        pair: _build_occupancy(
+            stocks_by_pair.get(pair, []),
+            crosses_by_pair.get(pair, []),
+            parent_stock_map_by_owner.get(pair[0], {}),
+        )
+        for pair in owner_tray_pairs
+    }
+
+    result = {}
+    for tray in trays:
+        pair = (_normalize_text(tray.get("User")), _normalize_text(tray.get("TrayID")))
+        result[tray["UniqueID"]] = occupancies_by_pair.get(pair, {})
+    return result
 
 
 def calculate_required_vials(stock_or_cross):

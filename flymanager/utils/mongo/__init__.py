@@ -57,7 +57,9 @@ from flymanager.utils.mongo.trays import (add_tray, annotate_tray_access,
                                           calculate_required_vials,
                                           delete_tray, get_accessible_tray,
                                           get_accessible_trays, get_tray,
-                                          get_tray_occupancy, get_user_trays,
+                                          get_tray_occupancy,
+                                          get_tray_occupancies_bulk,
+                                          get_user_trays,
                                           move_item_to_tray, update_tray)
 # User data functions
 from flymanager.utils.mongo.user_data import (get_all_genotypes,
@@ -137,6 +139,7 @@ __all__ = [
     "delete_tray",
     "update_tray",
     "get_tray_occupancy",
+    "get_tray_occupancies_bulk",
     "calculate_required_vials",
     "move_item_to_tray",
     # Helper/metadata functions

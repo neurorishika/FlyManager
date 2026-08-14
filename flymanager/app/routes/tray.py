@@ -15,6 +15,7 @@ from flymanager.utils.mongo import (OperationLockConflict, add_tray,
                                     get_accessible_stocks, get_accessible_tray,
                                     get_accessible_trays, get_direct_reports,
                                     get_tray, get_tray_occupancy,
+                                    get_tray_occupancies_bulk,
                                     hold_operation_locks, move_item_to_tray,
                                     record_operation_lock_keys,
                                     update_document_assignment, update_tray,
@@ -35,16 +36,17 @@ def tray_management():
     
     trays = get_accessible_trays(user, db)
     direct_reports = get_direct_reports(user, db)
+    occupancies = get_tray_occupancies_bulk(trays, db)
 
     for tray in trays:
-        occupancy = get_tray_occupancy(tray.get("User", user), tray["TrayID"], db)
+        occupancy = occupancies.get(tray["UniqueID"], {})
         tray["OccupiedStarts"] = len(
             [item for item in occupancy.values() if item.get("type") != "blocked"]
         )
         tray["BlockedCells"] = len(
             [item for item in occupancy.values() if item.get("type") == "blocked"]
         )
-    
+
     # Render the tray management page
     return render_template(
         'tray/tray_management.html', 
