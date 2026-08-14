@@ -49,11 +49,26 @@ def get_database(client):
 
 
 def ensure_mongo_indexes(db):
-    """Create the indexes used by stock/cross access patterns."""
+    """Create the indexes used by stock/cross access, tray, and auth query patterns."""
     db["stocks"].create_index([("User", 1), ("UniqueID", 1)], name="stocks_user_uid")
     db["stocks"].create_index([("AssignedTo", 1), ("UniqueID", 1)], name="stocks_assigned_uid")
+    db["stocks"].create_index([("User", 1), ("Status", 1), ("TrayID", 1)], name="stocks_user_status_tray")
+    db["stocks"].create_index([("AssignedTo", 1), ("Status", 1), ("TrayID", 1)], name="stocks_assigned_status_tray")
+
     db["crosses"].create_index([("User", 1), ("UniqueID", 1)], name="crosses_user_uid")
     db["crosses"].create_index([("AssignedTo", 1), ("UniqueID", 1)], name="crosses_assigned_uid")
+    db["crosses"].create_index([("User", 1), ("Status", 1), ("TrayID", 1)], name="crosses_user_status_tray")
+    db["crosses"].create_index([("AssignedTo", 1), ("Status", 1), ("TrayID", 1)], name="crosses_assigned_status_tray")
+
+    db["users"].create_index([("Username", 1)], name="users_username")
+    db["users"].create_index([("ReportsTo", 1)], name="users_reports_to")
+
+    db["activity"].create_index([("user", 1), ("timestamp", -1)], name="activity_user_timestamp")
+
+    db["trays"].create_index([("User", 1), ("TrayID", 1)], name="trays_user_trayid")
+
+    db["password_reset_tokens"].create_index([("TokenHash", 1)], name="password_reset_tokens_hash")
+
     db["operation_locks"].create_index("key", unique=True, name="operation_locks_key")
     db["operation_locks"].create_index("expires_at", expireAfterSeconds=0, name="operation_locks_expires_at")
 
