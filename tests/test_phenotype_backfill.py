@@ -92,7 +92,7 @@ def test_backfill_stock_phenotype_cache_skips_valid_entries():
 
     summary = backfill_stock_phenotype_cache(collection)
 
-    assert summary == {"scanned": 2, "updated": 1, "skipped_valid": 1}
+    assert summary == {"scanned": 2, "updated": 1, "skipped_valid": 1, "errors": 0}
     assert collection.updated[0][0] == {"_id": 2}
     assert collection.updated[0][1]["$set"]["PhenotypeCache"]["genotype"] == "w[1118]; +; +; +"
 
@@ -121,7 +121,7 @@ def test_backfill_cross_phenotype_cache_honors_user_filter_and_dry_run():
         dry_run=True,
     )
 
-    assert summary == {"scanned": 1, "updated": 1, "skipped_valid": 0}
+    assert summary == {"scanned": 1, "updated": 1, "skipped_valid": 0, "errors": 0}
     assert collection.updated == []
 
 
@@ -151,7 +151,7 @@ def test_backfill_stock_phenotype_cache_targets_records_user_actually_maintains(
 
     summary = backfill_stock_phenotype_cache(collection, users=["tech"], dry_run=True)
 
-    assert summary == {"scanned": 2, "updated": 2, "skipped_valid": 0}
+    assert summary == {"scanned": 2, "updated": 2, "skipped_valid": 0, "errors": 0}
 
 
 def test_logged_in_user_can_backfill_owned_phenotype_caches(monkeypatch):

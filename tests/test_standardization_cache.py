@@ -139,7 +139,7 @@ def test_backfill_stock_standardization_skips_valid_builds_missing():
 
     summary = backfill_stock_standardization_cache(collection)
 
-    assert summary == {"scanned": 2, "updated": 1, "skipped_valid": 1}
+    assert summary == {"scanned": 2, "updated": 1, "skipped_valid": 1, "errors": 0}
     assert collection.updated[0][0] == {"_id": 2}
     built = collection.updated[0][1]["$set"]["StandardizationCache"]
     assert built["genotype"] == DIRTY_GENOTYPE
@@ -156,7 +156,7 @@ def test_backfill_cross_standardization_honors_user_and_dry_run():
 
     summary = backfill_cross_standardization_cache(collection, users=["tech"], dry_run=True)
 
-    assert summary == {"scanned": 1, "updated": 1, "skipped_valid": 0}
+    assert summary == {"scanned": 1, "updated": 1, "skipped_valid": 0, "errors": 0}
     assert collection.updated == []
 
 
@@ -172,7 +172,7 @@ def test_generic_backfill_uses_named_cache_field():
         cache_builder=lambda record: {"built": True},
     )
 
-    assert summary == {"scanned": 1, "updated": 1, "skipped_valid": 0}
+    assert summary == {"scanned": 1, "updated": 1, "skipped_valid": 0, "errors": 0}
     assert collection.updated[0][1] == {"$set": {"WidgetCache": {"built": True}}}
 
 

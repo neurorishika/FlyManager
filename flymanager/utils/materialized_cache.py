@@ -68,8 +68,10 @@ def backfill_materialized_cache(collection, *, cache_field, cache_getter, cache_
 
     Skips records whose cache is already valid (``cache_getter`` returns a
     truthy value) unless ``force`` is set. Honours a ``users`` maintainer filter
-    both at the query level and per-record. Returns a summary dict with
-    ``scanned`` / ``updated`` / ``skipped_valid`` counts.
+    both at the query level and per-record. A ``cache_builder`` exception is
+    caught, counted in ``errors``, and that record is left unmodified rather
+    than aborting the run. Returns a summary dict with ``scanned`` /
+    ``updated`` / ``skipped_valid`` / ``errors`` counts.
     """
     if query is None:
         query = build_user_query(users)
@@ -78,14 +80,8 @@ def backfill_materialized_cache(collection, *, cache_field, cache_getter, cache_
         "scanned": 0,
         "updated": 0,
         "skipped_valid": 0,
+        "errors": 0,
     }
-
-    pending_operations = []
-
-    def flush():
-        if pending_operations:
-            collection.bulk_write(list(pending_operations), ordered=False)
-            pending_operations.clear()
 
     for record in collection.find(query, projection):
         if not record_matches_users(record, users):
@@ -96,18 +92,20 @@ def backfill_materialized_cache(collection, *, cache_field, cache_getter, cache_
             summary["skipped_valid"] += 1
             continue
 
-        summary["updated"] += 1
         if dry_run:
+            summary["updated"] += 1
             continue
 
-        pending_operations.append(
-            UpdateOne(
-                cache_selector_builder(record),
-                {"$set": {cache_field: cache_builder(record)}},
-            )
-        )
-        if len(pending_operations) >= _BULK_WRITE_CHUNK_SIZE:
-            flush()
+        try:
+            cache_payload = cache_builder(record)
+        except Exception:
+            summary["errors"] += 1
+            continue
 
-    flush()
+        summary["updated"] += 1
+        collection.update_one(
+            cache_selector_builder(record),
+            {"$set": {cache_field: cache_payload}},
+        )
+
     return summary
