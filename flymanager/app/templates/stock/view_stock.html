@@ -1053,7 +1053,9 @@ document.addEventListener("DOMContentLoaded", function() {
                         : sourceType;
                 }
                 if ('SourceID' in body.fields) {
+                    stockData.sourceID = body.fields.SourceID;
                     document.getElementById('sourceIdDisplay').textContent = body.fields.SourceID || 'Unavailable';
+                    document.getElementById('sourceID').value = body.fields.SourceID || '';
                 }
                 if ('FlyBaseStockID' in body.fields) {
                     document.getElementById('flyBaseStockIdDisplay').textContent = body.fields.FlyBaseStockID || 'Unavailable';
