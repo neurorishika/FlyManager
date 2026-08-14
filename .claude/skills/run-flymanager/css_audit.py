@@ -49,6 +49,12 @@ PAGES = [
     # status-200 + ".header" checks. See SKILL.md's `dev-fixtures` entry.
     ("view-cross", "/cross/view_cross/18d73b2cc8"),
     ("phenotype-preview", "/stock/phenotype_preview"),
+    # Task 10: a real tray DETAIL page (dynamic per-record grid, the
+    # highest-risk surface in that task). Owned by devtest directly in the
+    # seed data (User: "devtest") - no dev-fixtures mutation needed, unlike
+    # view-cross above. 10 rows x 20 columns exercises a large, non-square
+    # grid so a broken --tray-rows/--tray-cols custom property is visible.
+    ("view-tray", "/tray/tray/855909a1b3"),
 ]
 VIEWPORTS = [("tablet", 1024, 768), ("desktop", 1600, 1000)]
 THEMES = ["light", "dark"]
