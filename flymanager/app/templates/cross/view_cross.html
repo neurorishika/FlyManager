@@ -1,54 +1,7 @@
 {% extends 'base.html' %}
 
-{% block head %}
-<style nonce="{{ csp_nonce }}">
-    .offspring-phenotype-cell {
-        min-width: 260px;
-    }
-
-    .offspring-phenotype-images {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-top: 0.75rem;
-    }
-
-    .offspring-phenotype-image-card {
-        width: 84px;
-        border: 1px solid var(--border-color);
-        border-radius: 12px;
-        overflow: hidden;
-        background: color-mix(in srgb, var(--card-bg) 94%, white 6%);
-        box-shadow: none;
-    }
-
-    .offspring-phenotype-image-card img {
-        display: block;
-        width: 100%;
-        height: 56px;
-        object-fit: cover;
-    }
-
-    .offspring-phenotype-image-card-body {
-        padding: 0.35rem 0.45rem 0.4rem;
-        line-height: 1.2;
-    }
-
-    .offspring-phenotype-image-title {
-        display: block;
-        font-size: 0.72rem;
-        font-weight: 700;
-        line-height: 1.15;
-    }
-
-    .offspring-phenotype-image-source {
-        display: block;
-        margin-top: 0.1rem;
-        color: var(--muted-text);
-        font-size: 0.68rem;
-        line-height: 1.15;
-    }
-</style>
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/view_cross.css') }}">
 {% endblock %}
 
 {% block content %}

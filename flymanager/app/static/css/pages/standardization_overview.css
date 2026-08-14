@@ -1,0 +1,96 @@
+/* standardization_overview.css — standardization overview page (templates/stock/standardization_overview.html). */
+    .standardization-overview-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+
+    .standardization-overview-card {
+        padding: 18px;
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        background: var(--panel-background);
+        box-shadow: var(--surface-shadow);
+    }
+
+    .standardization-overview-label {
+        margin: 0 0 8px;
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        color: var(--muted-text);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .standardization-overview-value {
+        margin: 0;
+        font-size: clamp(1.05rem, 1rem + 0.4vw, 1.35rem);
+        line-height: 1.25;
+    }
+
+    .standardization-overview-copy {
+        margin: 8px 0 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .standardization-table td,
+    .standardization-table th {
+        vertical-align: top;
+    }
+
+    .standardization-status-pill,
+    .standardization-token-pill,
+    .standardization-recommendation-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
+        font-size: var(--font-size-sm);
+        margin: 0 8px 8px 0;
+        white-space: nowrap;
+    }
+
+    .standardization-status-pill.is-needs-review {
+        border-color: color-mix(in srgb, var(--warning-color) 45%, var(--border-color) 55%);
+    }
+
+    .standardization-status-pill.is-clean {
+        border-color: color-mix(in srgb, var(--success-color) 38%, var(--border-color) 62%);
+    }
+
+    .standardization-meta-copy {
+        margin: 0;
+        color: var(--muted-text);
+        font-size: var(--font-size-sm);
+    }
+
+    .standardization-genotype {
+        margin: 0;
+        max-width: 420px;
+        color: var(--text-color);
+        word-break: break-word;
+    }
+
+    .standardization-empty-state {
+        padding: 24px;
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
+    }
+
+    @media (max-width: 991px) {
+        .standardization-overview-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 767px) {
+        .standardization-overview-grid {
+            grid-template-columns: 1fr;
+        }
+    }

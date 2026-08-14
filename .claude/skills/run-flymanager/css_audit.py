@@ -39,6 +39,11 @@ PAGES = [
     ("add-cross", "/cross/add_cross"),
     ("standardization", "/stock/standardization_overview"),
     ("user-guide", "/user_guide"),
+    # Task 9/11: static-record IDs from the dev seed data, used only so
+    # these detail/preview pages have something real to render.
+    ("view-stock", "/stock/view/0034051b64"),
+    ("view-cross", "/cross/view_cross/6a08c91d7a14d0afb319ed06"),
+    ("phenotype-preview", "/stock/phenotype_preview"),
 ]
 VIEWPORTS = [("tablet", 1024, 768), ("desktop", 1600, 1000)]
 THEMES = ["light", "dark"]
