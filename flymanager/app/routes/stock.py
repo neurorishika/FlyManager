@@ -27,14 +27,15 @@ from flymanager.app.settings import DEFAULT_STOCK_PROPERTY_VALUES
 from flymanager.utils.genetics import qc_genotype
 from flymanager.utils.labels import generate_label_pdf
 from flymanager.utils.mongo import (OperationLockConflict, add_metadata,
-                                    add_to_stock, delete_stock, edit_stock,
+                                    add_to_stock, edit_stock,
                                     get_accessible_stock,
                                     get_accessible_stocks, get_direct_reports,
                                     get_eclosion_in, get_flip_in, get_metadata,
                                     get_user_initials, hold_operation_lock,
                                     update_document_assignment,
                                     update_stock_vials, write_activity)
-from flymanager.utils.mongo_records import current_timestamp
+from flymanager.utils.mongo_records import (current_timestamp,
+                                              delete_owned_documents_if_status)
 from flymanager.utils.phenotypes.image_library import \
     select_prediction_reference_images
 from flymanager.utils.phenotypes.predictor import (
@@ -1948,28 +1949,22 @@ def delete_stock_permanently():
             ),
             400,
         )
-    deleted_count = 0
-    skipped_count = 0
+    deleted_uids, skipped_uids = delete_owned_documents_if_status(
+        "stocks", username, unique_ids, db, required_status="No longer maintained",
+    )
+    if deleted_uids:
+        activity_documents = [
+            {
+                "user": username,
+                "timestamp": current_timestamp(),
+                "activity": f"Permanently deleted stock {uid}",
+            }
+            for uid in deleted_uids
+        ]
+        db["activity"].insert_many(activity_documents)
 
-    for uid in unique_ids:
-        # Get the stock and check its status
-        stock = db["stocks"].find_one({"UniqueID": uid, "User": username})
-
-        if not stock:
-            skipped_count += 1
-            continue
-
-        # Only delete stocks with 'No longer maintained' status
-        if stock.get("Status") == "No longer maintained":
-            success = delete_stock(username, uid, db)
-            if success:
-                # Log the deletion activity
-                write_activity(username, f"Permanently deleted stock {uid}", db)
-                deleted_count += 1
-            else:
-                skipped_count += 1
-        else:
-            skipped_count += 1
+    deleted_count = len(deleted_uids)
+    skipped_count = len(skipped_uids)
 
     return jsonify(
         {

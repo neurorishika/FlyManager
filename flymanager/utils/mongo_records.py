@@ -124,6 +124,35 @@ def delete_owned_document(collection_name, user, uid, db):
     return result.deleted_count > 0
 
 
+def delete_owned_documents_if_status(collection_name, user, uids, db, *, required_status):
+    """Delete every uid in `uids` owned by `user` whose Status matches
+    `required_status`, in one batched read + one batched delete.
+
+    Returns (deleted_uids, skipped_uids) — skipped covers both "not found /
+    not owned" and "wrong status", matching the per-item route's behaviour
+    of treating both as a skip rather than an error.
+    """
+    if not uids:
+        return [], []
+
+    collection = db[collection_name]
+    candidates = {
+        document["UniqueID"]: document
+        for document in collection.find({"UniqueID": {"$in": uids}, "User": user})
+    }
+
+    deletable_uids = [
+        uid for uid, document in candidates.items()
+        if document.get("Status") == required_status
+    ]
+    skipped_uids = [uid for uid in uids if uid not in deletable_uids]
+
+    if deletable_uids:
+        collection.delete_many({"UniqueID": {"$in": deletable_uids}, "User": user})
+
+    return deletable_uids, skipped_uids
+
+
 def get_missing_required_updates(document, required_properties, default_values):
     update_fields = {}
 

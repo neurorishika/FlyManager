@@ -25,6 +25,7 @@ from flymanager.utils.mongo import (OperationLockConflict, add_metadata,
                                     get_user_initials, hold_operation_lock,
                                     update_cross_vials,
                                     update_document_assignment, write_activity)
+from flymanager.utils.mongo_records import delete_owned_documents_if_status
 from flymanager.utils.phenotypes.image_library import \
     select_prediction_reference_images
 from flymanager.utils.phenotypes.predictor import (build_cross_phenotype_cache,
@@ -1001,30 +1002,22 @@ def delete_cross_permanently():
             ),
             400,
         )
-    deleted_count = 0
-    skipped_count = 0
+    deleted_uids, skipped_uids = delete_owned_documents_if_status(
+        "crosses", username, unique_ids, db, required_status="No longer maintained",
+    )
+    if deleted_uids:
+        activity_documents = [
+            {
+                "user": username,
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "activity": f"Permanently deleted cross {uid}",
+            }
+            for uid in deleted_uids
+        ]
+        db["activity"].insert_many(activity_documents)
 
-    for uid in unique_ids:
-        # Get the cross and check its status
-        cross = db["crosses"].find_one({"UniqueID": uid, "User": username})
-
-        if not cross:
-            skipped_count += 1
-            continue
-
-        # Only delete crosses with 'No longer maintained' status
-        if cross.get("Status") == "No longer maintained":
-            from flymanager.utils.mongo import delete_cross
-
-            success = delete_cross(username, uid, db)
-            if success:
-                # Log the deletion activity
-                write_activity(username, f"Permanently deleted cross {uid}", db)
-                deleted_count += 1
-            else:
-                skipped_count += 1
-        else:
-            skipped_count += 1
+    deleted_count = len(deleted_uids)
+    skipped_count = len(skipped_uids)
 
     return jsonify(
         {
