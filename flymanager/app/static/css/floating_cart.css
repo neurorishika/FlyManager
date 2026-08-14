@@ -39,16 +39,16 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-md);
     min-height: 76px;
-    padding: 14px clamp(14px, 2vw, 22px);
+    padding: var(--space-lg) clamp(var(--space-lg), 2vw, var(--space-xl));
     cursor: pointer;
     border-bottom: 1px solid transparent;
 }
 
 .cart-header h3 {
     margin: 0;
-    font-size: clamp(1rem, 0.95rem + 0.25vw, 1.15rem);
+    font-size: var(--font-size-lg);
     font-weight: 700;
 }
 
@@ -57,7 +57,7 @@
     align-items: center;
     justify-content: flex-end;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--space-xs);
 }
 
 .cart-header-actions .btn-link {
@@ -93,7 +93,7 @@
     border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent 22%);
     border-radius: 999px;
     color: var(--text-color);
-    font-size: 1rem;
+    font-size: var(--font-size-lg);
     cursor: pointer;
     transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
@@ -115,8 +115,8 @@
 
 .cart-content {
     display: grid;
-    gap: 16px;
-    padding: 0 clamp(14px, 2vw, 22px) 22px;
+    gap: var(--space-lg);
+    padding: 0 clamp(var(--space-lg), 2vw, var(--space-xl)) var(--space-xl);
     opacity: 0;
     transform: translateY(10px);
     pointer-events: none;
@@ -133,7 +133,7 @@
     max-height: 280px;
     overflow-y: auto;
     margin-bottom: 0;
-    padding: 6px 6px 0 0;
+    padding: var(--space-sm) var(--space-sm) 0 0;
 }
 
 #cartItems::-webkit-scrollbar {
@@ -158,10 +158,10 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-sm);
     flex-wrap: wrap;
-    padding: 10px 12px;
-    margin-bottom: 8px;
+    padding: var(--space-md);
+    margin-bottom: var(--space-sm);
     background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
     border-radius: 14px;
     border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent 18%);
@@ -169,7 +169,7 @@
 
 .cart-item span {
     flex: 1;
-    margin-right: 10px;
+    margin-right: var(--space-md);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -177,16 +177,16 @@
 
 .cart-item .quantity-input {
     width: 60px !important;
-    margin: 0 10px;
-    padding: 2px 5px;
+    margin: 0 var(--space-md);
+    padding: var(--space-2xs) var(--space-xs);
     text-align: center;
 }
 
 .cart-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    padding-top: 14px;
+    gap: var(--space-sm);
+    padding-top: var(--space-lg);
     border-top: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent 18%);
 }
 
@@ -199,8 +199,8 @@
     top: 50%;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 12px;
+    gap: var(--space-md);
+    padding: var(--space-md);
     background: color-mix(in srgb, var(--card-bg) 84%, var(--bg-color) 16%);
     border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent 20%);
     border-radius: 22px;
@@ -250,10 +250,10 @@
 .edge-dock-action {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-md);
     min-height: 46px;
     min-width: 170px;
-    padding: 0 16px;
+    padding: 0 var(--space-lg);
     color: var(--text-color);
     background: color-mix(in srgb, var(--bg-color) 72%, transparent 28%);
     border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent 20%);
@@ -282,7 +282,7 @@
 }
 
 .edge-dock-label {
-    font-size: 0.92rem;
+    font-size: var(--font-size-base);
 }
 
 /* Reserve space for the fixed cart within the main content, not below the footer */
@@ -305,7 +305,7 @@ body.has-floating-cart .main-content {
     .cart-header {
         min-height: 72px;
         align-items: center;
-        gap: 12px;
+        gap: var(--space-md);
     }
 
     .cart-header-actions {
@@ -362,8 +362,8 @@ body.has-floating-cart .main-content {
 @media (max-width: 575px) {
     .edge-dock {
         width: calc(100% - 12px);
-        padding: 8px;
-        gap: 6px;
+        padding: var(--space-sm);
+        gap: var(--space-sm);
     }
 
     .edge-dock-left {

@@ -4,7 +4,7 @@
 }
 
 .cross-item-submeta {
-    margin-top: 8px;
+    margin-top: var(--space-sm);
 }
 
 .badge-assignment {
