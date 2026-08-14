@@ -287,9 +287,13 @@
                         <label class="form-label" for="phenotypeForceConfirmPhrase">Type <code>FORCE RECOMPUTE PHENOTYPE</code> to confirm</label>
                         <input type="text" class="form-control" id="phenotypeForceConfirmPhrase" name="confirmPhrase" autocomplete="off" required>
                     </div>
-                    <button type="submit" class="btn btn-outline-danger" data-progress-label="Recomputing...">
+                    {% set phenotype_allowed, phenotype_retry_after = force_recompute_cooldowns.get('phenotype', (True, None)) %}
+                    <button type="submit" class="btn btn-outline-danger" data-progress-label="Recomputing..."{% if not phenotype_allowed %} disabled{% endif %}>
                         <i class="fas fa-exclamation-triangle"></i> Force Full Recompute (Phenotype)
                     </button>
+                    {% if not phenotype_allowed %}
+                    <small class="text-muted d-block mt-1">Next available at {{ phenotype_retry_after }}.</small>
+                    {% endif %}
                 </form>
             </div>
 
@@ -303,9 +307,13 @@
                         <label class="form-label" for="standardizationForceConfirmPhrase">Type <code>FORCE RECOMPUTE STANDARDIZATION</code> to confirm</label>
                         <input type="text" class="form-control" id="standardizationForceConfirmPhrase" name="confirmPhrase" autocomplete="off" required>
                     </div>
-                    <button type="submit" class="btn btn-outline-danger" data-progress-label="Recomputing...">
+                    {% set standardization_allowed, standardization_retry_after = force_recompute_cooldowns.get('standardization', (True, None)) %}
+                    <button type="submit" class="btn btn-outline-danger" data-progress-label="Recomputing..."{% if not standardization_allowed %} disabled{% endif %}>
                         <i class="fas fa-exclamation-triangle"></i> Force Full Recompute (Standardization)
                     </button>
+                    {% if not standardization_allowed %}
+                    <small class="text-muted d-block mt-1">Next available at {{ standardization_retry_after }}.</small>
+                    {% endif %}
                 </form>
             </div>
 
@@ -319,9 +327,13 @@
                         <label class="form-label" for="providerMatchForceConfirmPhrase">Type <code>FORCE RECOMPUTE PROVIDER MATCH</code> to confirm</label>
                         <input type="text" class="form-control" id="providerMatchForceConfirmPhrase" name="confirmPhrase" autocomplete="off" required>
                     </div>
-                    <button type="submit" class="btn btn-outline-danger" data-progress-label="Recomputing...">
+                    {% set provider_match_allowed, provider_match_retry_after = force_recompute_cooldowns.get('provider_match', (True, None)) %}
+                    <button type="submit" class="btn btn-outline-danger" data-progress-label="Recomputing..."{% if not provider_match_allowed %} disabled{% endif %}>
                         <i class="fas fa-exclamation-triangle"></i> Force Full Recompute (Provider Match)
                     </button>
+                    {% if not provider_match_allowed %}
+                    <small class="text-muted d-block mt-1">Next available at {{ provider_match_retry_after }}.</small>
+                    {% endif %}
                 </form>
             </div>
 

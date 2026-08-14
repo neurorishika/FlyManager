@@ -110,12 +110,17 @@ def admin_settings():
     flybase_reference_status = flybase_service.get_flybase_reference_status(
         current_app._get_current_object()
     )
+    force_recompute_cooldowns = {
+        cache_key: check_force_refresh_cooldown(cache_key, db)
+        for cache_key in ("phenotype", "standardization", "provider_match")
+    }
     return render_template(
         "settings/admin.html",
         settings=settings,
         user_profiles=user_profiles,
         manager_options=manager_options,
         flybase_reference_status=flybase_reference_status,
+        force_recompute_cooldowns=force_recompute_cooldowns,
     )
 
 
@@ -201,7 +206,7 @@ def backfill_all_phenotype_cache():
 @bp.route("/settings/force-recompute-cache/<cache_key>", methods=["POST"])
 @login_required
 @admin_required
-@limiter.limit("2 per hour")
+@limiter.limit("6 per hour")
 def force_recompute_cache(cache_key):
     username = session.get("username")
     redirect_to = url_for("settings.admin_settings")
