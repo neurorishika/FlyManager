@@ -38,6 +38,7 @@ PAGES = [
     ("add-stock", "/stock/add"),
     ("add-cross", "/cross/add_cross"),
     ("standardization", "/stock/standardization_overview"),
+    ("user-guide", "/user_guide"),
 ]
 VIEWPORTS = [("tablet", 1024, 768), ("desktop", 1600, 1000)]
 THEMES = ["light", "dark"]
@@ -98,6 +99,52 @@ def _settle(page):
     page.wait_for_timeout(250)
 
 
+# Delay between successive page.goto() calls within a capture/tapcheck run,
+# to stay clear of the app's per-route rate limits (see security.py /
+# flask-limiter). Task 6 hit the limiter mid-capture; a real screenshot of a
+# 429 page is byte-identical across runs, so `compare` would report a false
+# IDENTICAL on two equally-broken captures instead of catching the problem.
+# The delay is a mitigation; _load() below is what actually catches it.
+INTER_PAGE_DELAY_MS = 400
+
+
+class RateLimitedOrErrorPage(RuntimeError):
+    pass
+
+
+def _load(page, slug, path):
+    """Navigate to BASE+path and fail loudly if the response was not a
+    real, successful render of the page — rather than silently writing a
+    screenshot (capture) or measuring (tapcheck) a "Too Many Requests" or
+    other error placeholder.
+
+    Checks two independent signals:
+      1. The HTTP status of the navigation response must be 200. Flask's
+         default handling of a flask-limiter RateLimitExceeded is a 429;
+         other failures (5xx, unexpected redirects to an error route) are
+         caught the same way.
+      2. The page must actually contain the app chrome (`.header`), which
+         every authenticated page in PAGES renders via base.html. A 200
+         response that is nonetheless an error page (no such route ships
+         here today, but this is what the brief calls "consider also
+         asserting an expected element is present") would still be caught.
+    """
+    response = page.goto(f"{BASE}{path}", wait_until="networkidle")
+    if response is None or response.status != 200:
+        status = response.status if response is not None else "no response"
+        raise RateLimitedOrErrorPage(
+            f"{slug} ({path}): navigation returned status {status}, "
+            f"expected 200 — likely rate-limited or errored")
+    _settle(page)
+    try:
+        page.wait_for_selector(".header", timeout=3000)
+    except PlaywrightTimeoutError:
+        raise RateLimitedOrErrorPage(
+            f"{slug} ({path}): status 200 but '.header' app chrome not "
+            f"found — likely an error placeholder page")
+    page.wait_for_timeout(INTER_PAGE_DELAY_MS)
+
+
 def capture(label):
     out = SHOTS / label
     out.mkdir(parents=True, exist_ok=True)
@@ -115,8 +162,7 @@ def capture(label):
                     f"localStorage.setItem('theme', '{theme}')")
                 page = ctx.new_page()
                 for slug, path in PAGES:
-                    page.goto(f"{BASE}{path}", wait_until="networkidle")
-                    _settle(page)
+                    _load(page, slug, path)
                     page.screenshot(
                         path=out / f"{slug}--{theme}--{vp_name}.png",
                         full_page=True,
@@ -214,12 +260,11 @@ def tapcheck():
         )
         page = ctx.new_page()
         for slug, path in PAGES:
-            page.goto(f"{BASE}{path}", wait_until="networkidle")
             # tapcheck() never calls page.screenshot(), so the
             # animations="disabled" freeze capture() gets is not available
             # here - determinism for the DOM measurements below rests solely
-            # on _settle()'s 250ms wait_for_timeout.
-            _settle(page)
+            # on _settle()'s 250ms wait_for_timeout (invoked inside _load()).
+            _load(page, slug, path)
             small = page.eval_on_selector_all(
                 CONTROLS,
                 """(els, floor) => els
