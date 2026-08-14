@@ -206,7 +206,7 @@ def task_refresh_provider_caches(key, username):
 
         candidate_matches = sum(
             (doc.get(PROVIDER_MATCH_CACHE_FIELD) or {}).get("count", 0) or 0
-            for doc in db["stocks"].find({}, {PROVIDER_MATCH_CACHE_FIELD: 1})
+            for doc in db["stocks"].find({}, {f"{PROVIDER_MATCH_CACHE_FIELD}.count": 1})
         )
 
         message = (

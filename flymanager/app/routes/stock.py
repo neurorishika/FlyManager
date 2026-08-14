@@ -536,7 +536,7 @@ def backfill_stock_provider_match_cache(collection, *, users=None, dry_run=False
         cache_getter=_provider_match_cache_getter,
         cache_builder=_provider_match_cache_builder,
         cache_selector_builder=lambda record: {
-            "UniqueID": record["UniqueID"], "User": record["User"],
+            "UniqueID": record.get("UniqueID"), "User": record.get("User"),
         },
         projection={
             "_id": 1, "UniqueID": 1, "User": 1, "AssignedTo": 1,
