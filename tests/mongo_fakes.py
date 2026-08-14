@@ -12,9 +12,12 @@ from types import SimpleNamespace
 from pymongo import ReturnDocument
 
 
-def _matches_operator_clause(actual, clause):
+def _matches_operator_clause(actual, clause, *, field_present=True):
     for operator, operand in clause.items():
-        if operator == "$in":
+        if operator == "$exists":
+            if field_present != operand:
+                return False
+        elif operator == "$in":
             if actual not in operand:
                 return False
         elif operator == "$nin":
@@ -40,7 +43,9 @@ def _matches(record, query):
         if key in ("$or", "$and"):
             continue
         if isinstance(value, dict) and any(k.startswith("$") for k in value):
-            if not _matches_operator_clause(record.get(key), value):
+            if not _matches_operator_clause(
+                record.get(key), value, field_present=key in record
+            ):
                 return False
         elif record.get(key) != value:
             return False
@@ -130,12 +135,15 @@ class FakeCollection:
         return sum(1 for r in self._records if _matches(r, query or {}))
 
     def distinct(self, field, query=None):
+        # Matches the real driver: returns raw distinct values verbatim,
+        # including None/"" - callers are responsible for filtering those
+        # out, same as they must against a real MongoDB deployment.
         values = {
             record.get(field)
             for record in self._records
             if _matches(record, query or {})
         }
-        return sorted(v for v in values if v not in (None, ""))
+        return list(values)
 
     def insert_one(self, document):
         self._records.append(dict(document))
@@ -201,7 +209,9 @@ class FakeCollection:
     def create_index(self, *args, **kwargs):
         return "-".join(str(a) for a in args)
 
-    def aggregate(self, pipeline):
+    def aggregate(self, pipeline, **kwargs):
+        # kwargs (e.g. allowDiskUse) are accepted for signature compatibility
+        # with pymongo's real Collection.aggregate but have no effect here.
         records = [dict(r) for r in self._records]
         for stage in pipeline:
             if "$match" in stage:

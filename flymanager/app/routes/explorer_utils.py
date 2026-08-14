@@ -152,6 +152,91 @@ def paginate_explorer_records(records, *, page, per_page, per_page_value):
     }
 
 
+def build_pagination_from_db_page(items, total_count, pagination_state):
+    """Build the same pagination dict shape as paginate_explorer_records,
+    but from a page that MongoDB already sliced via skip/limit - total_count
+    comes from count_documents, not len(all_records).
+    """
+    per_page = pagination_state["per_page"]
+    if per_page is None:
+        return {
+            "items": items,
+            "page": 1,
+            "page_count": len(items),
+            "per_page": None,
+            "per_page_value": pagination_state["per_page_value"],
+            "total_items": total_count,
+            "total_pages": 1,
+            "start_index": 1 if total_count else 0,
+            "end_index": total_count,
+            "has_previous": False,
+            "has_next": False,
+            "previous_page": None,
+            "next_page": None,
+            "page_numbers": [{"type": "page", "value": 1}],
+            "is_all": True,
+        }
+
+    total_pages = max(1, math.ceil(total_count / per_page))
+    current_page = min(max(1, pagination_state["page"]), total_pages)
+    start_offset = (current_page - 1) * per_page
+    start_index = start_offset + 1 if total_count else 0
+    end_index = start_offset + len(items)
+    return {
+        "items": items,
+        "page": current_page,
+        "page_count": len(items),
+        "per_page": per_page,
+        "per_page_value": pagination_state["per_page_value"],
+        "total_items": total_count,
+        "total_pages": total_pages,
+        "start_index": start_index,
+        "end_index": end_index,
+        "has_previous": current_page > 1,
+        "has_next": current_page < total_pages,
+        "previous_page": current_page - 1 if current_page > 1 else None,
+        "next_page": current_page + 1 if current_page < total_pages else None,
+        "page_numbers": _build_page_display(total_pages, current_page),
+        "is_all": False,
+    }
+
+
+def compute_explorer_scope_counts(collection_name, username, db):
+    """Count documents in each assignment scope (maintain/assigned_out/incoming)
+    for the explorer's scope tabs.
+
+    A never-assigned document has no ``AssignedTo`` field at all (it's only
+    ever added via ``$set`` by the assignment-update helpers) - a missing
+    field satisfies Mongo's ``{"$nin": [...]}`` (there's nothing to exclude
+    on), so the assigned_out clause must explicitly require the field to
+    exist before comparing its value, or every never-assigned document gets
+    miscounted as assigned out.
+    """
+    owner_scope = {"$or": [{"User": username}, {"AssignedTo": username}]}
+    assigned_out_filter = {
+        "$and": [
+            owner_scope,
+            {"User": username},
+            {"$and": [
+                {"AssignedTo": {"$exists": True}},
+                {"AssignedTo": {"$nin": ["", username]}},
+            ]},
+        ]
+    }
+    incoming_filter = {
+        "$and": [owner_scope, {"AssignedTo": username}, {"User": {"$ne": username}}]
+    }
+    collection = db[collection_name]
+    total = collection.count_documents(owner_scope)
+    assigned_out = collection.count_documents(assigned_out_filter)
+    incoming = collection.count_documents(incoming_filter)
+    return {
+        "maintain": total - assigned_out,
+        "assigned_out": assigned_out,
+        "incoming": incoming,
+    }
+
+
 def set_flip_display_fields(record, *, raw_value, display_field):
     day_value = parse_flip_day(raw_value)
 

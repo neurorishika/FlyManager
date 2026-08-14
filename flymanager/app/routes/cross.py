@@ -1,5 +1,4 @@
 import datetime
-import math
 
 from flask import (Blueprint, current_app, flash, jsonify, redirect,
                    render_template, request, session, url_for)
@@ -8,7 +7,8 @@ from fuzzywuzzy import fuzz
 from flymanager.app import db
 from flymanager.app.routes.auth import login_required
 from flymanager.app.routes.explorer_utils import (
-    _build_page_display, collect_unique_values, get_explorer_filter_state,
+    build_pagination_from_db_page, collect_unique_values,
+    compute_explorer_scope_counts, get_explorer_filter_state,
     get_explorer_pagination_state, paginate_explorer_records,
     set_flip_display_fields)
 from flymanager.app.security import (get_json_payload, limiter,
@@ -273,7 +273,7 @@ def cross_explorer():
     mongo_filter = _build_cross_mongo_filter(filter_state)
 
     try:
-        scope_counts = _compute_cross_scope_counts(username, db)
+        scope_counts = compute_explorer_scope_counts("crosses", username, db)
         unique_values = _compute_cross_unique_values(username, db, filter_state)
 
         if search_query:
@@ -300,11 +300,11 @@ def cross_explorer():
                 "crosses", username, db, mongo_filter=mongo_filter,
                 skip=skip, limit=per_page, extra_sort_keys=(),
             )
-            pagination = _build_pagination_from_db_page(
+            pagination = build_pagination_from_db_page(
                 page_items, total_count, pagination_state,
             )
     except Exception as e:
-        print(f"Error fetching crosses for explorer: {e}")
+        current_app.logger.exception("Error fetching crosses for explorer: %s", e)
         scope_counts = {"maintain": 0, "assigned_out": 0, "incoming": 0}
         unique_values = {
             k: []
@@ -428,84 +428,21 @@ def _apply_cross_search(crosses, search_query):
     return [cross for cross in crosses if match(cross)]
 
 
-def _compute_cross_scope_counts(username, db):
-    owner_scope = {"$or": [{"User": username}, {"AssignedTo": username}]}
-    assigned_out_filter = {
-        "$and": [owner_scope, {"User": username}, {"AssignedTo": {"$nin": ["", username]}}]
-    }
-    incoming_filter = {
-        "$and": [owner_scope, {"AssignedTo": username}, {"User": {"$ne": username}}]
-    }
-    total = db["crosses"].count_documents(owner_scope)
-    assigned_out = db["crosses"].count_documents(assigned_out_filter)
-    incoming = db["crosses"].count_documents(incoming_filter)
-    return {
-        "maintain": total - assigned_out,
-        "assigned_out": assigned_out,
-        "incoming": incoming,
-    }
-
-
 def _compute_cross_unique_values(username, db, filter_state):
     owner_scope = {"$or": [{"User": username}, {"AssignedTo": username}]}
     mongo_filter = _build_cross_mongo_filter(filter_state) if filter_state else {}
     combined = {"$and": [owner_scope, mongo_filter]} if mongo_filter else owner_scope
 
     unique_values = {
-        field: sorted(db["crosses"].distinct(field, combined))
+        field: sorted(
+            str(v) for v in db["crosses"].distinct(field, combined) if v not in (None, "")
+        )
         for field in ("MaleSpecies", "FemaleSpecies", "TrayID", "FoodType")
     }
-    unique_values["Status"] = sorted(db["crosses"].distinct("Status", owner_scope))
+    unique_values["Status"] = sorted(
+        str(v) for v in db["crosses"].distinct("Status", owner_scope) if v not in (None, "")
+    )
     return unique_values
-
-
-def _build_pagination_from_db_page(items, total_count, pagination_state):
-    """Build the same pagination dict shape as paginate_explorer_records,
-    but from a page that MongoDB already sliced via skip/limit - total_count
-    comes from count_documents, not len(all_records).
-    """
-    per_page = pagination_state["per_page"]
-    if per_page is None:
-        return {
-            "items": items,
-            "page": 1,
-            "page_count": len(items),
-            "per_page": None,
-            "per_page_value": pagination_state["per_page_value"],
-            "total_items": total_count,
-            "total_pages": 1,
-            "start_index": 1 if total_count else 0,
-            "end_index": total_count,
-            "has_previous": False,
-            "has_next": False,
-            "previous_page": None,
-            "next_page": None,
-            "page_numbers": [{"type": "page", "value": 1}],
-            "is_all": True,
-        }
-
-    total_pages = max(1, math.ceil(total_count / per_page))
-    current_page = min(max(1, pagination_state["page"]), total_pages)
-    start_offset = (current_page - 1) * per_page
-    start_index = start_offset + 1 if total_count else 0
-    end_index = start_offset + len(items)
-    return {
-        "items": items,
-        "page": current_page,
-        "page_count": len(items),
-        "per_page": per_page,
-        "per_page_value": pagination_state["per_page_value"],
-        "total_items": total_count,
-        "total_pages": total_pages,
-        "start_index": start_index,
-        "end_index": end_index,
-        "has_previous": current_page > 1,
-        "has_next": current_page < total_pages,
-        "previous_page": current_page - 1 if current_page > 1 else None,
-        "next_page": current_page + 1 if current_page < total_pages else None,
-        "page_numbers": _build_page_display(total_pages, current_page),
-        "is_all": False,
-    }
 
 
 def _apply_cross_filters(crosses, filters):

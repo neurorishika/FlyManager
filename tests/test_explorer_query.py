@@ -10,6 +10,7 @@ from flymanager.app.routes.cross import (
     _apply_cross_filters, _apply_cross_search, _build_cross_mongo_filter,
     _cross_sort_key,
 )
+from flymanager.app.routes.explorer_utils import compute_explorer_scope_counts
 
 
 def _stock(uid, **overrides):
@@ -343,3 +344,56 @@ def test_cross_pushdown_default_sort_keys_would_diverge_from_cross_sort_key():
         "crosses", "alice", db, extra_sort_keys=(),
     )
     assert [c["UniqueID"] for c in default_sort_order] != [c["UniqueID"] for c in matching_sort_order]
+
+
+# --- Fix round 2: never-assigned documents must not count as assigned_out --
+
+def test_scope_counts_never_assigned_stock_is_not_counted_as_assigned_out():
+    # A freshly created stock never has an AssignedTo field set at all - it's
+    # only ever added via $set by the assignment-update helpers - so a query
+    # that treats a missing AssignedTo the same as it treats a real assignee
+    # value ({"$nin": ["", username]} without an $exists guard) would wrongly
+    # count every never-assigned stock as "assigned out".
+    db = FakeDatabase({
+        "stocks": [
+            {"UniqueID": "s1", "User": "alice", "Status": "Healthy"},  # no AssignedTo key
+            {"UniqueID": "s2", "User": "alice", "AssignedTo": "", "Status": "Healthy"},
+            {"UniqueID": "s3", "User": "alice", "AssignedTo": "bob", "Status": "Healthy"},
+        ]
+    })
+    counts = compute_explorer_scope_counts("stocks", "alice", db)
+    assert counts["maintain"] == 2  # s1 (never assigned) + s2 (explicitly returned)
+    assert counts["assigned_out"] == 1  # only s3, genuinely assigned to bob
+    assert counts["incoming"] == 0
+
+
+def test_scope_counts_never_assigned_cross_is_not_counted_as_assigned_out():
+    db = FakeDatabase({
+        "crosses": [
+            {"UniqueID": "c1", "User": "alice", "Status": "Healthy"},  # no AssignedTo key
+            {"UniqueID": "c2", "User": "alice", "AssignedTo": "bob", "Status": "Healthy"},
+        ]
+    })
+    counts = compute_explorer_scope_counts("crosses", "alice", db)
+    assert counts["maintain"] == 1
+    assert counts["assigned_out"] == 1
+    assert counts["incoming"] == 0
+
+
+def test_scope_counts_incoming_ignores_documents_missing_assigned_to():
+    # A document owned by someone else with no AssignedTo field must never
+    # count as "incoming" for a viewer who isn't the owner.
+    db = FakeDatabase({
+        "stocks": [
+            {"UniqueID": "s1", "User": "bob", "Status": "Healthy"},  # not alice's, no AssignedTo
+            {"UniqueID": "s2", "User": "bob", "AssignedTo": "alice", "Status": "Healthy"},
+        ]
+    })
+    counts = compute_explorer_scope_counts("stocks", "alice", db)
+    # s1 (bob's, no AssignedTo) is out of alice's scope entirely - it isn't
+    # owned by or assigned to her, so it contributes to none of the counts.
+    # s2 is genuinely incoming (assigned to alice by bob); total-in-scope is
+    # just s2, and it's not assigned_out since alice isn't its User.
+    assert counts["incoming"] == 1
+    assert counts["assigned_out"] == 0
+    assert counts["maintain"] == 1
