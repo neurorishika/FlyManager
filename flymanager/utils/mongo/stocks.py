@@ -217,6 +217,11 @@ def edit_stock(user, uid, db, updates, log_activity=True, refresh_vials=True):
         log_activity=log_activity,
     )
 
+    if success and "Genotype" in prepared_updates:
+        from flymanager.utils.mongo.crosses import \
+            propagate_stock_genotype_to_crosses
+        propagate_stock_genotype_to_crosses(user, uid, prepared_updates["Genotype"], db)
+
     if success and refresh_vials and current_stock:
         update_stock_vials(current_stock, user, db)
 
