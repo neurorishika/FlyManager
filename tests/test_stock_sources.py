@@ -1460,3 +1460,181 @@ def test_mark_ordered_route_updates_comments_with_order_note(monkeypatch):
         },
         refresh_vials=False,
     )
+
+
+def test_apply_provider_match_fills_blank_fields_without_confirmation(monkeypatch):
+    app = _make_app(monkeypatch)
+    stock = {
+        "UniqueID": "UID1", "User": "admin", "ViewerCanEdit": True,
+        "StockSource": "", "SourceCollection": "", "SourceID": "",
+        "FlyBaseStockID": "", "ExternalSupportStatus": "",
+        "Genotype": "w[*]; CyO/cn[1]; ; ",
+        "ProviderMatchCache": {
+            "candidates": [
+                {
+                    "stockSource": "VIENNA", "sourceCollection": "Vienna",
+                    "sourceID": "4321", "flyBaseStockID": "FBst0004321",
+                    "supportStatus": "supported",
+                }
+            ],
+        },
+    }
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "admin"
+
+        with patch(
+            "flymanager.app.routes.stock.get_accessible_stock", return_value=stock,
+        ), patch(
+            "flymanager.app.routes.stock._is_provider_match_cache_entry_valid",
+            return_value=True,
+        ), patch(
+            "flymanager.app.routes.stock.edit_stock", return_value=True,
+        ) as edit_stock_mock, patch(
+            "flymanager.app.routes.stock.write_activity",
+        ):
+            response = client.post(
+                "/stock/apply_provider_match/UID1",
+                json={"candidateIndex": 0},
+            )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["applied"] is True
+    assert body["fields"]["SourceID"] == "4321"
+    assert body["fields"]["FlyBaseStockID"] == "FBst0004321"
+    edit_stock_mock.assert_called_once()
+    assert edit_stock_mock.call_args.args[0] == "admin"
+    assert edit_stock_mock.call_args.args[1] == "UID1"
+
+
+def test_apply_provider_match_requires_confirmation_for_conflicting_field(monkeypatch):
+    app = _make_app(monkeypatch)
+    stock = {
+        "UniqueID": "UID1", "User": "admin", "ViewerCanEdit": True,
+        "StockSource": "BDSC", "SourceCollection": "Bloomington", "SourceID": "17",
+        "FlyBaseStockID": "FBst0000017", "ExternalSupportStatus": "manual",
+        "Genotype": "w[*]; CyO/cn[1]; ; ",
+        "ProviderMatchCache": {
+            "candidates": [
+                {
+                    "stockSource": "BDSC", "sourceCollection": "Bloomington",
+                    "sourceID": "17", "flyBaseStockID": "FBst0000017",
+                    "supportStatus": "supported",
+                }
+            ],
+        },
+    }
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "admin"
+
+        with patch(
+            "flymanager.app.routes.stock.get_accessible_stock", return_value=stock,
+        ), patch(
+            "flymanager.app.routes.stock._is_provider_match_cache_entry_valid",
+            return_value=True,
+        ), patch(
+            "flymanager.app.routes.stock.edit_stock",
+        ) as edit_stock_mock:
+            response = client.post(
+                "/stock/apply_provider_match/UID1",
+                json={"candidateIndex": 0},
+            )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["applied"] is False
+    assert body["requiresConfirmation"] is True
+    assert body["diff"]["ExternalSupportStatus"]["conflict"] is True
+    edit_stock_mock.assert_not_called()
+
+
+def test_apply_provider_match_writes_after_confirm(monkeypatch):
+    app = _make_app(monkeypatch)
+    stock = {
+        "UniqueID": "UID1", "User": "admin", "ViewerCanEdit": True,
+        "StockSource": "BDSC", "SourceCollection": "Bloomington", "SourceID": "17",
+        "FlyBaseStockID": "FBst0000017", "ExternalSupportStatus": "manual",
+        "Genotype": "w[*]; CyO/cn[1]; ; ",
+        "ProviderMatchCache": {
+            "candidates": [
+                {
+                    "stockSource": "BDSC", "sourceCollection": "Bloomington",
+                    "sourceID": "17", "flyBaseStockID": "FBst0000017",
+                    "supportStatus": "supported",
+                }
+            ],
+        },
+    }
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "admin"
+
+        with patch(
+            "flymanager.app.routes.stock.get_accessible_stock", return_value=stock,
+        ), patch(
+            "flymanager.app.routes.stock._is_provider_match_cache_entry_valid",
+            return_value=True,
+        ), patch(
+            "flymanager.app.routes.stock.edit_stock", return_value=True,
+        ) as edit_stock_mock, patch(
+            "flymanager.app.routes.stock.write_activity",
+        ):
+            response = client.post(
+                "/stock/apply_provider_match/UID1",
+                json={"candidateIndex": 0, "confirm": True},
+            )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["applied"] is True
+    assert body["fields"]["ExternalSupportStatus"] == "supported"
+    edit_stock_mock.assert_called_once()
+
+
+def test_apply_provider_match_rejects_out_of_range_candidate_index(monkeypatch):
+    app = _make_app(monkeypatch)
+    stock = {
+        "UniqueID": "UID1", "User": "admin", "ViewerCanEdit": True,
+        "ProviderMatchCache": {"candidates": []},
+    }
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "admin"
+
+        with patch(
+            "flymanager.app.routes.stock.get_accessible_stock", return_value=stock,
+        ), patch(
+            "flymanager.app.routes.stock._is_provider_match_cache_entry_valid",
+            return_value=True,
+        ):
+            response = client.post(
+                "/stock/apply_provider_match/UID1",
+                json={"candidateIndex": 0},
+            )
+
+    assert response.status_code == 409
+
+
+def test_apply_provider_match_rejects_when_viewer_cannot_edit(monkeypatch):
+    app = _make_app(monkeypatch)
+    stock = {"UniqueID": "UID1", "User": "admin", "ViewerCanEdit": False}
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "somebody_else"
+
+        with patch(
+            "flymanager.app.routes.stock.get_accessible_stock", return_value=stock,
+        ):
+            response = client.post(
+                "/stock/apply_provider_match/UID1",
+                json={"candidateIndex": 0},
+            )
+
+    assert response.status_code == 403

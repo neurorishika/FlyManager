@@ -38,7 +38,8 @@ from flymanager.utils.mongo import (OperationLockConflict, add_metadata,
                                     update_document_assignment,
                                     update_stock_vials, write_activity)
 from flymanager.utils.mongo_records import (current_timestamp,
-                                              delete_owned_documents_if_status)
+                                              delete_owned_documents_if_status,
+                                              diff_candidate_against_record)
 from flymanager.utils.phenotypes.image_library import \
     select_prediction_reference_images
 from flymanager.utils.phenotypes.flybase_pipeline import \
@@ -1560,6 +1561,77 @@ def reverse_search_stock(unique_id):
             "Error reverse searching stock %s for %s: %s", unique_id, username, e
         )
         return jsonify({"error": "An internal error occurred while reverse searching providers."}), 500
+
+
+@bp.route("/apply_provider_match/<unique_id>", methods=["POST"])
+@login_required
+@limiter.limit("30 per minute")
+def apply_provider_match(unique_id):
+    username = session.get("username")
+
+    try:
+        payload = get_json_payload()
+        candidate_index = parse_int_value(
+            payload.get("candidateIndex"), field_name="candidateIndex", minimum=0,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    confirmed = bool(payload.get("confirm"))
+
+    stock = get_accessible_stock(username, unique_id, db, annotate=True)
+    if not stock:
+        return jsonify({"error": "Stock not found."}), 404
+    if not stock.get("ViewerCanEdit"):
+        return jsonify({"error": "Only the owner can apply a provider match."}), 403
+
+    source_context = enrich_stock_source_context(stock)
+    cache_payload = stock.get(PROVIDER_MATCH_CACHE_FIELD)
+    if not _is_provider_match_cache_entry_valid(cache_payload, stock, source_context):
+        return jsonify({
+            "error": "Provider matches are out of date. Refresh matches and try again.",
+        }), 409
+
+    candidates = cache_payload.get("candidates") or []
+    if candidate_index >= len(candidates):
+        return jsonify({
+            "error": "That match is no longer available. Refresh matches and try again.",
+        }), 409
+
+    candidate = candidates[candidate_index]
+    field_mapping = {
+        "StockSource": candidate.get("stockSource", ""),
+        "SourceCollection": candidate.get("sourceCollection", ""),
+        "SourceID": candidate.get("sourceID", ""),
+        "FlyBaseStockID": candidate.get("flyBaseStockID", ""),
+        "ExternalSupportStatus": candidate.get("supportStatus", ""),
+    }
+
+    diff = diff_candidate_against_record(stock, field_mapping)
+    if not diff:
+        return jsonify({
+            "applied": False,
+            "message": "This stock already matches the selected candidate.",
+            "diff": {},
+        })
+
+    has_conflict = any(entry["conflict"] for entry in diff.values())
+    if has_conflict and not confirmed:
+        return jsonify({"applied": False, "requiresConfirmation": True, "diff": diff})
+
+    updates = {field: entry["candidate"] for field, entry in diff.items()}
+    success = edit_stock(stock["User"], unique_id, db, updates, refresh_vials=False)
+    if not success:
+        return jsonify({"error": "Unable to update stock record."}), 500
+
+    match_label = candidate.get("sourceCollection") or candidate.get("stockSource") or "provider"
+    write_activity(
+        username,
+        f"Applied {match_label} {candidate.get('sourceID', '')} provider match to stock {unique_id}",
+        db,
+    )
+
+    return jsonify({"applied": True, "diff": diff, "fields": updates})
 
 
 @bp.route("/review_standardization/<unique_id>", methods=["GET"])
