@@ -166,11 +166,11 @@ def get_user_profiles(db):
 
 
 def get_direct_reports(user, db):
-    return [
+    normalized_user = _normalize_username(user)
+    return sorted(
         _normalize_username(profile.get("Username"))
-        for profile in get_user_profiles(db)
-        if _normalize_username(profile.get("ReportsTo")) == user
-    ]
+        for profile in db["users"].find({"ReportsTo": normalized_user}, {"Username": 1})
+    )
 
 
 def get_reporting_manager(user, db):
