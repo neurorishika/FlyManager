@@ -111,13 +111,13 @@ def reset_database(db):
 def uid_exists(uid, db):
     """
     Check if a stock or cross with the given UniqueID exists in the MongoDB database.
-    
+
     Parameters:
     uid: str
         The unique identifier of the stock or cross.
     db: pymongo.database.Database
         The MongoDB database instance.
-    
+
     Returns:
     bool
         True if the UniqueID exists, False otherwise.
@@ -126,7 +126,7 @@ def uid_exists(uid, db):
     stocks_collection = db["stocks"]
     crosses_collection = db["crosses"]
 
-    stock = stocks_collection.find_one({"UniqueID": uid})
-    cross = crosses_collection.find_one({"UniqueID": uid})
+    stock = stocks_collection.find_one({"UniqueID": uid}, {"_id": 1})
+    cross = crosses_collection.find_one({"UniqueID": uid}, {"_id": 1})
 
     return stock is not None or cross is not None
