@@ -1,16 +1,16 @@
 .schedule-shell {
     display: grid;
-    gap: 18px;
+    gap: var(--space-lg);
 }
 
 .schedule-summary-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px;
+    gap: var(--space-lg);
 }
 
 .schedule-summary-card {
-    padding: 18px;
+    padding: var(--space-lg);
     border-radius: 18px;
     border: 1px solid var(--border-color);
     background: var(--panel-background);
@@ -18,7 +18,7 @@
 }
 
 .schedule-summary-label {
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-sm);
     font-size: var(--font-size-sm);
     font-weight: 700;
     color: var(--muted-text);
@@ -34,7 +34,7 @@
 }
 
 .schedule-summary-copy {
-    margin: 8px 0 0;
+    margin: var(--space-sm) 0 0;
     color: var(--muted-text);
     font-size: var(--font-size-sm);
 }
@@ -43,7 +43,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--space-lg);
     flex-wrap: wrap;
 }
 
@@ -55,13 +55,13 @@
 
 .schedule-board {
     display: grid;
-    gap: 16px;
+    gap: var(--space-lg);
 }
 
 .schedule-day-card {
     display: grid;
-    gap: 18px;
-    padding: clamp(18px, 2vw, 24px);
+    gap: var(--space-lg);
+    padding: clamp(var(--space-lg), 2vw, var(--space-xl));
     border-radius: 24px;
     border: 1px solid var(--panel-border);
     background:
@@ -74,21 +74,21 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--space-lg);
     flex-wrap: wrap;
 }
 
 .schedule-day-heading {
     display: grid;
-    gap: 10px;
+    gap: var(--space-md);
 }
 
 .schedule-day-kicker {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-sm);
     width: fit-content;
-    padding: 0.38rem 0.72rem;
+    padding: var(--space-sm) var(--space-md);
     border-radius: 999px;
     background: color-mix(in srgb, var(--accent-color) 12%, var(--card-bg) 88%);
     border: 1px solid color-mix(in srgb, var(--accent-color) 24%, var(--border-color) 76%);
@@ -100,7 +100,7 @@
 .schedule-day-title-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-md);
     flex-wrap: wrap;
 }
 
@@ -114,7 +114,7 @@
     align-items: center;
     justify-content: center;
     min-height: 32px;
-    padding: 0 12px;
+    padding: 0 var(--space-md);
     border-radius: 999px;
     background: color-mix(in srgb, var(--bg-color) 68%, var(--card-bg) 32%);
     border: 1px solid var(--border-color);
@@ -132,7 +132,7 @@
 .schedule-day-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-md);
     flex-wrap: wrap;
 }
 
@@ -142,7 +142,7 @@
 
 .schedule-tray-section {
     display: grid;
-    gap: 10px;
+    gap: var(--space-md);
 }
 
 .schedule-section-label {
@@ -157,15 +157,15 @@
 .schedule-tray-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--space-sm);
 }
 
 .schedule-tray-chip,
 .schedule-meta-chip {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 0.45rem 0.75rem;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
     border-radius: 999px;
     border: 1px solid var(--border-color);
     background: color-mix(in srgb, var(--bg-color) 68%, var(--card-bg) 32%);
@@ -181,15 +181,15 @@
 
 .schedule-item-grid {
     display: grid;
-    gap: 12px;
+    gap: var(--space-md);
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
 .schedule-item-card {
     display: grid;
-    gap: 12px;
+    gap: var(--space-md);
     min-width: 0;
-    padding: 16px;
+    padding: var(--space-lg);
     border-radius: 18px;
     border: 1px solid color-mix(in srgb, var(--accent-color) 12%, var(--border-color) 88%);
     background: color-mix(in srgb, var(--card-bg) 92%, var(--bg-color) 8%);
@@ -200,7 +200,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 10px;
+    gap: var(--space-md);
     flex-wrap: wrap;
 }
 
@@ -208,7 +208,7 @@
 .schedule-item-meta {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-sm);
     flex-wrap: wrap;
 }
 
@@ -218,9 +218,9 @@
     align-items: center;
     justify-content: center;
     min-height: 28px;
-    padding: 0 10px;
+    padding: 0 var(--space-md);
     border-radius: 999px;
-    font-size: 0.76rem;
+    font-size: var(--font-size-sm);
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -263,8 +263,8 @@
 }
 
 .schedule-modal-summary {
-    margin-bottom: 16px;
-    padding: 14px 16px;
+    margin-bottom: var(--space-lg);
+    padding: var(--space-lg);
     border-radius: 16px;
     border: 1px solid var(--border-color);
     background: color-mix(in srgb, var(--bg-color) 74%, var(--card-bg) 26%);
@@ -276,7 +276,7 @@
 }
 
 .schedule-modal-summary span {
-    margin-top: 4px;
+    margin-top: var(--space-xs);
     color: var(--muted-text);
     font-size: var(--font-size-sm);
 }

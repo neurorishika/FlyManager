@@ -1,6 +1,6 @@
 .tray-view-shell {
     display: grid;
-    gap: 18px;
+    gap: var(--space-lg);
     --tray-soft-surface: color-mix(in srgb, var(--card-bg) 88%, var(--bg-color) 12%);
     --tray-soft-surface-strong: color-mix(in srgb, var(--card-bg) 94%, white 6%);
     --tray-soft-surface-muted: color-mix(in srgb, var(--bg-color) 72%, var(--card-bg) 28%);
@@ -16,7 +16,7 @@
 .tray-workspace-grid {
     display: grid;
     grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.95fr);
-    gap: 18px;
+    gap: var(--space-lg);
     align-items: start;
 }
 
@@ -27,13 +27,13 @@
 
 .tray-side-column {
     display: grid;
-    gap: 18px;
+    gap: var(--space-lg);
 }
 
 .tray-summary {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
+    gap: var(--space-md);
 }
 
 .tray-summary .app-chip {
@@ -45,33 +45,33 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-md);
     flex-wrap: wrap;
 }
 
 .tray-sidebar-card .card-body,
 .tray-workspace-card .card-body {
-    padding: 1.25rem;
+    padding: var(--space-xl);
 }
 
 .tray-stats-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
+    gap: var(--space-md);
 }
 
 .tray-stat-card {
-    padding: 0.95rem 1rem;
+    padding: var(--space-lg);
     border-radius: 16px;
     border: 1px solid var(--tray-border-soft);
     background: linear-gradient(180deg, var(--tray-soft-surface-strong), var(--tray-soft-surface));
     box-shadow: var(--tray-shadow-soft);
     display: grid;
-    gap: 4px;
+    gap: var(--space-xs);
 }
 
 .tray-stat-label {
-    font-size: 0.76rem;
+    font-size: var(--font-size-sm);
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -79,6 +79,9 @@
 }
 
 .tray-stat-card strong {
+    /* Bespoke headline stat number, outside the 5-step --font-size-*
+       scale - same category as home.css's snapshot/insight/trend values
+       and view_stock.css's .stock-summary-value (Task 8/9 precedent). */
     font-size: 1.75rem;
     line-height: 1;
     color: var(--tray-text-strong);
@@ -98,11 +101,11 @@
     display: inline-flex;
     align-items: center;
     max-width: 100%;
-    padding: 0.55rem 0.8rem;
+    padding: var(--space-sm) var(--space-md);
     border-radius: 999px;
     background: var(--tray-chip-bg);
     color: var(--tray-chip-text);
-    font-size: 0.88rem;
+    font-size: var(--font-size-base);
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
@@ -122,12 +125,12 @@
 .tray-guidance-banner {
     display: grid;
     grid-template-columns: minmax(0, 1.4fr) minmax(240px, 0.9fr);
-    gap: 14px;
-    padding: 1rem 1.1rem;
+    gap: var(--space-lg);
+    padding: var(--space-lg);
     border-radius: 18px;
     background: linear-gradient(135deg, color-mix(in srgb, var(--accent-color) 14%, transparent 86%), color-mix(in srgb, #1897b7 12%, transparent 88%));
     border: 1px solid var(--tray-border-soft);
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-lg);
 }
 
 .tray-guidance-banner p:last-child {
@@ -136,17 +139,17 @@
 
 .tray-guidance-list {
     margin: 0;
-    padding-left: 1rem;
+    padding-left: var(--space-lg);
     color: var(--tray-text-strong);
 }
 
 .tray-guidance-list li + li {
-    margin-top: 0.3rem;
+    margin-top: var(--space-xs);
 }
 
 .tray-description-card {
-    margin-bottom: 1rem;
-    padding: 0.85rem 1rem;
+    margin-bottom: var(--space-lg);
+    padding: var(--space-lg);
     border-radius: 14px;
     border: 1px solid var(--tray-border-soft);
     background: var(--tray-soft-surface-strong);
@@ -154,28 +157,28 @@
 }
 
 .tray-sidebar-note {
-    margin-top: 0.35rem;
+    margin-top: var(--space-sm);
     color: var(--tray-text-muted);
-    font-size: 0.88rem;
+    font-size: var(--font-size-base);
 }
 
 .tray-tab-count {
     display: inline-flex;
     min-width: 1.5rem;
     justify-content: center;
-    padding: 0.1rem 0.45rem;
-    margin-left: 0.35rem;
+    padding: var(--space-2xs) var(--space-sm);
+    margin-left: var(--space-sm);
     border-radius: 999px;
     background: var(--tray-chip-bg);
     color: var(--tray-chip-text);
-    font-size: 0.78rem;
+    font-size: var(--font-size-sm);
     font-weight: 700;
 }
 
 .tray-search-label {
     display: block;
-    margin-bottom: 0.35rem;
-    font-size: 0.82rem;
+    margin-bottom: var(--space-sm);
+    font-size: var(--font-size-sm);
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
@@ -187,7 +190,7 @@
     align-items: center;
     justify-content: center;
     min-width: 2.5rem;
-    padding: 0.2rem 0.45rem;
+    padding: var(--space-2xs) var(--space-sm);
     border-radius: 999px;
     font-weight: 700;
     background: var(--tray-chip-bg);
@@ -196,8 +199,8 @@
 
 .occupied-type-badge {
     border-radius: 999px;
-    padding: 0.3rem 0.55rem;
-    font-size: 0.72rem;
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--font-size-xs);
     letter-spacing: 0.03em;
     text-transform: uppercase;
 }
@@ -284,12 +287,22 @@
     display: grid;
     grid-template-rows: repeat(var(--tray-rows), 1fr);
     grid-template-columns: repeat(var(--tray-cols), minmax(0, 1fr));
+    /* Not tokenized: this gap is multiplied by (columns - 1) across the
+       grid's width (per-record, up to 20+ columns in the seed data) and
+       directly eats into each cell's available area. The brief calls for
+       tightening the surrounding chrome rather than the size-constrained
+       wells themselves, so this stays at its original 6px rather than
+       following the generic spacing bucket. It happens to equal
+       --space-sm exactly (6px) - using the token here would be a pure
+       rename with zero visual change, but the value is pinned by
+       tap-target/legibility concerns, not spacing rhythm, so it is
+       treated as bespoke geometry, same category as .tray-cell below. */
     gap: 6px;
     margin: auto;
     min-width: 0;
     border: 1px solid var(--tray-border-soft);
     border-radius: 22px;
-    padding: 10px;
+    padding: var(--space-md);
     background: linear-gradient(180deg, var(--tray-soft-surface-strong), var(--tray-soft-surface));
     box-shadow: inset 0 1px 0 color-mix(in srgb, var(--card-bg) 70%, white 30%), 0 18px 35px rgba(90, 70, 127, 0.08);
 }
@@ -298,6 +311,13 @@
     border: 1px solid var(--tray-border-soft);
     background-color: var(--tray-soft-surface-strong);
     color: var(--text-color);
+    /* Not tokenized: cell-internal padding directly reduces the content
+       area of a size-constrained, per-record grid well (up to 20+
+       columns) that is also a tap target. The generic spacing bucket for
+       8px would round down to --space-sm (6px), a real 2px shrink on
+       every cell; per the brief's guidance to tighten chrome rather than
+       cells, this is left at its original value. min-height below is the
+       actual tap-target floor and is unaffected either way. */
     padding: 8px;
     min-height: 62px;
     min-width: 0;
@@ -361,7 +381,7 @@
 
 .tray-cell-code {
     font-weight: 700;
-    font-size: 0.8rem;
+    font-size: var(--font-size-sm);
     line-height: 1.1;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -376,7 +396,7 @@
     top: calc(100% + 10px);
     transform: translateX(-50%) translateY(6px);
     width: min(280px, calc(100vw - 32px));
-    padding: 0.8rem 0.9rem;
+    padding: var(--space-md) var(--space-lg);
     border-radius: 14px;
     border: 1px solid var(--tray-border-strong);
     background: color-mix(in srgb, var(--card-bg) 96%, var(--bg-color) 4%);
@@ -398,34 +418,34 @@
 
 .tray-cell-detail-label {
     display: inline-flex;
-    margin-bottom: 0.45rem;
-    padding: 0.18rem 0.5rem;
+    margin-bottom: var(--space-sm);
+    padding: var(--space-2xs) var(--space-sm);
     border-radius: 999px;
     font-weight: 700;
     letter-spacing: 0.03em;
     text-transform: uppercase;
-    font-size: 0.68rem;
+    font-size: var(--font-size-xs);
     background: var(--tray-chip-bg);
     color: var(--tray-chip-text);
 }
 
 .tray-cell-detail-title {
-    font-size: 0.86rem;
+    font-size: var(--font-size-base);
     font-weight: 700;
     line-height: 1.25;
     color: var(--tray-text-strong);
-    margin-bottom: 0.45rem;
+    margin-bottom: var(--space-sm);
     overflow-wrap: anywhere;
 }
 
 .tray-cell-detail-row {
-    font-size: 0.75rem;
+    font-size: var(--font-size-sm);
     line-height: 1.35;
     color: var(--tray-text-muted);
 }
 
 .tray-cell-detail-row + .tray-cell-detail-row {
-    margin-top: 0.2rem;
+    margin-top: var(--space-2xs);
 }
 
 .tray-cell-empty .tray-cell-code,
@@ -454,18 +474,18 @@
     display: flex;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 1rem;
+    gap: var(--space-md);
+    margin-top: var(--space-lg);
 }
 
 .legend-item {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-xs);
     color: var(--tray-text-strong);
     background: color-mix(in srgb, var(--card-bg) 84%, transparent 16%);
     border: 1px solid var(--tray-border-soft);
-    padding: 0.45rem 0.7rem;
+    padding: var(--space-sm) var(--space-md);
     border-radius: 999px;
 }
 
@@ -500,20 +520,27 @@
     max-height: 400px;
     overflow-y: auto;
     border: 1px solid var(--tray-border-soft);
-    padding: 10px;
+    padding: var(--space-md);
     border-radius: 16px;
     background: var(--tray-soft-surface-muted);
 }
 
 .drag-item {
     border: 1px solid var(--tray-border-soft);
-    padding: 12px;
-    margin-bottom: 10px;
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
     border-radius: 14px;
     cursor: grab;
     background-color: var(--tray-soft-surface-strong);
     color: var(--text-color);
     transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    /* Not tokenized: this whole block (through .add-item-option .badge
+       below) uses `em`, not `px`/`rem` - relative to the *inherited*
+       font-size at each nesting level, not the root. Swapping any of
+       these for a var(--font-size-*) token (an absolute clamp() in rem)
+       would change what they scale relative to and is a real behavior
+       change, not a pure tokenization - left as bespoke relative
+       typography. */
     font-size: 0.9em;
     box-shadow: 0 10px 20px rgba(90, 70, 127, 0.06);
 }
@@ -552,17 +579,17 @@
 
 .item-header {
     font-weight: bold;
-    margin-bottom: 5px;
+    margin-bottom: var(--space-xs);
 }
 
 .item-genotype {
-    font-size: 0.8rem;
+    font-size: var(--font-size-sm);
     color: var(--text-color);
     opacity: 0.8;
 }
 
 .item-info {
-    margin-top: 5px;
+    margin-top: var(--space-xs);
 }
 
 .drag-over {
@@ -580,8 +607,8 @@
 }
 
 .add-item-option {
-    padding: 10px;
-    margin: 4px;
+    padding: var(--space-md);
+    margin: var(--space-xs);
     border: 1px solid color-mix(in srgb, var(--accent-color) 18%, var(--border-color) 82%);
     border-radius: 12px;
     cursor: pointer;
@@ -629,17 +656,25 @@
 
 @media (max-width: 767px) {
     .tray-grid {
+        /* Not tokenized: same reasoning as the desktop .tray-grid gap
+           above - directly reduces per-cell width across a per-record
+           grid that can run 20+ columns wide, at the viewport width where
+           room is tightest. */
         gap: 4px;
-        padding: 6px;
+        padding: var(--space-sm);
     }
 
     .tray-cell {
         min-height: 54px;
+        /* Not tokenized: same reasoning as the desktop .tray-cell padding
+           above - cell-internal padding on a tap target, deliberately not
+           shrunk further at the viewport where cells are already
+           smallest. */
         padding: 6px;
     }
 
     .tray-cell-code {
-        font-size: 0.72rem;
+        font-size: var(--font-size-xs);
     }
 
     .tray-cell-detail {

@@ -1,6 +1,6 @@
 .flip-shell {
     display: grid;
-    gap: 18px;
+    gap: var(--space-lg);
 }
 
 .flip-hero-copy {
@@ -11,7 +11,7 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 16px;
+    gap: var(--space-lg);
     flex-wrap: wrap;
 }
 
@@ -19,7 +19,7 @@
     display: flex;
     align-items: end;
     justify-content: flex-start;
-    gap: 12px;
+    gap: var(--space-md);
     flex-wrap: wrap;
 }
 
@@ -29,7 +29,7 @@
 
 .flip-scan-stack {
     display: grid;
-    gap: 14px;
+    gap: var(--space-lg);
 }
 
 .flip-scan-mode {
@@ -40,21 +40,21 @@
 .flip-workflow-strip {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
+    gap: var(--space-md);
 }
 
 .flip-workflow-step {
     border-radius: 18px;
     border: 1px solid var(--border-color);
     background: color-mix(in srgb, var(--card-bg) 88%, var(--bg-color) 12%);
-    padding: 14px 16px;
+    padding: var(--space-lg);
     box-shadow: inset 0 1px 0 var(--surface-border-strong);
 }
 
 .flip-workflow-step strong {
     display: block;
-    margin-bottom: 4px;
-    font-size: 0.98rem;
+    margin-bottom: var(--space-xs);
+    font-size: var(--font-size-lg);
 }
 
 .flip-workflow-step p {
@@ -66,7 +66,7 @@
 .flip-scan-grid {
     display: grid;
     grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.9fr);
-    gap: 18px;
+    gap: var(--space-lg);
     align-items: start;
 }
 
@@ -74,7 +74,7 @@
 .flip-guide-panel {
     border: 1px solid var(--border-color);
     border-radius: 22px;
-    padding: 18px;
+    padding: var(--space-lg);
     background: color-mix(in srgb, var(--card-bg) 92%, var(--bg-color) 8%);
 }
 
@@ -83,7 +83,7 @@
     max-width: 420px;
     color: var(--text-color);
     border-radius: 14px;
-    padding: 12px 14px;
+    padding: var(--space-md) var(--space-lg);
     border: 1px solid color-mix(in srgb, var(--accent-color) 18%, var(--border-color) 82%);
     background: color-mix(in srgb, var(--accent-color) 9%, var(--card-bg) 91%);
 }
@@ -96,42 +96,42 @@
 
 .flip-camera-shell {
     display: grid;
-    gap: 12px;
+    gap: var(--space-md);
     justify-items: start;
 }
 
 .flip-mode-title {
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-sm);
     font-size: clamp(1.15rem, 1.05rem + 0.5vw, 1.45rem);
     font-weight: 800;
     letter-spacing: -0.03em;
 }
 
 .flip-mode-summary {
-    margin: 0 0 14px;
+    margin: 0 0 var(--space-lg);
     color: var(--muted-text);
 }
 
 .flip-guide-meta {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    margin-bottom: 14px;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
 }
 
 .flip-guide-meta-card {
     border-radius: 16px;
     border: 1px solid var(--border-color);
     background: color-mix(in srgb, var(--bg-color) 72%, var(--card-bg) 28%);
-    padding: 12px 14px;
+    padding: var(--space-md) var(--space-lg);
     min-height: 88px;
 }
 
 .flip-guide-meta-card span {
     display: block;
-    margin-bottom: 6px;
+    margin-bottom: var(--space-sm);
     color: var(--muted-text);
-    font-size: 0.75rem;
+    font-size: var(--font-size-sm);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -144,10 +144,10 @@
 
 .flip-browser-callout {
     display: grid;
-    gap: 6px;
-    margin-bottom: 14px;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
     border-radius: 18px;
-    padding: 14px 16px;
+    padding: var(--space-lg);
     border: 1px solid color-mix(in srgb, var(--accent-color) 20%, var(--border-color) 80%);
     background: color-mix(in srgb, var(--accent-color) 10%, var(--card-bg) 90%);
 }
@@ -160,14 +160,14 @@
 
 .flip-compatibility-grid {
     display: grid;
-    gap: 10px;
+    gap: var(--space-md);
 }
 
 .flip-compatibility-card {
     border-radius: 16px;
     border: 1px solid var(--border-color);
     background: color-mix(in srgb, var(--bg-color) 74%, var(--card-bg) 26%);
-    padding: 12px 14px;
+    padding: var(--space-md) var(--space-lg);
     transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
 }
 
@@ -181,12 +181,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 6px;
+    gap: var(--space-md);
+    margin-bottom: var(--space-sm);
 }
 
 .flip-compatibility-head strong {
-    font-size: 0.95rem;
+    font-size: var(--font-size-base);
 }
 
 .flip-compatibility-card p {
@@ -200,9 +200,9 @@
     align-items: center;
     justify-content: center;
     min-height: 28px;
-    padding: 0 10px;
+    padding: 0 var(--space-md);
     border-radius: 999px;
-    font-size: 0.76rem;
+    font-size: var(--font-size-sm);
     font-weight: 700;
     white-space: nowrap;
     border: 1px solid var(--border-color);
@@ -236,26 +236,26 @@
 .flip-detail-grid {
     display: grid;
     grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.8fr);
-    gap: 18px;
+    gap: var(--space-lg);
 }
 
 .flip-identifier {
     font-size: clamp(2.2rem, 5vw, 4.6rem);
     font-weight: 800;
     line-height: 0.95;
-    margin: 0 0 12px;
+    margin: 0 0 var(--space-md);
     letter-spacing: -0.04em;
 }
 
 .flip-name {
     font-size: clamp(1.1rem, 1rem + 0.5vw, 1.6rem);
     font-weight: 700;
-    margin-bottom: 14px;
+    margin-bottom: var(--space-lg);
 }
 
 .flip-detail-list {
     display: grid;
-    gap: 10px;
+    gap: var(--space-md);
 }
 
 .flip-detail-list p {
@@ -265,20 +265,20 @@
 .flip-status-panel {
     border: 1px solid var(--border-color);
     border-radius: 16px;
-    padding: 18px;
+    padding: var(--space-lg);
     background: color-mix(in srgb, var(--card-bg) 90%, var(--bg-color) 10%);
 }
 
 .flip-status-options {
     display: grid;
-    gap: 10px;
+    gap: var(--space-md);
 }
 
 .flip-status-option {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
+    gap: var(--space-md);
+    padding: var(--space-md);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     background: color-mix(in srgb, var(--bg-color) 75%, var(--card-bg) 25%);
@@ -286,17 +286,17 @@
 
 .flip-actions {
     display: flex;
-    gap: 10px;
+    gap: var(--space-md);
     flex-wrap: wrap;
-    margin-top: 12px;
+    margin-top: var(--space-md);
 }
 
 .flip-current-vial-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 14px;
-    margin-bottom: 16px;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-lg);
     flex-wrap: wrap;
 }
 
@@ -325,8 +325,11 @@
        to this rule, which would silently change the flip.html "no active
        vial" fallback state (never observed in the harness because it's
        normally .is-hidden). Pinned to the value that was actually
-       rendering so the move stays behaviorally identical. */
-    padding: clamp(16px, 2vw, 24px);
+       rendering so the move stays behaviorally identical. Tokenized here to
+       the same value (16px -> --space-xl, 24px -> --space-2xl) - this is
+       not a new decision, just expressing the identical already-rendering
+       clamp in tokens, matching .app-panel's own untouched px values. */
+    padding: clamp(var(--space-xl), 2vw, var(--space-2xl));
 }
 
 @media (max-width: 767px) {
