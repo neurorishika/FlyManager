@@ -42,6 +42,11 @@ PAGES = [
     # Task 9/11: static-record IDs from the dev seed data, used only so
     # these detail/preview pages have something real to render.
     ("view-stock", "/stock/view/0034051b64"),
+    # Reachable only after `driver.sh dev-fixtures` has run (sets
+    # AssignedTo: "devtest" on this cross) - otherwise get_accessible_cross()
+    # finds nothing owned by/assigned to devtest and this route silently
+    # redirects to /cross/cross_explorer, which still passes _load()'s
+    # status-200 + ".header" checks. See SKILL.md's `dev-fixtures` entry.
     ("view-cross", "/cross/view_cross/18d73b2cc8"),
     ("phenotype-preview", "/stock/phenotype_preview"),
 ]
@@ -49,6 +54,35 @@ VIEWPORTS = [("tablet", 1024, 768), ("desktop", 1600, 1000)]
 THEMES = ["light", "dark"]
 CONTROLS = ".btn, .form-control, .page-link, .nav-link"
 MIN_TAP_PX = 40
+
+# Wall-clock-sensitive DOM on the home dashboard (templates/home.html):
+#   - `.snapshot-activity`: the hero "Last activity" card, backed by
+#     routes/main.py's `snapshot.last_activity_at` / `.last_activity_copy`
+#     (most recent activity-log row's absolute timestamp/label).
+#   - `#recent-activity`: the full "Recent activity" panel further down the
+#     page (`.activity-card` entries under `.activity-list`), backed by
+#     `activity_pagination` - every entry renders an absolute `HH:MM`
+#     timestamp from the same activity log.
+# AUTH_STATE's cached session still has a hard SESSION_LIFETIME_SECONDS TTL
+# (default 3600s, flymanager/app/__init__.py) - any capture cycle that spans
+# that TTL (baseline capture, edit files, rebuild, recapture) makes
+# _ensure_auth_state() perform a real re-login, which writes a fresh
+# "Logged in" activity row and changes both widgets' text/timestamps for
+# reasons unrelated to CSS (confirmed: masking only `.snapshot-activity` was
+# NOT sufficient - `#recent-activity`'s list still shifted a full extra
+# "22:31 Logged in" row into view, producing a real byte diff). Masked out
+# on every screenshot so `compare` stays a mechanical CSS-only diff
+# regardless of session/login timing or any other DB activity generated
+# between two capture runs. Both selectors are existing, stable classes/ids
+# (not added for this fix) so no template change was needed.
+MASKED_SELECTORS = [".snapshot-activity", "#recent-activity"]
+
+
+def _masks(page):
+    """Locators to paint over in page.screenshot(), for elements whose
+    content depends on wall-clock time rather than on CSS. Built fresh per
+    page since a given selector may not exist on every route (home only)."""
+    return [page.locator(sel) for sel in MASKED_SELECTORS]
 
 
 def _login(page):
@@ -171,7 +205,9 @@ def capture(label):
                     page.screenshot(
                         path=out / f"{slug}--{theme}--{vp_name}.png",
                         full_page=True,
-                        animations="disabled")
+                        animations="disabled",
+                        mask=_masks(page),
+                        mask_color="#FF00FF")
                     print(f"captured {slug} {theme} {vp_name}")
                 ctx.close()
         browser.close()

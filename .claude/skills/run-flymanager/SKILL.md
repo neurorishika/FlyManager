@@ -130,6 +130,16 @@ data, working form), not a blank/error page.
 | `status` | `docker compose ps` |
 | `logs <service>` | `docker compose logs -f <service>` |
 | `down` | Stop the stack (keeps data volumes — no `-v`) |
+| `dev-fixtures` | Idempotently apply DB state `css_audit.py`'s `PAGES` list depends on (currently: `AssignedTo: "devtest"` on cross `18d73b2cc8`, needed for the `view-cross` route to render instead of silently redirecting) |
+
+**Run `driver.sh dev-fixtures` before `css_audit.py capture`/`tapcheck`
+whenever the Mongo volume is fresh or was reseeded.** There is no tracked
+seed/fixture script for the dev dataset in this repo — `mongo-init` in
+`compose.yaml` only initializes the replica set, the actual records live
+purely in the persistent volume — so `dev-fixtures` is the one tracked,
+idempotent place that records the DB-state dependencies the visual-regression
+harness's `PAGES` list has. Safe to re-run any time; it just re-asserts the
+same field value.
 
 ## Run (human path)
 

@@ -14,6 +14,8 @@
 #   ./driver.sh status      docker compose ps
 #   ./driver.sh logs <svc>  docker compose logs -f <service>
 #   ./driver.sh down        Stop the stack (keeps data volumes)
+#   ./driver.sh dev-fixtures  Idempotently apply DB state css_audit.py's
+#                              PAGES list depends on (see cmd_dev_fixtures)
 
 set -euo pipefail
 
@@ -118,6 +120,44 @@ cmd_screenshot() {
     echo "Screenshot written to $OUT"
 }
 
+cmd_dev_fixtures() {
+    # css_audit.py's PAGES list includes routes that only render real content
+    # (rather than a redirect) if specific dev-seed records are reachable by
+    # the `devtest` account. There is no tracked seed/fixture script for the
+    # dev dataset (mongo-init in compose.yaml only initializes the replica
+    # set) - the dataset itself lives purely in the persistent Mongo volume.
+    # This command is the one place that DB-state dependency is recorded and
+    # kept idempotent (safe to re-run, always converges to the same state):
+    #
+    #   - view-cross (/cross/view_cross/18d73b2cc8): get_accessible_cross()
+    #     only returns a document when User == devtest or
+    #     AssignedTo == devtest. No seed cross is owned by devtest, so this
+    #     sets AssignedTo on that one cross. Without it, the route 404s
+    #     internally and get_accessible_cross's "not found" branch silently
+    #     redirects to /cross/cross_explorer - a real page, so status-200 +
+    #     ".header" checks both pass and css_audit.py "succeeds" while
+    #     screenshotting the wrong page.
+    #
+    # Run this after `up`/`bootstrap` and before css_audit.py capture/tapcheck
+    # if the Mongo volume is ever reseeded/recreated from scratch.
+    #
+    # (view-stock and phenotype-preview were checked for the same latent
+    # dependency and don't have one: stock 0034051b64 already has
+    # User: "devtest" in the seed data, and phenotype_preview's GET route
+    # renders an empty form with no record lookup at all.)
+    docker exec flymanager-mongodb mongosh --quiet flymanager --eval '
+        const res = db.crosses.updateOne(
+            { UniqueID: "18d73b2cc8" },
+            { $set: { AssignedTo: "devtest" } }
+        );
+        if (res.matchedCount !== 1) {
+            print("FAILED: expected to match 1 cross with UniqueID 18d73b2cc8, matched " + res.matchedCount);
+            quit(1);
+        }
+        print("dev-fixtures OK: cross 18d73b2cc8 AssignedTo=devtest (matched=" + res.matchedCount + ", modified=" + res.modifiedCount + ")");
+    '
+}
+
 cmd_status() {
     docker compose -f compose.yaml ps --format "table {{.Name}}\t{{.Status}}"
 }
@@ -138,8 +178,9 @@ case "${1:-}" in
     status) cmd_status ;;
     logs) shift; cmd_logs "$@" ;;
     down) cmd_down ;;
+    dev-fixtures) cmd_dev_fixtures ;;
     *)
-        echo "Usage: $0 {up|bootstrap|verify|screenshot|status|logs <service>|down}" >&2
+        echo "Usage: $0 {up|bootstrap|verify|screenshot|status|logs <service>|down|dev-fixtures}" >&2
         exit 1
         ;;
 esac
