@@ -2,12 +2,12 @@
     .stock-view-summary-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 16px;
-        margin-bottom: 18px;
+        gap: var(--space-lg);
+        margin-bottom: var(--space-lg);
     }
 
     .stock-summary-card {
-        padding: 18px;
+        padding: var(--space-lg);
         border-radius: 16px;
         border: 1px solid var(--border-color);
         background: var(--panel-background);
@@ -15,7 +15,7 @@
     }
 
     .stock-summary-label {
-        margin: 0 0 8px;
+        margin: 0 0 var(--space-sm);
         font-size: var(--font-size-sm);
         font-weight: 700;
         color: var(--muted-text);
@@ -25,23 +25,26 @@
 
     .stock-summary-value {
         margin: 0;
+        /* Bespoke fluid stat display, deliberately outside the 5-step
+           --font-size-* scale (same pattern as home.css's snapshot/insight
+           values, Task 8) — this is a headline number, not a label. */
         font-size: clamp(1.05rem, 1rem + 0.4vw, 1.35rem);
         line-height: 1.25;
     }
 
     .stock-summary-copy {
-        margin: 8px 0 0;
+        margin: var(--space-sm) 0 0;
         color: var(--muted-text);
         font-size: var(--font-size-sm);
     }
 
     .stock-view-panel {
         display: grid;
-        gap: 18px;
+        gap: var(--space-lg);
     }
 
     .stock-view-note {
-        padding: 0.9rem 1rem;
+        padding: var(--space-lg);
         border-radius: 14px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 82%, var(--card-bg) 18%);
@@ -64,7 +67,7 @@
     }
 
     .stock-view-form .tagify__input {
-        min-height: 40px;
+        min-height: var(--control-height);
     }
 
     .stock-log-value {
@@ -78,22 +81,22 @@
     }
 
     .stock-view-footer-actions {
-        margin-top: 4px;
+        margin-top: var(--space-xs);
     }
 
     .stock-source-panel {
         display: grid;
-        gap: 16px;
+        gap: var(--space-lg);
     }
 
     .stock-assignment-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 14px;
+        gap: var(--space-lg);
     }
 
     .stock-assignment-cell {
-        padding: 14px;
+        padding: var(--space-lg);
         border-radius: 14px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 76%, var(--card-bg) 24%);
@@ -106,11 +109,11 @@
     .stock-source-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 14px;
+        gap: var(--space-lg);
     }
 
     .stock-source-cell {
-        padding: 14px;
+        padding: var(--space-lg);
         border-radius: 14px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 76%, var(--card-bg) 24%);
@@ -122,30 +125,30 @@
 
     .stock-match-results {
         display: grid;
-        gap: 10px;
+        gap: var(--space-md);
     }
 
     .stock-match-item {
         display: flex;
         justify-content: space-between;
-        gap: 12px;
+        gap: var(--space-md);
         align-items: flex-start;
-        padding: 12px;
+        padding: var(--space-md);
         border-radius: 12px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 72%, var(--card-bg) 28%);
     }
 
     .stock-match-copy {
-        margin: 4px 0 0;
+        margin: var(--space-xs) 0 0;
         color: var(--muted-text);
         font-size: var(--font-size-sm);
     }
 
     .stock-match-cache-summary {
         display: grid;
-        gap: 4px;
-        padding: 12px 14px;
+        gap: var(--space-xs);
+        padding: var(--space-md) var(--space-lg);
         border-radius: 12px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 76%, var(--card-bg) 24%);
@@ -163,11 +166,11 @@
 
     .stock-review-panel {
         display: grid;
-        gap: 14px;
+        gap: var(--space-lg);
     }
 
     .stock-review-summary {
-        padding: 12px 14px;
+        padding: var(--space-md) var(--space-lg);
         border-radius: 12px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 76%, var(--card-bg) 24%);
@@ -179,8 +182,8 @@
 
     .stock-review-issue {
         display: grid;
-        gap: 12px;
-        padding: 16px;
+        gap: var(--space-md);
+        padding: var(--space-lg);
         border-radius: 16px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 72%, var(--card-bg) 28%);
@@ -189,7 +192,7 @@
     .stock-review-header {
         display: flex;
         justify-content: space-between;
-        gap: 12px;
+        gap: var(--space-md);
         align-items: flex-start;
     }
 
@@ -206,19 +209,19 @@
     .stock-review-ambiguity,
     .stock-review-search {
         display: grid;
-        gap: 8px;
+        gap: var(--space-sm);
     }
 
     .stock-review-token {
-        font-size: 1rem;
+        font-size: var(--font-size-lg);
         font-weight: 700;
     }
 
     .stock-review-pill {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 0.35rem 0.7rem;
+        gap: var(--space-sm);
+        padding: var(--space-xs) var(--space-md);
         border-radius: 999px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
@@ -228,15 +231,15 @@
 
     .stock-review-candidate-list {
         display: grid;
-        gap: 10px;
+        gap: var(--space-md);
     }
 
     .stock-review-candidate {
         display: flex;
         justify-content: space-between;
-        gap: 12px;
+        gap: var(--space-md);
         align-items: flex-start;
-        padding: 12px;
+        padding: var(--space-md);
         border-radius: 12px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 68%, var(--card-bg) 32%);
@@ -244,7 +247,7 @@
 
     .stock-review-search-row {
         display: flex;
-        gap: 8px;
+        gap: var(--space-sm);
         align-items: center;
         flex-wrap: wrap;
     }
@@ -260,28 +263,31 @@
 
     .stock-phenotype-summary {
         display: grid;
-        /* MOVE-ONLY NOTE: this element also carries the global
-           `.app-view-field` class (components.css), which sets `gap: 6px`
-           at equal (0,1,0) specificity. Under the old block-head placement
-           (before components.css in <head>) that global rule always won on
-           source order, so the page's intended 12px never actually
-           rendered. Pinned to 6px here so the move step is byte-identical;
-           see the tokenize commit for the deliberate fix. */
-        gap: 6px;
+        /* Deliberate (not the move-only placeholder): this element also
+           carries the global `.app-view-field` class (components.css)
+           which sets a six-pixel gap at equal (0,1,0) specificity. Under
+           the old block-head placement that global rule always won, so a
+           six-pixel gap is what has actually been rendering here in
+           production. Standardizing on --space-sm (that same value) —
+           rather than resurrecting the page's originally authored but
+           never-rendered --space-lg — keeps this page-css move a pure
+           refactor and works with this task's density goal instead of
+           against it. */
+        gap: var(--space-sm);
     }
 
     .stock-phenotype-metadata {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: var(--space-md);
         align-items: center;
     }
 
     .stock-phenotype-pill {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 0.4rem 0.75rem;
+        gap: var(--space-sm);
+        padding: var(--space-sm) var(--space-md);
         border-radius: 999px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
@@ -302,7 +308,7 @@
 
     .stock-phenotype-warning-list {
         display: grid;
-        gap: 8px;
+        gap: var(--space-sm);
     }
 
     .stock-phenotype-image-grid {
@@ -310,8 +316,8 @@
         grid-template-columns: repeat(auto-fit, minmax(280px, 420px));
         justify-content: start;
         align-items: start;
-        gap: 1rem;
-        margin-top: 1rem;
+        gap: var(--space-lg);
+        margin-top: var(--space-lg);
     }
 
     .stock-phenotype-image-card {
@@ -341,8 +347,8 @@
 
     .stock-phenotype-image-card-body {
         display: grid;
-        gap: 0.35rem;
-        padding: 0.85rem 0.95rem 1rem;
+        gap: var(--space-xs);
+        padding: var(--space-lg);
         border-top: 1px solid var(--border-color);
     }
 
@@ -359,14 +365,14 @@
     }
 
     .stock-phenotype-image-card-meta {
-        margin: 0.1rem 0 0;
+        margin: var(--space-2xs) 0 0;
         color: var(--muted-text);
-        font-size: 0.82rem;
+        font-size: var(--font-size-base);
         text-transform: capitalize;
     }
 
     .stock-phenotype-warning {
-        padding: 0.8rem 1rem;
+        padding: var(--space-lg);
         border-radius: 12px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 70%, var(--warning-color) 10%);

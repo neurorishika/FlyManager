@@ -1,6 +1,6 @@
 /* phenotype_preview.css — phenotype sandbox page (templates/stock/phenotype_preview.html). */
     .phenotype-preview-note {
-        padding: 0.95rem 1rem;
+        padding: var(--space-lg);
         border-radius: 14px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
@@ -14,8 +14,8 @@
     .phenotype-preview-chip-row {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 12px;
+        gap: var(--space-md);
+        margin-top: var(--space-md);
     }
 
     .phenotype-preview-tagify .tagify__input {
@@ -25,15 +25,15 @@
     .stock-phenotype-metadata {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: var(--space-md);
         align-items: center;
     }
 
     .stock-phenotype-pill {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 0.4rem 0.75rem;
+        gap: var(--space-sm);
+        padding: var(--space-sm) var(--space-md);
         border-radius: 999px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);
@@ -54,7 +54,7 @@
 
     .stock-phenotype-warning-list {
         display: grid;
-        gap: 8px;
+        gap: var(--space-sm);
     }
 
     .stock-phenotype-image-grid {
@@ -62,8 +62,8 @@
         grid-template-columns: repeat(auto-fit, minmax(280px, 420px));
         justify-content: start;
         align-items: start;
-        gap: 1rem;
-        margin-top: 1rem;
+        gap: var(--space-lg);
+        margin-top: var(--space-lg);
     }
 
     .stock-phenotype-image-card {
@@ -93,8 +93,8 @@
 
     .stock-phenotype-image-card-body {
         display: grid;
-        gap: 0.35rem;
-        padding: 0.85rem 0.95rem 1rem;
+        gap: var(--space-xs);
+        padding: var(--space-lg);
         border-top: 1px solid var(--border-color);
     }
 
@@ -111,14 +111,14 @@
     }
 
     .stock-phenotype-image-card-meta {
-        margin: 0.1rem 0 0;
+        margin: var(--space-2xs) 0 0;
         color: var(--muted-text);
-        font-size: 0.82rem;
+        font-size: var(--font-size-base);
         text-transform: capitalize;
     }
 
     .stock-phenotype-warning {
-        padding: 0.8rem 1rem;
+        padding: var(--space-lg);
         border-radius: 12px;
         border: 1px solid var(--border-color);
         background: color-mix(in srgb, var(--bg-color) 70%, var(--warning-color) 10%);

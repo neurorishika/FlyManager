@@ -6,8 +6,8 @@
     .offspring-phenotype-images {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-top: 0.75rem;
+        gap: var(--space-sm);
+        margin-top: var(--space-md);
     }
 
     .offspring-phenotype-image-card {
@@ -27,21 +27,21 @@
     }
 
     .offspring-phenotype-image-card-body {
-        padding: 0.35rem 0.45rem 0.4rem;
+        padding: var(--space-xs) var(--space-sm) var(--space-sm);
         line-height: 1.2;
     }
 
     .offspring-phenotype-image-title {
         display: block;
-        font-size: 0.72rem;
+        font-size: var(--font-size-xs);
         font-weight: 700;
         line-height: 1.15;
     }
 
     .offspring-phenotype-image-source {
         display: block;
-        margin-top: 0.1rem;
+        margin-top: var(--space-2xs);
         color: var(--muted-text);
-        font-size: 0.68rem;
+        font-size: var(--font-size-xs);
         line-height: 1.15;
     }

@@ -42,7 +42,7 @@ PAGES = [
     # Task 9/11: static-record IDs from the dev seed data, used only so
     # these detail/preview pages have something real to render.
     ("view-stock", "/stock/view/0034051b64"),
-    ("view-cross", "/cross/view_cross/6a08c91d7a14d0afb319ed06"),
+    ("view-cross", "/cross/view_cross/18d73b2cc8"),
     ("phenotype-preview", "/stock/phenotype_preview"),
 ]
 VIEWPORTS = [("tablet", 1024, 768), ("desktop", 1600, 1000)]
