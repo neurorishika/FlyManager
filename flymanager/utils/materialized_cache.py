@@ -16,9 +16,13 @@ supply its field name, a ``cache_getter`` (returns the still-valid cache or
 new materialized cache is a handful of lines, not a copied backfill loop.
 """
 
+import logging
+
 from pymongo import UpdateOne
 
 _BULK_WRITE_CHUNK_SIZE = 500
+
+_logger = logging.getLogger(__name__)
 
 
 def normalize_users(users):
@@ -69,9 +73,11 @@ def backfill_materialized_cache(collection, *, cache_field, cache_getter, cache_
     Skips records whose cache is already valid (``cache_getter`` returns a
     truthy value) unless ``force`` is set. Honours a ``users`` maintainer filter
     both at the query level and per-record. A ``cache_builder`` exception is
-    caught, counted in ``errors``, and that record is left unmodified rather
-    than aborting the run. Returns a summary dict with ``scanned`` /
-    ``updated`` / ``skipped_valid`` / ``errors`` counts.
+    caught, logged, and counted in ``errors``, and that record is left
+    unmodified rather than aborting the run. Writes are batched via
+    ``bulk_write`` in chunks of ``_BULK_WRITE_CHUNK_SIZE`` for efficiency.
+    Returns a summary dict with ``scanned`` / ``updated`` / ``skipped_valid`` /
+    ``errors`` counts.
     """
     if query is None:
         query = build_user_query(users)
@@ -82,6 +88,13 @@ def backfill_materialized_cache(collection, *, cache_field, cache_getter, cache_
         "skipped_valid": 0,
         "errors": 0,
     }
+
+    pending_operations = []
+
+    def flush():
+        if pending_operations:
+            collection.bulk_write(list(pending_operations), ordered=False)
+            pending_operations.clear()
 
     for record in collection.find(query, projection):
         if not record_matches_users(record, users):
@@ -100,12 +113,21 @@ def backfill_materialized_cache(collection, *, cache_field, cache_getter, cache_
             cache_payload = cache_builder(record)
         except Exception:
             summary["errors"] += 1
+            _logger.exception(
+                "cache_builder failed while backfilling %s for record %s",
+                cache_field, record.get("_id"),
+            )
             continue
 
         summary["updated"] += 1
-        collection.update_one(
-            cache_selector_builder(record),
-            {"$set": {cache_field: cache_payload}},
+        pending_operations.append(
+            UpdateOne(
+                cache_selector_builder(record),
+                {"$set": {cache_field: cache_payload}},
+            )
         )
+        if len(pending_operations) >= _BULK_WRITE_CHUNK_SIZE:
+            flush()
 
+    flush()
     return summary
