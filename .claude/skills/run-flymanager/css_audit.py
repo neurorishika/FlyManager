@@ -8,6 +8,7 @@ Usage:
 import sys
 from pathlib import Path
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 BASE = "http://127.0.0.1:5234"
@@ -67,7 +68,12 @@ def _ensure_auth_state(browser):
             page.wait_for_selector(".header", timeout=3000)
             ctx.close()
             return
-        except Exception:
+        except PlaywrightTimeoutError:
+            # Cached session is stale/expired (or the file is malformed enough
+            # that Playwright accepted it but the server doesn't) - fall
+            # through and do a real login below. Deliberately narrow: a
+            # genuinely broken AUTH_STATE file should raise loudly instead of
+            # being silently treated as "just needs a fresh login".
             ctx.close()
 
     ctx = browser.new_context(bypass_csp=True)
@@ -120,23 +126,79 @@ def capture(label):
         browser.close()
 
 
+def _expected_filenames():
+    """The exact screenshot filenames a complete capture() run should produce,
+    derived from PAGES/THEMES/VIEWPORTS rather than a hardcoded count so this
+    stays correct as pages are added/removed (Tasks 9/10 in particular)."""
+    return {
+        f"{slug}--{theme}--{vp_name}.png"
+        for slug, _ in PAGES
+        for theme in THEMES
+        for vp_name, _, _ in VIEWPORTS
+    }
+
+
 def compare(label_a, label_b):
+    """Byte-compare two capture() output directories.
+
+    Refuses to report IDENTICAL (or DIFF) unless both directories actually
+    hold the full expected set of screenshots. A capture() that crashed or
+    was interrupted partway through leaves a truncated directory on disk;
+    without this check, comparing an empty/truncated directory against a
+    complete one (or against another equally-truncated one) would silently
+    report a false IDENTICAL - the worst failure mode for a harness every
+    later CSS task gates on.
+    """
     dir_a, dir_b = SHOTS / label_a, SHOTS / label_b
+    expected = _expected_filenames()
+    names_a = {p.name for p in dir_a.glob("*.png")} if dir_a.is_dir() else set()
+    names_b = {p.name for p in dir_b.glob("*.png")} if dir_b.is_dir() else set()
+
+    problems = []
+    for label, names in ((label_a, names_a), (label_b, names_b)):
+        if not names:
+            problems.append(f"{label}: no screenshots found ({SHOTS / label})")
+            continue
+        missing = sorted(expected - names)
+        extra = sorted(names - expected)
+        if missing:
+            problems.append(
+                f"{label}: missing {len(missing)}/{len(expected)} expected "
+                f"file(s): {missing}")
+        if extra:
+            problems.append(f"{label}: {len(extra)} unexpected file(s): {extra}")
+
+    if names_a and names_b and names_a != names_b:
+        only_a = sorted(names_a - names_b)
+        only_b = sorted(names_b - names_a)
+        if only_a:
+            problems.append(f"present only in {label_a}, not {label_b}: {only_a}")
+        if only_b:
+            problems.append(f"present only in {label_b}, not {label_a}: {only_b}")
+
+    if problems:
+        print(
+            f"INVALID COMPARE: {label_a} vs {label_b} do not both hold the "
+            f"expected {len(expected)} screenshots "
+            f"({len(PAGES)} pages x {len(THEMES)} themes x {len(VIEWPORTS)} "
+            f"viewports):")
+        for line in problems:
+            print(f"  {line}")
+        return 1
+
     failures = []
-    for shot in sorted(dir_a.glob("*.png")):
-        other = dir_b / shot.name
-        if not other.exists():
-            failures.append(f"{shot.name}: missing in {label_b}")
-        elif shot.read_bytes() != other.read_bytes():
+    for name in sorted(names_a):
+        a_bytes = (dir_a / name).read_bytes()
+        b_bytes = (dir_b / name).read_bytes()
+        if a_bytes != b_bytes:
             failures.append(
-                f"{shot.name}: differs ({shot.stat().st_size} vs "
-                f"{other.stat().st_size} bytes)")
+                f"{name}: differs ({len(a_bytes)} vs {len(b_bytes)} bytes)")
     if failures:
-        print(f"DIFF: {len(failures)} of {len(list(dir_a.glob('*.png')))} pages")
+        print(f"DIFF: {len(failures)} of {len(names_a)} pages")
         for line in failures:
             print(f"  {line}")
         return 1
-    print(f"IDENTICAL: all {len(list(dir_a.glob('*.png')))} pages match")
+    print(f"IDENTICAL: all {len(names_a)} pages match")
     return 0
 
 
@@ -153,6 +215,10 @@ def tapcheck():
         page = ctx.new_page()
         for slug, path in PAGES:
             page.goto(f"{BASE}{path}", wait_until="networkidle")
+            # tapcheck() never calls page.screenshot(), so the
+            # animations="disabled" freeze capture() gets is not available
+            # here - determinism for the DOM measurements below rests solely
+            # on _settle()'s 250ms wait_for_timeout.
             _settle(page)
             small = page.eval_on_selector_all(
                 CONTROLS,
