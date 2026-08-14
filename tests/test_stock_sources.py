@@ -1197,6 +1197,106 @@ def test_view_stock_embeds_cached_provider_matches(monkeypatch):
     assert "Vienna 4321" in page
 
 
+def test_is_provider_match_cache_entry_valid_checks_version_pipeline_and_signature(monkeypatch):
+    from flymanager.app.routes.stock import (
+        PROVIDER_MATCH_CACHE_VERSION, _build_provider_match_cache_signature,
+        _is_provider_match_cache_entry_valid)
+
+    monkeypatch.setattr(
+        "flymanager.app.routes.stock.compute_flybase_pipeline_signature",
+        lambda: "pipeline-sig-1",
+    )
+
+    stock = {
+        "StockSource": "BDSC", "SourceID": "17", "FlyBaseStockID": "FBst0000017",
+        "Genotype": "w[*]; CyO/cn[1]; ; ",
+    }
+    source_context = {
+        "sourceType": "BDSC", "sourceCollection": "Bloomington",
+        "flyBaseStockID": "FBst0000017", "providerURL": "",
+    }
+    record_signature = _build_provider_match_cache_signature(stock, source_context)
+
+    valid_cache = {
+        "version": PROVIDER_MATCH_CACHE_VERSION,
+        "pipelineSignature": "pipeline-sig-1",
+        "signature": record_signature,
+        "candidates": [],
+        "cachedAt": "2026-04-17 10:00",
+    }
+
+    assert _is_provider_match_cache_entry_valid(valid_cache, stock, source_context) is True
+    assert _is_provider_match_cache_entry_valid(None, stock, source_context) is False
+    assert _is_provider_match_cache_entry_valid(
+        {**valid_cache, "version": PROVIDER_MATCH_CACHE_VERSION - 1}, stock, source_context
+    ) is False
+    assert _is_provider_match_cache_entry_valid(
+        {**valid_cache, "pipelineSignature": "stale-pipeline-sig"}, stock, source_context
+    ) is False
+    assert _is_provider_match_cache_entry_valid(
+        {**valid_cache, "signature": "wrong-signature"}, stock, source_context
+    ) is False
+    assert _is_provider_match_cache_entry_valid(
+        {**valid_cache, "candidates": "not-a-list"}, stock, source_context
+    ) is False
+    assert _is_provider_match_cache_entry_valid(
+        {**valid_cache, "cachedAt": "not-a-timestamp"}, stock, source_context
+    ) is False
+
+
+def test_build_provider_match_cache_envelope_stamps_version_and_pipeline_signature(monkeypatch):
+    from flymanager.app.routes.stock import (PROVIDER_MATCH_CACHE_VERSION,
+                                              _build_provider_match_cache_envelope)
+
+    monkeypatch.setattr(
+        "flymanager.app.routes.stock.compute_flybase_pipeline_signature",
+        lambda: "pipeline-sig-2",
+    )
+
+    stock = {"StockSource": "BDSC", "SourceID": "17", "FlyBaseStockID": "FBst0000017", "Genotype": "w[*]"}
+    source_context = {
+        "sourceType": "BDSC", "sourceCollection": "Bloomington",
+        "flyBaseStockID": "FBst0000017", "providerURL": "",
+    }
+    candidates = [{"stockSource": "VIENNA", "sourceID": "4321"}]
+
+    envelope = _build_provider_match_cache_envelope(stock, source_context, candidates)
+
+    assert envelope["version"] == PROVIDER_MATCH_CACHE_VERSION
+    assert envelope["pipelineSignature"] == "pipeline-sig-2"
+    assert envelope["candidates"] == candidates
+    assert envelope["count"] == 1
+    assert envelope["cachedAt"]
+
+
+def test_get_valid_provider_match_cache_rejects_legacy_entry_missing_version(monkeypatch):
+    from flymanager.app.routes.stock import (_build_provider_match_cache_signature,
+                                              _get_valid_provider_match_cache)
+
+    monkeypatch.setattr(
+        "flymanager.app.routes.stock.compute_flybase_pipeline_signature",
+        lambda: "pipeline-sig-3",
+    )
+
+    stock_fields = {
+        "StockSource": "BDSC", "SourceID": "17", "FlyBaseStockID": "FBst0000017",
+        "Genotype": "w[*]",
+    }
+    source_context = {
+        "sourceType": "BDSC", "sourceCollection": "Bloomington",
+        "flyBaseStockID": "FBst0000017", "providerURL": "",
+    }
+    stock = dict(stock_fields)
+    stock["ProviderMatchCache"] = {
+        # Legacy shape: no "version", no "pipelineSignature" — must be treated as stale.
+        "signature": _build_provider_match_cache_signature(stock_fields, source_context),
+        "candidates": [],
+        "cachedAt": "2026-04-17 10:00",
+    }
+
+    assert _get_valid_provider_match_cache(stock, source_context) is None
+
+
 def test_admin_can_refresh_provider_match_cache_for_all_stocks(monkeypatch):
     app = _make_app(monkeypatch)
 

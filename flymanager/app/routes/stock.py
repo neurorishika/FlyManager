@@ -41,6 +41,8 @@ from flymanager.utils.mongo_records import (current_timestamp,
                                               delete_owned_documents_if_status)
 from flymanager.utils.phenotypes.image_library import \
     select_prediction_reference_images
+from flymanager.utils.phenotypes.flybase_pipeline import \
+    compute_flybase_pipeline_signature
 from flymanager.utils.phenotypes.predictor import (
     build_stock_phenotype_cache, get_cached_stock_phenotype,
     predict_individual_phenotype)
@@ -53,6 +55,7 @@ from flymanager.utils.utils import clean_tagify_data, increment_replicate_id
 
 bp = Blueprint("stock", __name__)  # url_prefix is defined in app/__init__
 PROVIDER_MATCH_CACHE_FIELD = "ProviderMatchCache"
+PROVIDER_MATCH_CACHE_VERSION = 1
 
 
 def _get_stock_reference_images(prediction):
@@ -482,38 +485,47 @@ def _build_provider_match_view_fields(cache_payload):
     }
 
 
+def _is_provider_match_cache_entry_valid(cache_payload, stock, source_context):
+    if not isinstance(cache_payload, dict):
+        return False
+    if cache_payload.get("version") != PROVIDER_MATCH_CACHE_VERSION:
+        return False
+    if str(cache_payload.get("pipelineSignature", "")) != compute_flybase_pipeline_signature():
+        return False
+    if not isinstance(cache_payload.get("candidates"), list):
+        return False
+    if _parse_provider_match_cache_timestamp(str(cache_payload.get("cachedAt") or "")) is None:
+        return False
+    if cache_payload.get("signature") != _build_provider_match_cache_signature(stock, source_context):
+        return False
+    return True
+
+
+def _build_provider_match_cache_envelope(stock, source_context, candidates):
+    return {
+        "version": PROVIDER_MATCH_CACHE_VERSION,
+        "pipelineSignature": compute_flybase_pipeline_signature(),
+        "signature": _build_provider_match_cache_signature(stock, source_context),
+        "candidates": candidates,
+        "count": len(candidates),
+        "cachedAt": current_timestamp(),
+    }
+
+
 def _get_valid_provider_match_cache(stock, source_context):
     cache_payload = stock.get(PROVIDER_MATCH_CACHE_FIELD)
-    if not isinstance(cache_payload, dict):
-        return None
-
-    cached_candidates = cache_payload.get("candidates")
-    if not isinstance(cached_candidates, list):
-        return None
-
-    cached_at_text = str(cache_payload.get("cachedAt") or "")
-    if _parse_provider_match_cache_timestamp(cached_at_text) is None:
-        return None
-
-    expected_signature = _build_provider_match_cache_signature(stock, source_context)
-    if cache_payload.get("signature") != expected_signature:
+    if not _is_provider_match_cache_entry_valid(cache_payload, stock, source_context):
         return None
 
     return _build_provider_match_payload(
-        cached_candidates,
+        cache_payload.get("candidates") or [],
         cached=True,
-        cached_at=cached_at_text,
+        cached_at=str(cache_payload.get("cachedAt") or ""),
     )
 
 
 def _store_provider_match_cache(stock, source_context, candidates):
-    timestamp = current_timestamp()
-    cache_payload = {
-        "signature": _build_provider_match_cache_signature(stock, source_context),
-        "candidates": candidates,
-        "count": len(candidates),
-        "cachedAt": timestamp,
-    }
+    cache_payload = _build_provider_match_cache_envelope(stock, source_context, candidates)
     db["stocks"].update_one(
         {"UniqueID": stock["UniqueID"], "User": stock["User"]},
         {"$set": {PROVIDER_MATCH_CACHE_FIELD: cache_payload}},
@@ -521,7 +533,7 @@ def _store_provider_match_cache(stock, source_context, candidates):
     return _build_provider_match_payload(
         candidates,
         cached=False,
-        cached_at=timestamp,
+        cached_at=cache_payload["cachedAt"],
     )
 
 
