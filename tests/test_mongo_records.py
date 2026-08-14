@@ -10,6 +10,7 @@ from flymanager.utils.mongo_records import (apply_updates_to_owned_document,
                                             build_owned_document,
                                             build_vial_update_properties,
                                             delete_owned_document,
+                                            diff_candidate_against_record,
                                             filter_by_indexes,
                                             flip_owned_document,
                                             generate_unique_id,
@@ -321,3 +322,34 @@ def test_delete_owned_document_removes_matching_record():
 
     assert success is True
     assert get_owned_document("crosses", "scientist", "cross-1", database) is None
+
+
+def test_diff_candidate_against_record_omits_fields_that_already_match():
+    current = {"SourceID": "17", "FlyBaseStockID": "FBst0000017"}
+    field_mapping = {"SourceID": "17", "FlyBaseStockID": "FBst0000017"}
+    assert diff_candidate_against_record(current, field_mapping) == {}
+
+
+def test_diff_candidate_against_record_flags_fill_in_the_blank_as_no_conflict():
+    current = {"FlyBaseStockID": ""}
+    field_mapping = {"FlyBaseStockID": "FBst0000017"}
+    diff = diff_candidate_against_record(current, field_mapping)
+    assert diff == {
+        "FlyBaseStockID": {"current": "", "candidate": "FBst0000017", "conflict": False}
+    }
+
+
+def test_diff_candidate_against_record_flags_differing_existing_value_as_conflict():
+    current = {"ExternalSupportStatus": "manual"}
+    field_mapping = {"ExternalSupportStatus": "supported"}
+    diff = diff_candidate_against_record(current, field_mapping)
+    assert diff == {
+        "ExternalSupportStatus": {"current": "manual", "candidate": "supported", "conflict": True}
+    }
+
+
+def test_diff_candidate_against_record_treats_none_as_empty():
+    current = {"SourceCollection": None}
+    field_mapping = {"SourceCollection": "Bloomington"}
+    diff = diff_candidate_against_record(current, field_mapping)
+    assert diff["SourceCollection"]["conflict"] is False

@@ -360,6 +360,29 @@ def build_owned_document_update_fields(current_document, updates, *, log_activit
     return update_fields
 
 
+def diff_candidate_against_record(current_document, field_mapping):
+    """Compare a candidate's field values against a document's current values.
+
+    Returns only fields that would actually change (after trimming, treating
+    ``None``/``""`` as equivalent-empty). Each entry flags whether applying it
+    would overwrite a genuinely different existing value (``conflict``) or
+    only fill an empty field.
+    """
+    diff = {}
+    for field, candidate_value in field_mapping.items():
+        current_value = current_document.get(field)
+        normalized_current = "" if current_value is None else str(current_value).strip()
+        normalized_candidate = "" if candidate_value is None else str(candidate_value).strip()
+        if normalized_current == normalized_candidate:
+            continue
+        diff[field] = {
+            "current": normalized_current,
+            "candidate": normalized_candidate,
+            "conflict": bool(normalized_current),
+        }
+    return diff
+
+
 def _normalize_flip_timestamp(timestamp, accept_datetime=False):
     if isinstance(timestamp, datetime.datetime):
         if not accept_datetime:
