@@ -1624,6 +1624,17 @@ def apply_provider_match(unique_id):
     if not success:
         return jsonify({"error": "Unable to update stock record."}), 500
 
+    updated_stock = dict(stock)
+    updated_stock.update(updates)
+    updated_source_context = enrich_stock_source_context(updated_stock)
+    refreshed_cache_payload = _build_provider_match_cache_envelope(
+        updated_stock, updated_source_context, candidates,
+    )
+    db["stocks"].update_one(
+        {"UniqueID": unique_id, "User": stock["User"]},
+        {"$set": {PROVIDER_MATCH_CACHE_FIELD: refreshed_cache_payload}},
+    )
+
     match_label = candidate.get("sourceCollection") or candidate.get("stockSource") or "provider"
     write_activity(
         username,
