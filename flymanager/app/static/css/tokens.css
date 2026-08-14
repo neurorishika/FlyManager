@@ -17,14 +17,29 @@
         linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, var(--bg-color) 180px);
     --panel-background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), var(--card-bg));
     --panel-border: color-mix(in srgb, var(--border-color) 70%, white 30%);
-    --page-gutter: clamp(12px, 2vw, 24px);
+    --page-gutter: clamp(8px, 1.2vw, 16px);
     --content-max-width: 1440px;
-    --font-size-sm: clamp(0.78rem, 0.75rem + 0.18vw, 0.88rem);
-    --font-size-base: clamp(0.9rem, 0.86rem + 0.24vw, 1rem);
-    --font-size-lg: clamp(1rem, 0.96rem + 0.4vw, 1.2rem);
-    --font-size-xl: clamp(1.35rem, 1.15rem + 1vw, 2rem);
+    --font-size-xs: clamp(0.68rem, 0.66rem + 0.1vw, 0.72rem);
+    --font-size-sm: clamp(0.74rem, 0.72rem + 0.14vw, 0.80rem);
+    --font-size-base: clamp(0.84rem, 0.81rem + 0.18vw, 0.90rem);
+    --font-size-lg: clamp(0.94rem, 0.90rem + 0.30vw, 1.05rem);
+    --font-size-xl: clamp(1.15rem, 1.00rem + 0.80vw, 1.60rem);
     --surface-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
     --surface-border-strong: rgba(255, 255, 255, 0.55);
+
+    /* Spacing scale — 4px based. Replaces all hardcoded px. */
+    --space-2xs: 2px;
+    --space-xs: 4px;
+    --space-sm: 6px;
+    --space-md: 8px;
+    --space-lg: 12px;
+    --space-xl: 16px;
+    --space-2xl: 24px;
+
+    /* Controls — density never shrinks a tap target below --control-height. */
+    --control-height: 40px;
+    --control-padding-x: var(--space-lg);
+    --control-gap: var(--space-md);
 }
 
 :root[data-theme="dark"] {
@@ -45,12 +60,27 @@
         linear-gradient(180deg, #222226 0%, #17171b 34%, #131316 100%);
     --panel-background: linear-gradient(180deg, #303036, #27272c);
     --panel-border: rgba(255, 255, 255, 0.08);
-    --page-gutter: clamp(12px, 2vw, 24px);
+    --page-gutter: clamp(8px, 1.2vw, 16px);
     --content-max-width: 1440px;
-    --font-size-sm: clamp(0.78rem, 0.75rem + 0.18vw, 0.88rem);
-    --font-size-base: clamp(0.9rem, 0.86rem + 0.24vw, 1rem);
-    --font-size-lg: clamp(1rem, 0.96rem + 0.4vw, 1.2rem);
-    --font-size-xl: clamp(1.35rem, 1.15rem + 1vw, 2rem);
+    --font-size-xs: clamp(0.68rem, 0.66rem + 0.1vw, 0.72rem);
+    --font-size-sm: clamp(0.74rem, 0.72rem + 0.14vw, 0.80rem);
+    --font-size-base: clamp(0.84rem, 0.81rem + 0.18vw, 0.90rem);
+    --font-size-lg: clamp(0.94rem, 0.90rem + 0.30vw, 1.05rem);
+    --font-size-xl: clamp(1.15rem, 1.00rem + 0.80vw, 1.60rem);
     --surface-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
     --surface-border-strong: rgba(255, 255, 255, 0.1);
+
+    /* Spacing scale — 4px based. Replaces all hardcoded px. */
+    --space-2xs: 2px;
+    --space-xs: 4px;
+    --space-sm: 6px;
+    --space-md: 8px;
+    --space-lg: 12px;
+    --space-xl: 16px;
+    --space-2xl: 24px;
+
+    /* Controls — density never shrinks a tap target below --control-height. */
+    --control-height: 40px;
+    --control-padding-x: var(--space-lg);
+    --control-gap: var(--space-md);
 }

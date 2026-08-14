@@ -357,3 +357,44 @@ label {
         margin: 0.5rem;
     }
 }
+
+/* ---- Density layer -------------------------------------------------
+   Vertical padding shrinks; min-height holds every tap target at 40px.
+   Tablet is the primary device — never let a control compute smaller. */
+
+.btn, .btn-sm, .form-control, .page-link, .nav-link {
+    min-height: var(--control-height);
+    padding-top: var(--space-xs);
+    padding-bottom: var(--space-xs);
+    padding-left: var(--control-padding-x);
+    padding-right: var(--control-padding-x);
+    line-height: 1.3;
+}
+
+/* Buttons and pagination center their label within the 40px box. */
+.btn, .page-link, .nav-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-sm { font-size: var(--font-size-sm); padding-left: var(--space-md); padding-right: var(--space-md); }
+
+.form-group { margin-bottom: var(--space-md); }
+label { margin-bottom: var(--space-2xs); font-size: var(--font-size-sm); }
+
+.card { margin-bottom: var(--space-lg); }
+.card-body { padding: var(--space-lg); }
+.card-header { padding: var(--space-md) var(--space-lg); font-size: var(--font-size-sm); }
+
+.table td, .table th { padding: var(--space-sm) var(--space-md); }
+.table { margin-bottom: var(--space-lg); }
+
+.alert { padding: var(--space-md) var(--space-lg); margin-bottom: var(--space-lg); }
+.badge { padding: var(--space-2xs) var(--space-sm); font-size: var(--font-size-xs); }
+.breadcrumb { padding: var(--space-sm) var(--space-md); margin-bottom: var(--space-md); }
+.modal-body { padding: var(--space-lg); }
+.modal-header, .modal-footer { padding: var(--space-md) var(--space-lg); }
+.pagination { margin-bottom: 0; }
+.nav-tabs .nav-link { padding-left: var(--space-lg); padding-right: var(--space-lg); }
+.input-group > .btn { min-height: var(--control-height); }

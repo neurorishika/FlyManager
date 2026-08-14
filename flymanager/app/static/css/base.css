@@ -3,7 +3,7 @@ body {
     background: var(--page-background);
     color: var(--text-color);
     font-size: var(--font-size-base);
-    line-height: 1.5;
+    line-height: 1.4;
     margin: 0;
     min-height: 100vh;
     display: flex;
@@ -11,11 +11,11 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-h1, .h1 { font-size: clamp(1.7rem, 1.45rem + 1.4vw, 2.4rem); }
-h2, .h2 { font-size: clamp(1.45rem, 1.25rem + 1vw, 2rem); }
-h3, .h3 { font-size: clamp(1.2rem, 1.08rem + 0.7vw, 1.55rem); }
-h4, .h4 { font-size: clamp(1.05rem, 0.98rem + 0.45vw, 1.3rem); }
-h5, .h5 { font-size: clamp(0.98rem, 0.94rem + 0.28vw, 1.1rem); }
+h1, .h1 { font-size: clamp(1.40rem, 1.20rem + 1.15vw, 1.95rem); margin-bottom: var(--space-md); }
+h2, .h2 { font-size: clamp(1.20rem, 1.03rem + 0.82vw, 1.65rem); margin-bottom: var(--space-md); }
+h3, .h3 { font-size: clamp(1.00rem, 0.90rem + 0.58vw, 1.28rem); margin-bottom: var(--space-md); }
+h4, .h4 { font-size: clamp(0.90rem, 0.84rem + 0.37vw, 1.07rem); margin-bottom: var(--space-md); }
+h5, .h5 { font-size: clamp(0.84rem, 0.81rem + 0.23vw, 0.92rem); margin-bottom: var(--space-md); }
 small, .small { font-size: var(--font-size-sm); }
 
 .app-shell-container {
