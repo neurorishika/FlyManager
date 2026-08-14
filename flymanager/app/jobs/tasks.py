@@ -250,6 +250,40 @@ def task_update_flybase_gene_metadata(key, username):
     _run(key, work)
 
 
+def _rebuild_caches_after_flybase_refresh(db):
+    """Run all five materialized-cache backfills at force=False after a FlyBase
+    reference-data refresh. Each wrapper is isolated in its own try/except so
+    one failing doesn't block the others; force=False means the cost is
+    proportional to how much reference data actually changed, since a valid
+    cache entry (unchanged pipelineSignature) is skipped, not rebuilt."""
+    from flymanager.app.routes.stock import backfill_stock_provider_match_cache
+    from flymanager.app.services.standardization_backfill import (
+        backfill_cross_standardization_cache, backfill_stock_standardization_cache)
+    from flymanager.utils.phenotypes.backfill import (
+        backfill_cross_phenotype_cache, backfill_stock_phenotype_cache)
+
+    wrappers = {
+        "stock_phenotype": lambda: backfill_stock_phenotype_cache(
+            db["stocks"], users=None, dry_run=False, force=False),
+        "cross_phenotype": lambda: backfill_cross_phenotype_cache(
+            db["crosses"], users=None, dry_run=False, force=False),
+        "stock_standardization": lambda: backfill_stock_standardization_cache(
+            db["stocks"], users=None, dry_run=False, force=False),
+        "cross_standardization": lambda: backfill_cross_standardization_cache(
+            db["crosses"], users=None, dry_run=False, force=False),
+        "stock_provider_match": lambda: backfill_stock_provider_match_cache(
+            db["stocks"], users=None, dry_run=False, force=False),
+    }
+
+    results = {}
+    for label, run in wrappers.items():
+        try:
+            results[label] = run()
+        except Exception:
+            results[label] = {"error": True}
+    return results
+
+
 def task_refresh_flybase_reference_data(key, username):
     def work(app, db):
         from flymanager.app.services import flybase as flybase_service
@@ -261,10 +295,18 @@ def task_refresh_flybase_reference_data(key, username):
         skipped_count = sum(
             1 for item in report["download_report"]["results"] if item.get("status") == "skipped"
         )
+
+        cache_rebuild = _rebuild_caches_after_flybase_refresh(db)
+        rebuild_summary = ", ".join(
+            f"{label} failed" if "error" in result else f"{label}: {result.get('updated', 0)} updated"
+            for label, result in cache_rebuild.items()
+        )
+
         message = (
             f"FlyBase release {report['release']} refresh completed: "
-            f"{downloaded_count} files downloaded, {skipped_count} reused, gene metadata refreshed."
+            f"{downloaded_count} files downloaded, {skipped_count} reused, gene metadata refreshed. "
+            f"Cache rebuild — {rebuild_summary}."
         )
-        return {"message": message, "release": report["release"]}
+        return {"message": message, "release": report["release"], "cacheRebuild": cache_rebuild}
 
     _run(key, work)
