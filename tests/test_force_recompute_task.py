@@ -3,7 +3,7 @@ from unittest.mock import ANY, patch
 import flymanager.app  # noqa: F401
 
 from tests.mongo_fakes import FakeDatabase
-from flymanager.app.jobs.tasks import _force_recompute_cache
+from flymanager.app.jobs.tasks import _force_recompute_cache, task_force_recompute_cache
 
 
 def test_force_recompute_phenotype_calls_stock_and_cross_backfill_with_force_true():
@@ -63,3 +63,78 @@ def test_force_recompute_unknown_cache_key_raises_value_error():
         assert False, "expected ValueError"
     except ValueError:
         pass
+
+
+def test_task_force_recompute_cache_calls_dispatcher_then_records_then_logs_activity_in_order():
+    """task_force_recompute_cache builds a work(app, db) closure and hands it to
+    _run's mark-running/succeeded/failed envelope. We don't have a real worker
+    app/Mongo replica set available for _run itself here, so we patch _run to
+    execute the closure immediately (as it would in production) and assert on
+    the call order of the three side effects the closure performs."""
+    db = FakeDatabase({"stocks": [], "crosses": []})
+    call_order = []
+
+    def fake_run(key, work):
+        work(None, db)
+
+    def fake_force_recompute_cache(cache_key, db):
+        call_order.append("_force_recompute_cache")
+        return {"stocks": {"updated": 1}}
+
+    def fake_record_force_refresh(cache_key, username, db):
+        call_order.append("record_force_refresh")
+
+    def fake_write_activity(username, message, db):
+        call_order.append("write_activity")
+
+    with patch("flymanager.app.jobs.tasks._run", side_effect=fake_run) as run_mock, patch(
+        "flymanager.app.jobs.tasks._force_recompute_cache",
+        side_effect=fake_force_recompute_cache,
+    ) as force_recompute_mock, patch(
+        "flymanager.utils.mongo.cache_force_refresh.record_force_refresh",
+        side_effect=fake_record_force_refresh,
+    ) as record_mock, patch(
+        "flymanager.app.jobs.tasks.write_activity", side_effect=fake_write_activity
+    ) as write_activity_mock:
+        task_force_recompute_cache("job-key", "admin", "phenotype")
+
+    run_mock.assert_called_once()
+    force_recompute_mock.assert_called_once_with("phenotype", db)
+    record_mock.assert_called_once_with("phenotype", "admin", db)
+    write_activity_mock.assert_called_once()
+    assert call_order == ["_force_recompute_cache", "record_force_refresh", "write_activity"]
+
+
+def test_task_force_recompute_cache_skips_record_and_activity_when_dispatcher_raises():
+    db = FakeDatabase({"stocks": [], "crosses": []})
+    call_order = []
+
+    def fake_run(key, work):
+        work(None, db)
+
+    def fake_force_recompute_cache(cache_key, db):
+        call_order.append("_force_recompute_cache")
+        raise RuntimeError("boom")
+
+    def fake_record_force_refresh(cache_key, username, db):
+        call_order.append("record_force_refresh")
+
+    def fake_write_activity(username, message, db):
+        call_order.append("write_activity")
+
+    with patch("flymanager.app.jobs.tasks._run", side_effect=fake_run), patch(
+        "flymanager.app.jobs.tasks._force_recompute_cache",
+        side_effect=fake_force_recompute_cache,
+    ), patch(
+        "flymanager.utils.mongo.cache_force_refresh.record_force_refresh",
+        side_effect=fake_record_force_refresh,
+    ), patch(
+        "flymanager.app.jobs.tasks.write_activity", side_effect=fake_write_activity
+    ):
+        try:
+            task_force_recompute_cache("job-key", "admin", "phenotype")
+            assert False, "expected RuntimeError to propagate out of the work closure"
+        except RuntimeError:
+            pass
+
+    assert call_order == ["_force_recompute_cache"]
