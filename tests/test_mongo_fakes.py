@@ -38,7 +38,12 @@ def test_find_supports_sort_skip_limit_chaining():
     assert [doc["UniqueID"] for doc in cursor] == ["s1"]
 
 
-def test_distinct_returns_unique_non_null_values():
+def test_distinct_returns_unique_values_including_blanks_like_real_mongo():
+    # The real MongoDB driver's distinct() returns "" and None verbatim - it
+    # does not filter them out. Callers are responsible for that filtering
+    # (see _compute_stock_unique_values/_compute_cross_unique_values), so the
+    # fake must match that behavior rather than silently hiding blanks that
+    # production code failed to filter.
     db = FakeDatabase({
         "stocks": [
             {"UniqueID": "s1", "User": "alice", "TrayID": "T1"},
@@ -47,7 +52,7 @@ def test_distinct_returns_unique_non_null_values():
             {"UniqueID": "s4", "User": "alice", "TrayID": ""},
         ]
     })
-    assert sorted(db["stocks"].distinct("TrayID", {"User": "alice"})) == ["T1", "T2"]
+    assert sorted(db["stocks"].distinct("TrayID", {"User": "alice"})) == ["", "T1", "T2"]
 
 
 def test_aggregate_match_addfields_convert_sort_skip_limit():

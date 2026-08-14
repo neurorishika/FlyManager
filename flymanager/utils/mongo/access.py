@@ -141,7 +141,10 @@ def get_accessible_documents_page(
     if limit is not None:
         pipeline.append({"$limit": limit})
 
-    items = list(db[collection_name].aggregate(pipeline))
+    # The $sort stage sorts on TrayID + a computed field, so it can never
+    # use an index; allowDiskUse lets MongoDB spill to disk instead of
+    # raising "Sort exceeded memory limit" once the accessible set is large.
+    items = list(db[collection_name].aggregate(pipeline, allowDiskUse=True))
     for document in items:
         document.pop("_sortTrayPosition", None)
     annotated = [annotate_document_access(document, user) for document in items]
