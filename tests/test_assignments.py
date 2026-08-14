@@ -431,17 +431,17 @@ def test_tray_assignment_route_updates_all_active_tray_items(monkeypatch):
             "flymanager.app.routes.tray.get_tray",
             return_value={"UniqueID": "tray-key", "TrayID": "T1", "User": "lead"},
         ), patch(
-            "flymanager.app.routes.tray.update_document_assignment",
-            return_value=(True, None),
+            "flymanager.app.routes.tray.bulk_update_document_assignments",
+            return_value=(2, None),
         ) as update_mock, patch(
             "flymanager.app.routes.tray.write_activity"
         ) as activity_mock:
             response = client.post("/tray/assign_tray/tray-key", data={"assignee": "assistant"})
 
     assert response.status_code == 302
-    assert update_mock.call_count == 2
-    update_mock.assert_any_call("stocks", "lead", "STK1", "assistant", fake_db)
-    update_mock.assert_any_call("crosses", "lead", "CRS1", "assistant", fake_db)
+    update_mock.assert_called_once_with(
+        "lead", "assistant", [("stocks", "STK1"), ("crosses", "CRS1")], fake_db,
+    )
     activity_mock.assert_called_once()
 
 

@@ -9,6 +9,7 @@ from flymanager.app.security import (get_json_payload, limiter,
                                      normalize_identifier_list,
                                      normalize_optional_text, parse_int_value)
 from flymanager.utils.mongo import (OperationLockConflict, add_tray,
+                                    bulk_update_document_assignments,
                                     calculate_required_vials, delete_tray,
                                     get_accessible_crosses,
                                     get_accessible_stock,
@@ -17,8 +18,7 @@ from flymanager.utils.mongo import (OperationLockConflict, add_tray,
                                     get_tray, get_tray_occupancy,
                                     get_tray_occupancies_bulk,
                                     hold_operation_locks, move_item_to_tray,
-                                    record_operation_lock_keys,
-                                    update_document_assignment, update_tray,
+                                    record_operation_lock_keys, update_tray,
                                     write_activity)
 
 # Create blueprint
@@ -84,19 +84,12 @@ def assign_tray_route(tray_id):
         flash(f"Tray {tray['TrayID']} has no active stocks or crosses to assign.", 'error')
         return redirect(url_for('tray.tray_management'))
 
-    updated_count = 0
-    for collection_name, unique_id in assignment_targets:
-        success, error_message = update_document_assignment(
-            collection_name,
-            user,
-            unique_id,
-            assignee,
-            db,
-        )
-        if not success:
-            flash(error_message or f'Unable to update assignments for tray {tray["TrayID"]}.', 'error')
-            return redirect(url_for('tray.tray_management'))
-        updated_count += 1
+    updated_count, error_message = bulk_update_document_assignments(
+        user, assignee, assignment_targets, db,
+    )
+    if error_message:
+        flash(error_message, 'error')
+        return redirect(url_for('tray.tray_management'))
 
     if assignee:
         flash(

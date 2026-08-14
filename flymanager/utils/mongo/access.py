@@ -1,3 +1,5 @@
+from pymongo import UpdateOne
+
 from flymanager.utils.mongo_records import current_timestamp
 
 
@@ -207,22 +209,17 @@ def can_assign_to_user(owner, assignee, db):
     return normalized_assignee in set(get_direct_reports(normalized_owner, db))
 
 
-def update_document_assignment(collection_name, owner, uid, assignee, db):
-    collection = db[collection_name]
-    current_document = collection.find_one({"UniqueID": uid, "User": owner})
-    if not current_document:
-        return False, "Record not found."
-
+def build_document_assignment_update_fields(current_document, owner, assignee):
+    """Compute the $set fields for reassigning one document, or None if the
+    assignment is already what was requested (no write needed).
+    """
     normalized_assignee = _normalize_username(assignee)
-    if not can_assign_to_user(owner, normalized_assignee, db):
-        return False, "Assignee must be one of your direct reports."
-
     stored_assignee = ""
     if normalized_assignee and normalized_assignee != owner:
         stored_assignee = normalized_assignee
 
     if _normalize_username(current_document.get("AssignedTo")) == stored_assignee:
-        return True, None
+        return None
 
     timestamp = current_timestamp()
     if stored_assignee:
@@ -233,7 +230,7 @@ def update_document_assignment(collection_name, owner, uid, assignee, db):
     modification_entry = f"{timestamp} : Assignment updated to {assignment_detail}"
     modification_log = current_document.get("ModificationLog", "")
 
-    update_fields = {
+    return {
         "AssignedTo": stored_assignee,
         "AssignmentUpdatedAt": timestamp,
         "AssignmentUpdatedBy": owner,
@@ -245,5 +242,66 @@ def update_document_assignment(collection_name, owner, uid, assignee, db):
         ),
     }
 
+
+def update_document_assignment(collection_name, owner, uid, assignee, db):
+    collection = db[collection_name]
+    current_document = collection.find_one({"UniqueID": uid, "User": owner})
+    if not current_document:
+        return False, "Record not found."
+
+    if not can_assign_to_user(owner, assignee, db):
+        return False, "Assignee must be one of your direct reports."
+
+    update_fields = build_document_assignment_update_fields(current_document, owner, assignee)
+    if update_fields is None:
+        return True, None
+
     collection.update_one({"UniqueID": uid, "User": owner}, {"$set": update_fields})
     return True, None
+
+
+def bulk_update_document_assignments(owner, assignee, targets, db):
+    """Reassign many (collection_name, uid) targets to the same assignee.
+
+    Mirrors update_document_assignment's per-item semantics (ownership check,
+    can_assign_to_user check, identical ModificationLog text) but issues one
+    find() + one bulk_write() per collection instead of one find_one() +
+    one update_one() per target.
+
+    `targets`: iterable of (collection_name, uid) tuples, all reassigned to
+    the same `assignee` by the same `owner` (this is what assign_tray_route
+    needs — every stock/cross in one tray moves to the same assignee).
+
+    Returns (updated_count, error_message). error_message is set (and no
+    writes happen) if `assignee` isn't a valid direct report.
+    """
+    if not can_assign_to_user(owner, assignee, db):
+        return 0, "Assignee must be one of your direct reports."
+
+    uids_by_collection = {}
+    for collection_name, uid in targets:
+        uids_by_collection.setdefault(collection_name, []).append(uid)
+
+    updated_count = 0
+    for collection_name, uids in uids_by_collection.items():
+        collection = db[collection_name]
+        documents = {
+            document["UniqueID"]: document
+            for document in collection.find({"UniqueID": {"$in": uids}, "User": owner})
+        }
+        operations = []
+        for uid in uids:
+            document = documents.get(uid)
+            if not document:
+                continue
+            update_fields = build_document_assignment_update_fields(document, owner, assignee)
+            updated_count += 1
+            if update_fields is None:
+                continue
+            operations.append(
+                UpdateOne({"UniqueID": uid, "User": owner}, {"$set": update_fields})
+            )
+        if operations:
+            collection.bulk_write(operations, ordered=False)
+
+    return updated_count, None

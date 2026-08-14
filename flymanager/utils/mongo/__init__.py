@@ -1,7 +1,8 @@
 # Core database functions
 # Activity logging
 # Access and assignment helpers
-from flymanager.utils.mongo.access import (get_accessible_cross,
+from flymanager.utils.mongo.access import (bulk_update_document_assignments,
+                                           get_accessible_cross,
                                            get_accessible_crosses,
                                            get_accessible_stock,
                                            get_accessible_stocks,
@@ -100,6 +101,7 @@ __all__ = [
     "get_reporting_manager",
     "get_user_profiles",
     "update_document_assignment",
+    "bulk_update_document_assignments",
     "update_user_reporting_manager",
     # Auth functions
     "add_user",
