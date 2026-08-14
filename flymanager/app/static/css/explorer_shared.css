@@ -446,7 +446,11 @@
     background: color-mix(in srgb, var(--card-bg) 88%, var(--bg-color) 12%);
 }
 
-.explorer-filter-search {
+/* Specificity raised to (0,2,0) so this survives the global density
+   layer's `.form-control { padding-left: var(--control-padding-x) }`
+   (bootstrap-density.css loads after this file) — otherwise the tie
+   is broken by load order and the magnifier icon clearance is lost. */
+.form-control.explorer-filter-search {
     padding-left: 36px;
 }
 

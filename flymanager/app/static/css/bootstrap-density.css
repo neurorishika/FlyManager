@@ -371,10 +371,21 @@ label {
     line-height: 1.3;
 }
 
-/* Buttons and pagination center their label within the 40px box. */
+/* Buttons and pagination center their label within the 40px box.
+   gap separates an icon from its label — inline-flex collapses the
+   whitespace text node between them into nothing, so without a gap
+   icon+label buttons render jammed together (e.g. "Details"). */
 .btn, .page-link, .nav-link {
     display: inline-flex;
     align-items: center;
+    gap: var(--space-sm);
+}
+
+/* Horizontal centering is only correct for buttons, pagination, and
+   tab controls. Bare .nav-link is also used for left-aligned nav
+   lists (e.g. the User Guide table of contents) where centering
+   would break the layout, so it is excluded here. */
+.btn, .page-link, .nav-tabs .nav-link {
     justify-content: center;
 }
 
