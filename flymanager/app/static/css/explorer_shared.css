@@ -193,7 +193,7 @@
     align-items: center;
     gap: var(--space-md);
     margin-top: var(--space-md);
-    padding: var(--space-md) var(--space-lg);
+    padding: var(--space-lg);
     border-radius: 14px;
     border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent 18%);
     background: color-mix(in srgb, var(--card-bg) 88%, var(--bg-color) 12%);
