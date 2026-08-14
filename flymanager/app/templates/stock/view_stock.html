@@ -1016,7 +1016,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    function applyProviderMatch(candidateIndex, candidate, statusNote, confirmed) {
+    function applyProviderMatch(candidateIndex, statusNote, confirmed) {
         return fetch(applyProviderMatchUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1040,11 +1040,16 @@ document.addEventListener("DOMContentLoaded", function() {
                     statusNote.textContent = body.message || 'Nothing to apply.';
                     return;
                 }
+                if ('StockSource' in body.fields) {
+                    stockData.sourceType = body.fields.StockSource;
+                }
+                if ('SourceCollection' in body.fields) {
+                    stockData.sourceCollection = body.fields.SourceCollection;
+                }
                 if ('StockSource' in body.fields || 'SourceCollection' in body.fields) {
-                    const sourceType = body.fields.StockSource || document.getElementById('sourceDisplay').dataset.rawSourceType || 'OTHER';
-                    const sourceCollection = body.fields.SourceCollection || '';
-                    document.getElementById('sourceDisplay').textContent = sourceCollection
-                        ? `${sourceType} / ${sourceCollection}`
+                    const sourceType = stockData.sourceType || 'OTHER';
+                    document.getElementById('sourceDisplay').textContent = stockData.sourceCollection
+                        ? `${sourceType} / ${stockData.sourceCollection}`
                         : sourceType;
                 }
                 if ('SourceID' in body.fields) {
@@ -1110,7 +1115,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 applyBtn.addEventListener('click', () => {
                     const pendingIndex = statusNote.dataset.pendingCandidateIndex;
                     const isConfirming = pendingIndex === String(candidateIndex);
-                    applyProviderMatch(candidateIndex, candidate, statusNote, isConfirming);
+                    applyProviderMatch(candidateIndex, statusNote, isConfirming);
                 });
                 item.appendChild(applyBtn);
             }
