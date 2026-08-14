@@ -1,0 +1,56 @@
+/* tokens.css — design tokens. The single place scale values change. */
+:root[data-theme="light"] {
+    --bg-color: #f0f0f0;
+    --text-color: #212529;
+    --header-bg: var(--accent-color);
+    --header-text: #fff;
+    --card-bg: #fff;
+    --highlighted-card-bg: #d3d4d6;
+    --highlighted-border-color: #aeaeae;
+    --border-color: #dee2e6;
+    --muted-text: rgba(33, 37, 41, 0.72);
+    --success-color: #1f9d55;
+    --warning-color: #d97706;
+    --danger-color: #dc2626;
+    --page-background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.48), transparent 28%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, var(--bg-color) 180px);
+    --panel-background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), var(--card-bg));
+    --panel-border: color-mix(in srgb, var(--border-color) 70%, white 30%);
+    --page-gutter: clamp(12px, 2vw, 24px);
+    --content-max-width: 1440px;
+    --font-size-sm: clamp(0.78rem, 0.75rem + 0.18vw, 0.88rem);
+    --font-size-base: clamp(0.9rem, 0.86rem + 0.24vw, 1rem);
+    --font-size-lg: clamp(1rem, 0.96rem + 0.4vw, 1.2rem);
+    --font-size-xl: clamp(1.35rem, 1.15rem + 1vw, 2rem);
+    --surface-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    --surface-border-strong: rgba(255, 255, 255, 0.55);
+}
+
+:root[data-theme="dark"] {
+    --bg-color: #1a1a1a;
+    --text-color: #e1e1e1;
+    --header-bg: var(--accent-color);
+    --header-text: #fff;
+    --card-bg: #2d2d2d;
+    --highlighted-card-bg: #616161;
+    --highlighted-border-color: #404040;
+    --border-color: #404040;
+    --muted-text: rgba(225, 225, 225, 0.72);
+    --success-color: #2fbe6c;
+    --warning-color: #e0912f;
+    --danger-color: #e5484d;
+    --page-background:
+        radial-gradient(circle at top center, rgba(255, 255, 255, 0.035), transparent 22%),
+        linear-gradient(180deg, #222226 0%, #17171b 34%, #131316 100%);
+    --panel-background: linear-gradient(180deg, #303036, #27272c);
+    --panel-border: rgba(255, 255, 255, 0.08);
+    --page-gutter: clamp(12px, 2vw, 24px);
+    --content-max-width: 1440px;
+    --font-size-sm: clamp(0.78rem, 0.75rem + 0.18vw, 0.88rem);
+    --font-size-base: clamp(0.9rem, 0.86rem + 0.24vw, 1rem);
+    --font-size-lg: clamp(1rem, 0.96rem + 0.4vw, 1.2rem);
+    --font-size-xl: clamp(1.35rem, 1.15rem + 1vw, 2rem);
+    --surface-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
+    --surface-border-strong: rgba(255, 255, 255, 0.1);
+}
