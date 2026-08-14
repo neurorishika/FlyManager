@@ -284,6 +284,52 @@ def _rebuild_caches_after_flybase_refresh(db):
     return results
 
 
+def _force_recompute_cache(cache_key, db):
+    """Runs the relevant backfill wrapper(s) for cache_key at force=True.
+
+    Unlike _rebuild_caches_after_flybase_refresh, this is a targeted dispatch
+    for exactly one cache (the one an admin explicitly chose to force), not a
+    fan-out across all five wrappers.
+    """
+    if cache_key == "phenotype":
+        from flymanager.utils.phenotypes.backfill import (
+            backfill_cross_phenotype_cache, backfill_stock_phenotype_cache)
+        return {
+            "stocks": backfill_stock_phenotype_cache(db["stocks"], users=None, dry_run=False, force=True),
+            "crosses": backfill_cross_phenotype_cache(db["crosses"], users=None, dry_run=False, force=True),
+        }
+    if cache_key == "standardization":
+        from flymanager.app.services.standardization_backfill import (
+            backfill_cross_standardization_cache, backfill_stock_standardization_cache)
+        return {
+            "stocks": backfill_stock_standardization_cache(db["stocks"], users=None, dry_run=False, force=True),
+            "crosses": backfill_cross_standardization_cache(db["crosses"], users=None, dry_run=False, force=True),
+        }
+    if cache_key == "provider_match":
+        from flymanager.app.routes.stock import backfill_stock_provider_match_cache
+        return {
+            "stocks": backfill_stock_provider_match_cache(db["stocks"], users=None, dry_run=False, force=True),
+        }
+    raise ValueError(f"Unknown cache_key: {cache_key}")
+
+
+def task_force_recompute_cache(key, username, cache_key):
+    def work(app, db):
+        from flymanager.utils.mongo.cache_force_refresh import record_force_refresh
+
+        summary = _force_recompute_cache(cache_key, db)
+        record_force_refresh(cache_key, username, db)
+        write_activity(
+            username,
+            f"[FORCE-RECOMPUTE] Forced full recompute of {cache_key} cache",
+            db,
+        )
+        message = f"Forced full recompute of the {cache_key} cache complete: {summary}"
+        return {"message": message, "summary": summary}
+
+    _run(key, work)
+
+
 def task_refresh_flybase_reference_data(key, username):
     def work(app, db):
         from flymanager.app.services import flybase as flybase_service
