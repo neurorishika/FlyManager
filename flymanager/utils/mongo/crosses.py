@@ -240,6 +240,53 @@ def edit_cross(user, uid, db, updates, log_activity=True, refresh_vials=True):
     return success
 
 
+def propagate_stock_genotype_to_crosses(user, stock_unique_id, new_genotype, db):
+    """Refresh denormalized genotype + caches on crosses referencing this stock as a parent.
+
+    Called after a stock's own Genotype is edited, so dependent crosses don't
+    go stale until someone happens to edit the cross directly. Writes go
+    through apply_updates_to_owned_document directly (not edit_cross) to skip
+    edit_cross's vial-refresh side effect, which doesn't apply here.
+    """
+    query = {
+        "$and": [
+            {"User": user},
+            {"$or": [
+                {"MaleUniqueID": stock_unique_id},
+                {"FemaleUniqueID": stock_unique_id},
+            ]},
+        ]
+    }
+
+    summary = {"crosses_updated": 0, "errors": 0}
+    for cross in db["crosses"].find(query):
+        try:
+            is_male_parent = cross.get("MaleUniqueID") == stock_unique_id
+            is_female_parent = cross.get("FemaleUniqueID") == stock_unique_id
+
+            male_genotype = new_genotype if is_male_parent else cross.get("MaleGenotype", "")
+            female_genotype = new_genotype if is_female_parent else cross.get("FemaleGenotype", "")
+
+            updates = {}
+            if is_male_parent:
+                updates["MaleGenotype"] = male_genotype
+            if is_female_parent:
+                updates["FemaleGenotype"] = female_genotype
+
+            updates["PhenotypeCache"] = build_cross_phenotype_cache(male_genotype, female_genotype)
+            updates["StandardizationCache"] = build_cross_standardization_cache(male_genotype, female_genotype)
+
+            success, _ = apply_updates_to_owned_document(
+                "crosses", user, cross["UniqueID"], db, updates, log_activity=True,
+            )
+            if success:
+                summary["crosses_updated"] += 1
+        except Exception:
+            summary["errors"] += 1
+
+    return summary
+
+
 def update_cross_vials(cross, username, db):
     """
     Refresh the cross vials based on the flip log.
