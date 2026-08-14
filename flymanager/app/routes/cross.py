@@ -283,6 +283,7 @@ def cross_explorer():
             # the original route did, just over a far smaller candidate set.
             candidates, _ = get_accessible_documents_page(
                 "crosses", username, db, mongo_filter=mongo_filter, limit=None,
+                extra_sort_keys=(),
             )
             filtered_crosses = _apply_cross_search(candidates, search_query)
             filtered_crosses = sorted(filtered_crosses, key=_cross_sort_key)
@@ -297,7 +298,7 @@ def cross_explorer():
             skip = (pagination_state["page"] - 1) * per_page if per_page else 0
             page_items, total_count = get_accessible_documents_page(
                 "crosses", username, db, mongo_filter=mongo_filter,
-                skip=skip, limit=per_page,
+                skip=skip, limit=per_page, extra_sort_keys=(),
             )
             pagination = _build_pagination_from_db_page(
                 page_items, total_count, pagination_state,
@@ -348,7 +349,7 @@ def cross_explorer_selection():
     mongo_filter = _build_cross_mongo_filter(filter_state)
     candidates, _ = get_accessible_documents_page(
         "crosses", username, db, mongo_filter=mongo_filter,
-        limit=None, projection=_CROSS_SELECTION_PROJECTION,
+        limit=None, projection=_CROSS_SELECTION_PROJECTION, extra_sort_keys=(),
     )
     search_query = filter_state.get("searchQuery")
     filtered_crosses = (
@@ -451,10 +452,10 @@ def _compute_cross_unique_values(username, db, filter_state):
     combined = {"$and": [owner_scope, mongo_filter]} if mongo_filter else owner_scope
 
     unique_values = {
-        field: db["crosses"].distinct(field, combined)
+        field: sorted(db["crosses"].distinct(field, combined))
         for field in ("MaleSpecies", "FemaleSpecies", "TrayID", "FoodType")
     }
-    unique_values["Status"] = db["crosses"].distinct("Status", owner_scope)
+    unique_values["Status"] = sorted(db["crosses"].distinct("Status", owner_scope))
     return unique_values
 
 

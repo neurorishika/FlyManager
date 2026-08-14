@@ -797,10 +797,10 @@ def _compute_stock_unique_values(username, db, filter_state):
     combined = {"$and": [owner_scope, mongo_filter]} if mongo_filter else owner_scope
 
     unique_values = {
-        field: db["stocks"].distinct(field, combined)
+        field: sorted(db["stocks"].distinct(field, combined))
         for field in ("Type", "TrayID", "FoodType", "Species")
     }
-    unique_values["Status"] = db["stocks"].distinct("Status", owner_scope)
+    unique_values["Status"] = sorted(db["stocks"].distinct("Status", owner_scope))
     unique_values["Provenance"] = sorted({
         str(value).split("/")[0]
         for value in db["stocks"].distinct("Provenance", combined)

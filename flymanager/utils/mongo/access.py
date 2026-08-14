@@ -82,6 +82,7 @@ def get_accessible_documents(collection_name, user, db, annotate=False, projecti
 
 def get_accessible_documents_page(
     collection_name, user, db, *, mongo_filter=None, skip=0, limit=None, projection=None,
+    extra_sort_keys=("Name", "UniqueID"),
 ):
     """Query, sort, and paginate accessible documents at the database level.
 
@@ -90,13 +91,25 @@ def get_accessible_documents_page(
     every matching document (still filtered + projected server-side) and
     apply the fuzzy filter + pagination themselves afterward.
 
-    Sorts by TrayID, then TrayPosition (parsed numerically, matching
-    ``_stock_sort_key``'s tie-break order), then Name, then UniqueID.
+    Sorts by TrayID, then TrayPosition (parsed numerically), then by
+    ``extra_sort_keys`` in order. The default ``("Name", "UniqueID")``
+    matches ``_stock_sort_key``'s tie-break order; callers whose Python
+    sort key ties break differently (e.g. crosses, which only tie-break on
+    TrayID/TrayPosition - see ``_cross_sort_key``) should pass a matching
+    ``extra_sort_keys`` (``()`` for crosses) so the DB-level browse path and
+    the Python-level search/selection paths agree on ordering.
 
     Access annotation (``annotate_document_access``) runs before
     ``projection`` is applied, so a projection strictly limits the final
     field set to exactly the requested names (dropping any annotation-only
     fields not explicitly requested), matching a real Mongo projection.
+
+    When ``limit`` is set and the requested ``skip`` would land past the
+    last page (stale bookmark, a filter that shrank the result set, a
+    manually-edited URL), ``skip`` is clamped down to the start of the
+    last valid page instead of returning an empty page - matching the
+    pre-pushdown behavior of slicing an in-memory list after clamping the
+    page number.
 
     Returns (items, total_count).
     """
@@ -105,6 +118,15 @@ def get_accessible_documents_page(
 
     total_count = db[collection_name].count_documents(combined_filter)
 
+    if limit is not None and limit > 0 and total_count:
+        max_skip = ((total_count - 1) // limit) * limit
+        if skip > max_skip:
+            skip = max_skip
+
+    sort_spec = {"TrayID": 1, "_sortTrayPosition": 1}
+    for field in extra_sort_keys:
+        sort_spec[field] = 1
+
     pipeline = [
         {"$match": combined_filter},
         {"$addFields": {
@@ -112,7 +134,7 @@ def get_accessible_documents_page(
                 "$convert": {"input": "$TrayPosition", "to": "double", "onError": 0, "onNull": 0}
             },
         }},
-        {"$sort": {"TrayID": 1, "_sortTrayPosition": 1, "Name": 1, "UniqueID": 1}},
+        {"$sort": sort_spec},
     ]
     if skip:
         pipeline.append({"$skip": skip})

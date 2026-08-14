@@ -193,6 +193,7 @@ def test_pushdown_path_matches_python_path_for_cross_deterministic_filters():
     )
     new_result, _ = get_accessible_documents_page(
         "crosses", "alice", db, mongo_filter=_build_cross_mongo_filter(filter_state),
+        extra_sort_keys=(),
     )
 
     assert [c["UniqueID"] for c in old_result] == [c["UniqueID"] for c in new_result]
@@ -219,3 +220,126 @@ def test_pushdown_plus_python_search_matches_fully_python_path_for_cross():
     )
 
     assert [c["UniqueID"] for c in old_result] == [c["UniqueID"] for c in new_result]
+
+
+# --- Fix round 1: out-of-range page clamps instead of returning empty --
+
+def test_skip_past_last_page_clamps_to_last_page_instead_of_empty():
+    db = FakeDatabase({
+        "stocks": [_stock(f"s{i}", TrayID="T1", TrayPosition=str(i)) for i in range(5)]
+    })
+    # 5 items, per_page=2 -> 3 pages (offsets 0, 2, 4). Request an
+    # out-of-range page (skip=20, far past the last valid offset of 4).
+    items, total = get_accessible_documents_page("stocks", "alice", db, skip=20, limit=2)
+    assert total == 5
+    # Must show the last valid page's actual content (s4), not an empty list.
+    assert [item["UniqueID"] for item in items] == ["s4"]
+
+
+def test_skip_within_range_is_not_clamped():
+    db = FakeDatabase({
+        "stocks": [_stock(f"s{i}", TrayID="T1", TrayPosition=str(i)) for i in range(5)]
+    })
+    items, total = get_accessible_documents_page("stocks", "alice", db, skip=2, limit=2)
+    assert total == 5
+    assert [item["UniqueID"] for item in items] == ["s2", "s3"]
+
+
+def test_zero_results_with_skip_stays_empty_and_does_not_error():
+    db = FakeDatabase({"stocks": [_stock("s1", Status="Sick")]})
+    items, total = get_accessible_documents_page(
+        "stocks", "alice", db, mongo_filter={"Status": "Healthy"}, skip=10, limit=2,
+    )
+    assert total == 0
+    assert items == []
+
+
+def test_route_level_out_of_range_page_shows_last_page_items(monkeypatch):
+    # Reproduces the reported bug at the route level: _build_pagination_from_db_page
+    # clamps the *displayed* page number using total_count, but the skip
+    # passed into get_accessible_documents_page must also be clamped or the
+    # items returned won't match the displayed page.
+    import flymanager.app as flymanager_app_module  # noqa: F401
+    from unittest.mock import patch
+    from flymanager.app import create_app
+
+    monkeypatch.setenv("ENABLE_SCHEDULER", "0")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+    monkeypatch.setenv("MAIL_SUPPRESS_SEND", "1")
+    with patch("flymanager.app.get_settings", return_value={
+        "lab_info": {"lab_name": "Test Lab", "admin_name": "Admin", "admin_email": "a@b.com"},
+        "theme": {"accent_color": "#0055aa", "dark_mode": False},
+    }):
+        app = create_app()
+    app.config.update(TESTING=True)
+
+    # per_page must be one of the explorer's allowed values (20/50/100/all)
+    # - anything else is normalized back to the default - so use 41 stocks
+    # with per_page=20 to get 3 real pages (20, 20, 1).
+    db = FakeDatabase({
+        "stocks": [
+            _stock(
+                f"s{i:03d}", TrayID="T1", TrayPosition=str(i),
+                NextFlipDates="2026-01-01", NextEclosionDates="2026-01-01",
+            )
+            for i in range(1, 42)
+        ]
+    })
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "alice"
+
+        with patch("flymanager.app.routes.stock.db", db):
+            # 41 stocks, per_page=20 -> 3 valid pages; request page 99.
+            response = client.get("/stock/explorer?page=99&per_page=20")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    # The last valid page (page 3) holds only s041 - it must actually
+    # render, not an empty result set.
+    assert "s041" in body
+    assert "Showing 41-41 of 41 stocks" in body
+
+
+# --- Fix round 1: cross sort tie-break must match _cross_sort_key -------
+
+def test_cross_pushdown_sort_ties_match_cross_sort_key_when_extra_sort_keys_empty():
+    # Two crosses sharing the same TrayID+TrayPosition (both blank, the
+    # common "un-trayed" case) but with Name values that would reorder them
+    # under the stock-shaped 4-key sort. _cross_sort_key only tie-breaks on
+    # (TrayID, TrayPosition), so a stable sort preserves original order for
+    # ties - the DB-level browse path must match that when extra_sort_keys=().
+    db = FakeDatabase({
+        "crosses": [
+            _cross("c-zebra", Name="Zebra cross", TrayID="", TrayPosition=""),
+            _cross("c-alpha", Name="Alpha cross", TrayID="", TrayPosition=""),
+        ]
+    })
+    python_order = [
+        c["UniqueID"]
+        for c in sorted(list(db["crosses"].find({"User": "alice"})), key=_cross_sort_key)
+    ]
+    db_order, _ = get_accessible_documents_page(
+        "crosses", "alice", db, extra_sort_keys=(),
+    )
+    assert [c["UniqueID"] for c in db_order] == python_order
+
+
+def test_cross_pushdown_default_sort_keys_would_diverge_from_cross_sort_key():
+    # Sanity check that the two sort specs actually differ for tied
+    # TrayID/TrayPosition data (otherwise the fix above wouldn't be testing
+    # anything meaningful): the stock-shaped default (Name, UniqueID
+    # tie-break) reorders "Zebra" after "Alpha", while _cross_sort_key
+    # (no Name/UniqueID tie-break) preserves insertion order.
+    db = FakeDatabase({
+        "crosses": [
+            _cross("c-zebra", Name="Zebra cross", TrayID="", TrayPosition=""),
+            _cross("c-alpha", Name="Alpha cross", TrayID="", TrayPosition=""),
+        ]
+    })
+    default_sort_order, _ = get_accessible_documents_page("crosses", "alice", db)
+    matching_sort_order, _ = get_accessible_documents_page(
+        "crosses", "alice", db, extra_sort_keys=(),
+    )
+    assert [c["UniqueID"] for c in default_sort_order] != [c["UniqueID"] for c in matching_sort_order]
