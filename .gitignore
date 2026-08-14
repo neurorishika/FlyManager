@@ -170,6 +170,9 @@ directory.path
 # generated labels
 flymanager/app/static/generated_labels/*
 
+# local Flask session storage (bind-mounted runtime state, compose.yaml)
+flask_session/
+
 # .old directories
 **/.old
 
