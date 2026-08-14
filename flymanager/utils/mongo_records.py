@@ -2,6 +2,8 @@ import datetime
 import math
 from hashlib import shake_256
 
+from pymongo import ReturnDocument
+
 from flymanager.utils.utils import clean_log_entry
 
 
@@ -411,7 +413,8 @@ def flip_owned_document(
         added_comment=added_comment,
     )
 
-    collection.update_one(
-        {"UniqueID": uid, "User": user}, {"$set": update_fields}
+    return collection.find_one_and_update(
+        {"UniqueID": uid, "User": user},
+        {"$set": update_fields},
+        return_document=ReturnDocument.AFTER,
     )
-    return collection.find_one({"UniqueID": uid, "User": user})

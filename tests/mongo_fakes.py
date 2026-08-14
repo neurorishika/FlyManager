@@ -8,6 +8,8 @@ codebase's aggregation pipelines use) so later tests don't redefine it.
 import copy
 from types import SimpleNamespace
 
+from pymongo import ReturnDocument
+
 
 def _matches(record, query):
     for key, value in (query or {}).items():
@@ -127,9 +129,13 @@ class FakeCollection:
         return SimpleNamespace(matched_count=0, modified_count=0)
 
     def find_one_and_update(self, query, update, return_document="AFTER"):
+        # `return_document` may be the literal string "AFTER" or the real
+        # pymongo.ReturnDocument.AFTER enum member; a plain `!= "AFTER"`
+        # string comparison never matches the enum form, so check both.
+        return_after = return_document in ("AFTER", ReturnDocument.AFTER)
         for record in self._records:
             if _matches(record, query):
-                if return_document != "AFTER":
+                if not return_after:
                     before = dict(record)
                     record.update(update.get("$set", {}))
                     return before

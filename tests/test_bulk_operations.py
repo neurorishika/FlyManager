@@ -10,6 +10,8 @@ import datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from pymongo import ReturnDocument
+
 # Import the app package first so flymanager.utils.mongo is fully initialised
 # before we pull submodules from it (avoids a partial-init circular import when
 # a mongo submodule is the entry point rather than flymanager.app).
@@ -56,6 +58,20 @@ class FakeCollection:
                 record.update(update.get("$set", {}))
                 return SimpleNamespace(matched_count=1, modified_count=1)
         return SimpleNamespace(matched_count=0, modified_count=0)
+
+    def find_one_and_update(self, query, update, return_document="AFTER"):
+        # `return_document` may be the literal string "AFTER" or the real
+        # pymongo.ReturnDocument.AFTER enum member; check both forms.
+        return_after = return_document in ("AFTER", ReturnDocument.AFTER)
+        for record in self._records:
+            if self._matches(record, query):
+                if not return_after:
+                    before = dict(record)
+                    record.update(update.get("$set", {}))
+                    return before
+                record.update(update.get("$set", {}))
+                return dict(record)
+        return None
 
     def insert_one(self, document):
         self._records.append(dict(document))
