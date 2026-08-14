@@ -322,8 +322,24 @@ def get_tray_occupancy(user, tray_id, db):
     stocks_collection = db["stocks"]
     crosses_collection = db["crosses"]
 
-    stocks = stocks_collection.find({"User": user, "TrayID": tray_id})
-    crosses = crosses_collection.find({"User": user, "TrayID": tray_id})
+    stocks = list(stocks_collection.find({"User": user, "TrayID": tray_id}))
+    crosses = list(crosses_collection.find({"User": user, "TrayID": tray_id}))
+
+    # Batch-resolve male/female parent stocks for all crosses in one query
+    parent_ids = {
+        parent_id
+        for cross in crosses
+        for parent_id in (cross.get("MaleUniqueID"), cross.get("FemaleUniqueID"))
+        if parent_id
+    }
+    parent_stock_map = {}
+    if parent_ids:
+        parent_stock_map = {
+            stock["UniqueID"]: stock
+            for stock in stocks_collection.find(
+                {"User": user, "UniqueID": {"$in": list(parent_ids)}}
+            )
+        }
 
     # Create occupancy map
     occupancy = {}
@@ -380,12 +396,8 @@ def get_tray_occupancy(user, tray_id, db):
             position_str = str(position_int)
 
             # Get the stock IDs for male and female
-            male_stock = stocks_collection.find_one(
-                {"User": user, "UniqueID": cross["MaleUniqueID"]}
-            )
-            female_stock = stocks_collection.find_one(
-                {"User": user, "UniqueID": cross["FemaleUniqueID"]}
-            )
+            male_stock = parent_stock_map.get(cross.get("MaleUniqueID"))
+            female_stock = parent_stock_map.get(cross.get("FemaleUniqueID"))
 
             male_id = male_stock["UniqueID"] if male_stock else "Unknown"
             female_id = female_stock["UniqueID"] if female_stock else "Unknown"
