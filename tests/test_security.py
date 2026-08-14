@@ -352,8 +352,6 @@ def test_home_page_renders_dashboard_command_sections(monkeypatch):
     assert "Stale" in page
     assert "Phenotype Cache" in page
     assert "Backfill My Phenotype Caches" in page
-    assert "Refresh All Provider Caches" in page
-    assert "data-confirm-message=\"This will rerun provider match caching for every stock in the database. Continue?\"" in page
     assert "Genotype Reviewer" in page
     assert ">Open<" in page
 

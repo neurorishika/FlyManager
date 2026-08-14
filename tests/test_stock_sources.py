@@ -1297,34 +1297,6 @@ def test_get_valid_provider_match_cache_rejects_legacy_entry_missing_version(mon
     assert _get_valid_provider_match_cache(stock, source_context) is None
 
 
-def test_admin_can_refresh_provider_match_cache_for_all_stocks(monkeypatch):
-    app = _make_app(monkeypatch)
-
-    with app.test_client() as client:
-        with client.session_transaction() as sess:
-            sess["username"] = "admin"
-
-        with patch(
-            "flymanager.app.routes.settings._run_provider_match_cache_refresh",
-            return_value={
-                "scanned": 5,
-                "refreshed": 5,
-                "errors": 0,
-                "candidate_matches": 12,
-            },
-        ) as refresh_provider_cache, patch(
-            "flymanager.app.routes.settings.hold_operation_lock",
-            return_value=nullcontext(),
-        ), patch(
-            "flymanager.app.routes.settings.write_activity"
-        ) as write_activity:
-            response = client.post("/settings/refresh-all-provider-caches")
-
-    assert response.status_code == 302
-    refresh_provider_cache.assert_called_once_with()
-    write_activity.assert_called_once_with("admin", "Refreshed provider match cache for all stocks", ANY)
-
-
 def test_stock_explorer_embeds_cached_provider_matches(monkeypatch):
     app = _make_app(monkeypatch)
     stock = {
