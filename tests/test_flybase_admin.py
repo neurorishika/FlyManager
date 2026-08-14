@@ -396,13 +396,21 @@ def test_refresh_flybase_reference_data_rebuilds_phenotype_cache_and_renews_reco
     ) as stock_backfill, patch(
         "flymanager.app.services.flybase.backfill_cross_phenotype_cache",
         return_value={"scanned": 3, "updated": 3, "skipped_valid": 0},
-    ) as cross_backfill:
+    ) as cross_backfill, patch(
+        "flymanager.app.services.flybase.backfill_stock_standardization_cache",
+        return_value={"scanned": 5, "updated": 5, "skipped_valid": 0},
+    ) as stock_standardization_backfill, patch(
+        "flymanager.app.services.flybase.backfill_cross_standardization_cache",
+        return_value={"scanned": 3, "updated": 3, "skipped_valid": 0},
+    ) as cross_standardization_backfill:
         report = refresh_flybase_reference_data(app, data_dir=tmp_path)
 
     ingest_bundle.assert_called_once_with(tmp_path, ANY)
     phenotype_cache_builder.assert_called_once_with(data_dir=tmp_path, force=True, db=ANY)
     stock_backfill.assert_called_once()
     cross_backfill.assert_called_once()
+    stock_standardization_backfill.assert_called_once()
+    cross_standardization_backfill.assert_called_once()
     assert report["balancer_ingestion_report"]["db"]["inserted"] == 6
     assert report["flybase_ingestion_report"]["collections"]["flybase_phenotypes"]["inserted"] == 7
     assert report["phenotype_cache_report"]["source_kind"] == "mongo_ingest"

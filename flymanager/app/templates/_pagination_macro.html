@@ -1,0 +1,31 @@
+{% macro render_pagination(pagination, page_href) %}
+<ul class="pagination pagination-sm mb-0">
+    <li class="page-item {% if not pagination.has_previous %}disabled{% endif %}">
+        {% if pagination.has_previous %}
+        <a class="page-link" href="{{ page_href(pagination.previous_page) }}" aria-label="Previous page"><i class="fas fa-angle-left"></i></a>
+        {% else %}
+        <span class="page-link" aria-hidden="true"><i class="fas fa-angle-left"></i></span>
+        {% endif %}
+    </li>
+    {% for entry in pagination.page_numbers %}
+    {% if entry.type == 'ellipsis' %}
+    <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+    {% else %}
+    <li class="page-item {% if entry.value == pagination.page %}active{% endif %}">
+        {% if entry.value == pagination.page %}
+        <span class="page-link">{{ entry.value }}</span>
+        {% else %}
+        <a class="page-link" href="{{ page_href(entry.value) }}">{{ entry.value }}</a>
+        {% endif %}
+    </li>
+    {% endif %}
+    {% endfor %}
+    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+        {% if pagination.has_next %}
+        <a class="page-link" href="{{ page_href(pagination.next_page) }}" aria-label="Next page"><i class="fas fa-angle-right"></i></a>
+        {% else %}
+        <span class="page-link" aria-hidden="true"><i class="fas fa-angle-right"></i></span>
+        {% endif %}
+    </li>
+</ul>
+{% endmacro %}

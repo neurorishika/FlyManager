@@ -104,8 +104,8 @@
     }
 
     .tray-board-status.is-active {
-        background: rgba(23, 162, 184, 0.12);
-        color: #0f7281;
+        background: color-mix(in srgb, var(--accent-color) 16%, var(--card-bg) 84%);
+        color: color-mix(in srgb, var(--accent-color) 78%, var(--text-color) 22%);
     }
 
     .tray-board-status.is-error {
@@ -197,13 +197,13 @@
     }
 
     .occupied-type-stock {
-        background: rgba(40, 167, 69, 0.12);
-        color: color-mix(in srgb, #2ca45c 70%, var(--text-color) 30%);
+        background: color-mix(in srgb, var(--accent-color) 14%, var(--card-bg) 86%);
+        color: color-mix(in srgb, var(--accent-color) 72%, var(--text-color) 28%);
     }
 
     .occupied-type-cross {
-        background: rgba(0, 123, 255, 0.12);
-        color: color-mix(in srgb, #1897b7 72%, var(--text-color) 28%);
+        background: color-mix(in srgb, var(--accent-color) 26%, var(--card-bg) 74%);
+        color: color-mix(in srgb, var(--accent-color) 88%, black 12%);
     }
 
     .occupied-list-scroll {
@@ -645,16 +645,16 @@
         grid-template-columns: repeat({{ tray.Columns }}, 1fr);
         gap: 6px;
         margin: auto;
-        border: 1px solid rgba(124, 100, 173, 0.12);
+        border: 1px solid var(--tray-border-soft);
         border-radius: 22px;
         padding: 10px;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(244, 240, 251, 0.9));
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 18px 35px rgba(90, 70, 127, 0.08);
+        background: linear-gradient(180deg, var(--tray-soft-surface-strong), var(--tray-soft-surface));
+        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--card-bg) 70%, white 30%), 0 18px 35px rgba(90, 70, 127, 0.08);
     }
-    
+
     .tray-cell {
-        border: 1px solid rgba(124, 100, 173, 0.12);
-        background-color: rgba(255, 255, 255, 0.94);
+        border: 1px solid var(--tray-border-soft);
+        background-color: var(--tray-soft-surface-strong);
         color: var(--text-color);
         padding: 8px;
         min-height: 62px;
@@ -668,25 +668,25 @@
         transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
         overflow: visible;
     }
-    
+
     .tray-cell.empty {
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 245, 252, 0.92));
-        color: rgba(83, 65, 120, 0.7);
+        background: linear-gradient(180deg, var(--tray-soft-surface-strong), var(--tray-soft-surface));
+        color: var(--tray-text-muted);
     }
-    
+
     .tray-cell.stock {
-        background: linear-gradient(180deg, rgba(40, 167, 69, 0.12), rgba(40, 167, 69, 0.03));
-        border-color: rgba(40, 167, 69, 0.28);
+        background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 14%, transparent 86%), color-mix(in srgb, var(--accent-color) 4%, transparent 96%));
+        border-color: color-mix(in srgb, var(--accent-color) 30%, var(--tray-border-soft) 70%);
     }
-    
+
     .tray-cell.cross {
-        background: linear-gradient(180deg, rgba(0, 123, 255, 0.12), rgba(0, 123, 255, 0.03));
-        border-color: rgba(0, 123, 255, 0.28);
+        background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 28%, transparent 72%), color-mix(in srgb, var(--accent-color) 8%, transparent 92%));
+        border-color: color-mix(in srgb, var(--accent-color) 48%, var(--tray-border-soft) 52%);
     }
-    
+
     .tray-cell.blocked {
-        background: repeating-linear-gradient(135deg, rgba(120, 118, 129, 0.08), rgba(120, 118, 129, 0.08) 8px, rgba(120, 118, 129, 0.14) 8px, rgba(120, 118, 129, 0.14) 16px);
-        border-color: rgba(124, 100, 173, 0.16);
+        background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted-text) 10%, transparent 90%), color-mix(in srgb, var(--muted-text) 10%, transparent 90%) 8px, color-mix(in srgb, var(--muted-text) 16%, transparent 84%) 8px, color-mix(in srgb, var(--muted-text) 16%, transparent 84%) 16px);
+        border-color: var(--tray-border-soft);
         cursor: not-allowed;
         opacity: 0.9;
     }
@@ -791,9 +791,9 @@
     }
 
     .tray-cell.drop-valid {
-        border-color: rgba(23, 162, 184, 0.48);
-        box-shadow: inset 0 0 0 2px rgba(23, 162, 184, 0.12), 0 12px 24px rgba(23, 162, 184, 0.12);
-        background: linear-gradient(180deg, rgba(23, 162, 184, 0.12), rgba(23, 162, 184, 0.03));
+        border-color: color-mix(in srgb, var(--accent-color) 48%, transparent 52%);
+        box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-color) 12%, transparent 88%), 0 12px 24px color-mix(in srgb, var(--accent-color) 12%, transparent 88%);
+        background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 12%, transparent 88%), color-mix(in srgb, var(--accent-color) 3%, transparent 97%));
     }
 
     .tray-cell.drop-invalid {
@@ -838,11 +838,11 @@
     }
     
     .legend-stock {
-        background-color: rgba(40, 167, 69, 0.1);
+        background-color: color-mix(in srgb, var(--accent-color) 14%, transparent 86%);
     }
-    
+
     .legend-cross {
-        background-color: rgba(0, 123, 255, 0.1);
+        background-color: color-mix(in srgb, var(--accent-color) 30%, transparent 70%);
     }
     
     .legend-blocked {
@@ -856,27 +856,27 @@
     .item-list {
         max-height: 400px;
         overflow-y: auto;
-        border: 1px solid rgba(124, 100, 173, 0.12);
+        border: 1px solid var(--tray-border-soft);
         padding: 10px;
         border-radius: 16px;
-        background: rgba(248, 246, 252, 0.72);
+        background: var(--tray-soft-surface-muted);
     }
-    
+
     .drag-item {
-        border: 1px solid rgba(124, 100, 173, 0.14);
+        border: 1px solid var(--tray-border-soft);
         padding: 12px;
         margin-bottom: 10px;
         border-radius: 14px;
         cursor: grab;
-        background-color: rgba(255, 255, 255, 0.94);
+        background-color: var(--tray-soft-surface-strong);
         color: var(--text-color);
         transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
         font-size: 0.9em;
         box-shadow: 0 10px 20px rgba(90, 70, 127, 0.06);
     }
-    
+
     .drag-item:hover {
-        background-color: rgba(255, 255, 255, 1);
+        background-color: var(--card-bg);
         color: var(--text-color);
         transform: translateY(-2px);
         box-shadow: 0 14px 24px rgba(90, 70, 127, 0.1);
@@ -900,11 +900,11 @@
     }
     
     .stock-item {
-        border-left: 4px solid #28a745;
+        border-left: 4px solid color-mix(in srgb, var(--accent-color) 55%, transparent 45%);
     }
-    
+
     .cross-item {
-        border-left: 4px solid #007bff;
+        border-left: 4px solid var(--accent-color);
     }
     
     .item-header {
@@ -923,43 +923,43 @@
     }
     
     .drag-over {
-        border: 2px dashed var(--header-bg);
-        background-color: rgba(0, 123, 255, 0.1);
+        border: 2px dashed var(--accent-color);
+        background-color: color-mix(in srgb, var(--accent-color) 12%, transparent 88%);
     }
-    
+
     .add-item-list {
         max-height: 400px;
         overflow-y: auto;
-        border: 1px solid rgba(124, 100, 173, 0.12);
+        border: 1px solid color-mix(in srgb, var(--accent-color) 18%, var(--border-color) 82%);
         border-radius: 14px;
         font-size: 0.9em;
-        background: rgba(248, 246, 252, 0.72);
+        background: color-mix(in srgb, var(--bg-color) 72%, var(--card-bg) 28%);
     }
-    
+
     .add-item-option {
         padding: 10px;
         margin: 4px;
-        border: 1px solid rgba(124, 100, 173, 0.14);
+        border: 1px solid color-mix(in srgb, var(--accent-color) 18%, var(--border-color) 82%);
         border-radius: 12px;
         cursor: pointer;
         transition: all 0.2s;
-        background-color: rgba(255, 255, 255, 0.94);
+        background-color: color-mix(in srgb, var(--card-bg) 94%, white 6%);
         color: var(--text-color);
     }
-    
+
     .add-item-option:hover {
-        background-color: rgba(255, 255, 255, 1);
+        background-color: var(--card-bg);
         color: var(--text-color);
         transform: translateY(-2px);
         box-shadow: 0 12px 20px rgba(90, 70, 127, 0.08);
     }
-    
+
     .add-item-option.stock {
-        border-left: 4px solid #28a745;
+        border-left: 4px solid color-mix(in srgb, var(--accent-color) 55%, transparent 45%);
     }
-    
+
     .add-item-option.cross {
-        border-left: 4px solid #007bff;
+        border-left: 4px solid var(--accent-color);
     }
     
     .add-item-option .item-header {

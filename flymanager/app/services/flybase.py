@@ -3,6 +3,8 @@ from datetime import datetime
 from pathlib import Path
 
 from flymanager.app.services.bloomington import update_gene_collections
+from flymanager.app.services.standardization_backfill import (
+    backfill_cross_standardization_cache, backfill_stock_standardization_cache)
 from flymanager.utils.phenotypes.backfill import (
     backfill_cross_phenotype_cache, backfill_stock_phenotype_cache)
 from flymanager.utils.phenotypes.data.balancer_ingest import (
@@ -426,6 +428,15 @@ def refresh_flybase_reference_data(
                             force=True,
                         ),
                     }
+                    # Standardization summaries also derive from the FlyBase
+                    # reference data (aliases / canonical tokens), so force a
+                    # rebuild under the same flag to keep the reviewer current.
+                    backfill_stock_standardization_cache(
+                        db["stocks"], dry_run=False, force=True,
+                    )
+                    backfill_cross_standardization_cache(
+                        db["crosses"], dry_run=False, force=True,
+                    )
                 except Exception as exc:
                     app.logger.exception(
                         "[%s] FlyBase phenotype cache renewal failed during refresh",

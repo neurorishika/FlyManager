@@ -762,7 +762,7 @@ def test_standardization_reviewer_route_summarizes_stocks_and_cross_parents(monk
             "flymanager.app.routes.main.get_accessible_crosses",
             return_value=[cross_record],
         ), patch(
-            "flymanager.app.routes.main.review_stock_standardization",
+            "flymanager.app.services.stock_standardization.review_stock_standardization",
             side_effect=[
                 {"issue_count": 0, "summary": {}, "issues": []},
                 {
@@ -830,7 +830,7 @@ def test_standardization_reviewer_paginates_second_page(monkeypatch):
             "flymanager.app.routes.main.get_accessible_crosses",
             return_value=[],
         ), patch(
-            "flymanager.app.routes.main.review_stock_standardization",
+            "flymanager.app.services.stock_standardization.review_stock_standardization",
             return_value={"issue_count": 0, "summary": {}, "issues": []},
         ):
             response = client.get("/reviewer?page=2&per_page=20")

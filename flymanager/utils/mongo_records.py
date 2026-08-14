@@ -295,7 +295,24 @@ def apply_updates_to_owned_document(
     if not current_document:
         return False, None
 
-    timestamp = current_timestamp()
+    update_fields = build_owned_document_update_fields(
+        current_document, updates, log_activity=log_activity
+    )
+
+    result = collection.update_one(
+        {"UniqueID": uid, "User": user}, {"$set": update_fields}
+    )
+    return result.matched_count > 0, current_document
+
+
+def build_owned_document_update_fields(current_document, updates, *, log_activity=True, timestamp=None):
+    """Compute the ``$set`` fields for an owned-document update (no writes).
+
+    Pure helper shared by :func:`apply_updates_to_owned_document` and the
+    batched bulk-operation path so both build the ModificationLog /
+    DataModifiedDate bookkeeping identically.
+    """
+    timestamp = timestamp or current_timestamp()
     update_fields = dict(updates)
     modification_log_entries = _build_modification_log_entries(updates, timestamp)
 
@@ -309,10 +326,7 @@ def apply_updates_to_owned_document(
         )
         update_fields["DataModifiedDate"] = timestamp
 
-    result = collection.update_one(
-        {"UniqueID": uid, "User": user}, {"$set": update_fields}
-    )
-    return result.matched_count > 0, current_document
+    return update_fields
 
 
 def _normalize_flip_timestamp(timestamp, accept_datetime=False):

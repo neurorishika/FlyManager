@@ -61,7 +61,7 @@
 {% endif %}
 <div class="explorer-toolbar mb-3">
     <div class="app-toolbar">
-        <a href="{{ url_for('cross.add_cross') }}" class="btn btn-success">Add New Cross</a>
+        <a href="{{ url_for('cross.add_cross') }}" class="btn btn-primary">Add New Cross</a>
         <span class="explorer-results-meta">{% if pagination.total_items %}Showing {{ pagination.start_index }}-{{ pagination.end_index }} of {{ pagination.total_items }} cross{% if pagination.total_items != 1 %}es{% endif %}{% else %}0 crosses in view{% endif %}</span>
     </div>
     <div class="explorer-toolbar-controls">
@@ -389,9 +389,34 @@
 
 <form id="generateLabelsForm" method="post" action="{{ url_for('cross.generate_cross_labels') }}" target="_blank">
     <input type="hidden" name="selected_uids" id="selectedUids">
-    <input type="hidden" name="blank_spaces" id="blankSpaces">
     <input type="hidden" name="quantities" id="quantities">
 </form>
+
+<!-- Generate Labels Modal -->
+<div class="modal fade" id="labelOptionsModal" tabindex="-1" role="dialog" aria-labelledby="labelOptionsModalTitle" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="labelOptionsModalTitle">Generate Labels</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3"><strong id="labelItemCount">0</strong> item(s) from your cart will be included in this label run.</p>
+                <div class="form-group mb-0">
+                    <label for="blankSpaces">Blank label spaces</label>
+                    <input type="number" class="form-control" name="blank_spaces" id="blankSpaces" form="generateLabelsForm" value="0" min="0" max="200" step="1">
+                    <small class="form-text text-muted">Use this to leave unused labels at the top of the sheet before printing.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary" form="generateLabelsForm">Generate Labels</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Bulk Flip Modal -->
 <div class="modal fade" id="bulkFlipModal" tabindex="-1" role="dialog" aria-labelledby="bulkFlipModalLabel" aria-hidden="true">

@@ -2,6 +2,8 @@ from flask import (Blueprint, flash, jsonify, redirect, render_template,
                    request, session, url_for)
 
 from flymanager.app import db
+from flymanager.app.jobs import enqueue_job
+from flymanager.app.jobs import tasks as job_tasks
 from flymanager.app.routes.auth import login_required
 from flymanager.app.security import (get_json_payload, limiter,
                                      normalize_identifier_list,
@@ -343,57 +345,49 @@ def move_to_tray_route():
 @login_required
 @limiter.limit('20 per minute')
 def bulk_remove_from_tray():
-    """
-    Remove multiple items from their trays.
-    """
+    """Queues a background job that removes the selected items from their trays."""
     try:
         data = get_json_payload()
         item_type = normalize_optional_text(data.get('item_type'), field_name='Item type', max_length=16)
         unique_ids = normalize_identifier_list(data.get('uniqueIDs', []), field_name='uniqueIDs')
     except ValueError as exc:
-        return jsonify({"success": False, "message": str(exc)})
+        return jsonify({"success": False, "queued": False, "message": str(exc)}), 400
     if item_type not in {'stock', 'cross'}:
-        return jsonify({"success": False, "message": "Invalid item type"})
-    
-    user = session.get('username')
-    success_count = 0
+        return jsonify({"success": False, "queued": False, "message": "Invalid item type"}), 400
+    if not unique_ids:
+        return jsonify({"success": False, "queued": False, "message": "No items selected."}), 400
 
+    user = session.get('username')
+    key = f"bulk-remove-from-tray:user:{user}"
     try:
-        with hold_operation_locks(
+        enqueue_job(
             db,
-            keys=record_operation_lock_keys(unique_ids),
+            key=key,
             actor=user,
-            label="Bulk remove from tray",
-            ttl_seconds=900,
+            label=f"Bulk remove from tray ({len(unique_ids)} items)",
+            func=job_tasks.task_bulk_remove_from_tray,
+            kwargs={
+                "key": key,
+                "username": user,
+                "item_type": item_type,
+                "uids": unique_ids,
+            },
+            ttl_seconds=1800,
             metadata={"route": "bulk_remove_from_tray", "uid_count": len(unique_ids), "item_type": item_type},
-            conflict_message="Another request is already updating one or more selected records. Please wait for it to finish before retrying the tray removal.",
-        ):
-            for item_id in unique_ids:
-                if move_item_to_tray(user, item_type, item_id, '', '', db):
-                    success_count += 1
-    except OperationLockConflict as exc:
-        return jsonify({"success": False, "message": str(exc), "results": {"success": [], "failed": unique_ids}}), 409
-    
-    if success_count > 0:
-        write_activity(
-            user,
-            f"Bulk removed {success_count} {item_type}s from trays",
-            db
+            conflict_message="A tray removal for you is already running. Please wait for it to finish before starting another.",
         )
-        message = f"Successfully removed {success_count} out of {len(unique_ids)} items from trays"
-        return jsonify({
+    except OperationLockConflict as exc:
+        return jsonify({"success": False, "queued": False, "message": str(exc)}), 409
+
+    return (
+        jsonify({
             "success": True,
-            "message": message,
-            "results": {
-                "success": unique_ids[:success_count],
-                "failed": unique_ids[success_count:]
-            }
-        })
-    else:
-        return jsonify({
-            "success": False,
-            "message": "Failed to remove any items from trays"
-        })
+            "queued": True,
+            "job": key,
+            "message": f"Removing {len(unique_ids)} item{'s' if len(unique_ids) != 1 else ''} from trays in the background. Watch the jobs banner for progress.",
+        }),
+        202,
+    )
 
 # API endpoint to get tray occupancy data for the UI
 @bp.route('/api/tray/<tray_id>/occupancy')

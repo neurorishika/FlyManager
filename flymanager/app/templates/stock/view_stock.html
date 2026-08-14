@@ -548,6 +548,10 @@
         <div id="standardizationReviewPanel" class="stock-review-panel is-hidden"></div>
     </div>
 
+    <form id="refreshStockPhenotypeForm" method="POST" action="{{ url_for('stock.refresh_stock_phenotype', unique_id=stock_data.uniqueID) }}" data-progress-form data-progress-message="Refreshing this stock phenotype cache..." data-progress-duplicate-message="This stock phenotype refresh is already in progress." data-progress-label="Refreshing...">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+
     <form id="stockViewForm" method="POST" action="{{ url_for('stock.view_stock', unique_id=stock_data.uniqueID) }}" class="app-form-shell stock-view-form">
         <div class="app-form-section">
             <div>
@@ -640,10 +644,7 @@
             </div>
             <div class="app-toolbar">
                 <span class="stock-phenotype-pill">{% if stock_phenotype.is_cached %}Cached {{ stock_phenotype.cached_at }}{% else %}Cache missing{% endif %}</span>
-                <form method="POST" action="{{ url_for('stock.refresh_stock_phenotype', unique_id=stock_data.uniqueID) }}" data-progress-form data-progress-message="Refreshing this stock phenotype cache..." data-progress-duplicate-message="This stock phenotype refresh is already in progress." data-progress-label="Refreshing...">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-outline-secondary btn-sm">Refresh Cache</button>
-                </form>
+                <button type="submit" form="refreshStockPhenotypeForm" class="btn btn-outline-secondary btn-sm">Refresh Cache</button>
             </div>
             <div class="app-detail-grid">
                 <div class="span-12 app-view-field stock-phenotype-summary">

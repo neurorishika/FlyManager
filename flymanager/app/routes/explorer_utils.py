@@ -80,6 +80,27 @@ def get_explorer_pagination_state(*, session_key, default_per_page="20"):
     }
 
 
+def _build_page_display(total_pages, current_page):
+    """Build a compact pagination display: 1,2,3 ... current ... N-2,N-1,N.
+
+    The first three and last three pages are always shown; the current page
+    is inserted in between (with an ellipsis on each side) when it does not
+    already fall within those edge groups.
+    """
+    pages = set(range(1, min(3, total_pages) + 1))
+    pages.update(range(max(1, total_pages - 2), total_pages + 1))
+    pages.add(current_page)
+
+    display = []
+    previous_page = None
+    for page_number in sorted(pages):
+        if previous_page is not None and page_number - previous_page > 1:
+            display.append({"type": "ellipsis"})
+        display.append({"type": "page", "value": page_number})
+        previous_page = page_number
+    return display
+
+
 def paginate_explorer_records(records, *, page, per_page, per_page_value):
     total_items = len(records)
 
@@ -100,7 +121,7 @@ def paginate_explorer_records(records, *, page, per_page, per_page_value):
             "has_next": False,
             "previous_page": None,
             "next_page": None,
-            "page_numbers": [1],
+            "page_numbers": [{"type": "page", "value": 1}],
             "is_all": True,
         }
 
@@ -111,9 +132,6 @@ def paginate_explorer_records(records, *, page, per_page, per_page_value):
     items = list(records[start_offset:end_offset])
     start_index = start_offset + 1 if total_items else 0
     end_index = start_offset + len(items)
-    page_start = max(1, current_page - 2)
-    page_end = min(total_pages, current_page + 2)
-
     return {
         "items": items,
         "page": current_page,
@@ -129,7 +147,7 @@ def paginate_explorer_records(records, *, page, per_page, per_page_value):
         "has_next": current_page < total_pages,
         "previous_page": current_page - 1 if current_page > 1 else None,
         "next_page": current_page + 1 if current_page < total_pages else None,
-        "page_numbers": list(range(page_start, page_end + 1)),
+        "page_numbers": _build_page_display(total_pages, current_page),
         "is_all": False,
     }
 

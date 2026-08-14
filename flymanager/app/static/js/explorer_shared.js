@@ -1403,19 +1403,23 @@
                         return;
                     }
 
-                    const blankSpaces = prompt('How many blank spaces should be left?');
-                    if (blankSpaces !== null) {
-                        document.getElementById('selectedUids').value = cart.map(function(item) {
-                            return item.uid;
-                        }).join(',');
-                        document.getElementById('blankSpaces').value = blankSpaces;
-                        document.getElementById('quantities').value = cart.map(function(item) {
-                            return item.quantity;
-                        }).join(',');
-                        document.getElementById('generateLabelsForm').submit();
+                    document.getElementById('selectedUids').value = cart.map(function(item) {
+                        return item.uid;
+                    }).join(',');
+                    document.getElementById('quantities').value = cart.map(function(item) {
+                        return item.quantity;
+                    }).join(',');
+
+                    const blankSpacesInput = document.getElementById('blankSpaces');
+                    if (blankSpacesInput) {
+                        blankSpacesInput.value = '0';
+                    }
+                    const countNode = document.getElementById('labelItemCount');
+                    if (countNode) {
+                        countNode.textContent = cart.length;
                     }
 
-                    emptyCart();
+                    $('#labelOptionsModal').modal('show');
                 });
             }
 
@@ -1466,14 +1470,15 @@
                     })
                         .then(function(data) {
                             $('#bulkFlipModal').modal('hide');
-                            if (data.results && data.results.success && data.results.success.length > 0) {
-                                emptyCart();
-                            }
-                            finishBulkOperation(data.message || 'Bulk flip completed.', 'success');
+                            // The flip now runs as a background job; the cart is
+                            // emptied optimistically and the jobs banner reports
+                            // progress and toasts on completion.
+                            emptyCart();
+                            finishBulkOperation(data.message || 'Bulk flip started in the background.', 'success');
                         })
                         .catch(function(error) {
                             console.error('Error during bulk flip:', error);
-                            finishBulkOperation(error.message || 'Error occurred during bulk flip operation.', 'error', true);
+                            finishBulkOperation(error.message || 'Error occurred while starting the bulk flip.', 'error', true);
                         });
                 });
             }
@@ -1512,14 +1517,14 @@
                         status: status,
                     })
                         .then(function(data) {
-                            if (data.results && data.results.success && data.results.success.length > 0) {
-                                emptyCart();
-                            }
-                            finishBulkOperation(data.message || 'Bulk status change completed.', 'success');
+                            // Runs as a background job now; empty the cart
+                            // optimistically and let the jobs banner report on it.
+                            emptyCart();
+                            finishBulkOperation(data.message || 'Bulk status change started in the background.', 'success');
                         })
                         .catch(function(error) {
                             console.error('Error during bulk status change:', error);
-                            finishBulkOperation(error.message || 'Error occurred during bulk status change operation.', 'error', true);
+                            finishBulkOperation(error.message || 'Error occurred while starting the bulk status change.', 'error', true);
                         });
                 });
             });
@@ -1552,15 +1557,16 @@
                         }),
                     })
                         .then(function(data) {
-                            if (data.results && data.results.success && data.results.success.length > 0) {
-                                emptyCart();
-                            }
-                            finishBulkOperation(data.message || 'Tray removal completed.', 'success', true);
-                            window.location.reload();
+                            // Runs as a background job now; empty the cart
+                            // optimistically. The page is not reloaded immediately
+                            // because the removal completes asynchronously - the
+                            // jobs banner toasts when it finishes.
+                            emptyCart();
+                            finishBulkOperation(data.message || 'Tray removal started in the background.', 'success', true);
                         })
                         .catch(function(error) {
                             console.error('Error during bulk remove from tray:', error);
-                            finishBulkOperation(error.message || 'Error occurred during bulk remove from tray operation.', 'error', true);
+                            finishBulkOperation(error.message || 'Error occurred while starting the bulk remove from tray.', 'error', true);
                         });
                 });
             }

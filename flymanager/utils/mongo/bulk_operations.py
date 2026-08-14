@@ -1,0 +1,265 @@
+"""Batched implementations of the explorer bulk actions (flip / status change /
+remove-from-tray).
+
+The per-item routes used to issue roughly a dozen MongoDB round-trips *per
+selected record* (accessibility lookups against both collections, a flip
+write, a vial-refresh write, an activity insert, ...). At tens or hundreds of
+selected records that serialised into tens of seconds and blew the request
+timeout.
+
+These functions collapse the work into a handful of round-trips regardless of
+selection size:
+
+* one ``$in`` read per collection to resolve accessible records,
+* the field math computed in memory reusing the exact same pure helpers the
+  single-item path uses (so the resulting documents are identical), and
+* a single ``bulk_write`` per collection plus one ``insert_many`` for the
+  activity log.
+
+They contain no request/response or job concerns and are safe to call from a
+background worker task.
+"""
+import datetime
+
+from pymongo import UpdateOne
+
+from flymanager.app.settings import (DEFAULT_CROSS_PROPERTY_VALUES,
+                                     DEFAULT_STOCK_PROPERTY_VALUES,
+                                     REQUIRED_CROSS_PROPERTIES,
+                                     REQUIRED_STOCK_PROPERTIES)
+from flymanager.utils.mongo.crosses import compute_cross_vial_properties
+from flymanager.utils.mongo.stocks import compute_stock_vial_properties
+from flymanager.utils.mongo.trays import move_item_to_tray
+from flymanager.utils.mongo_records import (_build_flip_update_fields,
+                                            _normalize_flip_timestamp,
+                                            build_owned_document_update_fields,
+                                            get_missing_required_updates)
+
+
+def _accessible_map(collection, user, uids):
+    """Resolve which of ``uids`` are accessible in ``collection`` for ``user``.
+
+    Mirrors the priority in :func:`get_accessible_document`: a record the user
+    owns wins over one merely assigned to them. Two batched reads at most.
+    """
+    owned = {
+        document["UniqueID"]: document
+        for document in collection.find({"UniqueID": {"$in": uids}, "User": user})
+    }
+    remaining = [uid for uid in uids if uid not in owned]
+    if remaining:
+        for document in collection.find(
+            {"UniqueID": {"$in": remaining}, "AssignedTo": user}
+        ):
+            owned.setdefault(document["UniqueID"], document)
+    return owned
+
+
+def _activity_document(user, activity):
+    """Build one activity-log document identical to :func:`write_activity`."""
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    return {"user": user, "timestamp": timestamp, "activity": activity}
+
+
+def _compute_flip_set(document, normalized_timestamp, new_status, comment,
+                      vial_properties_fn, required_properties, default_values):
+    """Compute the merged ``$set`` for flipping one record.
+
+    Equivalent to ``flip_owned_document`` followed by ``update_*_vials`` for the
+    common (existing-vials) case: apply the flip fields to an in-memory copy,
+    fill any missing required defaults, then overlay the recomputed vial
+    timeline - vial fields win, exactly as the sequential writes ordered them.
+    """
+    flip_fields = _build_flip_update_fields(
+        document,
+        normalized_timestamp,
+        new_status=new_status,
+        added_comment=comment or None,
+    )
+    flipped = {**document, **flip_fields}
+    default_updates = get_missing_required_updates(
+        flipped, required_properties, default_values
+    )
+    working = {**flipped, **default_updates}
+    vial_properties, _refresh_vials = vial_properties_fn(working)
+    return {**flip_fields, **default_updates, **vial_properties}
+
+
+def bulk_flip_records(user, uids, db, flip_time, *, new_status=None, comment="",
+                      progress_cb=None):
+    """Flip many stocks/crosses in a batched, timeout-resistant way.
+
+    Returns ``{"success": [...], "failed": [...]}`` matching the shape the old
+    inline route produced.
+    """
+    normalized_timestamp = _normalize_flip_timestamp(flip_time, accept_datetime=True)
+
+    results = {"success": [], "failed": []}
+    stock_map = _accessible_map(db["stocks"], user, uids)
+    cross_map = _accessible_map(db["crosses"], user, uids)
+
+    stock_ops = []
+    cross_ops = []
+    activity_documents = []
+    total = len(uids)
+
+    for index, uid in enumerate(uids):
+        try:
+            if uid in stock_map:
+                document = stock_map[uid]
+                update_set = _compute_flip_set(
+                    document, normalized_timestamp, new_status, comment,
+                    compute_stock_vial_properties,
+                    REQUIRED_STOCK_PROPERTIES, DEFAULT_STOCK_PROPERTY_VALUES,
+                )
+                stock_ops.append(
+                    UpdateOne(
+                        {"UniqueID": uid, "User": document["User"]},
+                        {"$set": update_set},
+                    )
+                )
+                activity_documents.append(
+                    _activity_document(user, f"Flipped stock {uid} (bulk operation)")
+                )
+                results["success"].append({"uid": uid, "type": "Stock"})
+            elif uid in cross_map:
+                document = cross_map[uid]
+                update_set = _compute_flip_set(
+                    document, normalized_timestamp, new_status, comment,
+                    compute_cross_vial_properties,
+                    REQUIRED_CROSS_PROPERTIES, DEFAULT_CROSS_PROPERTY_VALUES,
+                )
+                cross_ops.append(
+                    UpdateOne(
+                        {"UniqueID": uid, "User": document["User"]},
+                        {"$set": update_set},
+                    )
+                )
+                activity_documents.append(
+                    _activity_document(user, f"Flipped cross {uid} (bulk operation)")
+                )
+                results["success"].append({"uid": uid, "type": "Cross"})
+            else:
+                results["failed"].append(
+                    {"uid": uid, "reason": "UID not recognized for this user."}
+                )
+        except Exception as exc:  # noqa: BLE001 - per-record isolation, matches old route
+            results["failed"].append({"uid": uid, "reason": str(exc)})
+
+        if progress_cb is not None:
+            progress_cb(index + 1, total)
+
+    if stock_ops:
+        db["stocks"].bulk_write(stock_ops, ordered=False)
+    if cross_ops:
+        db["crosses"].bulk_write(cross_ops, ordered=False)
+    if activity_documents:
+        db["activity"].insert_many(activity_documents)
+
+    return results
+
+
+def bulk_change_status_records(user, uids, db, status, *, comment=None,
+                               progress_cb=None):
+    """Change the status (and optionally append a comment) on many records."""
+    results = {"success": [], "failed": []}
+    stock_map = _accessible_map(db["stocks"], user, uids)
+    cross_map = _accessible_map(db["crosses"], user, uids)
+
+    stock_ops = []
+    cross_ops = []
+    activity_documents = []
+    total = len(uids)
+
+    for index, uid in enumerate(uids):
+        try:
+            if uid in stock_map:
+                document = stock_map[uid]
+                updates = _status_updates(document, status, comment)
+                update_set = build_owned_document_update_fields(document, updates)
+                stock_ops.append(
+                    UpdateOne(
+                        {"UniqueID": uid, "User": document["User"]},
+                        {"$set": update_set},
+                    )
+                )
+                activity_documents.append(
+                    _activity_document(
+                        user,
+                        f"Changed status of stock {uid} to {status} (bulk operation)",
+                    )
+                )
+                results["success"].append({"uid": uid, "type": "Stock"})
+            elif uid in cross_map:
+                document = cross_map[uid]
+                updates = _status_updates(document, status, comment)
+                update_set = build_owned_document_update_fields(document, updates)
+                cross_ops.append(
+                    UpdateOne(
+                        {"UniqueID": uid, "User": document["User"]},
+                        {"$set": update_set},
+                    )
+                )
+                activity_documents.append(
+                    _activity_document(
+                        user,
+                        f"Changed status of cross {uid} to {status} (bulk operation)",
+                    )
+                )
+                results["success"].append({"uid": uid, "type": "Cross"})
+            else:
+                results["failed"].append(
+                    {"uid": uid, "reason": "UID not recognized for this user."}
+                )
+        except Exception as exc:  # noqa: BLE001 - per-record isolation, matches old route
+            results["failed"].append({"uid": uid, "reason": str(exc)})
+
+        if progress_cb is not None:
+            progress_cb(index + 1, total)
+
+    if stock_ops:
+        db["stocks"].bulk_write(stock_ops, ordered=False)
+    if cross_ops:
+        db["crosses"].bulk_write(cross_ops, ordered=False)
+    if activity_documents:
+        db["activity"].insert_many(activity_documents)
+
+    return results
+
+
+def _status_updates(document, status, comment):
+    updates = {"Status": status}
+    if comment:
+        existing_comments = str(document.get("Comments", "") or "").strip()
+        updates["Comments"] = (
+            f"{comment}; {existing_comments}" if existing_comments else comment
+        )
+    return updates
+
+
+def bulk_remove_from_tray_records(user, item_type, uids, db, *, progress_cb=None):
+    """Remove many items from their trays.
+
+    Tray removal also refreshes vials (via ``edit_stock``/``edit_cross``), so
+    this preserves that exact per-item behaviour through ``move_item_to_tray``
+    rather than reimplementing it - the win here is running off the request
+    thread in a background job, not collapsing the writes.
+    """
+    results = {"success": [], "failed": []}
+    total = len(uids)
+
+    for index, uid in enumerate(uids):
+        try:
+            if move_item_to_tray(user, item_type, uid, "", "", db):
+                results["success"].append({"uid": uid, "type": item_type})
+            else:
+                results["failed"].append(
+                    {"uid": uid, "reason": "Item not found or could not be removed."}
+                )
+        except Exception as exc:  # noqa: BLE001 - per-record isolation
+            results["failed"].append({"uid": uid, "reason": str(exc)})
+
+        if progress_cb is not None:
+            progress_cb(index + 1, total)
+
+    return results

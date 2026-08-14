@@ -91,8 +91,8 @@
         gap: 8px;
         padding: 0.5rem 0.8rem;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.62);
-        border: 1px solid rgba(255, 255, 255, 0.72);
+        background: color-mix(in srgb, var(--card-bg) 80%, white 20%);
+        border: 1px solid color-mix(in srgb, var(--header-bg) 14%, var(--border-color) 86%);
         color: var(--text-color);
         font-size: var(--font-size-sm);
         font-weight: 600;
@@ -245,9 +245,17 @@
         font-size: 1rem;
     }
 
+    .action-card,
+    .action-card:visited,
+    .action-card:hover,
+    .action-card:focus {
+        color: var(--text-color);
+    }
+
     .action-card strong {
         font-size: 1rem;
         line-height: 1.2;
+        color: var(--text-color);
     }
 
     .action-card span {
@@ -1193,6 +1201,7 @@
 </style>
 {% endblock %}
 
+{% from '_pagination_macro.html' import render_pagination %}
 {% block content %}
 <div class="dashboard-shell">
     <section class="dashboard-hero">
@@ -1489,7 +1498,7 @@
                         <span class="suggestion-icon"><i class="{{ suggestion.icon }}"></i></span>
                         <div>
                             <h4>{{ suggestion.title }}</h4>
-                            <p>{{ suggestion.copy }}</p>
+                            <p>{{ suggestion['copy'] }}</p>
                         </div>
                         <div>
                             <a href="{{ suggestion.href }}" class="btn btn-outline-primary btn-sm">{{ suggestion.label }}</a>
@@ -1578,32 +1587,9 @@
                         Showing {{ attention_pagination.start_index }}-{{ attention_pagination.end_index }} of {{ attention_pagination.total_items }} items
                     </div>
                     {% if attention_pagination.total_pages > 1 %}
+                    {% macro attention_page_href(page_number) %}{{ url_for('main.home', attention_filter=attention_filter, attention_page=page_number, schedule_page=schedule_pagination.page, upcoming_page=upcoming_schedule_pagination.page, activity_page=activity_pagination.page) }}#attention-board{% endmacro %}
                     <nav class="panel-pagination-nav" aria-label="Attention board pages">
-                        <ul class="pagination pagination-sm">
-                            <li class="page-item {% if not attention_pagination.has_previous %}disabled{% endif %}">
-                                {% if attention_pagination.has_previous %}
-                                <a class="page-link" href="{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.previous_page, schedule_page=schedule_pagination.page, upcoming_page=upcoming_schedule_pagination.page, activity_page=activity_pagination.page) }}#attention-board">Previous</a>
-                                {% else %}
-                                <span class="page-link">Previous</span>
-                                {% endif %}
-                            </li>
-                            {% for page_number in attention_pagination.page_numbers %}
-                            <li class="page-item {% if page_number == attention_pagination.page %}active{% endif %}">
-                                {% if page_number == attention_pagination.page %}
-                                <span class="page-link">{{ page_number }}</span>
-                                {% else %}
-                                <a class="page-link" href="{{ url_for('main.home', attention_filter=attention_filter, attention_page=page_number, schedule_page=schedule_pagination.page, upcoming_page=upcoming_schedule_pagination.page, activity_page=activity_pagination.page) }}#attention-board">{{ page_number }}</a>
-                                {% endif %}
-                            </li>
-                            {% endfor %}
-                            <li class="page-item {% if not attention_pagination.has_next %}disabled{% endif %}">
-                                {% if attention_pagination.has_next %}
-                                <a class="page-link" href="{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.next_page, schedule_page=schedule_pagination.page, upcoming_page=upcoming_schedule_pagination.page, activity_page=activity_pagination.page) }}#attention-board">Next</a>
-                                {% else %}
-                                <span class="page-link">Next</span>
-                                {% endif %}
-                            </li>
-                        </ul>
+                        {{ render_pagination(attention_pagination, attention_page_href) }}
                     </nav>
                     {% endif %}
                 </div>
@@ -1688,32 +1674,9 @@
                         Showing {{ schedule_pagination.start_index }}-{{ schedule_pagination.end_index }} of {{ schedule_pagination.total_items }} scheduled items
                     </div>
                     {% if schedule_pagination.total_pages > 1 %}
+                    {% macro schedule_page_href(page_number) %}{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.page, schedule_page=page_number, upcoming_page=upcoming_schedule_pagination.page, activity_page=activity_pagination.page) }}#todays-schedule{% endmacro %}
                     <nav class="panel-pagination-nav" aria-label="Today's schedule pages">
-                        <ul class="pagination pagination-sm">
-                            <li class="page-item {% if not schedule_pagination.has_previous %}disabled{% endif %}">
-                                {% if schedule_pagination.has_previous %}
-                                <a class="page-link" href="{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.page, schedule_page=schedule_pagination.previous_page, upcoming_page=upcoming_schedule_pagination.page, activity_page=activity_pagination.page) }}#todays-schedule">Previous</a>
-                                {% else %}
-                                <span class="page-link">Previous</span>
-                                {% endif %}
-                            </li>
-                            {% for page_number in schedule_pagination.page_numbers %}
-                            <li class="page-item {% if page_number == schedule_pagination.page %}active{% endif %}">
-                                {% if page_number == schedule_pagination.page %}
-                                <span class="page-link">{{ page_number }}</span>
-                                {% else %}
-                                <a class="page-link" href="{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.page, schedule_page=page_number, upcoming_page=upcoming_schedule_pagination.page, activity_page=activity_pagination.page) }}#todays-schedule">{{ page_number }}</a>
-                                {% endif %}
-                            </li>
-                            {% endfor %}
-                            <li class="page-item {% if not schedule_pagination.has_next %}disabled{% endif %}">
-                                {% if schedule_pagination.has_next %}
-                                <a class="page-link" href="{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.page, schedule_page=schedule_pagination.next_page, upcoming_page=upcoming_schedule_pagination.page, activity_page=activity_pagination.page) }}#todays-schedule">Next</a>
-                                {% else %}
-                                <span class="page-link">Next</span>
-                                {% endif %}
-                            </li>
-                        </ul>
+                        {{ render_pagination(schedule_pagination, schedule_page_href) }}
                     </nav>
                     {% endif %}
                 </div>
@@ -1755,32 +1718,9 @@
                         Showing {{ upcoming_schedule_pagination.start_index }}-{{ upcoming_schedule_pagination.end_index }} of {{ upcoming_schedule_pagination.total_items }} upcoming days
                     </div>
                     {% if upcoming_schedule_pagination.total_pages > 1 %}
+                    {% macro upcoming_schedule_page_href(page_number) %}{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.page, schedule_page=schedule_pagination.page, upcoming_page=page_number, activity_page=activity_pagination.page) }}#upcoming-schedule{% endmacro %}
                     <nav class="panel-pagination-nav" aria-label="Upcoming schedule pages">
-                        <ul class="pagination pagination-sm">
-                            <li class="page-item {% if not upcoming_schedule_pagination.has_previous %}disabled{% endif %}">
-                                {% if upcoming_schedule_pagination.has_previous %}
-                                <a class="page-link" href="{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.page, schedule_page=schedule_pagination.page, upcoming_page=upcoming_schedule_pagination.previous_page, activity_page=activity_pagination.page) }}#upcoming-schedule">Previous</a>
-                                {% else %}
-                                <span class="page-link">Previous</span>
-                                {% endif %}
-                            </li>
-                            {% for page_number in upcoming_schedule_pagination.page_numbers %}
-                            <li class="page-item {% if page_number == upcoming_schedule_pagination.page %}active{% endif %}">
-                                {% if page_number == upcoming_schedule_pagination.page %}
-                                <span class="page-link">{{ page_number }}</span>
-                                {% else %}
-                                <a class="page-link" href="{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.page, schedule_page=schedule_pagination.page, upcoming_page=page_number, activity_page=activity_pagination.page) }}#upcoming-schedule">{{ page_number }}</a>
-                                {% endif %}
-                            </li>
-                            {% endfor %}
-                            <li class="page-item {% if not upcoming_schedule_pagination.has_next %}disabled{% endif %}">
-                                {% if upcoming_schedule_pagination.has_next %}
-                                <a class="page-link" href="{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.page, schedule_page=schedule_pagination.page, upcoming_page=upcoming_schedule_pagination.next_page, activity_page=activity_pagination.page) }}#upcoming-schedule">Next</a>
-                                {% else %}
-                                <span class="page-link">Next</span>
-                                {% endif %}
-                            </li>
-                        </ul>
+                        {{ render_pagination(upcoming_schedule_pagination, upcoming_schedule_page_href) }}
                     </nav>
                     {% endif %}
                 </div>
@@ -1820,32 +1760,9 @@
                         Showing {{ activity_pagination.start_index }}-{{ activity_pagination.end_index }} of {{ activity_pagination.total_items }} activity days
                     </div>
                     {% if activity_pagination.total_pages > 1 %}
+                    {% macro activity_page_href(page_number) %}{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.page, schedule_page=schedule_pagination.page, upcoming_page=upcoming_schedule_pagination.page, activity_page=page_number) }}#recent-activity{% endmacro %}
                     <nav class="panel-pagination-nav" aria-label="Recent activity pages">
-                        <ul class="pagination pagination-sm">
-                            <li class="page-item {% if not activity_pagination.has_previous %}disabled{% endif %}">
-                                {% if activity_pagination.has_previous %}
-                                <a class="page-link" href="{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.page, schedule_page=schedule_pagination.page, upcoming_page=upcoming_schedule_pagination.page, activity_page=activity_pagination.previous_page) }}#recent-activity">Previous</a>
-                                {% else %}
-                                <span class="page-link">Previous</span>
-                                {% endif %}
-                            </li>
-                            {% for page_number in activity_pagination.page_numbers %}
-                            <li class="page-item {% if page_number == activity_pagination.page %}active{% endif %}">
-                                {% if page_number == activity_pagination.page %}
-                                <span class="page-link">{{ page_number }}</span>
-                                {% else %}
-                                <a class="page-link" href="{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.page, schedule_page=schedule_pagination.page, upcoming_page=upcoming_schedule_pagination.page, activity_page=page_number) }}#recent-activity">{{ page_number }}</a>
-                                {% endif %}
-                            </li>
-                            {% endfor %}
-                            <li class="page-item {% if not activity_pagination.has_next %}disabled{% endif %}">
-                                {% if activity_pagination.has_next %}
-                                <a class="page-link" href="{{ url_for('main.home', attention_filter=attention_filter, attention_page=attention_pagination.page, schedule_page=schedule_pagination.page, upcoming_page=upcoming_schedule_pagination.page, activity_page=activity_pagination.next_page) }}#recent-activity">Next</a>
-                                {% else %}
-                                <span class="page-link">Next</span>
-                                {% endif %}
-                            </li>
-                        </ul>
+                        {{ render_pagination(activity_pagination, activity_page_href) }}
                     </nav>
                     {% endif %}
                 </div>

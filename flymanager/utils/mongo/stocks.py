@@ -19,6 +19,15 @@ from flymanager.utils.mongo_records import (apply_updates_to_owned_document,
 from flymanager.utils.phenotypes.predictor import build_stock_phenotype_cache
 
 
+def build_stock_standardization_cache(genotype):
+    # Imported lazily: the standardization service lives under
+    # ``flymanager.app.services`` and importing it at module load would pull the
+    # app package in during MongoDB bootstrap, creating a circular import.
+    from flymanager.app.services.stock_standardization import \
+        build_stock_standardization_cache as _build
+    return _build(genotype)
+
+
 def add_to_stock(user, properties, db):
     """
     Add a stock to the user's stock collection in MongoDB.
@@ -72,6 +81,7 @@ def add_to_stock(user, properties, db):
         base_document={
             "Genotype": genotype,
             "PhenotypeCache": build_stock_phenotype_cache(genotype),
+            "StandardizationCache": build_stock_standardization_cache(genotype),
             "Name": properties["Name"],
             "TrayID": "",
             "TrayPosition": "",
@@ -194,6 +204,9 @@ def edit_stock(user, uid, db, updates, log_activity=True, refresh_vials=True):
         prepared_updates["PhenotypeCache"] = build_stock_phenotype_cache(
             prepared_updates["Genotype"]
         )
+        prepared_updates["StandardizationCache"] = build_stock_standardization_cache(
+            prepared_updates["Genotype"]
+        )
 
     success, current_stock = apply_updates_to_owned_document(
         "stocks",
@@ -239,6 +252,30 @@ def update_stock_vials(stock, username, db):
             print(f"Failed to update stock {uid} with default values")
             return False
 
+    vial_update_properties, refresh_vials = compute_stock_vial_properties(stock)
+
+    success = edit_stock(
+        username,
+        uid,
+        db,
+        vial_update_properties,
+        log_activity=False,
+        refresh_vials=refresh_vials,
+    )
+    return success
+
+
+def compute_stock_vial_properties(stock):
+    """Compute the vial-refresh field updates for a stock (no database writes).
+
+    Pure companion to :func:`update_stock_vials`: given a stock document, it
+    returns ``(update_properties, refresh_vials)`` where ``update_properties``
+    are the ``$set`` fields describing the refreshed vial timeline and
+    ``refresh_vials`` mirrors the recursive-refresh flag the writer path uses.
+
+    Factored out so the single-item flip path and the batched bulk flip path
+    share one implementation of the vial math and cannot drift apart.
+    """
     flip_frequency = float(stock["FlipFrequency"])
     developmental_time = float(stock["DevelopmentalTime"])
     vial_lifetime = float(stock["VialLifetime"])
@@ -288,12 +325,4 @@ def update_stock_vials(stock, username, db):
         flip_log=timeline.get("flip_log"),
     )
 
-    success = edit_stock(
-        username,
-        uid,
-        db,
-        update_properties,
-        log_activity=False,
-        refresh_vials=refresh_vials,
-    )
-    return success
+    return update_properties, refresh_vials

@@ -6,6 +6,8 @@ import os
 from dotenv import load_dotenv
 from pymongo import MongoClient
 
+from flymanager.app.services.standardization_backfill import (
+    backfill_cross_standardization_cache, backfill_stock_standardization_cache)
 from flymanager.utils.phenotypes.backfill import (
     backfill_cross_phenotype_cache, backfill_stock_phenotype_cache)
 
@@ -71,6 +73,16 @@ def _build_argument_parser():
         action="store_true",
         help="Rebuild caches even when a valid cache is already present.",
     )
+    parser.add_argument(
+        "--phenotype",
+        action="store_true",
+        help="Backfill phenotype caches. Defaults on when no cache type is selected.",
+    )
+    parser.add_argument(
+        "--standardization",
+        action="store_true",
+        help="Backfill standardization caches. Defaults on when no cache type is selected.",
+    )
     return parser
 
 
@@ -87,6 +99,8 @@ def main():
 
     run_stocks = args.stocks or not (args.stocks or args.crosses)
     run_crosses = args.crosses or not (args.stocks or args.crosses)
+    run_phenotype = args.phenotype or not (args.phenotype or args.standardization)
+    run_standardization = args.standardization or not (args.phenotype or args.standardization)
 
     client = create_mongo_client()
     try:
@@ -94,23 +108,34 @@ def main():
         if not ping_database(db):
             parser.error("Could not connect to the configured MongoDB database.")
 
-        if run_stocks:
-            stock_summary = backfill_stock_phenotype_cache(
-                db["stocks"],
-                users=args.users,
-                dry_run=args.dry_run,
-                force=args.force,
+        cache_backfills = []
+        if run_phenotype:
+            cache_backfills.append(
+                ("phenotype", backfill_stock_phenotype_cache, backfill_cross_phenotype_cache)
             )
-            _print_summary("stocks", stock_summary, dry_run=args.dry_run)
+        if run_standardization:
+            cache_backfills.append(
+                ("standardization", backfill_stock_standardization_cache, backfill_cross_standardization_cache)
+            )
 
-        if run_crosses:
-            cross_summary = backfill_cross_phenotype_cache(
-                db["crosses"],
-                users=args.users,
-                dry_run=args.dry_run,
-                force=args.force,
-            )
-            _print_summary("crosses", cross_summary, dry_run=args.dry_run)
+        for cache_label, stock_backfill, cross_backfill in cache_backfills:
+            if run_stocks:
+                stock_summary = stock_backfill(
+                    db["stocks"],
+                    users=args.users,
+                    dry_run=args.dry_run,
+                    force=args.force,
+                )
+                _print_summary(f"stocks/{cache_label}", stock_summary, dry_run=args.dry_run)
+
+            if run_crosses:
+                cross_summary = cross_backfill(
+                    db["crosses"],
+                    users=args.users,
+                    dry_run=args.dry_run,
+                    force=args.force,
+                )
+                _print_summary(f"crosses/{cache_label}", cross_summary, dry_run=args.dry_run)
 
     finally:
         client.close()

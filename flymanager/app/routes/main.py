@@ -12,8 +12,9 @@ from flymanager.app.routes.explorer_utils import (
 from flymanager.app.security import get_json_payload, limiter
 from flymanager.app.services import flybase as flybase_service
 from flymanager.app.services.scheduler import schedule_daily_flip_reminders
-from flymanager.app.services.stock_standardization import \
-    review_stock_standardization
+from flymanager.app.services.stock_standardization import (
+    get_cached_cross_standardization, get_cached_stock_standardization,
+    summarize_genotype_standardization)
 from flymanager.utils.mongo import (OperationLockConflict,
                                     get_accessible_crosses,
                                     get_accessible_stocks, get_flip_in,
@@ -196,23 +197,40 @@ def _reviewer_record_sort_key(row):
     )
 
 
-def _build_standardization_reviewer_row(*, record_type, subject_label, unique_id,
-                                        name, genotype, tray_id, tray_position,
-                                        assignment_scope_label,
+# Only the fields the reviewer list renders (plus access/dedupe fields) are
+# loaded — notably NOT the large PhenotypeCache — so the page never pulls whole
+# documents into memory.
+_STOCK_REVIEWER_PROJECTION = {
+    '_id': 0,
+    'UniqueID': 1,
+    'User': 1,
+    'AssignedTo': 1,
+    'Name': 1,
+    'Genotype': 1,
+    'TrayID': 1,
+    'TrayPosition': 1,
+    'StandardizationCache': 1,
+}
+_CROSS_REVIEWER_PROJECTION = {
+    '_id': 0,
+    'UniqueID': 1,
+    'User': 1,
+    'AssignedTo': 1,
+    'Name': 1,
+    'MaleGenotype': 1,
+    'FemaleGenotype': 1,
+    'TrayID': 1,
+    'TrayPosition': 1,
+    'StandardizationCache': 1,
+}
+
+
+def _build_standardization_reviewer_row(*, summary, record_type, subject_label,
+                                        unique_id, name, genotype, tray_id,
+                                        tray_position, assignment_scope_label,
                                         assignment_scope_detail, action_href,
                                         action_label):
-    review = review_stock_standardization(str(genotype or ''), candidate_limit=0)
-    issues = list(review.get('issues') or [])
-    top_tokens = [issue.get('token', '') for issue in issues[:4] if issue.get('token')]
-    recommended_replacements = [
-        {
-            'from': issue.get('token', ''),
-            'to': issue.get('recommended_replacement', ''),
-        }
-        for issue in issues
-        if issue.get('token') and issue.get('recommended_replacement')
-    ]
-
+    summary = summary or {}
     return {
         'recordType': record_type,
         'recordTypeLabel': 'Stock' if record_type == 'stock' else 'Cross',
@@ -224,14 +242,39 @@ def _build_standardization_reviewer_row(*, record_type, subject_label, unique_id
         'trayPosition': str(tray_position or ''),
         'assignmentScopeLabel': str(assignment_scope_label or 'Maintain'),
         'assignmentScopeDetail': str(assignment_scope_detail or 'Owned by you'),
-        'issueCount': int(review.get('issue_count') or 0),
-        'unresolvedCount': int((review.get('summary') or {}).get('unresolved_token', 0)),
-        'unmodeledCount': int((review.get('summary') or {}).get('standard_format_unmodeled', 0)),
-        'topTokens': top_tokens,
-        'recommendedReplacements': recommended_replacements[:3],
+        'issueCount': int(summary.get('issueCount') or 0),
+        'unresolvedCount': int(summary.get('unresolvedCount') or 0),
+        'unmodeledCount': int(summary.get('unmodeledCount') or 0),
+        'topTokens': list(summary.get('topTokens') or []),
+        'recommendedReplacements': list(summary.get('recommendedReplacements') or [])[:3],
         'actionHref': action_href,
         'actionLabel': action_label,
     }
+
+
+def _stock_standardization_summary(stock):
+    """Compact standardization summary for a stock, preferring the cache.
+
+    Reads the materialized ``StandardizationCache`` (non-strict, so viewing a
+    record never triggers a live recompute even across pipeline drift). Falls
+    back to a live compute only when the cache is missing/incompatible — cheap
+    now that the bulk path never runs the fuzzy candidate scan.
+    """
+    cache = get_cached_stock_standardization(stock, strict=False)
+    if cache is not None:
+        return cache.get('summary')
+    return summarize_genotype_standardization(stock.get('Genotype', ''))
+
+
+def _cross_standardization_summaries(cross):
+    """Return (male_summary, female_summary) for a cross, preferring the cache."""
+    cache = get_cached_cross_standardization(cross, strict=False)
+    if cache is not None:
+        return cache.get('male'), cache.get('female')
+    return (
+        summarize_genotype_standardization(cross.get('MaleGenotype', '')),
+        summarize_genotype_standardization(cross.get('FemaleGenotype', '')),
+    )
 
 
 def _build_standardization_reviewer_rows(stocks, crosses):
@@ -243,6 +286,7 @@ def _build_standardization_reviewer_rows(stocks, crosses):
             continue
         rows.append(
             _build_standardization_reviewer_row(
+                summary=_stock_standardization_summary(stock),
                 record_type='stock',
                 subject_label='Stock genotype',
                 unique_id=stock.get('UniqueID'),
@@ -259,15 +303,17 @@ def _build_standardization_reviewer_rows(stocks, crosses):
 
     for cross in crosses:
         cross_name = str(cross.get('Name') or cross.get('UniqueID') or '')
-        for subject_label, genotype_key in (
-            ('Male Parent', 'MaleGenotype'),
-            ('Female Parent', 'FemaleGenotype'),
+        male_summary, female_summary = _cross_standardization_summaries(cross)
+        for subject_label, genotype_key, parent_summary in (
+            ('Male Parent', 'MaleGenotype', male_summary),
+            ('Female Parent', 'FemaleGenotype', female_summary),
         ):
             genotype = str(cross.get(genotype_key) or '').strip()
             if not genotype:
                 continue
             rows.append(
                 _build_standardization_reviewer_row(
+                    summary=parent_summary,
                     record_type='cross_parent',
                     subject_label=subject_label,
                     unique_id=cross.get('UniqueID'),
@@ -1002,8 +1048,12 @@ def standardization_reviewer():
     )
 
     try:
-        stocks = get_accessible_stocks(username, db, annotate=True)
-        crosses = get_accessible_crosses(username, db, annotate=True)
+        stocks = get_accessible_stocks(
+            username, db, annotate=True, projection=_STOCK_REVIEWER_PROJECTION
+        )
+        crosses = get_accessible_crosses(
+            username, db, annotate=True, projection=_CROSS_REVIEWER_PROJECTION
+        )
         reviewer_rows = _build_standardization_reviewer_rows(stocks, crosses)
         pagination = paginate_explorer_records(
             reviewer_rows,

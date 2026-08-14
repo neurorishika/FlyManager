@@ -59,10 +59,19 @@ def _dedupe_documents(documents):
     return deduped
 
 
-def get_accessible_documents(collection_name, user, db, annotate=False):
+def get_accessible_documents(collection_name, user, db, annotate=False, projection=None):
+    """Return documents the user owns or maintains.
+
+    ``projection`` is passed through to MongoDB to limit the fields loaded. When
+    supplied it must include the fields required downstream — at minimum
+    ``UniqueID`` (dedupe) and ``User``/``AssignedTo`` (access annotation).
+    """
     collection = db[collection_name]
-    owned_documents = list(collection.find({"User": user}))
-    assigned_documents = list(collection.find({"AssignedTo": user}))
+    # Only forward a projection when one is supplied, so callers/fakes that
+    # implement the single-argument ``find(query)`` signature keep working.
+    find_args = (projection,) if projection is not None else ()
+    owned_documents = list(collection.find({"User": user}, *find_args))
+    assigned_documents = list(collection.find({"AssignedTo": user}, *find_args))
     documents = _dedupe_documents(owned_documents + assigned_documents)
     if annotate:
         return [annotate_document_access(document, user) for document in documents]
@@ -109,12 +118,12 @@ def get_maintainable_document(collection_name, user, uid, db, annotate=False):
     return dict(document)
 
 
-def get_accessible_stocks(user, db, annotate=False):
-    return get_accessible_documents("stocks", user, db, annotate=annotate)
+def get_accessible_stocks(user, db, annotate=False, projection=None):
+    return get_accessible_documents("stocks", user, db, annotate=annotate, projection=projection)
 
 
-def get_accessible_crosses(user, db, annotate=False):
-    return get_accessible_documents("crosses", user, db, annotate=annotate)
+def get_accessible_crosses(user, db, annotate=False, projection=None):
+    return get_accessible_documents("crosses", user, db, annotate=annotate, projection=projection)
 
 
 def get_maintainable_stocks(user, db, annotate=False):

@@ -6,6 +6,8 @@ from flask import (Blueprint, current_app, flash, jsonify, redirect,
 
 # Import necessary components from the app context and services
 from flymanager.app import MIN_FLIP_DIFFERENCE, db, socketio
+from flymanager.app.jobs import enqueue_job
+from flymanager.app.jobs import tasks as job_tasks
 from flymanager.app.routes.auth import login_required
 from flymanager.app.security import (get_json_payload, limiter,
                                      normalize_identifier_list,
@@ -258,7 +260,13 @@ def handle_flip_vial_route():
 @bp.route("/bulk_flip", methods=["POST"])
 @limiter.limit("20 per minute")
 def bulk_flip_route():
-    """Handles the logic for flipping multiple vials at once."""
+    """Queues a background job that flips the selected vials.
+
+    The heavy lifting (batched reads + writes across potentially hundreds of
+    records) runs in the RQ worker instead of blocking the request, so large
+    selections no longer time out. The jobs banner polls /jobs/status.json and
+    toasts when the flip finishes.
+    """
     if not session.get("username"):
         return jsonify({"message": "Authentication required."}), 401
 
@@ -269,77 +277,56 @@ def bulk_flip_route():
         status = normalize_optional_text(data.get("status"), field_name="Status", max_length=64)
         comment = normalize_optional_text(data.get("comment"), field_name="Comment", max_length=500) or ""
 
-        # Determine flip time
+        # Validate/normalise the flip time here so the user gets an immediate
+        # error rather than a failed background job.
         flip_time = parse_iso_datetime(data.get("flipTime"), field_name="flip time")
 
-        results = {"success": [], "failed": []}
+        if not uids:
+            return jsonify({"message": "No items selected for flipping."}), 400
 
-        with hold_operation_locks(
+        key = f"bulk-flip:user:{username}"
+        enqueue_job(
             db,
-            keys=record_operation_lock_keys(uids),
+            key=key,
             actor=username,
-            label="Bulk flip",
-            ttl_seconds=900,
+            label=f"Bulk flip ({len(uids)} items)",
+            func=job_tasks.task_bulk_flip,
+            kwargs={
+                "key": key,
+                "username": username,
+                "uids": uids,
+                "flip_time": flip_time.isoformat(),
+                "status": status,
+                "comment": comment,
+            },
+            ttl_seconds=1800,
             metadata={"route": "bulk_flip", "uid_count": len(uids)},
-            conflict_message="Another request is already updating one or more selected records. Please wait for it to finish before retrying the bulk flip.",
-        ):
-            for uid in uids:
-                try:
-                    stock = get_accessible_stock(username, uid, db)
-                    cross = get_accessible_cross(username, uid, db)
-
-                    item_type = None
-                    flip_function = None
-
-                    if stock:
-                        item_type = "Stock"
-                        flip_function = flip_stock
-                        owner_username = stock.get("User", username)
-                    elif cross:
-                        item_type = "Cross"
-                        flip_function = flip_cross
-                        owner_username = cross.get("User", username)
-                    else:
-                        results["failed"].append(
-                            {"uid": uid, "reason": "UID not recognized for this user."}
-                        )
-                        continue
-
-                    flip_function(
-                        owner_username,
-                        uid,
-                        db,
-                        flip_time,
-                        new_status=status,
-                        added_comment=comment,
-                    )
-                    write_activity(
-                        username, f"Flipped {item_type.lower()} {uid} (bulk operation)", db
-                    )
-                    results["success"].append({"uid": uid, "type": item_type})
-
-                except Exception as e:
-                    results["failed"].append({"uid": uid, "reason": str(e)})
-                    current_app.logger.warning("Error flipping %s: %s", uid, e)
-
-        return jsonify(
-            {
-                "message": f'Bulk flip completed. {len(results["success"])} successful, {len(results["failed"])} failed.',
-                "results": results,
-            }
+            conflict_message="A bulk flip for you is already running. Please wait for it to finish before starting another.",
         )
-
     except OperationLockConflict as exc:
-        return jsonify({"message": str(exc), "results": {"success": [], "failed": []}}), 409
+        return jsonify({"message": str(exc), "queued": False}), 409
+    except ValueError as exc:
+        return jsonify({"message": str(exc), "queued": False}), 400
     except Exception as e:
-        current_app.logger.exception("Error handling bulk flip for %s: %s", username, e)
-        return jsonify({"message": "An internal error occurred during bulk flip."}), 500
+        current_app.logger.exception("Error queuing bulk flip for %s: %s", username, e)
+        return jsonify({"message": "An internal error occurred while queuing the bulk flip."}), 500
+
+    return (
+        jsonify(
+            {
+                "queued": True,
+                "job": key,
+                "message": f"Flipping {len(uids)} item{'s' if len(uids) != 1 else ''} in the background. Watch the jobs banner for progress.",
+            }
+        ),
+        202,
+    )
 
 
 @bp.route("/bulk_status_change", methods=["POST"])
 @limiter.limit("20 per minute")
 def bulk_status_change_route():
-    """Handles the logic for changing the status of multiple vials at once without flipping."""
+    """Queues a background job that changes the status of the selected records."""
     if not session.get("username"):
         return jsonify({"message": "Authentication required."}), 401
 
@@ -352,88 +339,50 @@ def bulk_status_change_route():
         if not status:
             return jsonify({"message": "Status is required."}), 400
 
-        results = {"success": [], "failed": []}
+        if not uids:
+            return jsonify({"message": "No items selected."}), 400
 
-        with hold_operation_locks(
+        key = f"bulk-status:user:{username}"
+        enqueue_job(
             db,
-            keys=record_operation_lock_keys(uids),
+            key=key,
             actor=username,
-            label="Bulk status change",
-            ttl_seconds=900,
+            label=f"Bulk status change ({len(uids)} items)",
+            func=job_tasks.task_bulk_status_change,
+            kwargs={
+                "key": key,
+                "username": username,
+                "uids": uids,
+                "status": status,
+                "comment": comment,
+            },
+            ttl_seconds=1800,
             metadata={"route": "bulk_status_change", "uid_count": len(uids), "status": status},
-            conflict_message="Another request is already updating one or more selected records. Please wait for it to finish before retrying the bulk status change.",
-        ):
-            for uid in uids:
-                try:
-                    stock = get_accessible_stock(username, uid, db)
-                    cross = get_accessible_cross(username, uid, db)
-
-                    if stock:
-                        stock_updates = {"Status": status}
-                        if comment:
-                            existing_comments = str(stock.get("Comments", "") or "").strip()
-                            stock_updates["Comments"] = (
-                                f"{comment}; {existing_comments}" if existing_comments else comment
-                            )
-
-                        edit_stock(
-                            stock["User"],
-                            uid,
-                            db,
-                            stock_updates,
-                            refresh_vials=False,
-                        )
-                        item_type = "Stock"
-                    elif cross:
-                        cross_updates = {"Status": status}
-                        if comment:
-                            existing_comments = str(cross.get("Comments", "") or "").strip()
-                            cross_updates["Comments"] = (
-                                f"{comment}; {existing_comments}" if existing_comments else comment
-                            )
-
-                        edit_cross(
-                            cross["User"],
-                            uid,
-                            db,
-                            cross_updates,
-                            refresh_vials=False,
-                        )
-                        item_type = "Cross"
-                    else:
-                        results["failed"].append(
-                            {"uid": uid, "reason": "UID not recognized for this user."}
-                        )
-                        continue
-
-                    write_activity(
-                        username,
-                        f"Changed status of {item_type.lower()} {uid} to {status} (bulk operation)",
-                        db,
-                    )
-                    results["success"].append({"uid": uid, "type": item_type})
-
-                except Exception as e:
-                    results["failed"].append({"uid": uid, "reason": str(e)})
-                    current_app.logger.warning("Error changing status for %s: %s", uid, e)
-
-        return jsonify(
-            {
-                "message": f'Bulk status change completed. {len(results["success"])} successful, {len(results["failed"])} failed.',
-                "results": results,
-            }
+            conflict_message="A bulk status change for you is already running. Please wait for it to finish before starting another.",
         )
-
     except OperationLockConflict as exc:
-        return jsonify({"message": str(exc), "results": {"success": [], "failed": []}}), 409
+        return jsonify({"message": str(exc), "queued": False}), 409
+    except ValueError as exc:
+        return jsonify({"message": str(exc), "queued": False}), 400
     except Exception as e:
-        current_app.logger.exception("Error handling bulk status change for %s: %s", username, e)
+        current_app.logger.exception("Error queuing bulk status change for %s: %s", username, e)
         return (
             jsonify(
-                {"message": "An internal error occurred during bulk status change."}
+                {"message": "An internal error occurred while queuing the bulk status change."}
             ),
             500,
         )
+
+    return (
+        jsonify(
+            {
+                "queued": True,
+                "job": key,
+                "message": f"Updating {len(uids)} item{'s' if len(uids) != 1 else ''} to {status} in the background. Watch the jobs banner for progress.",
+            }
+        ),
+        202,
+    )
 
 
 @bp.route("/schedule")

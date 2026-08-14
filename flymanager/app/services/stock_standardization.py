@@ -2,14 +2,15 @@ import csv
 import gzip
 import re
 from collections import Counter
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 
 from fuzzywuzzy import fuzz
 
 from flymanager.utils.phenotypes.flybase_pipeline import (
-    get_flybase_phenotype_cache, resolve_flybase_data_dir,
-    resolve_flybase_phenotype_cache_path)
+    compute_flybase_pipeline_signature, get_flybase_phenotype_cache,
+    resolve_flybase_data_dir, resolve_flybase_phenotype_cache_path)
 from flymanager.utils.phenotypes.parser import parse_gene_package
 from flymanager.utils.phenotypes.visual_markers import (
     ALLELE_VISUAL_MARKER_DICTIONARY, REVIEWED_MARKER_ALIASES,
@@ -300,6 +301,13 @@ def search_flybase_standardization_candidates(query, *, limit=DEFAULT_CANDIDATE_
     if not query_text:
         return []
 
+    # A limit of 0 means the caller wants issue detection only, not ranked
+    # candidates (e.g. the bulk reviewer / materialization path). Scoring every
+    # entry in the FlyBase candidate index just to slice ``matches[:0]`` is pure
+    # wasted work, so short-circuit before the linear fuzzy scan.
+    if limit is not None and limit <= 0:
+        return []
+
     matches = []
     for candidate in _candidate_index(data_dir=data_dir, cache_path=cache_path):
         score, basis = _score_candidate(query_text, candidate)
@@ -466,3 +474,131 @@ def review_stock_standardization(genotype, *, token_search_overrides=None, candi
         "summary": dict(summary),
         "issues": issue_payloads,
     }
+
+
+# ---------------------------------------------------------------------------
+# Materialized standardization cache
+#
+# The bulk reviewer page must not run the full standardization review (a per
+# token pass over the genotype) for every accessible stock/cross on every
+# request. Instead we materialize a compact per-genotype summary onto each
+# document, mirroring the ``PhenotypeCache`` pattern: a versioned payload
+# stamped with the FlyBase pipeline signature so it can be detected as stale
+# and recomputed on write or during a backfill. The bulk path only ever needs
+# issue detection, so the summary is built with ``candidate_limit=0`` and never
+# triggers the expensive fuzzy candidate scan.
+# ---------------------------------------------------------------------------
+
+STANDARDIZATION_CACHE_VERSION = 1
+
+
+def _standardization_cache_timestamp():
+    return (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
+
+
+def summarize_genotype_standardization(genotype):
+    """Compact standardization summary for a single genotype string.
+
+    Contains exactly what the reviewer list renders per row, and nothing that
+    requires the fuzzy candidate scan (``candidate_limit=0``).
+    """
+    review = review_stock_standardization(str(genotype or ""), candidate_limit=0)
+    issues = list(review.get("issues") or [])
+    top_tokens = [issue.get("token", "") for issue in issues[:4] if issue.get("token")]
+    recommended_replacements = [
+        {
+            "from": issue.get("token", ""),
+            "to": issue.get("recommended_replacement", ""),
+        }
+        for issue in issues
+        if issue.get("token") and issue.get("recommended_replacement")
+    ]
+    review_summary = review.get("summary") or {}
+    issue_count = int(review.get("issue_count") or 0)
+
+    return {
+        "issueCount": issue_count,
+        "hasIssues": bool(issue_count),
+        "unresolvedCount": int(review_summary.get("unresolved_token", 0)),
+        "unmodeledCount": int(review_summary.get("standard_format_unmodeled", 0)),
+        "topTokens": top_tokens,
+        "recommendedReplacements": recommended_replacements[:3],
+    }
+
+
+def build_stock_standardization_cache(genotype):
+    genotype_text = str(genotype or "")
+    return {
+        "version": STANDARDIZATION_CACHE_VERSION,
+        "computedAt": _standardization_cache_timestamp(),
+        "pipelineSignature": compute_flybase_pipeline_signature(),
+        "genotype": genotype_text,
+        "summary": summarize_genotype_standardization(genotype_text),
+    }
+
+
+def build_cross_standardization_cache(male_genotype, female_genotype):
+    male_text = str(male_genotype or "")
+    female_text = str(female_genotype or "")
+    return {
+        "version": STANDARDIZATION_CACHE_VERSION,
+        "computedAt": _standardization_cache_timestamp(),
+        "pipelineSignature": compute_flybase_pipeline_signature(),
+        "maleGenotype": male_text,
+        "femaleGenotype": female_text,
+        "male": summarize_genotype_standardization(male_text),
+        "female": summarize_genotype_standardization(female_text),
+    }
+
+
+def _standardization_cache_is_current(cache, strict):
+    """Shared version/signature staleness check.
+
+    strict=True (backfill/refresh paths) also requires the cache version and
+    FlyBase pipeline signature to match the current pipeline. strict=False
+    (ordinary read paths) serves whatever is stored; only the genotype match is
+    still enforced by the callers as a correctness guard.
+    """
+    if not isinstance(cache, dict):
+        return False
+    if not strict:
+        return True
+    if cache.get("version") != STANDARDIZATION_CACHE_VERSION:
+        return False
+    signature = str(cache.get("pipelineSignature", ""))
+    if signature and signature != compute_flybase_pipeline_signature():
+        return False
+    return True
+
+
+def get_cached_stock_standardization(record, strict=True):
+    cache = record.get("StandardizationCache")
+    genotype = str(record.get("Genotype", ""))
+
+    if not _standardization_cache_is_current(cache, strict):
+        return None
+    if str(cache.get("genotype", "")) != genotype:
+        return None
+    if not isinstance(cache.get("summary"), dict):
+        return None
+    return cache
+
+
+def get_cached_cross_standardization(record, strict=True):
+    cache = record.get("StandardizationCache")
+    male_genotype = str(record.get("MaleGenotype", ""))
+    female_genotype = str(record.get("FemaleGenotype", ""))
+
+    if not _standardization_cache_is_current(cache, strict):
+        return None
+    if str(cache.get("maleGenotype", "")) != male_genotype:
+        return None
+    if str(cache.get("femaleGenotype", "")) != female_genotype:
+        return None
+    if not isinstance(cache.get("male"), dict) or not isinstance(cache.get("female"), dict):
+        return None
+    return cache

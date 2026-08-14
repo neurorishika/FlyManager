@@ -310,7 +310,7 @@
 
 .cross-item[data-status="Ordered"],
 .stock-item[data-status="Ordered"] {
-    border-left: 5px solid #17a2b8;
+    border-left: 5px solid var(--accent-color);
 }
 
 .cross-item[data-status="No longer maintained"],
@@ -318,10 +318,7 @@
     border-left: 5px solid #6c757d;
 }
 
-.badge-info {
-    background-color: #17a2b8;
-    color: white;
-}
+/* .badge-info is themed globally in base.html to follow the accent color. */
 
 .badge-secondary {
     background-color: #6c757d;
@@ -1253,3 +1250,6 @@
         grid-column: auto;
     }
 }
+
+/* Pagination theming lives globally in base.html (.page-link) so every
+   pagination control in the app is covered, not just the explorer panel. */

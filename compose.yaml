@@ -115,8 +115,14 @@ services:
     env_file:
       - ${FLYMANAGER_ENV_FILE:-.env}
     environment: &app-environment
-      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017,mongodb2:27017/?replicaSet=rs0}
-      MONGO_DB_NAME: ${MONGO_DB_NAME:-flymanager}
+      # Pinned to the bundled replica set (not ${MONGO_URI:-...}) on purpose:
+      # Compose auto-loads .env for interpolation, so a stale MONGO_URI left in a
+      # developer's .env would otherwise shadow the default and crash the app
+      # against a dead remote cluster. `environment:` outranks `env_file:`, so
+      # this literal always wins for the local stack. Remote/production DBs are
+      # configured through compose.production.yaml / compose.synology.yaml.
+      MONGO_URI: mongodb://mongodb:27017,mongodb2:27017/?replicaSet=rs0
+      MONGO_DB_NAME: flymanager
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       APP_HOST: 0.0.0.0
       APP_PORT: ${APP_PORT:-5234}

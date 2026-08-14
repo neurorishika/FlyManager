@@ -19,6 +19,14 @@ from flymanager.utils.mongo_records import (apply_updates_to_owned_document,
 from flymanager.utils.phenotypes.predictor import build_cross_phenotype_cache
 
 
+def build_cross_standardization_cache(male_genotype, female_genotype):
+    # Imported lazily to avoid a circular import during MongoDB bootstrap; see
+    # the matching helper in flymanager.utils.mongo.stocks for details.
+    from flymanager.app.services.stock_standardization import \
+        build_cross_standardization_cache as _build
+    return _build(male_genotype, female_genotype)
+
+
 def add_to_cross(user, properties, db):
     """
     Add a cross to the user's cross collection in MongoDB.
@@ -72,6 +80,10 @@ def add_to_cross(user, properties, db):
             "MaleGenotype": male_genotype,
             "FemaleGenotype": female_genotype,
             "PhenotypeCache": build_cross_phenotype_cache(
+                male_genotype,
+                female_genotype,
+            ),
+            "StandardizationCache": build_cross_standardization_cache(
                 male_genotype,
                 female_genotype,
             ),
@@ -208,6 +220,10 @@ def edit_cross(user, uid, db, updates, log_activity=True, refresh_vials=True):
             male_genotype,
             female_genotype,
         )
+        prepared_updates["StandardizationCache"] = build_cross_standardization_cache(
+            male_genotype,
+            female_genotype,
+        )
 
     success, current_cross = apply_updates_to_owned_document(
         "crosses",
@@ -253,6 +269,26 @@ def update_cross_vials(cross, username, db):
             print(f"Failed to update cross {uid} with default values")
             return False
 
+    vial_update_properties, refresh_vials = compute_cross_vial_properties(cross)
+
+    success = edit_cross(
+        username,
+        uid,
+        db,
+        vial_update_properties,
+        log_activity=False,
+        refresh_vials=refresh_vials,
+    )
+    return success
+
+
+def compute_cross_vial_properties(cross):
+    """Compute the vial-refresh field updates for a cross (no database writes).
+
+    Pure companion to :func:`update_cross_vials`, mirroring
+    :func:`flymanager.utils.mongo.stocks.compute_stock_vial_properties` so the
+    single-item and batched bulk flip paths share one implementation.
+    """
     flip_frequency = float(cross["FlipFrequency"])
     developmental_time = float(cross["DevelopmentalTime"])
     vial_lifetime = float(cross["VialLifetime"])
@@ -294,12 +330,4 @@ def update_cross_vials(cross, username, db):
         flip_log=timeline.get("flip_log"),
     )
 
-    success = edit_cross(
-        username,
-        uid,
-        db,
-        update_properties,
-        log_activity=False,
-        refresh_vials=refresh_vials,
-    )
-    return success
+    return update_properties, refresh_vials
