@@ -374,6 +374,22 @@
 </div>
 
 <!-- CSS Styles for Tray Visualization -->
+<!--
+    Unlike home.html's per-column class (guarded by an explicit range
+    check there, per Task 8), these two custom properties below are
+    emitted unconditionally, with no template-side range guard. That is
+    safe here, not an oversight: tray only ever reaches this route via
+    get_accessible_tray() (utils/mongo/trays.py), which reads it straight
+    back out of MongoDB, and every write path that can create/edit a tray
+    document validates Rows/Columns through parse_int_value() with
+    minimum=1, maximum=100 (app/security.py, ~line 171; called from
+    routes/tray.py's add_tray_route ~line 183-184 and edit_tray_route
+    ~line 230-231), which raises ValueError on anything non-integer or out
+    of that range rather than clamping or silently accepting it - so no
+    tray document with a bad Rows/Columns value can exist in the database
+    in the first place. The write-path validation is the bound; no guard
+    is needed at render time.
+-->
 <style nonce="{{ csp_nonce }}">
     .tray-grid {
         --tray-rows: {{ tray.Rows }};

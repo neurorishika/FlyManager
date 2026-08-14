@@ -61,6 +61,37 @@ THEMES = ["light", "dark"]
 CONTROLS = ".btn, .form-control, .page-link, .nav-link"
 MIN_TAP_PX = 40
 
+# KNOWN, TRACKED tap-target violation - deliberately NOT in CONTROLS.
+#
+# `.tray-cell` (templates/tray/view_tray.html, styled in
+# static/css/pages/view_tray.css) is genuinely interactive: an occupied
+# cell opens a detail/remove modal (view_tray.html ~665-667, ~999-1036),
+# an empty cell opens an add-item modal that writes to that exact tray
+# position (~748-885). It is also, on a wide tray, narrower than
+# MIN_TAP_PX: on the 10x20 dev-seed fixture (`view-tray` in PAGES above)
+# measured rendered width was ~22-37px depending on viewport - a
+# pre-existing characteristic of fitting 20 columns into this app's
+# supported viewport widths, present before Task 10 touched this file and
+# NOT something that task's tokenization caused (it measured 21.88px ->
+# 22.67px, i.e. slightly wider, not narrower, after tokenizing the
+# surrounding chrome).
+#
+# `.tray-cell` is deliberately excluded from CONTROLS above rather than
+# added to it: adding it would fail `tapcheck()` on a pre-existing
+# condition this harness has no way to fix (the width is dictated by
+# `grid-template-columns: repeat(var(--tray-cols), ...)` dividing a fixed
+# content width by however many columns a given tray record has - not a
+# CSS rule any single page stylesheet controls). Recorded here so the gap
+# stays a known, documented, intentionally-excluded condition instead of a
+# silent one nobody rediscovers. Fixing it (e.g. a minimum cell width with
+# horizontal scroll past some column count) is a product decision, out of
+# scope for a CSS density/tokenization pass.
+TAP_TARGET_KNOWN_EXCLUSIONS = {
+    ".tray-cell": "wide trays (many columns) can render narrower than "
+                   "MIN_TAP_PX; pre-existing, tracked, not in CONTROLS - "
+                   "see comment above.",
+}
+
 # Wall-clock-sensitive DOM on the home dashboard (templates/home.html):
 #   - `.snapshot-activity`: the hero "Last activity" card, backed by
 #     routes/main.py's `snapshot.last_activity_at` / `.last_activity_copy`
@@ -81,7 +112,25 @@ MIN_TAP_PX = 40
 # regardless of session/login timing or any other DB activity generated
 # between two capture runs. Both selectors are existing, stable classes/ids
 # (not added for this fix) so no template change was needed.
-MASKED_SELECTORS = [".snapshot-activity", "#recent-activity"]
+#
+# Wall-clock-sensitive DOM on the stock explorer (templates/stock/stock_explorer.html):
+#   - `.stock-provider-cache-summary` (card view, ~line 176): wraps
+#     `.stock-provider-cache-primary`, which renders
+#     `stock.ProviderMatchesStatusLabel`.
+#   - `.table-provider-cache` (table view, ~line 284): renders the same
+#     `ProviderMatchesStatusLabel` in the table-row layout.
+# Both are backed by routes/stock.py's `_format_provider_match_cache_age()`
+# (~line 376), which buckets `datetime.now() - cached_at` into "Xm ago" /
+# "Xh ago" / "Xd ago" text - genuinely wall-clock-volatile, the same class
+# of bug as the home-page activity widgets above, just on a different page.
+# Masked for the same reason: two otherwise-identical capture runs can
+# render different minute/hour buckets and produce a false `DIFF`.
+MASKED_SELECTORS = [
+    ".snapshot-activity",
+    "#recent-activity",
+    ".stock-provider-cache-summary",
+    ".table-provider-cache",
+]
 
 
 def _masks(page):

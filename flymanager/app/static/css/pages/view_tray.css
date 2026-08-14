@@ -225,7 +225,21 @@
 }
 
 .tray-occupied-table {
-    margin-bottom: 0;
+    /* Cascade collision: this table also carries the bare `.table` class
+       (bootstrap-density.css, `margin-bottom: var(--space-lg)`), at equal
+       (0,1,0) specificity. Under the old {% block head %} placement (page
+       CSS loaded before bootstrap-density.css in <head>), bootstrap-density.css
+       always won this tie on source order, so `margin-bottom: 0` here
+       never actually rendered - the table always had a 12px bottom
+       margin. Moving to {% block page_css %} (loads after
+       bootstrap-density.css) flips the winner to this rule. This table
+       only renders when `occupied_positions` is non-empty
+       (view_tray.html), a state the harness's tray fixture (zero
+       occupied positions) never reaches, so the byte-identical move-step
+       compare could not catch it - found in code review, not by the
+       harness. Pinned to the value that was actually rendering so the
+       move stays behaviorally identical. */
+    margin-bottom: var(--space-lg);
     color: var(--text-color);
 }
 
