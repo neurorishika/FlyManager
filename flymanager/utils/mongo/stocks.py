@@ -18,6 +18,10 @@ from flymanager.utils.mongo_records import (apply_updates_to_owned_document,
                                             require_fields)
 from flymanager.utils.phenotypes.predictor import build_stock_phenotype_cache
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def build_stock_standardization_cache(genotype):
     # Imported lazily: the standardization service lives under
@@ -220,7 +224,17 @@ def edit_stock(user, uid, db, updates, log_activity=True, refresh_vials=True):
     if success and "Genotype" in prepared_updates:
         from flymanager.utils.mongo.crosses import \
             propagate_stock_genotype_to_crosses
-        propagate_stock_genotype_to_crosses(user, uid, prepared_updates["Genotype"], db)
+        summary = propagate_stock_genotype_to_crosses(
+            user, uid, prepared_updates["Genotype"], db
+        )
+        if summary.get("errors"):
+            logger.warning(
+                "Genotype propagation for stock %s hit %s error(s) "
+                "(crosses_updated=%s)",
+                uid,
+                summary["errors"],
+                summary.get("crosses_updated"),
+            )
 
     if success and refresh_vials and current_stock:
         update_stock_vials(current_stock, user, db)
