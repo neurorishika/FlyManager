@@ -51,6 +51,7 @@ rq = "^1.16.2"
 
 [tool.poetry.group.dev.dependencies]
 fakeredis = "^2.26"
+playwright = "^1.47"
 
 [build-system]
 requires = ["poetry-core"]
