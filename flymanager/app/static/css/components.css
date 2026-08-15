@@ -20,7 +20,7 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: var(--space-xl);
+    gap: var(--space-lg);
     flex-wrap: wrap;
 }
 
@@ -35,7 +35,7 @@
 
 .app-page-title {
     margin: 0;
-    line-height: 1.1;
+    line-height: var(--line-height-110);
 }
 
 .app-page-subtitle {
@@ -55,7 +55,7 @@
 .app-chip-row {
     display: flex;
     align-items: center;
-    gap: var(--space-md);
+    gap: var(--space-sm);
     flex-wrap: wrap;
 }
 
@@ -84,7 +84,7 @@
 
 .app-form-shell {
     display: grid;
-    gap: var(--space-xl);
+    gap: var(--space-lg);
 }
 
 .app-form-section {
@@ -95,7 +95,7 @@
 
 .app-form-section + .app-form-section {
     border-top: 1px solid var(--border-color);
-    padding-top: var(--space-xl);
+    padding-top: var(--space-lg);
 }
 
 .app-form-section-title {
@@ -113,7 +113,7 @@
 
 .app-detail-grid {
     display: grid;
-    gap: var(--space-xl);
+    gap: var(--space-lg);
     grid-template-columns: repeat(12, minmax(0, 1fr));
 }
 
@@ -161,21 +161,21 @@
 
 .app-empty-code {
     font-size: clamp(4rem, 10vw, 7rem);
-    line-height: 1;
+    line-height: var(--line-height-100);
     margin: 0;
     color: var(--header-bg);
 }
 
 .app-settings-grid {
     display: grid;
-    gap: var(--space-xl);
+    gap: var(--space-lg);
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .app-action-card {
     display: grid;
-    gap: var(--space-lg);
-    padding: var(--space-xl);
+    gap: var(--space-md);
+    padding: var(--space-lg);
     border: 1px solid var(--border-color);
     border-radius: 16px;
     background: color-mix(in srgb, var(--bg-color) 82%, var(--card-bg) 18%);
@@ -310,7 +310,7 @@
 @media (max-width: 767px) {
     .app-panel {
         border-radius: 14px;
-        padding: var(--space-xl);
+        padding: var(--space-lg);
     }
 
     .app-form-grid.two-column {
