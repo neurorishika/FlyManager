@@ -79,7 +79,7 @@
 .app-empty-state {
     text-align: center;
     color: var(--muted-text);
-    padding: 28px 16px;
+    padding: 28px var(--space-xl);
 }
 
 .app-form-shell {
@@ -90,7 +90,7 @@
 .app-form-section {
     display: grid;
     gap: 14px;
-    padding-top: 2px;
+    padding-top: var(--space-2xs);
 }
 
 .app-form-section + .app-form-section {
@@ -280,7 +280,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-lg);
-    padding: 0.5rem 0.85rem;
+    padding: var(--space-md) 0.85rem;
     border-radius: 0.35rem;
     border: 1px solid rgba(0, 0, 0, 0.1);
     background: rgba(13, 110, 253, 0.06);

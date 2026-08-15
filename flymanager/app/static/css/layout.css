@@ -1,7 +1,7 @@
 .header {
     background: linear-gradient(135deg, color-mix(in srgb, var(--header-bg) 86%, white 14%), color-mix(in srgb, var(--header-bg) 92%, black 8%));
     color: var(--header-text);
-    padding: 12px 0 10px;
+    padding: var(--space-lg) 0 10px;
     position: sticky;
     width: 100%;
     top: 0;
@@ -28,7 +28,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--space-xl);
     flex-wrap: wrap;
 }
 
@@ -44,12 +44,12 @@
 .app-brand {
     display: inline-flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-lg);
     color: var(--header-text);
     margin: 0;
     text-decoration: none;
     flex-shrink: 0;
-    padding: 8px 12px 8px 8px;
+    padding: var(--space-md) var(--space-lg) var(--space-md) var(--space-md);
     border-radius: 18px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -110,7 +110,7 @@
 .header-current-view {
     display: grid;
     flex: 1 1 280px;
-    gap: 4px;
+    gap: var(--space-xs);
     min-width: 0;
     max-width: 520px;
     padding-left: 18px;
@@ -168,7 +168,7 @@
 }
 
 .header-action-button {
-    min-height: 40px;
+    min-height: var(--control-height);
     padding: 0 14px;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.18);
@@ -177,7 +177,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: var(--space-md);
     font-weight: 600;
     font-size: 0.88rem;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
@@ -195,7 +195,7 @@
 }
 
 .header-action-button.dropdown-toggle::after {
-    margin-left: 4px;
+    margin-left: var(--space-xs);
 }
 
 .header-status-badge,
@@ -233,7 +233,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-lg);
 }
 
 .dropdown-item-with-badge > span:first-child {
@@ -256,15 +256,15 @@
 .header-primary-nav {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-md);
     flex-wrap: wrap;
 }
 
 .header-nav-link {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    min-height: 40px;
+    gap: var(--space-md);
+    min-height: var(--control-height);
     padding: 0 14px;
     border-radius: 999px;
     margin: 0;
@@ -328,7 +328,7 @@
     align-items: center;
     gap: 10px;
     border-radius: 12px;
-    padding: 0.58rem 0.75rem;
+    padding: 0.58rem var(--space-lg);
     font-weight: 600;
     color: var(--text-color);
 }
@@ -350,7 +350,7 @@
 }
 
 .header-menu .dropdown-divider {
-    margin: 8px 0;
+    margin: var(--space-md) 0;
     border-top-color: var(--panel-border);
 }
 
@@ -393,7 +393,7 @@
 .auth-brand-mark {
     display: inline-flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-lg);
     margin-bottom: 10px;
 }
 
@@ -414,7 +414,7 @@
     width: 100%;
     border-radius: 14px;
     font-weight: 700;
-    padding: 0.72rem 1rem;
+    padding: 0.72rem var(--space-xl);
 }
 
 .auth-form .form-control,
@@ -426,7 +426,7 @@
 
 .auth-support {
     text-align: center;
-    margin-top: 16px;
+    margin-top: var(--space-xl);
     color: var(--muted-text);
     font-size: var(--font-size-sm);
 }
@@ -465,7 +465,7 @@
         width: 100%;
         flex-wrap: nowrap;
         overflow-x: auto;
-        padding-bottom: 2px;
+        padding-bottom: var(--space-2xs);
         scrollbar-width: none;
     }
 
@@ -484,15 +484,15 @@
     }
 
     .header-panel {
-        gap: 12px;
+        gap: var(--space-lg);
     }
 
     .header-main {
-        gap: 12px;
+        gap: var(--space-lg);
     }
 
     .header-brand-row {
-        gap: 12px;
+        gap: var(--space-lg);
     }
 
     .app-brand-meta span {
@@ -537,7 +537,7 @@
     .header-primary-nav {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 8px;
+        gap: var(--space-md);
         overflow: visible;
     }
 
