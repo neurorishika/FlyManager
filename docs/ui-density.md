@@ -478,3 +478,51 @@ line-height) but ran higher than what was actually measured here. Do not
 read this table as "the project reached 15% density" — it is the delta
 from this specific fix wave only, layered on top of whatever the
 preceding 13 tasks already achieved.
+
+## Known gaps and follow-ups
+
+Recorded at the end of the density/tokenization work (branch `bugfixes`, 2026-08-14) so
+they are not rediscovered from scratch. None block use of the system above.
+
+### Tap targets
+
+The app is tablet-first and `--control-height` (40px) is the floor. `tapcheck` gates it,
+but with real limits:
+
+- **`tapcheck` cannot see hidden controls.** Its scan filters `offsetParent !== null`, so
+  closed dropdown menus, closed `<details>` panels, and post-scan-only UI are never
+  measured. Of the four controls whose floor was restored in this work, only
+  `.filter-chip` is genuinely gated going forward. Closing this needs the harness to open
+  menus and panels before scanning. **This is the most valuable single follow-up here** —
+  it is the blind spot that let the header dropdown regress below 40px unnoticed.
+- **`_is_known_exclusion` matches if ANY class token is excluded**, and has no size
+  ceiling, so an element that picks up an excluded class is exempted wholesale and a
+  documented 17px element could regress to 2px and still pass. It silences nothing today.
+- **Known sub-40px interactive elements**, deliberately excluded and not regressions:
+  `.tray-cell` (22-37px wide on wide trays — genuinely interactive: tapping opens an
+  add/remove modal that writes to that position), `.bulk-status-item` (~30px),
+  `.custom-control-label` (~17px), `.breadcrumb-item a` (~20px), `.dashboard-link`
+  (~15px), and explorer row-selection checkboxes (~13-18px). Fixing `.tray-cell`
+  specifically means rethinking how wide trays render, not tuning CSS.
+
+### Density
+
+Measured result was ~8-13% page-height reduction against a ~15% goal, and the "7 list rows
+where 5 fit" target was not reached. That target needs roughly a 28% row-height cut. A
+measured explorer card is ~318px, of which ~48px is an untouchable 40px-floor button row
+and ~90px is five text lines already at zero inter-paragraph margin. **The remaining
+distance is an information-architecture problem, not a CSS one** — it needs the card to
+show less or lay out differently (e.g. label:value pairs in two columns), not tighter
+tokens.
+
+### Harness fixtures
+
+- The tray-detail fixture has zero occupied positions, so `.tray-occupied-table` and
+  populated-cell states render in no screenshot. This is exactly what let one cascade
+  collision through review. Extending `driver.sh dev-fixtures` to assign a stock to that
+  tray would close it, but the only `devtest`-owned stock is load-bearing for other
+  fixtures, so it needs a synthetic record.
+- `driver.sh dev-fixtures` carries a single hardcoded fixture rather than deriving from
+  `PAGES`; a new `PAGES` entry with a DB dependency needs a hand-written block.
+- `#recent-activity` is masked for determinism, so that panel's own CSS is permanently
+  outside `compare`'s coverage and needs manual browser checks.
