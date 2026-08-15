@@ -102,6 +102,40 @@ comically wide before they'd even show meaningfully. `tapcheck` (below)
 excludes `.tray-cell` from its scan for exactly this reason — this is not
 an oversight to "fix."
 
+**Other tracked, non-`.tray-cell` violations:** a handful of pre-existing
+controls sit below the 40px floor and predate this project — plain
+Bootstrap `.dropdown-item.bulk-status-item` in the explorer bulk-status
+menus (~30.4px, not nested under `.header-menu` so it gets none of that
+selector's density treatment) and Bootstrap's default
+`.custom-control-label` checkbox/radio label (~17.9px, several
+templates — the native `<input>` is the actual hit target, not the text
+label). Both are recorded in `css_audit.py`'s `TAP_TARGET_KNOWN_EXCLUSIONS`
+with measured sizes and are excluded from `tapcheck`'s pass/fail gate
+rather than silently passing or silently failing on a pre-existing
+condition this pass didn't cause. `.breadcrumb-item a` (~20.2px,
+`view_tray.html`) and the explorer's raw row-selection checkboxes
+(~13–18px, one per table row) are pre-existing too but aren't matched by
+`CONTROLS` at all, so `tapcheck` structurally can't see them; they're
+noted in a comment next to `TAP_TARGET_KNOWN_EXCLUSIONS` for the record.
+None of the four were resized in the final review's fix wave — see
+`.superpowers/sdd/2026-08-14-ui-density-css-tokenization/final-fix-report.md`.
+
+**`tapcheck` checks width as well as height.** A control that is tall
+enough but too narrow (a square icon-only button, say) is exactly as hard
+to hit reliably as one that's too short, so both dimensions gate the same
+40px floor. `CONTROLS` was also widened to include `.dropdown-item`,
+`.filter-chip`, `.flip-status-option`, `.column-selector-option`,
+`.guide-pill`, `.close`, and `.custom-control-label` — the final review
+found three genuinely new sub-floor regressions this project caused
+(`.header-menu .dropdown-item`, `.flip-status-option`, `.filter-chip`)
+that the original `CONTROLS` list never caught, partly because none of
+them carried a class in that list and partly because two of the three are
+hidden at rest (a closed dropdown, a flip-status panel that only shows
+after a scan) so no screenshot ever showed them either — a double blind
+spot. All three (plus `.column-selector-option`, fixed alongside them
+since the fix was equally cheap) now carry `min-height: var(--control-height)`
+with restored `--space-lg` padding.
+
 ## The rebuild requirement
 
 The app's `Dockerfile` does a plain `COPY . .` — there is **no bind mount**
@@ -284,3 +318,163 @@ page and inspecting the render directly, rather than relying on `compare`.
 
 See `.superpowers/sdd/2026-08-14-ui-density-css-tokenization/task-13-report.md`
 for the full before/after value table and per-rule reasoning.
+
+**Scope note:** the "5 literal-font-size exceptions" / "11 lines" figures
+above are scoped to `layout.css` and `components.css` only (the two files
+Task 13 closed the tokenization gap on). They are not a project-wide
+count — running the acceptance grep across the rest of `pages/*.css`
+turns up a few more pre-existing, already-justified literals not listed
+in this file until the final whole-branch review found them undocumented:
+`pages/view_tray.css`'s `.tray-stat-card` (`1.75rem`, already commented
+in-file as a bespoke headline-stat value, same category as
+`.stock-summary-value`) and `pages/home.css`'s `.tray-mini-cell`
+(`0.5rem`, a single-character label inside a ~14px tray-heatmap swatch —
+below `--font-size-xs`, the smallest token, with no token that fits a
+label this small without growing the swatch; now commented in-file too).
+`pages/user_guide.css`'s `.guide-section { scroll-margin-top: 96px; }` is
+a different kind of exception — it offsets in-page anchor scrolling by
+the sticky header's height so a jumped-to section doesn't render partly
+hidden underneath it, the same category as `floating_cart.css`'s
+`calc()` offset above, not a spacing-rhythm value. A pre-existing, undocumented
+`@media (max-width: 767px) { body { font-size: clamp(0.88rem, ..., 0.96rem); } }`
+override in `base.css` was removed outright in the same review rather
+than added here: it predated `--font-size-base`'s current, tighter
+`clamp()` and, left in place, made body text render *larger* on the
+smallest screens than on desktop (measured 900px → 14.4px, 767px →
+15.36px, 600px → 15.24px) — density running backwards on a tablet-first
+app, on a viewport range the capture harness (≥1024px only) structurally
+can't see. `body` now relies solely on `var(--font-size-base)`, which is
+already a responsive `clamp()`.
+
+## `layout.css`/`components.css` were tokenized at parity, not tightened (fixed)
+
+Task 13 (above) genuinely tokenized `layout.css`/`components.css`, but
+its "tighten" pass systematically chose the *parity* token over the
+*tightened* one for the same source literal, even though every
+`pages/*.css` file had already tightened the identical literal one step
+down the scale. The literal itself never changed — only which token it
+was assigned to — so this shipped as a silent, page-invisible
+inconsistency: the same shared widget rendered looser in the header/
+footer/chrome than in its page-local counterpart, and the chrome layer
+never picked up the density gain the rest of the project did.
+
+| Source literal | pages/*.css token | layout.css/components.css token (before fix) |
+| --- | --- | --- |
+| 16px | `--space-lg` (12px), ×31 | `--space-xl` (16px) |
+| 18px | `--space-lg` (12px), ×26 | `--space-xl` (16px) |
+| 12px | `--space-md` (8px), ×54 | `--space-lg` (12px) |
+| 8px | `--space-sm` (6px), ×46 | `--space-md` (8px) |
+
+Fixed by moving every one of those chrome-layer declarations to the same
+tightened token `pages/*.css` already used — the specific `gap`/
+`padding`/`margin` declarations this covers are `layout.css` lines
+28–47, 113–116, 177–180, 233–266, 361–431, 486–542, and `components.css`
+lines 19–58, 84–178, 310–313 (declaration list, not every line in that
+range — decorative `border-radius`/`box-shadow` literals in the same
+neighborhood were left untouched; only spacing tokens moved). The fluid
+`clamp()` spacing exceptions above were **not** touched — they're
+deliberately parity, not a drift bug. The `991px`/`767px` `@media`
+overrides in `layout.css` that shadow `.header-panel`/`.header-main`/
+`.header-brand-row` were moved in lockstep with their now-tightened base
+rules so the responsive step-down stays a real step down rather than
+collapsing to a no-op; verified by driving a real browser at 900px,
+767px, and 600px (the capture harness only reaches ≥1024px) — no
+horizontal overflow, header/nav still wraps correctly, tap-target floor
+still holds at every width checked.
+
+## Line-height is now tokenized
+
+`--line-height-*` tokens were added to `tokens.css` (both theme blocks —
+line-height doesn't vary by theme, but the other scales live there so
+this one does too, for one lookup location): `--line-height-100` through
+`--line-height-150` in 0.05 steps by *name* (`100` = 1, `150` = 1.5, etc,
+since there's no natural t-shirt sizing for this scale), plus
+`--line-height-base` (1.3) for body copy specifically. Before this, `line-height`
+was the one remaining type property with zero tokens — 38 hardcoded
+values across 11 distinct numbers, spread across every layer from
+`base.css` down through `pages/*.css`. All 38 now reference a token.
+
+`body`'s line-height was tightened from a pre-existing `1.4` to
+`--line-height-base` (1.3) as part of this — the only *value* change in
+the line-height tokenization (every other hardcoded number kept its
+existing value, just moved onto a `var(...)`). Line-height carries zero
+tap-target risk: control sizing is driven by `--control-height`/padding,
+never by text metrics, so tightening body leading cannot push anything
+below the 40px floor.
+
+## Explorer/global CSS collisions (Important 6, final review)
+
+`base.html`'s inline `<style>` block was always positioned after
+`{% block head %}` in the real DOM order, so the explorer stylesheets
+(`explorer_shared.css`, loaded from `{% block head %}` in both explorer
+templates) have always lost equal-specificity ties against the
+unconditional global layer (`bootstrap-density.css`/`layout.css`/
+`components.css`, loaded later at steps 6–8). This project's file split
+didn't create that ordering — it only made the resulting collisions
+`grep`-able. Two were found and fixed in the final review:
+
+- **`.explorer-filter-control`** (search/select filter inputs, reached
+  through every `templates/filter_field.html`-rendered dropdown) declared
+  its own `min-height: 38px`/`height: 38px`/`border-radius: 10px`/
+  `border`/`background`/vertical padding, all of which were silently and
+  *always* overridden by `bootstrap-density.css`'s later, equal-specificity
+  `.form-control` rules — including the sub-floor `min-height: 38px`,
+  which lied about the control's own geometry (it has always actually
+  rendered at 40px, never at 38px). Fixed by deleting the dead
+  declarations rather than raising specificity to make them win: the
+  40px result already winning is the *correct* one (38px would sit below
+  the tap-target floor), so only `color`/`box-shadow`/`font-size` — the
+  properties that do actually apply — were kept.
+- **`.column-selector-toggle`** ("Columns" pill button on both
+  explorers) also carries `.btn.btn-outline-secondary` in the template,
+  so it matches `bootstrap-density.css`'s density-layer `.btn, .form-control, ...`
+  rule directly. That rule's `padding-left`/`padding-right` longhands
+  (added as part of this project's density work) newly clobber the
+  toggle's own `padding-inline` shorthand — a genuinely *new* regression,
+  not a pre-existing one — and its `min-height: var(--control-height)`
+  (40px) also wins over the toggle's intended 52px pill sizing. Fixed by
+  raising the toggle's own rule to `.btn.column-selector-toggle`
+  (specificity (0,2,0)), which now wins regardless of load order: the
+  pill renders at its intended 52px/999px-radius/`padding-inline` sizing
+  again, matching its sibling pill controls.
+
+## `--code-bg`/`--code-color` (final review, minor)
+
+`pages/user_guide.css`'s `code { background-color: var(--code-bg); color: var(--code-color); }`
+referenced two tokens that were never defined anywhere in `tokens.css`,
+so `<code>` blocks in the User Guide rendered with browser-default
+(unstyled) colors in both themes — pre-existing, not something this
+project's tokenization introduced, but a real gap against "every color
+is a token." Defined in both theme blocks in `tokens.css`.
+
+## Measured density delta (final review's fix wave)
+
+Real `document.body.scrollHeight` at 1024px, `devtest` login, before vs.
+after the chrome-layer bucketing fix + line-height tightening above
+(same content, same seed data — only these two CSS changes in between):
+
+| Page | Before | After | Δ |
+| --- | --- | --- | --- |
+| home | 5318px | 5201px | −2.2% |
+| stock-explorer | 1818px | 1760px | −3.2% |
+| cross-explorer | 1377px | 1339px | −2.8% |
+| flip-schedule | 1122px | 1098px | −2.1% |
+| flip | 1518px | 1483px | −2.3% |
+| add-stock | 1688px | 1634px | −3.2% |
+| add-cross | 1459px | 1418px | −2.8% |
+| standardization | 1419px | 1361px | −4.1% |
+| user-guide | 7372px | 7064px | −4.2% |
+| view-stock | 5431px | 5255px | −3.2% |
+| view-cross | 10000px | 9560px | −4.4% |
+| phenotype-preview | 1009px | 983px | −2.6% |
+| view-tray | 2776px | 2740px | −1.3% |
+
+Real, measured range: **roughly 1–4% additional page-height reduction**
+from this fix wave alone, on top of whatever Task 13 already delivered.
+This is the actual number, not the final review's own ~4–7% estimate for
+the combined chrome-bucketing-fix + line-height change — the estimate
+was directionally right (both changes help, chrome bucketing more than
+line-height) but ran higher than what was actually measured here. Do not
+read this table as "the project reached 15% density" — it is the delta
+from this specific fix wave only, layered on top of whatever the
+preceding 13 tasks already achieved.
