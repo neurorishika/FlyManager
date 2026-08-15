@@ -1,0 +1,9 @@
+/* tray_management.css — tray management page (templates/tray/tray_management.html). */
+
+/* Give the "assign to" select enough width to show a username without
+   truncating; pre-dates the CSS tokenization work as a blocked
+   style="min-width: 180px" attribute (CSP has no 'unsafe-inline', so it
+   silently never applied). */
+.tray-assignee-select {
+    min-width: 180px;
+}

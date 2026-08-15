@@ -5,7 +5,7 @@
 .flash-stack {
     display: grid;
     gap: 10px;
-    margin-bottom: 4px;
+    margin-bottom: var(--space-xs);
 }
 
 .app-panel {
@@ -20,12 +20,12 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 16px;
+    gap: var(--space-xl);
     flex-wrap: wrap;
 }
 
 .app-kicker {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-sm);
     font-size: var(--font-size-sm);
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -39,7 +39,7 @@
 }
 
 .app-page-subtitle {
-    margin: 8px 0 0;
+    margin: var(--space-md) 0 0;
     color: var(--muted-text);
     max-width: 68ch;
 }
@@ -55,14 +55,14 @@
 .app-chip-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-md);
     flex-wrap: wrap;
 }
 
 .app-chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-sm);
     padding: 0.35rem 0.7rem;
     border-radius: 999px;
     background: color-mix(in srgb, var(--header-bg) 14%, var(--card-bg) 86%);
@@ -106,14 +106,14 @@
 }
 
 .app-form-section-copy {
-    margin: 4px 0 0;
+    margin: var(--space-xs) 0 0;
     color: var(--muted-text);
     font-size: var(--font-size-sm);
 }
 
 .app-detail-grid {
     display: grid;
-    gap: 16px;
+    gap: var(--space-xl);
     grid-template-columns: repeat(12, minmax(0, 1fr));
 }
 
@@ -130,7 +130,7 @@
 
 .app-view-field {
     display: grid;
-    gap: 6px;
+    gap: var(--space-sm);
 }
 
 .app-view-value {
@@ -174,7 +174,7 @@
 
 .app-action-card {
     display: grid;
-    gap: 12px;
+    gap: var(--space-lg);
     padding: 18px;
     border: 1px solid var(--border-color);
     border-radius: 16px;
@@ -246,7 +246,7 @@
 
 .app-form-grid {
     display: grid;
-    gap: 16px;
+    gap: var(--space-md);
 }
 
 .app-form-grid.two-column {
@@ -256,6 +256,7 @@
 .app-inline-note {
     color: var(--muted-text);
     font-size: var(--font-size-sm);
+    margin: var(--space-md) 0;
 }
 
 .species-display {
@@ -267,8 +268,8 @@
 .job-status-banner {
     display: none;
     flex-direction: column;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+    gap: var(--space-md);
+    margin-bottom: var(--space-xl);
 }
 
 .job-status-banner.job-status-banner--visible {
@@ -278,7 +279,7 @@
 .job-status-row {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-lg);
     padding: 0.5rem 0.85rem;
     border-radius: 0.35rem;
     border: 1px solid rgba(0, 0, 0, 0.1);
@@ -309,7 +310,7 @@
 @media (max-width: 767px) {
     .app-panel {
         border-radius: 14px;
-        padding: 16px;
+        padding: var(--space-xl);
     }
 
     .app-form-grid.two-column {

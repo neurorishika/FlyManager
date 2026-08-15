@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/tray_management.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="app-panel app-page-header">
     <div>
@@ -16,8 +20,6 @@
 </div>
 
 <div>
-    <div class="row">
-        <div class="col-12">
             {% if trays %}
             <div class="app-panel">
                 <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
@@ -53,7 +55,7 @@
                                 <td>
                                     {% if tray.ViewerCanEdit and direct_reports %}
                                     <form method="POST" action="{{ url_for('tray.assign_tray_route', tray_id=tray.UniqueID) }}" class="app-button-row flex-wrap justify-content-start">
-                                        <select class="form-control form-control-sm" name="assignee" style="min-width: 180px;">
+                                        <select class="form-control form-control-sm tray-assignee-select" name="assignee">
                                             <option value="">Maintain myself</option>
                                             {% for report_username in direct_reports %}
                                             <option value="{{ report_username }}">{{ report_username }}</option>
@@ -107,8 +109,6 @@
                 </div>
             </div>
             {% endif %}
-        </div>
-    </div>
 </div>
 
 <!-- Delete Confirmation Modal -->

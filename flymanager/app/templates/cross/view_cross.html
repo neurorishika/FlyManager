@@ -141,7 +141,7 @@
                         {% for image in parent_phenotypes.male.reference_images %}
                         <div class="col-md-4 mb-2">
                             <div class="card h-100">
-                                <img class="card-img-top" src="{{ url_for('stock.phenotype_reference_image', relative_path=image.relative_path) }}" alt="Reference image for {{ image.display_label }}" style="height: 120px; object-fit: cover;">
+                                <img class="card-img-top parent-reference-image" src="{{ url_for('stock.phenotype_reference_image', relative_path=image.relative_path) }}" alt="Reference image for {{ image.display_label }}">
                                 <div class="card-body p-2">
                                     <div><strong>{{ image.display_label }}</strong></div>
                                     <div class="small text-muted">{{ image.source_name or image.source_collection|replace('_', ' ') }}</div>
@@ -171,7 +171,7 @@
                         {% for image in parent_phenotypes.female.reference_images %}
                         <div class="col-md-4 mb-2">
                             <div class="card h-100">
-                                <img class="card-img-top" src="{{ url_for('stock.phenotype_reference_image', relative_path=image.relative_path) }}" alt="Reference image for {{ image.display_label }}" style="height: 120px; object-fit: cover;">
+                                <img class="card-img-top parent-reference-image" src="{{ url_for('stock.phenotype_reference_image', relative_path=image.relative_path) }}" alt="Reference image for {{ image.display_label }}">
                                 <div class="card-body p-2">
                                     <div><strong>{{ image.display_label }}</strong></div>
                                     <div class="small text-muted">{{ image.source_name or image.source_collection|replace('_', ' ') }}</div>

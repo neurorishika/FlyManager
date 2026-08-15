@@ -30,13 +30,7 @@
 
 label {
     font-weight: 600;
-    margin-bottom: 0.4rem;
 }
-
-.form-group {
-    margin-bottom: 1rem;
-}
-
 
 .btn-primary {
     background-color: var(--accent-color);
@@ -264,12 +258,10 @@ label {
     border-radius: 12px;
     font-weight: 600;
     min-height: 42px;
-    padding: 0.6rem 1rem;
 }
 
 .btn-sm {
     min-height: 34px;
-    padding: 0.4rem 0.75rem;
     border-radius: 10px;
 }
 
@@ -326,7 +318,7 @@ label {
 }
 
 .modal-dialog {
-    margin: 1rem auto;
+    margin: var(--space-xl) auto;
 }
 
 .alert-info {
@@ -354,7 +346,7 @@ label {
 
 @media (max-width: 767px) {
     .modal-dialog {
-        margin: 0.5rem;
+        margin: var(--space-md);
     }
 }
 

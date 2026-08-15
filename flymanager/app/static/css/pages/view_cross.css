@@ -45,3 +45,13 @@
         font-size: var(--font-size-xs);
         line-height: 1.15;
     }
+
+    /* Parent phenotype-preview reference-image crop. Pre-dates the CSS
+       tokenization work as a blocked style="…" attribute (CSP has no
+       'unsafe-inline', so the intended 120px/object-fit crop silently
+       never applied); moved here as a real rule so it actually takes
+       effect. */
+    .parent-reference-image {
+        height: 120px;
+        object-fit: cover;
+    }
