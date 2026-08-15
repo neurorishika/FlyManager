@@ -3,7 +3,7 @@ body {
     background: var(--page-background);
     color: var(--text-color);
     font-size: var(--font-size-base);
-    line-height: 1.4;
+    line-height: var(--line-height-base);
     margin: 0;
     min-height: 100vh;
     display: flex;
@@ -55,8 +55,15 @@ a.btn {
     text-decoration: none;
 }
 
-@media (max-width: 767px) {
-    body {
-        font-size: clamp(0.88rem, 0.84rem + 0.3vw, 0.96rem);
-    }
-}
+/* No small-viewport body font-size override: body already uses
+ * var(--font-size-base) (a responsive clamp() itself, tokens.css), which
+ * already sizes down toward its floor as the viewport narrows. A
+ * pre-existing 767px override here once bumped mobile body text back UP
+ * (clamp(0.88rem,...,0.96rem)) from underneath the desktop size — a
+ * relic of an earlier, looser --font-size-base that predated this
+ * project's tightened token. Left in place across the density pass it
+ * made the smallest screens render LARGER text than desktop (measured:
+ * 900px -> 14.4px, 767px -> 15.36px, 600px -> 15.24px), i.e. density
+ * running backwards on a tablet-first app. Removed rather than retuned:
+ * it added nothing --font-size-base didn't already do responsively.
+ */
