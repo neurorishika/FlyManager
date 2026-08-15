@@ -5,27 +5,57 @@ All spacing and type values are tokens defined in
 roomier, change the scale there — do not add hardcoded px/rem to a
 component or page file.
 
-## Layers (load order, defined in `base.html`)
+## Layers — the *real* load order, read straight from `base.html`
 
-| File | Owns |
-| --- | --- |
-| `tokens.css` | Theme colors (light/dark) + the spacing, type, and control scales |
-| `base.css` | Element defaults: `body`, headings, `.app-shell-container` |
-| `bootstrap-density.css` | Theming + density overrides for vendored Bootstrap 4.5 components |
-| `layout.css` | Header, brand, nav, footer, auth shell |
-| `components.css` | The shared `.app-*` component system (panels, form grids, chips, empty states, job-status widgets) |
-| `pages/*.css`, `explorer_shared.css`, `stock_explorer.css`, `cross_explorer.css`, `floating_cart.css` | One file per page/subsystem, loaded via `{% block page_css %}` |
+`base.html`'s `<head>` links CSS in this exact order:
+
+```text
+1. vendor/bootstrap-4.5.2.min.css, vendor/fontawesome
+2. floating_cart.css                    <- unconditional link, base.html:18
+3. {% block head %}{% endblock %}       <- page-supplied, BEFORE the layer below
+4. tokens.css
+5. base.css
+6. bootstrap-density.css
+7. layout.css
+8. components.css
+9. {% block page_css %}{% endblock %}   <- page-supplied, AFTER the layer above
+10. inline <style> (accent-color custom property only)
+```
+
+| File | Owns | Linked from |
+| --- | --- | --- |
+| `floating_cart.css` | The floating order-cart bar (every page) | **base.html:18, unconditionally** — before even `{% block head %}`, so before `tokens.css`/`layout.css`/`components.css` |
+| `explorer_shared.css` | Shared filter-bar/card/search-icon styling for both explorers | `{% block head %}` in `stock_explorer.html`/`cross_explorer.html` — **before** `tokens.css`/`bootstrap-density.css`/`layout.css`/`components.css` |
+| `stock_explorer.css` / `cross_explorer.css` | Per-explorer page rules | Same `{% block head %}`, same explorer templates — **before** the component layer |
+| `tokens.css` | Theme colors (light/dark) + the spacing, type, and control scales | Unconditional, step 4 |
+| `base.css` | Element defaults: `body`, headings, `.app-shell-container` | Unconditional, step 5 |
+| `bootstrap-density.css` | Theming + density overrides for vendored Bootstrap 4.5 components | Unconditional, step 6 |
+| `layout.css` | Header, brand, nav, footer, auth shell | Unconditional, step 7 |
+| `components.css` | The shared `.app-*` component system (panels, form grids, chips, empty states, job-status widgets) | Unconditional, step 8 |
+| `pages/*.css` (`view_cross.css`, `view_tray.css`, `home.css`, `flip.css`, `tray_management.css`, etc.) | One file per page | `{% block page_css %}` in that page's template — **after** the entire component layer above |
 
 Each file carries its own `@media` rules at its end, rather than a separate
 responsive stylesheet.
 
-## `{% block page_css %}`, not `{% block head %}`
+## `{% block page_css %}` vs `{% block head %}` — they are opposites
 
-Page-specific stylesheets are linked from `{% block page_css %}` in
-`base.html`, which renders **after** `layout.css` and `components.css` but
-**before** the page body. `{% block head %}` renders earlier, before any of
-the global stylesheets, and is reserved for things that must load first
-(e.g. an explorer page's own early hints) — page CSS must not go there.
+These two blocks are **not** interchangeable, and using the wrong one
+silently flips which rule wins a specificity tie:
+
+- **`{% block head %}`** renders at step 3, **before** `tokens.css`,
+  `bootstrap-density.css`, `layout.css`, and `components.css`. A rule
+  linked here **loses** any equal-specificity tie against the global
+  layer, because the global layer loads later. This is where
+  `explorer_shared.css`/`stock_explorer.css`/`cross_explorer.css`
+  currently link from — which is *why* they were vulnerable to the
+  search-icon collision below, not despite it.
+- **`{% block page_css %}`** renders at step 9, **after** the entire
+  global layer. A rule linked here **wins** any equal-specificity tie
+  against `bootstrap-density.css`/`layout.css`/`components.css`. This is
+  the block every `pages/*.css` file should use, and the one to reach for
+  by default — put a new page stylesheet here unless you have a specific
+  reason (matching `floating_cart.css`'s or the explorers' existing
+  early-load behavior) to do otherwise.
 
 This ordering matters because of a CSS trap: when two rules have equal
 specificity, the one that loads **later** wins, regardless of which one is
@@ -179,10 +209,22 @@ that don't have an exact-pixel token match (chip padding, form-section
 gaps, job-status-row padding, etc.) remain hardcoded. None of these are
 new — they've rendered unchanged since before this project started — but
 they are a real gap against the "no hardcoded spacing/type values
-anywhere" goal, not a documented exception. Retokenizing the header/nav
-chrome safely needs its own dedicated pass with per-breakpoint visual
-review (like Tasks 7–11 got for the page files), since it's globally
-visible on every page and several of its values are decorative geometry
-(pill radii, badge sizes) tuned as a set rather than independently. Do not
-assume every remaining match in those two files is "fine" — check whether
-it's on the exception list above before leaving it alone.
+anywhere" goal, not a documented exception.
+
+As of this writing the acceptance grep above returns **124 matches**:
+**52 in `layout.css`**, **22 in `components.css`** (18 after excluding
+the 4 `clamp(...)` lines already listed as justified exceptions), and the
+rest already accounted for by the exceptions above. A full risk-classified
+breakdown of every one of those 70 lines (which are floor-coupled,
+which are breakpoint-coupled, which are collision traps, which are safe
+first candidates) lives in the Task 12 report's review addendum
+(`.superpowers/sdd/2026-08-14-ui-density-css-tokenization/task-12-report.md`)
+— read that before scoping the follow-up pass rather than re-deriving it.
+
+Retokenizing the header/nav chrome safely needs its own dedicated pass
+with per-breakpoint visual review (like Tasks 7–11 got for the page
+files), since it's globally visible on every page and several of its
+values are decorative geometry (pill radii, badge sizes) tuned as a set
+rather than independently. Do not assume every remaining match in those
+two files is "fine" — check whether it's on the exception list above
+before leaving it alone.
