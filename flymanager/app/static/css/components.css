@@ -4,7 +4,7 @@
 
 .flash-stack {
     display: grid;
-    gap: 10px;
+    gap: var(--space-md);
     margin-bottom: var(--space-xs);
 }
 
@@ -48,7 +48,7 @@
 .app-button-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-md);
     flex-wrap: wrap;
 }
 
@@ -63,7 +63,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-sm);
-    padding: 0.35rem 0.7rem;
+    padding: var(--space-sm) var(--space-lg);
     border-radius: 999px;
     background: color-mix(in srgb, var(--header-bg) 14%, var(--card-bg) 86%);
     border: 1px solid color-mix(in srgb, var(--header-bg) 24%, var(--border-color) 76%);
@@ -72,35 +72,35 @@
 }
 
 .app-section-title {
-    margin: 0 0 14px;
+    margin: 0 0 var(--space-lg);
     font-size: clamp(1.05rem, 1rem + 0.4vw, 1.28rem);
 }
 
 .app-empty-state {
     text-align: center;
     color: var(--muted-text);
-    padding: 28px var(--space-xl);
+    padding: var(--space-2xl) var(--space-xl);
 }
 
 .app-form-shell {
     display: grid;
-    gap: 18px;
+    gap: var(--space-xl);
 }
 
 .app-form-section {
     display: grid;
-    gap: 14px;
+    gap: var(--space-lg);
     padding-top: var(--space-2xs);
 }
 
 .app-form-section + .app-form-section {
     border-top: 1px solid var(--border-color);
-    padding-top: 18px;
+    padding-top: var(--space-xl);
 }
 
 .app-form-section-title {
     margin: 0;
-    font-size: 1rem;
+    font-size: var(--font-size-base);
     font-weight: 700;
     color: var(--text-color);
 }
@@ -137,7 +137,7 @@
     min-height: 44px;
     display: flex;
     align-items: center;
-    padding: 0.7rem 0.9rem;
+    padding: var(--space-lg) var(--space-lg);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     background: color-mix(in srgb, var(--bg-color) 76%, var(--card-bg) 24%);
@@ -168,14 +168,14 @@
 
 .app-settings-grid {
     display: grid;
-    gap: 18px;
+    gap: var(--space-xl);
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .app-action-card {
     display: grid;
     gap: var(--space-lg);
-    padding: 18px;
+    padding: var(--space-xl);
     border: 1px solid var(--border-color);
     border-radius: 16px;
     background: color-mix(in srgb, var(--bg-color) 82%, var(--card-bg) 18%);
@@ -184,9 +184,9 @@
 .app-form-progress {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-top: 10px;
-    padding: 0.7rem 0.9rem;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+    padding: var(--space-lg) var(--space-lg);
     border-radius: 12px;
     border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent 22%);
     background: color-mix(in srgb, var(--card-bg) 90%, var(--bg-color) 10%);
@@ -280,11 +280,11 @@
     display: flex;
     align-items: center;
     gap: var(--space-lg);
-    padding: var(--space-md) 0.85rem;
+    padding: var(--space-md) var(--space-lg);
     border-radius: 0.35rem;
     border: 1px solid rgba(0, 0, 0, 0.1);
     background: rgba(13, 110, 253, 0.06);
-    font-size: 0.9rem;
+    font-size: var(--font-size-base);
 }
 
 .job-status-row--succeeded {

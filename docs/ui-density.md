@@ -193,38 +193,58 @@ is deliberate:
   `padding-bottom: calc(clamp(...) + 104px)` and its mobile variant). The
   added constant is the measured height of the floating cart bar itself so
   page content doesn't render underneath it, not a spacing choice.
+- **Fluid spacing `clamp()`s** — not just the display-heading font-sizes
+  above, the same pattern shows up for a handful of *spacing* properties
+  that intentionally scale with viewport width rather than sitting on the
+  fixed `--space-*` step scale: `layout.css` `.main-content` padding
+  (`clamp(16px, 2vw, 28px) 0 clamp(28px, 4vw, 44px)`) and `.auth-shell`
+  margin (`clamp(12px, 4vw, 32px) auto`); `components.css` `.app-panel`
+  padding (`clamp(16px, 2vw, 24px)`) and `.app-upload-shell`/
+  `.app-empty-shell` margin (`clamp(12px, 4vw, 28px) auto`). Like
+  `tokens.css`'s own token definitions, these are themselves `clamp()`
+  expressions containing raw px — the fluid behavior is the point, not a
+  leak.
 
-## Known gap: `layout.css` and `components.css` were extracted but never fully tokenized
+## `layout.css` and `components.css` are now tokenized (Task 13)
 
-Unlike `pages/*.css` (each given both an extraction task and a matching
-"tokenize and tighten" pass), `layout.css` (header/nav/footer/auth shell)
-and `components.css` (shared `.app-*` system) only ever received a
-byte-for-byte extraction out of `base.html`'s original inline `<style>`
-block. A handful of clearly generic, exact-token-value spacing rules in
-`components.css` and the dead pre-density rules and `.modal-dialog` margin
-in `bootstrap-density.css` were tokenized as part of closing out this
-project, but most of `layout.css`'s header/nav chrome (pill padding, badge
-sizing, brand lockup gaps, etc.) and a number of `components.css` rules
-that don't have an exact-pixel token match (chip padding, form-section
-gaps, job-status-row padding, etc.) remain hardcoded. None of these are
-new — they've rendered unchanged since before this project started — but
-they are a real gap against the "no hardcoded spacing/type values
-anywhere" goal, not a documented exception.
+`layout.css` (header/nav/footer/auth shell) and `components.css` (shared
+`.app-*` system) were extracted verbatim out of `base.html`'s original
+inline `<style>` block (Tasks 4–5) and never given the tokenize-and-tighten
+pass every `pages/*.css` file got — a real, previously-documented gap
+against the "no hardcoded spacing/type values anywhere" goal. Task 13
+closed it in two commits:
 
-As of this writing the acceptance grep above returns **124 matches**:
-**52 in `layout.css`**, **22 in `components.css`** (18 after excluding
-the 4 `clamp(...)` lines already listed as justified exceptions), and the
-rest already accounted for by the exceptions above. A full risk-classified
-breakdown of every one of those 70 lines (which are floor-coupled,
-which are breakpoint-coupled, which are collision traps, which are safe
-first candidates) lives in the Task 12 report's review addendum
-(`.superpowers/sdd/2026-08-14-ui-density-css-tokenization/task-12-report.md`)
-— read that before scoping the follow-up pass rather than re-deriving it.
+1. **Tokenize at parity** — every literal that exactly equalled an
+   existing token value (2/4/6/8/12/16/24px, and the 40px
+   `--control-height` floor on `.header-action-button`/`.header-nav-link`,
+   previously hardcoded rather than tracking the token) became a `var(...)`
+   with zero value change, confirmed `IDENTICAL` via a full 56-shot
+   capture/compare.
+2. **Tighten** — every remaining hardcoded spacing/type value was mapped
+   onto the scale using the project's standard bucketing (2-3px→2xs,
+   4-5px→xs, 6-8px→sm, 10px→md, 14-16px→lg, 20-24px→xl, 30-40px→2xl, with
+   in-between values assigned to the nearer bucket), including static
+   `rem` font-sizes retuned onto the fluid `--font-size-*` clamp tokens
+   (e.g. `.header-nav-link`/`.header-action-button` font-size 0.88rem →
+   `var(--font-size-base)`, `.app-form-section-title` 1rem →
+   `var(--font-size-base)` — the latter is a genuine static→fluid behavior
+   change, previously flagged as worth calling out).
 
-Retokenizing the header/nav chrome safely needs its own dedicated pass
-with per-breakpoint visual review (like Tasks 7–11 got for the page
-files), since it's globally visible on every page and several of its
-values are decorative geometry (pill radii, badge sizes) tuned as a set
-rather than independently. Do not assume every remaining match in those
-two files is "fine" — check whether it's on the exception list above
-before leaving it alone.
+The acceptance grep against these two files now returns only the 6
+`clamp()` lines listed as justified exceptions above (was 124 total /
+52 + 22 in these two files before Task 13). `.header-action-button` and
+`.header-nav-link` keep `min-height: var(--control-height)`; their padding
+was tightened but verified — by driving a real browser at 900px and
+600px, since the harness only captures ≥1024px — to still measure exactly
+40px tall at both widths. `.app-view-value`'s `min-height: 44px` (not
+matched by the acceptance grep, and not itself a `--control-height`-style
+floor) was left untouched; only its padding was tightened.
+
+`.job-status-row` and `.app-form-progress` only render mid-submit or while
+a background job runs, so no harness screenshot ever shows them; Task 13
+verified their tightened spacing by injecting the exact DOM
+`job_status_banner.js` produces (same classes, same markup) into a live
+page and inspecting the render directly, rather than relying on `compare`.
+
+See `.superpowers/sdd/2026-08-14-ui-density-css-tokenization/task-13-report.md`
+for the full before/after value table and per-rule reasoning.
