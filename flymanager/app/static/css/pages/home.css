@@ -61,7 +61,7 @@
     .hero-title {
         margin: 0;
         font-size: clamp(1.6rem, 1.3rem + 1.2vw, 2.4rem);
-        line-height: 1.05;
+        line-height: var(--line-height-105);
         letter-spacing: -0.03em;
     }
 
@@ -122,7 +122,7 @@
     .snapshot-value {
         display: block;
         font-size: clamp(1.2rem, 1.02rem + 0.7vw, 1.65rem);
-        line-height: 1;
+        line-height: var(--line-height-100);
         font-weight: 800;
         letter-spacing: -0.03em;
         color: var(--accent-color);
@@ -187,7 +187,7 @@
     .panel-header h3,
     .panel-header h4 {
         margin: 0;
-        line-height: 1.1;
+        line-height: var(--line-height-110);
     }
 
     /* Panel titles are card-level labels, not document headings a user
@@ -256,7 +256,7 @@
 
     .action-card strong {
         font-size: var(--font-size-lg);
-        line-height: 1.2;
+        line-height: var(--line-height-120);
         color: var(--text-color);
     }
 
@@ -284,14 +284,14 @@
 
     .insight-value {
         font-size: clamp(1.45rem, 1.2rem + 0.9vw, 2rem);
-        line-height: 0.95;
+        line-height: var(--line-height-095);
         font-weight: 800;
         letter-spacing: -0.04em;
         color: var(--accent-color);
     }
 
     .insight-label {
-        font-size: var(--font-size-lg);
+        font-size: var(--font-size-base);
         font-weight: 700;
     }
 
@@ -354,7 +354,7 @@
 
     .trend-value {
         font-size: clamp(1.5rem, 1.28rem + 0.8vw, 2.05rem);
-        line-height: 0.95;
+        line-height: var(--line-height-095);
         font-weight: 800;
         letter-spacing: -0.04em;
         color: var(--accent-color);
@@ -529,6 +529,12 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        /* Below --font-size-xs (the smallest token, clamp(0.68rem,...)):
+           a single-character label inside a ~14px tray-heatmap swatch,
+           the same tray-grid-density category view_tray.css's .tray-cell
+           is already exempt from (see docs/ui-density.md). No token on
+           the scale fits a label this small without the swatch itself
+           growing past its intended micro-heatmap size. */
         font-size: 0.5rem;
         font-weight: 800;
         border: 1px solid rgba(0, 0, 0, 0.06);
@@ -620,7 +626,7 @@
         background: color-mix(in srgb, var(--header-bg) 16%, white 84%);
         color: var(--accent-color);
         font-weight: 800;
-        font-size: var(--font-size-base);
+        font-size: var(--font-size-sm);
         flex: 0 0 auto;
     }
 
@@ -680,7 +686,7 @@
         margin: var(--space-xs) 0 0;
         color: var(--muted-text);
         font-size: var(--font-size-sm);
-        line-height: 1.35;
+        line-height: var(--line-height-135);
     }
 
     .tray-heatmap-head .btn {
@@ -833,7 +839,7 @@
     .mini-section h4,
     .upcoming-card h4 {
         margin: 0;
-        line-height: 1.2;
+        line-height: var(--line-height-120);
     }
 
     .suggestion-card p,
@@ -1100,7 +1106,7 @@
     }
 
     .dashboard-link i {
-        font-size: var(--font-size-base);
+        font-size: var(--font-size-sm);
     }
 
     @media (max-width: 1199px) {

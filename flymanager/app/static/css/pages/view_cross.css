@@ -28,14 +28,14 @@
 
     .offspring-phenotype-image-card-body {
         padding: var(--space-xs) var(--space-sm) var(--space-sm);
-        line-height: 1.2;
+        line-height: var(--line-height-120);
     }
 
     .offspring-phenotype-image-title {
         display: block;
         font-size: var(--font-size-xs);
         font-weight: 700;
-        line-height: 1.15;
+        line-height: var(--line-height-115);
     }
 
     .offspring-phenotype-image-source {
@@ -43,7 +43,7 @@
         margin-top: var(--space-2xs);
         color: var(--muted-text);
         font-size: var(--font-size-xs);
-        line-height: 1.15;
+        line-height: var(--line-height-115);
     }
 
     /* Parent phenotype-preview reference-image crop. Pre-dates the CSS

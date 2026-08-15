@@ -83,7 +83,7 @@
        scale - same category as home.css's snapshot/insight/trend values
        and view_stock.css's .stock-summary-value (Task 8/9 precedent). */
     font-size: 1.75rem;
-    line-height: 1;
+    line-height: var(--line-height-100);
     color: var(--tray-text-strong);
 }
 
@@ -396,7 +396,7 @@
 .tray-cell-code {
     font-weight: 700;
     font-size: var(--font-size-sm);
-    line-height: 1.1;
+    line-height: var(--line-height-110);
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--tray-text-strong);
@@ -446,7 +446,7 @@
 .tray-cell-detail-title {
     font-size: var(--font-size-base);
     font-weight: 700;
-    line-height: 1.25;
+    line-height: var(--line-height-125);
     color: var(--tray-text-strong);
     margin-bottom: var(--space-sm);
     overflow-wrap: anywhere;
@@ -454,7 +454,7 @@
 
 .tray-cell-detail-row {
     font-size: var(--font-size-sm);
-    line-height: 1.35;
+    line-height: var(--line-height-135);
     color: var(--tray-text-muted);
 }
 

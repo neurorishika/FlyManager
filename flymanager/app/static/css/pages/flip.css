@@ -139,7 +139,7 @@
 
 .flip-guide-meta-card strong {
     display: block;
-    line-height: 1.3;
+    line-height: var(--line-height-base);
 }
 
 .flip-browser-callout {
@@ -242,7 +242,7 @@
 .flip-identifier {
     font-size: clamp(2.2rem, 5vw, 4.6rem);
     font-weight: 800;
-    line-height: 0.95;
+    line-height: var(--line-height-095);
     margin: 0 0 var(--space-md);
     letter-spacing: -0.04em;
 }

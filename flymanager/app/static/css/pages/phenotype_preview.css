@@ -107,13 +107,13 @@
         margin: 0;
         color: var(--muted-text);
         font-size: var(--font-size-sm);
-        line-height: 1.4;
+        line-height: var(--line-height-140);
     }
 
     .stock-phenotype-image-card-meta {
         margin: var(--space-2xs) 0 0;
         color: var(--muted-text);
-        font-size: var(--font-size-base);
+        font-size: var(--font-size-sm);
         text-transform: capitalize;
     }
 

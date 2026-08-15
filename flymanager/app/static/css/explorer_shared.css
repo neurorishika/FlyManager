@@ -278,7 +278,7 @@
     margin: 0 0 var(--space-xs);
     font-weight: 700;
     font-size: var(--font-size-lg);
-    line-height: 1.35;
+    line-height: var(--line-height-135);
 }
 
 .cross-item p,
@@ -427,17 +427,22 @@
     font-size: var(--font-size-base);
 }
 
+/* min-height/height/border-radius/border/background/padding-top/
+   padding-bottom were previously declared here at (0,1,0) specificity
+   and were ALWAYS fully overridden by bootstrap-density.css's later,
+   equal-specificity `.form-control` rules (both the base rule and the
+   density layer's `.btn, .form-control, ...` rule) — a pre-existing
+   collision this project's file split only made greppable, not new.
+   The dead min-height:38px/height:38px in particular lied about this
+   control's own floor: the box has always actually rendered at the
+   global 40px `--control-height`, never at 38px. Removed rather than
+   specificity-raised, since the global 40px result is the CORRECT one
+   (38px would sit below the tap-target floor) — only the color/
+   font-size below still apply and are worth keeping explicit. */
 .explorer-filter-control {
-    min-height: 38px;
-    height: 38px;
-    border-radius: 10px;
-    border: 1px solid color-mix(in srgb, var(--border-color) 86%, transparent 14%);
-    background: color-mix(in srgb, var(--bg-color) 70%, var(--card-bg) 30%);
     color: var(--text-color);
     box-shadow: none;
     font-size: var(--font-size-base);
-    padding-top: var(--space-sm);
-    padding-bottom: var(--space-sm);
 }
 
 .explorer-filter-control:focus {
@@ -609,7 +614,7 @@
     background: color-mix(in srgb, var(--bg-color) 76%, var(--card-bg) 24%);
     font-size: var(--font-size-sm);
     font-weight: 700;
-    line-height: 1.15;
+    line-height: var(--line-height-115);
 }
 
 .table-location-code,
@@ -635,7 +640,7 @@
 .table-primary {
     color: var(--text-color);
     font-weight: 700;
-    line-height: 1.35;
+    line-height: var(--line-height-135);
     min-width: 0;
     background: transparent;
     overflow-wrap: anywhere;
@@ -644,7 +649,7 @@
 .table-secondary {
     color: var(--muted-text);
     font-size: var(--font-size-sm);
-    line-height: 1.35;
+    line-height: var(--line-height-135);
     min-width: 0;
     background: transparent;
     overflow-wrap: anywhere;
@@ -883,7 +888,20 @@
     display: none;
 }
 
-.column-selector-toggle {
+/* Selector doubled to `.btn.column-selector-toggle` (0,2,0) rather than
+   plain `.column-selector-toggle` (0,1,0): the <summary> this styles
+   also carries `.btn.btn-outline-secondary` (templates/stock/
+   stock_explorer.html, cross_explorer.html), so bootstrap-density.css's
+   later, equal-specificity `.btn, .form-control, ...` density-layer rule
+   was winning min-height (40px, not the intended 52px pill) — and its
+   `padding-left`/`padding-right` longhands were winning over this rule's
+   `padding-inline` shorthand too, the one genuinely NEW clobber from
+   this project's density work (that longhand pair did not previously
+   exist on a selector matching this element). border-radius survived by
+   luck (bootstrap-density's .btn radius rule targets a different
+   selector) but is pinned here too so it isn't the next silent regression
+   if that changes. */
+.btn.column-selector-toggle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -894,7 +912,7 @@
     background-color: color-mix(in srgb, var(--card-bg) 97%, white 3%);
     background-image: none;
     border: 1px solid color-mix(in srgb, var(--panel-border) 84%, transparent 16%);
-    line-height: 1;
+    line-height: var(--line-height-100);
     white-space: nowrap;
     color: color-mix(in srgb, var(--text-color) 72%, var(--bg-color) 28%);
     box-shadow: var(--surface-shadow);
@@ -929,7 +947,7 @@
     align-items: center;
     justify-content: center;
     gap: var(--space-sm);
-    line-height: 1;
+    line-height: var(--line-height-100);
     white-space: nowrap;
     margin-left: 0 !important;
     padding-inline: var(--space-lg);
@@ -942,7 +960,7 @@
 }
 
 .view-toggle-container .btn i {
-    line-height: 1;
+    line-height: var(--line-height-100);
 }
 
 .view-toggle-container .btn:hover,

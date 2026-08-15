@@ -29,7 +29,7 @@
 .schedule-summary-value {
     margin: 0;
     font-size: clamp(1.2rem, 1.05rem + 0.7vw, 1.75rem);
-    line-height: 1.05;
+    line-height: var(--line-height-105);
     letter-spacing: -0.03em;
 }
 
@@ -106,7 +106,7 @@
 
 .schedule-day-title {
     margin: 0;
-    line-height: 1.1;
+    line-height: var(--line-height-110);
 }
 
 .schedule-day-count {
@@ -253,7 +253,7 @@
 
 .schedule-item-body {
     color: var(--text-color);
-    line-height: 1.5;
+    line-height: var(--line-height-150);
     min-width: 0;
     overflow-wrap: anywhere;
 }

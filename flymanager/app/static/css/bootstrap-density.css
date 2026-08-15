@@ -360,7 +360,7 @@ label {
     padding-bottom: var(--space-xs);
     padding-left: var(--control-padding-x);
     padding-right: var(--control-padding-x);
-    line-height: 1.3;
+    line-height: var(--line-height-base);
 }
 
 /* Buttons and pagination center their label within the 40px box.

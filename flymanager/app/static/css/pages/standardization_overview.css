@@ -29,7 +29,7 @@
            --font-size-* scale (same pattern as home.css's snapshot/insight
            values, Task 8) — this is a headline number, not a label. */
         font-size: clamp(1.05rem, 1rem + 0.4vw, 1.35rem);
-        line-height: 1.25;
+        line-height: var(--line-height-125);
     }
 
     .standardization-overview-copy {

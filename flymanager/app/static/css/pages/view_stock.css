@@ -29,7 +29,7 @@
            --font-size-* scale (same pattern as home.css's snapshot/insight
            values, Task 8) — this is a headline number, not a label. */
         font-size: clamp(1.05rem, 1rem + 0.4vw, 1.35rem);
-        line-height: 1.25;
+        line-height: var(--line-height-125);
     }
 
     .stock-summary-copy {
@@ -75,7 +75,7 @@
         max-height: 320px;
         align-items: flex-start;
         white-space: pre-wrap;
-        line-height: 1.5;
+        line-height: var(--line-height-150);
         overflow: auto;
         scrollbar-gutter: stable;
     }
@@ -361,13 +361,13 @@
         margin: 0;
         color: var(--muted-text);
         font-size: var(--font-size-sm);
-        line-height: 1.4;
+        line-height: var(--line-height-140);
     }
 
     .stock-phenotype-image-card-meta {
         margin: var(--space-2xs) 0 0;
         color: var(--muted-text);
-        font-size: var(--font-size-base);
+        font-size: var(--font-size-sm);
         text-transform: capitalize;
     }
 
