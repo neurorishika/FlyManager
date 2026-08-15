@@ -204,6 +204,34 @@ is deliberate:
   `tokens.css`'s own token definitions, these are themselves `clamp()`
   expressions containing raw px — the fluid behavior is the point, not a
   leak.
+- **Static font-sizes kept as literals because every candidate token grows
+  the text** (`layout.css`): `.app-brand-name` (`1.02rem`),
+  `.app-brand-meta` (`0.7rem`), `.header-eyebrow` (`0.68rem`),
+  `.header-action-button`/`.header-nav-link` (`0.88rem`, both — the same
+  literal, same token decision, per the consistency rule). A density pass
+  must never render a converted font-size *larger* than the value it
+  replaced at any viewport width, and for each of these the nearest token
+  by raw-distance failed that test:
+  - `.app-brand-name` (1.02rem/16.32px): `--font-size-lg` peaks at
+    1.05rem, above the original above ~640px viewport width. The next
+    token down, `--font-size-base`, peaks at 0.90rem — always safely
+    smaller, but a ~12% shrink to the brand wordmark, a decorative/identity
+    element rather than a density-relevant control. Kept as a literal
+    rather than force a disproportionate cosmetic change onto a piece of
+    UI this pass isn't really about.
+  - `.app-brand-meta` (0.7rem) and `.header-eyebrow` (0.68rem) both sit
+    at/inside `--font-size-xs`'s own range (0.68–0.72rem) — the smallest
+    token on the scale — so tokenizing either would grow it above ~360–
+    640px rather than shrink it. There is no smaller token to step down
+    to. Kept as literals.
+  - `.header-action-button`/`.header-nav-link` (0.88rem): the next token
+    down from `--font-size-base` (which grows this above ~620px) is
+    `--font-size-sm`, capping at 0.80rem. These are the app's primary
+    touch/nav controls on a tablet-first app — legibility here matters
+    more than on decorative text, and 0.80rem read too small for primary
+    navigation labels in visual review. Kept as a literal rather than
+    either grow the text (density regression) or shrink it past what's
+    comfortable to read on a touch control.
 
 ## `layout.css` and `components.css` are now tokenized (Task 13)
 
@@ -225,14 +253,22 @@ closed it in two commits:
    4-5px→xs, 6-8px→sm, 10px→md, 14-16px→lg, 20-24px→xl, 30-40px→2xl, with
    in-between values assigned to the nearer bucket), including static
    `rem` font-sizes retuned onto the fluid `--font-size-*` clamp tokens
-   (e.g. `.header-nav-link`/`.header-action-button` font-size 0.88rem →
-   `var(--font-size-base)`, `.app-form-section-title` 1rem →
-   `var(--font-size-base)` — the latter is a genuine static→fluid behavior
-   change, previously flagged as worth calling out).
+   where a token existed that stayed **at or below** the original value at
+   every viewport width (e.g. `.app-form-section-title` 1rem →
+   `var(--font-size-base)`, capping at 0.90rem — a genuine static→fluid
+   behavior change, but strictly a shrink; `.header-session-copy` 0.83rem
+   and `.theme-toggle-label` 0.82rem both → `var(--font-size-sm)`, capping
+   at 0.80rem, after an initial pass wrongly picked `--font-size-base`
+   (peaks at 0.90rem) by nearest-boundary-distance without checking
+   direction — caught in review and fixed). Five font-size conversions
+   where *no* token satisfied "never larger than the original" were kept
+   as literals instead — see the new exceptions below.
 
-The acceptance grep against these two files now returns only the 6
-`clamp()` lines listed as justified exceptions above (was 124 total /
-52 + 22 in these two files before Task 13). `.header-action-button` and
+The acceptance grep against these two files now returns 11 lines: the 6
+`clamp()` lines listed above plus the 5 literal-font-size exceptions just
+below (was 124 total / 52 + 22 in these two files before Task 13, then
+briefly 6 after Task 13's first pass before the direction-check review
+added the 5 font-size literals back). `.header-action-button` and
 `.header-nav-link` keep `min-height: var(--control-height)`; their padding
 was tightened but verified — by driving a real browser at 900px and
 600px, since the harness only captures ≥1024px — to still measure exactly
