@@ -866,10 +866,11 @@
         background: transparent;
         color: var(--text-color);
         border-radius: 999px;
-        padding: var(--space-sm) var(--space-lg);
+        padding: var(--space-lg);
+        min-height: var(--control-height);
+        box-sizing: border-box;
         font-size: var(--font-size-sm);
         font-weight: 700;
-        min-height: 0;
         display: inline-flex;
         align-items: center;
         text-decoration: none;

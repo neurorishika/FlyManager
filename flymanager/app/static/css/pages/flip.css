@@ -278,7 +278,9 @@
     display: flex;
     align-items: center;
     gap: var(--space-md);
-    padding: var(--space-md);
+    padding: var(--space-lg);
+    min-height: var(--control-height);
+    box-sizing: border-box;
     border: 1px solid var(--border-color);
     border-radius: 12px;
     background: color-mix(in srgb, var(--bg-color) 75%, var(--card-bg) 25%);

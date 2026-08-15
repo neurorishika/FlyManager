@@ -1036,6 +1036,8 @@
     min-width: 0;
     margin: 0;
     padding: var(--space-md);
+    min-height: var(--control-height);
+    box-sizing: border-box;
     border-radius: 12px;
     border: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent 16%);
     background: color-mix(in srgb, var(--bg-color) 78%, var(--card-bg) 22%);

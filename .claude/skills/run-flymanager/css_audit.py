@@ -58,7 +58,11 @@ PAGES = [
 ]
 VIEWPORTS = [("tablet", 1024, 768), ("desktop", 1600, 1000)]
 THEMES = ["light", "dark"]
-CONTROLS = ".btn, .form-control, .page-link, .nav-link"
+CONTROLS = (
+    ".btn, .form-control, .page-link, .nav-link, .dropdown-item, "
+    ".filter-chip, .flip-status-option, .column-selector-option, "
+    ".guide-pill, .close, .custom-control-label"
+)
 MIN_TAP_PX = 40
 
 # KNOWN, TRACKED tap-target violation - deliberately NOT in CONTROLS.
@@ -90,7 +94,46 @@ TAP_TARGET_KNOWN_EXCLUSIONS = {
     ".tray-cell": "wide trays (many columns) can render narrower than "
                    "MIN_TAP_PX; pre-existing, tracked, not in CONTROLS - "
                    "see comment above.",
+    # Final whole-branch review (2026-08-14 ui-density pass), Important 3:
+    # pre-existing sub-floor controls this project did not introduce and
+    # is not resizing in this fix wave (see final-fix-report.md). Recorded
+    # here instead of silently passing tapcheck once CONTROLS was widened
+    # to include .dropdown-item/.custom-control-label.
+    #
+    # `.bulk-status-item`: plain Bootstrap `.dropdown-item` (not nested
+    # under `.header-menu`, so it gets none of that selector's density
+    # padding/min-height) used by the bulk-status-change dropdown on both
+    # explorers (templates/stock/stock_explorer.html,
+    # templates/cross/cross_explorer.html). Measured ~30.4px, 10x across
+    # both explorers. Matched by its own class token so the shared
+    # `.header-menu .dropdown-item` fix above does not also cover it.
+    ".bulk-status-item": "plain Bootstrap .dropdown-item outside "
+                          ".header-menu (explorer bulk-status dropdowns); "
+                          "~30.4px measured, pre-existing, not resized "
+                          "this pass.",
+    # `.custom-control-label`: Bootstrap's default checkbox/radio label
+    # (add_stock.html, add_cross.html, view_tray.html, settings/admin.html)
+    # - an inline text label beside a native input, not a standalone
+    # button; the native <input> (or the label's full click-through area
+    # in some layouts) is the actual hit target. Measured ~17.9px tall.
+    # Resizing every checkbox/radio label site-wide to a 40px block is a
+    # layout change well beyond a tap-target CSS fix and was judged out of
+    # scope for this wave.
+    ".custom-control-label": "Bootstrap checkbox/radio label, ~17.9px, "
+                              "several templates; pre-existing, not "
+                              "resized this pass - see comment above.",
 }
+
+# Also pre-existing and NOT covered by CONTROLS (so tapcheck cannot see
+# them at all), recorded here for the record per the same review:
+#   - `.breadcrumb-item a` (templates/tray/view_tray.html:11): ~20.2px,
+#     plain Bootstrap breadcrumb link.
+#   - Explorer row-selection checkboxes (raw `<input type="checkbox">`,
+#     one per table row in both explorers): ~13-18px, native checkbox
+#     size, not styled by any project CSS.
+# Neither is a `.dropdown-item`/`.custom-control-label`/etc. token so
+# widening CONTROLS would not surface them; listed here only so a future
+# reader has the same picture the review did.
 
 # Wall-clock-sensitive DOM on the home dashboard (templates/home.html):
 #   - `.snapshot-activity`: the hero "Last activity" card, backed by
@@ -344,8 +387,19 @@ def compare(label_a, label_b):
     return 0
 
 
+def _is_known_exclusion(sel):
+    """True if every class token on `sel` is covered by
+    TAP_TARGET_KNOWN_EXCLUSIONS (matched by bare class name, dot stripped)."""
+    classes = sel.split()
+    if not classes:
+        return False
+    known = {k.lstrip(".") for k in TAP_TARGET_KNOWN_EXCLUSIONS}
+    return any(c in known for c in classes)
+
+
 def tapcheck():
     violations = []
+    excluded = []
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
         _ensure_auth_state(browser)
@@ -361,25 +415,41 @@ def tapcheck():
             # here - determinism for the DOM measurements below rests solely
             # on _settle()'s 250ms wait_for_timeout (invoked inside _load()).
             _load(page, slug, path)
+            # Checks both height AND width: a control that is tall enough
+            # but too narrow (e.g. a square icon-only button) is just as
+            # hard to hit reliably as one that is too short.
             small = page.eval_on_selector_all(
                 CONTROLS,
                 """(els, floor) => els
                     .filter(e => e.offsetParent !== null)
-                    .map(e => ({
-                        h: Math.round(e.getBoundingClientRect().height),
-                        sel: e.className || e.tagName,
-                    }))
-                    .filter(e => e.h > 0 && e.h < floor)""",
+                    .map(e => {
+                        const r = e.getBoundingClientRect();
+                        return {
+                            h: Math.round(r.height),
+                            w: Math.round(r.width),
+                            sel: e.className || e.tagName,
+                        };
+                    })
+                    .filter(e => (e.h > 0 && e.h < floor) ||
+                                 (e.w > 0 && e.w < floor))""",
                 MIN_TAP_PX)
             for item in small:
-                violations.append(f"{slug}: {item['h']}px  {item['sel'][:60]}")
+                line = f"{slug}: {item['h']}x{item['w']}px  {item['sel'][:60]}"
+                if _is_known_exclusion(item["sel"]):
+                    excluded.append(line)
+                else:
+                    violations.append(line)
         browser.close()
+    if excluded:
+        print(f"TAP-TARGET KNOWN EXCLUSIONS ({len(excluded)}), not counted as failures:")
+        for line in sorted(set(excluded)):
+            print(f"  {line}")
     if violations:
         print(f"TAP-TARGET VIOLATIONS ({len(violations)}), floor {MIN_TAP_PX}px:")
         for line in violations:
             print(f"  {line}")
         return 1
-    print(f"TAP-TARGETS OK: none below {MIN_TAP_PX}px")
+    print(f"TAP-TARGETS OK: none below {MIN_TAP_PX}px (outside documented exclusions)")
     return 0
 
 
