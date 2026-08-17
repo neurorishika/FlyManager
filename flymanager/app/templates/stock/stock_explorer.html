@@ -172,14 +172,6 @@
                     <p class="stock-item-submeta"><strong>Phenotype:</strong> {{ stock.PhenotypeGuess }} ({{ stock.PhenotypeConfidence|title }})</p>
                 <p class="stock-item-submeta"><strong>Responsibility:</strong> {{ stock.AssignmentScopeDetail }}</p>
                 <p class="stock-item-submeta"><strong>Provenance:</strong> {{ stock.Provenance }}</p>
-                {% if stock.ProviderMatchesLoaded %}
-                <div class="stock-provider-cache-summary">
-                    <p class="stock-provider-cache-primary"><strong>Provider Cache:</strong> {{ stock.ProviderMatchesCountLabel }}{% if stock.ProviderMatchesStatusLabel %} • {{ stock.ProviderMatchesStatusLabel }}{% endif %}</p>
-                    {% if stock.ProviderMatchesPrimaryLabel %}
-                    <p class="stock-provider-cache-secondary">Top match: {{ stock.ProviderMatchesPrimaryLabel }}</p>
-                    {% endif %}
-                </div>
-                {% endif %}
                 <p class="stock-item-submeta"><strong>Unique Identifier:</strong> <i>{{ stock.UniqueID }}</i></p>
             </div>
             <div class="stock-item-actions">

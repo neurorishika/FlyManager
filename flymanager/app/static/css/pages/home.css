@@ -1025,13 +1025,42 @@
         color: var(--accent-color);
     }
 
-    .week-chart {
+    .month-chart {
         display: grid;
-        grid-template-columns: repeat(7, minmax(0, 1fr));
-        gap: var(--space-md);
+        grid-template-columns: repeat(30, minmax(0, 1fr));
+        gap: var(--space-2xs);
         align-items: end;
         min-height: 200px;
         margin-top: var(--space-md);
+    }
+
+    /* 30 bars in one dashboard column: drop the per-bar chrome the 7-bar
+     * version could afford, and rely on the shared shell tint for the axis. */
+    .month-chart .bar-shell {
+        border-radius: 6px;
+        padding: 2px;
+    }
+
+    .month-chart .bar {
+        border-radius: 4px;
+        min-height: 2px;
+    }
+
+    .month-chart .day-label {
+        font-size: var(--font-size-xs);
+        font-weight: 600;
+        color: var(--muted-text);
+        min-height: 1em;
+    }
+
+    .month-chart-legend {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: var(--space-sm);
+        margin-top: var(--space-md);
+        font-size: var(--font-size-sm);
+        color: var(--muted-text);
     }
 
     .day-bar {
@@ -1176,14 +1205,17 @@
             flex: 1 1 0;
         }
 
-        .week-chart {
-            gap: var(--space-sm);
+        .month-chart {
             min-height: 160px;
         }
 
         .bar-shell {
             min-height: 112px;
             padding: var(--space-sm);
+        }
+
+        .month-chart .bar-shell {
+            padding: 2px;
         }
 
         .queue-strip {

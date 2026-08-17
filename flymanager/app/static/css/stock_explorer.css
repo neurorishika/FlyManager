@@ -15,25 +15,6 @@
     margin-top: var(--space-sm);
 }
 
-.stock-provider-cache-summary {
-    margin-top: var(--space-md);
-    padding: var(--space-md);
-    border-radius: 12px;
-    border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent 18%);
-    background: color-mix(in srgb, var(--bg-color) 76%, var(--card-bg) 24%);
-}
-
-.stock-provider-cache-primary,
-.stock-provider-cache-secondary {
-    margin: 0;
-    color: var(--muted-text);
-    font-size: var(--font-size-sm);
-}
-
-.stock-provider-cache-secondary {
-    margin-top: var(--space-xs);
-}
-
 .badge-assignment {
     border: 1px solid transparent;
 }

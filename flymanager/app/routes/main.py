@@ -626,17 +626,23 @@ def home():
 
         parsed_activities.sort(key=lambda item: item['datetime'], reverse=True)
 
-        # Count flips in the last week
+        # Count flips in the last week, plus a per-date series over the last 30
+        # days for the monthly activity chart (a 7-day view is too sparse to
+        # show batching rhythm).
+        one_month_ago = today - timedelta(days=30)
         weekly_flips = 0
         flips_by_day = defaultdict(int)
+        flips_by_date = defaultdict(int)
 
         for activity in parsed_activities:
             activity_time = activity['datetime']
             activity_text = activity['activity']
-            if activity_time >= one_week_ago and 'flipped' in activity_text.lower():
-                weekly_flips += 1
-                day_name = activity_time.strftime('%A')
-                flips_by_day[day_name] += 1
+            if activity_time >= one_month_ago and 'flipped' in activity_text.lower():
+                flips_by_date[activity_time.date()] += 1
+                if activity_time >= one_week_ago:
+                    weekly_flips += 1
+                    day_name = activity_time.strftime('%A')
+                    flips_by_day[day_name] += 1
 
         # Process activities by date
         activity_groups = []
@@ -741,6 +747,25 @@ def home():
         busiest_day = None
         if max_flips:
             busiest_day = max(week_chart, key=lambda item: item['count'])
+
+        # Monthly chart: one bar per calendar day for the trailing 30 days.
+        # Labels are thinned to every 5th day so 30 bars stay readable.
+        month_chart = []
+        max_daily_flips = max(flips_by_date.values()) if flips_by_date else 0
+        for offset in range(29, -1, -1):
+            day_date = (today - timedelta(days=offset)).date()
+            flips = flips_by_date.get(day_date, 0)
+            height = round((flips / max_daily_flips) * 100) if max_daily_flips else 0
+            month_chart.append({
+                'label': day_date.strftime('%b %d'),
+                'short_label': day_date.strftime('%d'),
+                'show_label': offset % 5 == 0 or offset == 29,
+                'count': flips,
+                'height': int(height),
+            })
+
+        monthly_flips = sum(flips_by_date.values())
+        busiest_date = max(month_chart, key=lambda item: item['count']) if max_daily_flips else None
 
         healthy_count = status_distribution.get('Healthy', 0)
         healthy_share = round((healthy_count / total_lines) * 100) if total_lines else 0
@@ -945,7 +970,9 @@ def home():
             tray_heatmaps=tray_heatmaps,
             my_queue=my_queue,
             trend_signals=trend_signals,
-            week_chart=week_chart,
+            month_chart=month_chart,
+            monthly_flips=monthly_flips,
+            busiest_date=busiest_date,
             busiest_day=busiest_day,
             status_breakdown=status_breakdown,
             hero_copy=hero_copy,
@@ -1013,10 +1040,9 @@ def home():
             tray_heatmaps=[],
             my_queue=[],
             trend_signals=[],
-            week_chart=[
-                {'label': day, 'short_label': day[:3], 'count': 0, 'height': 0}
-                for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-            ],
+            month_chart=[],
+            monthly_flips=0,
+            busiest_date=None,
             busiest_day=None,
             status_breakdown=[],
             hero_copy='The dashboard is temporarily unavailable, but core navigation is still accessible.',

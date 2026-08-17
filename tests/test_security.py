@@ -342,7 +342,6 @@ def test_home_page_renders_dashboard_command_sections(monkeypatch):
     page = response.get_data(as_text=True)
     assert response.status_code == 200
     assert "onsubmit=" not in page
-    assert "data-confirm-message=\"This will backfill missing or stale phenotype caches for the stocks and crosses you currently maintain. Continue?\"" in page
     assert "Tray Heatmap" in page
     assert "My Queue" in page
     assert "Trend Signals" in page
@@ -350,8 +349,7 @@ def test_home_page_renders_dashboard_command_sections(monkeypatch):
     assert "Tray Heatmap" in page
     assert "FlyBase Sync Health" in page
     assert "Stale" in page
-    assert "Phenotype Cache" in page
-    assert "Backfill My Phenotype Caches" in page
+    assert "Backfill My Phenotype Caches" not in page
     assert "Genotype Reviewer" in page
     assert ">Open<" in page
 
@@ -487,7 +485,7 @@ def test_home_page_paginates_upcoming_schedule_and_recent_activity(monkeypatch):
     assert "activity_page=1" in page
 
 
-def test_home_page_renders_phenotype_cache_backfill_for_standard_user(monkeypatch):
+def test_home_page_omits_phenotype_cache_backfill_for_standard_user(monkeypatch):
     app = _make_app(monkeypatch)
 
     with app.test_client() as client:
@@ -503,10 +501,30 @@ def test_home_page_renders_phenotype_cache_backfill_for_standard_user(monkeypatc
 
     page = response.get_data(as_text=True)
     assert response.status_code == 200
-    assert "Phenotype Cache" in page
-    assert "Backfill My Phenotype Caches" in page
+    assert "Backfill My Phenotype Caches" not in page
     assert "Refresh All Provider Caches" not in page
     assert "Backfill All Phenotype Caches" not in page
+
+
+def test_jobs_page_hosts_phenotype_cache_backfill_for_standard_user(monkeypatch):
+    app = _make_app(monkeypatch)
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "scientist"
+
+        with patch("flymanager.app.routes.jobs.list_recent_jobs", return_value=[]):
+            response = client.get("/jobs")
+
+    page = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "Backfill My Phenotype Caches" in page
+    assert "Backfill All Phenotype Caches" not in page
+    assert "onsubmit=" not in page
+    assert (
+        "data-confirm-message=\"This will backfill missing or stale phenotype caches for the stocks and crosses you currently maintain. Continue?\""
+        in page
+    )
 
 
 def test_home_page_renders_failed_flybase_sync_warning_for_admin(monkeypatch):

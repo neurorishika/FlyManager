@@ -1380,7 +1380,10 @@ def test_stock_explorer_embeds_cached_provider_matches(monkeypatch):
     assert response.status_code == 200
     assert "1 cached match" in page
     assert "Cached 2h ago" in page
-    assert "Top match: Vienna 4321" in page
+    # Provider cache details live in the expandable detail panes only; the
+    # always-visible card summary was removed as clutter.
+    assert "Top match: Vienna 4321" not in page
+    assert "Top Cached Match:</strong> Vienna 4321" in page
     assert 'data-provider-matches-loaded="true"' in page
 
 

@@ -278,7 +278,10 @@
     transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.header-nav-link:visited {
+/* `a.` prefix is required: base.css has `a:visited:not(.btn)` (0-2-1), which
+ * outranks a bare `.header-nav-link:visited` (0-2-0) and would repaint visited
+ * nav pills in accent purple — unreadable on the purple header. */
+a.header-nav-link:visited {
     color: var(--header-text);
 }
 

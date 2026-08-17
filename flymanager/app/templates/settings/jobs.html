@@ -59,4 +59,15 @@
     <p class="app-page-subtitle mb-0">No background jobs have run yet.</p>
     {% endif %}
 </div>
+
+<div class="app-panel">
+    <h2 class="app-section-title">Maintenance</h2>
+    <p class="app-page-subtitle">
+        Refresh cached phenotype summaries for the stocks and crosses you currently maintain, including records
+        assigned to you. Only missing or stale caches are recomputed, so it is safe to rerun.
+    </p>
+    <form method="POST" action="{{ url_for('settings.backfill_my_phenotype_cache') }}" class="mb-0" data-confirm-message="This will backfill missing or stale phenotype caches for the stocks and crosses you currently maintain. Continue?" data-progress-form data-progress-message="Backfilling phenotype caches for your maintained records..." data-progress-duplicate-message="Your phenotype cache backfill is already running." data-progress-label="Backfilling...">
+        <button type="submit" class="btn btn-outline-primary btn-sm" data-progress-label="Backfilling...">Backfill My Phenotype Caches</button>
+    </form>
+</div>
 {% endblock %}

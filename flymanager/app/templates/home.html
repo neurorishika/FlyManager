@@ -9,7 +9,7 @@
     #tray-heatmap-{{ loop.index }} .tray-mini-row { --home-grid-columns: {{ tray.columns }}; }
     {% endif %}
     {% endfor %}
-    {% for day in week_chart %}
+    {% for day in month_chart %}
     #day-bar-{{ loop.index }} .bar { --progress-value: {{ day.height }}; }
     {% endfor %}
     {% for item in status_breakdown %}
@@ -128,38 +128,6 @@
                 <strong>Import Workbook</strong>
                 <span>Swap in curated updates from Excel when needed.</span>
             </a>
-            {% endif %}
-        </div>
-    </section>
-
-    <section class="dashboard-panel">
-        <div class="panel-header">
-            <div>
-                <h3>Phenotype Cache</h3>
-                <p class="panel-copy">Backfill stored phenotype previews without opening every stock or cross record one by one. This only fills missing or stale caches, so it is safe to rerun.</p>
-            </div>
-        </div>
-
-        <div class="sub-grid">
-            <article class="compact-card">
-                <h4>My Records</h4>
-                <p class="panel-copy">Refresh cached phenotype summaries for the stocks and crosses you currently maintain, including records assigned to you. Existing valid caches are left alone.</p>
-                <form method="POST" action="{{ url_for('settings.backfill_my_phenotype_cache') }}" data-confirm-message="This will backfill missing or stale phenotype caches for the stocks and crosses you currently maintain. Continue?" data-progress-form data-progress-message="Backfilling phenotype caches for your maintained records..." data-progress-duplicate-message="Your phenotype cache backfill is already running." data-progress-label="Backfilling...">
-                    <button type="submit" class="btn btn-primary btn-sm" data-progress-label="Backfilling...">Backfill My Phenotype Caches</button>
-                </form>
-            </article>
-
-            {% if is_admin %}
-            <article class="compact-card">
-                <h4>Admin Scope</h4>
-                <p class="panel-copy">Refresh everyone at once from the dashboard when you need to rebuild missing or stale phenotype caches across the entire database.</p>
-                <div class="app-button-row justify-content-end">
-                    <form method="POST" action="{{ url_for('settings.backfill_all_phenotype_cache') }}" class="mb-0" data-confirm-message="This will scan all user-owned stocks and crosses and backfill missing or stale phenotype caches across the entire database. Continue?" data-progress-form data-progress-message="Backfilling phenotype caches for all users..." data-progress-duplicate-message="A global phenotype cache backfill is already running." data-progress-label="Backfilling...">
-                        <button type="submit" class="btn btn-outline-primary btn-sm" data-progress-label="Backfilling...">Backfill All Phenotype Caches</button>
-                    </form>
-                    <a href="{{ url_for('settings.admin_settings') }}" class="btn btn-outline-secondary btn-sm">Open Admin Settings</a>
-                </div>
-            </article>
             {% endif %}
         </div>
     </section>
@@ -419,23 +387,30 @@
             <section class="dashboard-panel">
                 <div class="panel-header">
                     <div>
-                        <h3>Weekly Flip Activity</h3>
-                        <p class="panel-copy">Recent execution rhythm across the week, useful for spotting batching patterns and gaps.</p>
+                        <h3>Monthly Flip Activity</h3>
+                        <p class="panel-copy">Recent execution rhythm across the last 30 days, useful for spotting batching patterns and gaps.</p>
                     </div>
                     <a class="dashboard-link" href="{{ url_for('flip.flip_schedule_display') }}"><i class="fas fa-arrow-right"></i> Schedule view</a>
                 </div>
 
-                <div class="week-chart">
-                    {% for day in week_chart %}
-                    <div class="day-bar" id="day-bar-{{ loop.index }}">
+                {% if month_chart %}
+                <div class="month-chart">
+                    {% for day in month_chart %}
+                    <div class="day-bar" id="day-bar-{{ loop.index }}" title="{{ day.label }} · {{ day.count }} flips">
                         <div class="bar-shell">
                             <div class="bar"></div>
                         </div>
-                        <div class="day-label">{{ day.short_label }}</div>
-                        <div class="day-value">{{ day.count }}</div>
+                        <div class="day-label">{% if day.show_label %}{{ day.short_label }}{% endif %}</div>
                     </div>
                     {% endfor %}
                 </div>
+                <div class="month-chart-legend">
+                    <span>{{ monthly_flips }} flips in the last 30 days</span>
+                    {% if busiest_date %}<span>Busiest: {{ busiest_date.label }} · {{ busiest_date.count }}</span>{% endif %}
+                </div>
+                {% else %}
+                <p class="empty-copy">No flip activity recorded yet.</p>
+                {% endif %}
             </section>
         </div>
 
