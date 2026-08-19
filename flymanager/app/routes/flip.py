@@ -23,6 +23,7 @@ from flymanager.utils.mongo import (OperationLockConflict, edit_cross,
                                     get_maintainable_stocks, get_user_initials,
                                     hold_operation_lock, hold_operation_locks,
                                     record_operation_lock_keys, write_activity)
+from flymanager.utils.mongo_records import seconds_since_last_flip
 # Import utility functions
 from flymanager.utils.scanner import get_available_ports
 
@@ -190,44 +191,26 @@ def handle_flip_vial_route():
         else:
             return jsonify({"message": "UID not recognized for this user."}), 404
 
-        # Check last flip time to prevent rapid re-flips
-        if last_flip_str:
-            try:
-                # Assuming format 'YYYY-MM-DD HH:MM:SS' or similar from utils/mongo update functions
-                # Need to ensure consistency in date format storage
-                try:
-                    last_flip_dt = datetime.strptime(
-                        last_flip_str.split(".")[0], "%Y-%m-%d %H:%M:%S"
-                    )
-                except:
-                    last_flip_dt = datetime.strptime(
-                        last_flip_str.split(".")[0], "%Y-%m-%d %H:%M"
-                    )
-                difference = (flip_time - last_flip_dt).total_seconds()
-                if difference < MIN_FLIP_DIFFERENCE:
-                    current_app.logger.info(
-                        "%s %s already flipped recently (%.0fs ago)",
-                        item_type,
-                        uid,
-                        difference,
-                    )
-                    return (
-                        jsonify(
-                            {
-                                "message": f'{item_type} already flipped recently at: {last_flip_dt.strftime("%Y-%m-%d %H:%M:%S")}'
-                            }
-                        ),
-                        409,
-                    )  # 409 Conflict
-
-            except (ValueError, TypeError) as e:
-                current_app.logger.warning(
-                    "Could not parse last flip date '%s' for %s %s: %s",
-                    last_flip_str,
-                    item_type.lower(),
-                    uid,
-                    e,
-                )
+        # Check last flip time to prevent rapid re-flips. Shared with the
+        # bulk-flip path via seconds_since_last_flip so this rule can't
+        # silently drift out of sync between the two again (see
+        # bulk_operations.py's bulk_flip_records for the other call site).
+        difference = seconds_since_last_flip(last_flip_str, flip_time)
+        if difference is not None and difference < MIN_FLIP_DIFFERENCE:
+            current_app.logger.info(
+                "%s %s already flipped recently (%.0fs ago)",
+                item_type,
+                uid,
+                difference,
+            )
+            return (
+                jsonify(
+                    {
+                        "message": f"{item_type} already flipped recently at: {last_flip_str}"
+                    }
+                ),
+                409,
+            )  # 409 Conflict
                 # Decide whether to proceed or return an error if date is unparseable
 
         current_app.logger.info("Flipping %s %s for user %s", item_type.lower(), uid, username)

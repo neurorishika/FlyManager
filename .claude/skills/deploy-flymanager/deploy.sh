@@ -186,14 +186,56 @@ print(previous)
 ")"
 }
 
+# Pre-pulls an image directly on the NAS over SSH, outside of Portainer's
+# request/response cycle. This is the fix for a real incident: Portainer's
+# PUT /api/stacks/{id} with pullImage:true pulls synchronously as part of
+# handling the HTTP request, and the DSM reverse proxy in front of
+# Portainer (PORTAINER_URL) times out (504) well before a slow Docker Hub
+# pull finishes — even though Portainer keeps working server-side and the
+# deploy eventually succeeds anyway. Pre-pulling here means Portainer's own
+# pull is a fast no-op ("Image is up to date"), so the PUT call finishes
+# well inside the proxy's timeout instead of racing it.
+pre_pull_image() {
+  local image="$1"
+  echo "==> Pre-pulling ${image} on the NAS (avoids racing the Portainer reverse-proxy timeout)"
+  ssh_nas "/usr/local/bin/docker pull '${image}'"
+}
+
 put_stack() {
   local tmpdir="$1"
   local base="${PORTAINER_URL%/}"
-  curl -fsS -X PUT \
+  # --max-time is a safety margin, not the fix — pre_pull_image is the fix.
+  # A 504 here is treated as "uncertain", not "failed": the caller confirms
+  # via confirm_image_applied instead of trusting this exit code alone,
+  # because Portainer has been observed to complete the redeploy server-side
+  # even when the client-facing request times out.
+  curl -sS --max-time 240 -X PUT \
     -H "X-API-Key: ${PORTAINER_API_KEY}" \
     -H "Content-Type: application/json" \
     --data "@${tmpdir}/redeploy_payload.json" \
-    "${base}/api/stacks/${STACK_ID}?endpointId=${ENDPOINT_ID}" >/dev/null
+    -o /dev/null -w '%{http_code}' \
+    "${base}/api/stacks/${STACK_ID}?endpointId=${ENDPOINT_ID}"
+}
+
+# Polls the NAS directly for up to $2 seconds to confirm $APP_CONTAINER is
+# actually running $1 — the ground truth, independent of what the Portainer
+# API call returned. Echoes "confirmed" or "timeout".
+confirm_image_applied() {
+  local expected_image="$1"
+  local timeout_seconds="${2:-120}"
+  local waited=0
+  while [[ $waited -lt $timeout_seconds ]]; do
+    local actual
+    actual="$(ssh_nas "/usr/local/bin/docker inspect ${APP_CONTAINER} --format '{{.Config.Image}}'" 2>/dev/null || true)"
+    if [[ "$actual" == "$expected_image" ]]; then
+      echo "confirmed"
+      return 0
+    fi
+    sleep 10
+    waited=$((waited + 10))
+  done
+  echo "timeout"
+  return 1
 }
 
 redeploy() {
@@ -235,8 +277,23 @@ json.dump(state, open(path, 'w'), indent=2)
 "
   fi
 
+  pre_pull_image "$NEW_IMAGE"
+
   echo "==> Setting APP_IMAGE=${NEW_IMAGE} and redeploying (pullImage=true)"
-  put_stack "$tmpdir"
+  local http_code
+  http_code="$(put_stack "$tmpdir")"
+
+  if [[ "$http_code" == 2* ]]; then
+    echo "==> Redeploy request accepted (HTTP ${http_code})."
+  else
+    echo "WARNING: Portainer API returned HTTP ${http_code} (may be a reverse-proxy timeout, not a real failure)."
+    echo "==> Confirming actual state on the NAS directly..."
+    if [[ "$(confirm_image_applied "$NEW_IMAGE" 180)" != "confirmed" ]]; then
+      echo "ERROR: ${APP_CONTAINER} is still not running ${NEW_IMAGE} after waiting — redeploy genuinely failed." >&2
+      exit 1
+    fi
+    echo "==> Confirmed: ${APP_CONTAINER} is running ${NEW_IMAGE} despite the non-2xx response — redeploy succeeded."
+  fi
   echo "==> Redeploy triggered."
 }
 
@@ -338,7 +395,20 @@ rollback_image() {
   trap 'rm -rf "$tmpdir"' RETURN
   resolve_stack "$tmpdir"
   build_redeploy_payload "$tmpdir" "$previous_app_image"
-  put_stack "$tmpdir"
+  pre_pull_image "$previous_app_image"
+  local http_code
+  http_code="$(put_stack "$tmpdir")"
+  if [[ "$http_code" == 2* ]]; then
+    echo "==> Revert request accepted (HTTP ${http_code})."
+  else
+    echo "WARNING: Portainer API returned HTTP ${http_code} (may be a reverse-proxy timeout, not a real failure)."
+    echo "==> Confirming actual state on the NAS directly..."
+    if [[ "$(confirm_image_applied "$previous_app_image" 180)" != "confirmed" ]]; then
+      echo "ERROR: ${APP_CONTAINER} is still not running ${previous_app_image} after waiting — image rollback genuinely failed." >&2
+      exit 1
+    fi
+    echo "==> Confirmed: ${APP_CONTAINER} is running ${previous_app_image} despite the non-2xx response."
+  fi
   echo "==> Stack reverted to ${previous_app_image}."
 }
 

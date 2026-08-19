@@ -58,9 +58,9 @@ user before running anything past `build`/`backup` (i.e. `push`,
 | `backup` | SSHes in, runs the existing `container-mongo-backup.sh` inside `flymanager-mongo-backup` (on-demand `mongodump --oplog --archive --gzip`, same script the container already runs every 6h), records the archive path and every collection's document count into `.state/last-deploy.json` |
 | `build` | `docker buildx build --platform linux/amd64 --load`, tags `neurorishika/flymanager:<git-short-sha>` and `:latest` |
 | `push` | Pushes both tags to Docker Hub |
-| `redeploy` | Looks up the `flymanager` stack via `GET /api/stacks`, fetches its current file + env, **overwrites the `APP_IMAGE` entry** with the new `<sha>` tag (recording the old value into `.state/last-deploy.json` for rollback), then `PUT`s the stack back with `pullImage: true` — everything else in `Env` (`SECRET_KEY`, admin/SMTP credentials, etc.) round-trips unchanged |
+| `redeploy` | Looks up the `flymanager` stack via `GET /api/stacks`, fetches its current file + env, **overwrites the `APP_IMAGE` entry** with the new `<sha>` tag (recording the old value into `.state/last-deploy.json` for rollback), **pre-pulls the new image directly on the NAS over SSH**, then `PUT`s the stack back with `pullImage: true` — everything else in `Env` (`SECRET_KEY`, admin/SMTP credentials, etc.) round-trips unchanged. If the PUT itself comes back non-2xx (e.g. a reverse-proxy 504), it doesn't give up — it polls the NAS directly to confirm whether the image actually applied before deciding it really failed. |
 | `verify` | Polls `http://127.0.0.1:12754/health/ready` on the NAS (via SSH) for up to 120s, confirms `flymanager-app`'s running image matches the new tag, then re-counts every collection and fails if any count **decreased** versus the pre-deploy backup. Sets a failure-kind flag (`deploy` for health/image failures, `data` for count regressions) so `all` knows which rollback is actually warranted. |
-| `rollback-image` | Cheap: reverts `APP_IMAGE` in Portainer to the pre-deploy value and redeploys. No data touched, no outage beyond the container recreate. |
+| `rollback-image` | Cheap: pre-pulls the previous image on the NAS, reverts `APP_IMAGE` in Portainer to the pre-deploy value, and redeploys (same non-2xx-tolerant confirmation as `redeploy`). No data touched, no outage beyond the container recreate. |
 | `rollback-data` | Expensive: stops `flymanager-app`/`flymanager-worker`, restores Mongo from the recorded backup archive (`mongorestore --archive --gzip --drop --writeConcern '{"w":1}'`), restarts the app/worker containers. Only warranted when data actually regressed. |
 | `rollback` | Full rollback — `rollback-data` then `rollback-image`. What a human asking to roll back almost certainly wants. |
 | `all` (default) | `backup` → `build` → `push` → `redeploy` → `verify`; on failure, runs **only** the rollback the failure warrants — `rollback-image` alone for a health/image failure (nothing touched the data), both for a data-count regression — then exits non-zero |
@@ -116,6 +116,53 @@ If `verify`/`rollback` ever behave unexpectedly again, `.state/last-deploy.json`
 is gitignored but not deleted between runs — check it (`backup_archive`,
 `pre_counts`, `previous_app_image`) to see exactly what a given `redeploy`/
 `rollback` believed the prior state was.
+
+## Incident: 504 from Portainer's API on a real redeploy (2026-08-19)
+
+The very next real deploy attempt (after the fixes above landed) hit a
+different failure: `redeploy`'s `PUT /api/stacks/{id}?endpointId=...` came
+back `curl: (56) The requested URL returned error: 504`, and the script
+(at the time) treated any non-success from that call as fatal. But
+checking the NAS directly afterward showed the redeploy had *actually
+succeeded* — Portainer had pulled the new image and recreated
+`flymanager-app`/`flymanager-worker` correctly; only the HTTP response
+back through the DSM reverse proxy in front of Portainer (`PORTAINER_URL`)
+had timed out. Root cause: `pullImage: true` makes Portainer pull the
+image *synchronously* as part of handling the PUT request, and pulling a
+multi-hundred-MB image from Docker Hub to the NAS can take longer than the
+reverse proxy's timeout window (~60s), even though Portainer keeps working
+past that point.
+
+Two fixes landed as a direct result:
+
+1. **`pre_pull_image` runs `docker pull` directly on the NAS over SSH,
+   before** the Portainer API call, in both `redeploy` and
+   `rollback_image`. This does the slow part (fetching layers from Docker
+   Hub) outside of any HTTP request/response cycle that has a timeout —
+   so by the time Portainer's own `pullImage: true` pull runs, it's just a
+   fast "already up to date" check, and the PUT reliably finishes well
+   inside the proxy's window instead of racing it.
+2. **The HTTP status code from Portainer is no longer trusted as the sole
+   signal.** `put_stack` returns the code; a non-2xx now triggers
+   `confirm_image_applied`, which polls `docker inspect` on the NAS
+   directly (ground truth) for up to 3 minutes before deciding the deploy
+   actually failed. A genuine failure (image never applied within that
+   window) still aborts with a clear error; a proxy hiccup on top of a
+   real success no longer does.
+
+If `redeploy`/`rollback_image` print a `WARNING: Portainer API returned
+HTTP ...` line followed by `==> Confirmed: ... running ... despite the
+non-2xx response`, that's this exact scenario working as intended, not a
+new problem — the deploy succeeded, only the status report was unreliable.
+
+**Separately:** if you commit anything to the repo between running
+`redeploy` and later running `verify`/`rollback` standalone (not as part
+of the same `all` invocation), `git rev-parse --short HEAD` — and
+therefore the default `DEPLOY_TAG` — will have moved on. `verify` will
+then correctly report a mismatch against whatever tag is actually live,
+because it's comparing against the *new* HEAD, not the one that was
+deployed. Pin `DEPLOY_TAG=<the-sha-that-was-actually-deployed>` explicitly
+when re-running `verify`/`rollback` standalone after the fact.
 
 ## Gotchas
 

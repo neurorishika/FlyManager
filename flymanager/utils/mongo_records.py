@@ -172,6 +172,42 @@ def normalize_schedule_dates(dates):
     ]
 
 
+def parse_flip_timestamp_precise(timestamp_str):
+    """Parse a LastFlipDate/flip-time string to a full datetime, keeping
+    time-of-day (unlike :func:`parse_last_flip_date`, which truncates to
+    midnight and is useless for a same-day recency check).
+    """
+    for timestamp_format in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.datetime.strptime(
+                timestamp_str.split(".")[0], timestamp_format
+            )
+        except ValueError:
+            continue
+
+    raise ValueError(f"Unsupported flip timestamp format: {timestamp_str}")
+
+
+def seconds_since_last_flip(last_flip_str, flip_time):
+    """Seconds between a stored ``LastFlipDate`` and ``flip_time`` (a
+    datetime), or ``None`` if there's no last-flip value or it can't be
+    parsed.
+
+    Shared by the single-item flip route and the batched bulk-flip path so
+    the "reject a re-flip within MIN_FLIP_DIFFERENCE" rule can't drift
+    between them again the way it did before bulk flip had this check at
+    all (see the bulk_flip_records incident: a re-run bulk flip silently
+    appended a second vial to dozens of stocks with no rejection).
+    """
+    if not last_flip_str:
+        return None
+    try:
+        last_flip_dt = parse_flip_timestamp_precise(last_flip_str)
+    except ValueError:
+        return None
+    return (flip_time - last_flip_dt).total_seconds()
+
+
 def parse_last_flip_date(timestamp_str):
     for timestamp_format in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
         try:

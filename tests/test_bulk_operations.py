@@ -254,6 +254,48 @@ def test_bulk_flip_writes_one_activity_document_per_success():
     assert len(batched_db.data.get("activity", [])) == 2
 
 
+def test_bulk_flip_rejects_stock_flipped_too_recently():
+    # LastFlipDate is 1 hour before FLIP_TIME - well inside the 12-hour
+    # MIN_FLIP_DIFFERENCE window the single-item /flip route enforces.
+    # bulk_flip_records must apply the same guard instead of silently
+    # double-flipping (this is what produced the real duplicate-vial
+    # incident: a bulk flip re-ran on stocks flipped minutes earlier).
+    initial = {
+        "stocks": [make_stock("stock-1", LastFlipDate="2026-02-01 08:00:00")],
+        "crosses": [],
+    }
+
+    original_stock = copy.deepcopy(initial["stocks"][0])
+    batched_db = FakeDatabase(copy.deepcopy(initial))
+    results = bulk_flip_records(USER, ["stock-1"], batched_db, FLIP_TIME)
+
+    assert results["success"] == []
+    assert results["failed"] == [
+        {
+            "uid": "stock-1",
+            "reason": "Stock already flipped recently at: 2026-02-01 08:00:00",
+        }
+    ]
+    # The document must be completely untouched - no new vial appended.
+    assert batched_db.data["stocks"][0] == original_stock
+    assert batched_db.data.get("activity", []) == []
+
+
+def test_bulk_flip_allows_stock_flipped_over_12_hours_ago():
+    # Sanity check the guard's boundary doesn't over-reject: a LastFlipDate
+    # safely outside the window must still flip normally.
+    initial = {
+        "stocks": [make_stock("stock-1", LastFlipDate="2026-01-31 20:00:00")],
+        "crosses": [],
+    }
+
+    batched_db = FakeDatabase(copy.deepcopy(initial))
+    results = bulk_flip_records(USER, ["stock-1"], batched_db, FLIP_TIME)
+
+    assert [entry["uid"] for entry in results["success"]] == ["stock-1"]
+    assert results["failed"] == []
+
+
 def test_bulk_change_status_matches_sequential():
     initial = {
         "stocks": [make_stock("stock-1"), make_stock("stock-2")],

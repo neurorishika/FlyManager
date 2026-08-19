@@ -33,7 +33,9 @@ from flymanager.utils.mongo.trays import move_item_to_tray
 from flymanager.utils.mongo_records import (_build_flip_update_fields,
                                             _normalize_flip_timestamp,
                                             build_owned_document_update_fields,
-                                            get_missing_required_updates)
+                                            get_missing_required_updates,
+                                            parse_flip_timestamp_precise,
+                                            seconds_since_last_flip)
 
 
 def _accessible_map(collection, user, uids):
@@ -93,6 +95,13 @@ def bulk_flip_records(user, uids, db, flip_time, *, new_status=None, comment="",
     inline route produced.
     """
     normalized_timestamp = _normalize_flip_timestamp(flip_time, accept_datetime=True)
+    flip_time_dt = parse_flip_timestamp_precise(normalized_timestamp)
+
+    # Same 12-hour "don't double-flip" rule the single-item /flip route
+    # enforces against LastFlipDate - bulk_flip_records used to skip this
+    # entirely, which let a re-run/duplicate bulk flip silently append a
+    # second vial to every already-flipped record in the selection.
+    from flymanager.app import MIN_FLIP_DIFFERENCE
 
     results = {"success": [], "failed": []}
     stock_map = _accessible_map(db["stocks"], user, uids)
@@ -106,7 +115,35 @@ def bulk_flip_records(user, uids, db, flip_time, *, new_status=None, comment="",
     for index, uid in enumerate(uids):
         try:
             if uid in stock_map:
-                document = stock_map[uid]
+                item_type, document, collection_key = "Stock", stock_map[uid], "stock"
+            elif uid in cross_map:
+                item_type, document, collection_key = "Cross", cross_map[uid], "cross"
+            else:
+                results["failed"].append(
+                    {"uid": uid, "reason": "UID not recognized for this user."}
+                )
+                if progress_cb is not None:
+                    progress_cb(index + 1, total)
+                continue
+
+            difference = seconds_since_last_flip(
+                document.get("LastFlipDate"), flip_time_dt
+            )
+            if difference is not None and difference < MIN_FLIP_DIFFERENCE:
+                results["failed"].append(
+                    {
+                        "uid": uid,
+                        "reason": (
+                            f"{item_type} already flipped recently at: "
+                            f"{document['LastFlipDate']}"
+                        ),
+                    }
+                )
+                if progress_cb is not None:
+                    progress_cb(index + 1, total)
+                continue
+
+            if collection_key == "stock":
                 update_set = _compute_flip_set(
                     document, normalized_timestamp, new_status, comment,
                     compute_stock_vial_properties,
@@ -121,9 +158,7 @@ def bulk_flip_records(user, uids, db, flip_time, *, new_status=None, comment="",
                 activity_documents.append(
                     _activity_document(user, f"Flipped stock {uid} (bulk operation)")
                 )
-                results["success"].append({"uid": uid, "type": "Stock"})
-            elif uid in cross_map:
-                document = cross_map[uid]
+            else:
                 update_set = _compute_flip_set(
                     document, normalized_timestamp, new_status, comment,
                     compute_cross_vial_properties,
@@ -138,11 +173,7 @@ def bulk_flip_records(user, uids, db, flip_time, *, new_status=None, comment="",
                 activity_documents.append(
                     _activity_document(user, f"Flipped cross {uid} (bulk operation)")
                 )
-                results["success"].append({"uid": uid, "type": "Cross"})
-            else:
-                results["failed"].append(
-                    {"uid": uid, "reason": "UID not recognized for this user."}
-                )
+            results["success"].append({"uid": uid, "type": item_type})
         except Exception as exc:  # noqa: BLE001 - per-record isolation, matches old route
             results["failed"].append({"uid": uid, "reason": str(exc)})
 
