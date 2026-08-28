@@ -29,7 +29,8 @@ from flymanager.utils.mongo import (OperationLockConflict, create_mongo_client,
                                     get_settings, get_user_email,
                                     hold_operation_lock, ping_database,
                                     preload_metadata_cache)
-from flymanager.utils.stock_sources import preload_flybase_stock_indexes
+from flymanager.utils.stock_sources import (preload_flybase_chromosome_lookup_tables,
+                                             preload_flybase_stock_indexes)
 
 # Load environment variables
 load_dotenv()
@@ -291,6 +292,14 @@ def create_app():
             except Exception as exc:
                 app.logger.warning(
                     "Unable to preload FlyBase stock indexes during startup: %s",
+                    exc,
+                )
+
+            try:
+                preload_flybase_chromosome_lookup_tables()
+            except Exception as exc:
+                app.logger.warning(
+                    "Unable to preload FlyBase chromosome lookup tables during startup: %s",
                     exc,
                 )
 

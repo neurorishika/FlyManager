@@ -20,6 +20,7 @@ REQUIRED_FLYBASE_DOWNLOADS = {
     "construct_descriptions": "transgenic_construct_descriptions",
     "split_system_combinations": "split_system_combinations",
     "gene_map_table": "gene_map_table",
+    "insertion_mapping": "insertion_mapping",
 }
 
 

@@ -12,8 +12,15 @@ from flymanager.utils.genetics import (get_bloomington_data,
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FLYBASE_STOCKS_PATH = REPO_ROOT / "data" / "flybase" / "stocks_FB2026_01.tsv.gz"
 FLYBASE_STOCKS_TEXT_PATH = REPO_ROOT / "data" / "flybase" / "stocks_FB2026_01.tsv"
+FLYBASE_INSERTION_MAPPING_PATH = REPO_ROOT / "data" / "flybase" / "insertion_mapping_fb_2026_01.tsv.gz"
+FLYBASE_INSERTION_MAPPING_TEXT_PATH = REPO_ROOT / "data" / "flybase" / "insertion_mapping_fb_2026_01.tsv"
+FLYBASE_FBAL_TO_FBGN_PATH = REPO_ROOT / "data" / "flybase" / "fbal_to_fbgn_fb_2026_01.tsv.gz"
+FLYBASE_FBAL_TO_FBGN_TEXT_PATH = REPO_ROOT / "data" / "flybase" / "fbal_to_fbgn_fb_2026_01.tsv"
+FLYBASE_GENE_MAP_TABLE_PATH = REPO_ROOT / "data" / "flybase" / "gene_map_table_fb_2026_01.tsv.gz"
+FLYBASE_GENE_MAP_TABLE_TEXT_PATH = REPO_ROOT / "data" / "flybase" / "gene_map_table_fb_2026_01.tsv"
 LOGGER = logging.getLogger(__name__)
 GROUP_PAIRS = {"{": "}", "[": "]", "(": ")"}
+
 
 SOURCE_TYPE_TO_COLLECTION = {
     "BDSC": "Bloomington",
@@ -537,6 +544,412 @@ def _score_external_stock_match(
     return score, deduped_reasons
 
 
+def _resolve_flybase_bulk_path(explicit_path, primary_path, text_path, label):
+    if explicit_path is not None:
+        resolved_path = Path(explicit_path)
+        if not resolved_path.exists():
+            raise FileNotFoundError(f"{label} file not found at {resolved_path}")
+        return resolved_path
+
+    for candidate in (primary_path, text_path):
+        if candidate.exists():
+            return candidate
+
+    raise FileNotFoundError(f"{label} file not found at {primary_path} or {text_path}")
+
+
+def resolve_flybase_insertion_mapping_path(insertion_mapping_path=None):
+    return _resolve_flybase_bulk_path(
+        insertion_mapping_path,
+        FLYBASE_INSERTION_MAPPING_PATH,
+        FLYBASE_INSERTION_MAPPING_TEXT_PATH,
+        "FlyBase insertion mapping",
+    )
+
+
+def resolve_flybase_fbal_to_fbgn_path(fbal_to_fbgn_path=None):
+    return _resolve_flybase_bulk_path(
+        fbal_to_fbgn_path,
+        FLYBASE_FBAL_TO_FBGN_PATH,
+        FLYBASE_FBAL_TO_FBGN_TEXT_PATH,
+        "FlyBase allele-to-gene",
+    )
+
+
+def resolve_flybase_gene_map_table_path(gene_map_table_path=None):
+    return _resolve_flybase_bulk_path(
+        gene_map_table_path,
+        FLYBASE_GENE_MAP_TABLE_PATH,
+        FLYBASE_GENE_MAP_TABLE_TEXT_PATH,
+        "FlyBase gene map table",
+    )
+
+
+def _iter_flybase_annotation_rows(path):
+    resolved_path = Path(path)
+    opener = gzip.open if resolved_path.suffix == ".gz" else open
+
+    with opener(resolved_path, "rt", encoding="utf-8") as handle:
+        header = None
+        for line in handle:
+            stripped_line = line.rstrip("\n")
+            if stripped_line.startswith("#"):
+                if "\t" not in stripped_line:
+                    continue
+                header_fields = stripped_line.lstrip("#").split("\t")
+                if header_fields and header_fields[0] == "":
+                    header_fields = header_fields[1:]
+                header = header_fields
+                continue
+
+            if header is None or not stripped_line:
+                continue
+
+            yield dict(zip(header, stripped_line.split("\t")))
+
+
+def _chromosome_index_from_location(location_text):
+    arm = str(location_text or "").split(":", 1)[0].strip().upper()
+    if arm == "X":
+        return 0
+    if arm in ("2L", "2R", "2"):
+        return 1
+    if arm in ("3L", "3R", "3"):
+        return 2
+    if arm == "4":
+        return 3
+    return None
+
+
+def _chromosome_index_from_recombination_loc(recombination_loc_text):
+    # Old classical linkage-map genes (no modern sequence coordinates) often
+    # only carry a recombination position like "2-52.5", using the same
+    # 1=X,2,3,4 chromosome numbering as bloomington.csv's "Ch # all" column.
+    prefix = str(recombination_loc_text or "").split("-", 1)[0].strip().upper()
+    if prefix in ("1", "X"):
+        return 0
+    if prefix == "2":
+        return 1
+    if prefix == "3":
+        return 2
+    if prefix == "4":
+        return 3
+    return None
+
+
+def _find_all_top_level_groups(text):
+    groups = []
+    closing_stack = []
+    group_start_stack = []
+
+    for index, character in enumerate(text):
+        if character in GROUP_PAIRS:
+            if not closing_stack:
+                group_start_stack.append((character, index))
+            closing_stack.append(GROUP_PAIRS[character])
+            continue
+
+        if character in GROUP_PAIRS.values():
+            if closing_stack and character == closing_stack[-1]:
+                closing_stack.pop()
+                if not closing_stack:
+                    open_character, start_index = group_start_stack.pop()
+                    groups.append((open_character, start_index, index))
+
+    return groups
+
+
+def _find_top_level_bracket_groups(text):
+    return [group for group in _find_all_top_level_groups(text) if group[0] in ("{", "[")]
+
+
+def _extract_site_name_candidate(text):
+    # FlyBase's own nomenclature grammar for site-specific transgenes is
+    # "Vector{payload}site-name" (e.g. "PBac{...}VK00005") or, when the site
+    # itself disrupts a host gene, "Gene[site-name]" (e.g. "Msp300[attP40]").
+    # Reading the last top-level bracket group under that grammar recovers
+    # the site name for any current or future site-naming scheme without
+    # needing to guess what such names look like via a regex character class.
+    normalized_text = str(text or "")
+    groups = _find_top_level_bracket_groups(normalized_text)
+    if not groups:
+        return None
+
+    open_character, start_index, end_index = groups[-1]
+    if open_character == "[":
+        candidate = normalized_text[start_index + 1:end_index]
+    else:
+        candidate = normalized_text[end_index + 1:]
+
+    candidate = candidate.strip()
+    return candidate or None
+
+
+def _extract_brace_payload(text):
+    normalized_text = str(text or "")
+    for open_character, start_index, end_index in _find_top_level_bracket_groups(normalized_text):
+        if open_character == "{":
+            return normalized_text[start_index + 1:end_index]
+    return None
+
+
+# insertion_mapping.tsv carries a genomic_location for ~70k ordinary,
+# one-off insertions (any sequence-mapped transposon), not just reusable
+# docking sites - so it can't be used wholesale as a site-name source: e.g.
+# "Doc{}Ubx[1]" structurally extracts a "1" candidate that collides with an
+# ordinary allele suffix like "cn[1]". Docking sites are instead created by
+# a small, closed set of FlyBase-standard vector payloads that have been
+# stable for ~15 years (Groth 2004, Venken 2006, Bischof 2007); restricting
+# to rows using one of those payloads reliably isolates genuine reusable
+# docking-site definitions while the site *name* itself is still read
+# structurally, so any current or future site name under these systems
+# (VK00041, a new ZH-* line, etc.) resolves with no code change.
+DOCKING_SITE_VECTOR_PAYLOAD_PREFIXES = ("y[+]-attP-",)
+DOCKING_SITE_VECTOR_PAYLOAD_SUFFIXES = (".attP",)
+DOCKING_SITE_VECTOR_PAYLOAD_EXACT = {"CaryP"}
+
+
+def _is_docking_site_vector_payload(payload):
+    if not payload:
+        return False
+    if payload in DOCKING_SITE_VECTOR_PAYLOAD_EXACT:
+        return True
+    if payload.startswith(DOCKING_SITE_VECTOR_PAYLOAD_PREFIXES):
+        return True
+    return payload.endswith(DOCKING_SITE_VECTOR_PAYLOAD_SUFFIXES)
+
+
+def _get_landing_site_cache_key(insertion_mapping_path=None):
+    resolved_path = resolve_flybase_insertion_mapping_path(insertion_mapping_path)
+    stat_result = resolved_path.stat()
+    return str(resolved_path), stat_result.st_mtime_ns, stat_result.st_size
+
+
+@lru_cache(maxsize=4)
+def _load_landing_site_chromosome_map(cache_key):
+    resolved_path = Path(cache_key[0])
+    site_chromosome_index = {}
+
+    for row in _iter_flybase_annotation_rows(resolved_path):
+        genomic_location = str(row.get("genomic_location", "") or "").strip()
+        if not genomic_location:
+            continue
+
+        insertion_symbol = row.get("insertion_symbol", "")
+        if not _is_docking_site_vector_payload(_extract_brace_payload(insertion_symbol)):
+            continue
+
+        site_name = _extract_site_name_candidate(insertion_symbol)
+        if not site_name:
+            continue
+
+        chromosome_index = _chromosome_index_from_location(genomic_location)
+        if chromosome_index is None:
+            continue
+
+        site_chromosome_index.setdefault(site_name, chromosome_index)
+
+    return site_chromosome_index
+
+
+def _get_landing_site_chromosome_map(insertion_mapping_path=None):
+    return _load_landing_site_chromosome_map(_get_landing_site_cache_key(insertion_mapping_path))
+
+
+def _get_gene_map_cache_key(gene_map_table_path=None):
+    resolved_path = resolve_flybase_gene_map_table_path(gene_map_table_path)
+    stat_result = resolved_path.stat()
+    return str(resolved_path), stat_result.st_mtime_ns, stat_result.st_size
+
+
+@lru_cache(maxsize=4)
+def _load_gene_symbol_chromosome_map(cache_key):
+    resolved_path = Path(cache_key[0])
+    gene_chromosome_index = {}
+
+    for row in _iter_flybase_annotation_rows(resolved_path):
+        symbol = str(row.get("current_symbol", "") or "").strip()
+        if not symbol:
+            continue
+
+        chromosome_index = _chromosome_index_from_location(row.get("sequence_loc", ""))
+        if chromosome_index is None:
+            chromosome_index = _chromosome_index_from_recombination_loc(
+                row.get("recombination_loc", "")
+            )
+        if chromosome_index is None:
+            continue
+
+        gene_chromosome_index.setdefault(symbol, chromosome_index)
+
+    return gene_chromosome_index
+
+
+def _get_gene_symbol_chromosome_map(gene_map_table_path=None):
+    return _load_gene_symbol_chromosome_map(_get_gene_map_cache_key(gene_map_table_path))
+
+
+def _get_allele_cache_key(fbal_to_fbgn_path=None, gene_map_table_path=None):
+    resolved_fbal_path = resolve_flybase_fbal_to_fbgn_path(fbal_to_fbgn_path)
+    stat_result = resolved_fbal_path.stat()
+    return (
+        (str(resolved_fbal_path), stat_result.st_mtime_ns, stat_result.st_size),
+        _get_gene_map_cache_key(gene_map_table_path),
+    )
+
+
+@lru_cache(maxsize=4)
+def _load_allele_symbol_chromosome_map(cache_key):
+    fbal_cache_key, gene_map_cache_key = cache_key
+    gene_chromosome_index = _load_gene_symbol_chromosome_map(gene_map_cache_key)
+    resolved_path = Path(fbal_cache_key[0])
+    allele_chromosome_index = {}
+
+    for row in _iter_flybase_annotation_rows(resolved_path):
+        allele_symbol = str(row.get("AlleleSymbol", "") or "").strip()
+        gene_symbol = str(row.get("GeneSymbol", "") or "").strip()
+        if not allele_symbol or not gene_symbol:
+            continue
+
+        chromosome_index = gene_chromosome_index.get(gene_symbol)
+        if chromosome_index is None:
+            continue
+
+        allele_chromosome_index.setdefault(allele_symbol, chromosome_index)
+
+    return allele_chromosome_index
+
+
+def _get_allele_symbol_chromosome_map(fbal_to_fbgn_path=None, gene_map_table_path=None):
+    return _load_allele_symbol_chromosome_map(
+        _get_allele_cache_key(fbal_to_fbgn_path, gene_map_table_path)
+    )
+
+
+def preload_flybase_chromosome_lookup_tables():
+    # Building these from the raw TSVs takes a few seconds (mostly gzip
+    # decompression + line parsing over ~70k-220k rows) - call this once at
+    # app startup so that cost lands off the request path instead of
+    # stalling whichever request first triggers a genotype resolution.
+    _get_landing_site_chromosome_map()
+    _get_gene_symbol_chromosome_map()
+    _get_allele_symbol_chromosome_map()
+
+
+def _bare_gene_symbol(token):
+    # Strip only a trailing allele-designator "[...]" to recover the gene
+    # symbol, and skip past any leading vector "{...}" payload first - a
+    # naive "stop at the first [ or (" regex breaks on gene names that
+    # legitimately contain parens (su(pr)[3], tu(2)bw[36a]) and on
+    # transposon-prefixed disruption tokens whose first "[" is nested
+    # inside the vector's own payload (P{w[+mC]=lacW}pnt[1277] -> "pnt",
+    # not "P{w").
+    #
+    # Also reports whether a real "[...]" allele bracket was found and
+    # stripped. Without one, the "symbol" is just whatever trailed a
+    # vector's "{...}" payload verbatim (e.g. the bare "D" in
+    # "P{...}D") - BDSC's convention for distinguishing independent
+    # insertion lines of the same construct, not a gene reference, and
+    # it collides too easily with real short gene symbols (D=Dichaete,
+    # H=Hairless, ...) to be trusted as one.
+    normalized_token = str(token or "").strip()
+    groups = _find_all_top_level_groups(normalized_token)
+
+    search_start = 0
+    for open_character, _start_index, end_index in groups:
+        if open_character == "{":
+            search_start = end_index + 1
+
+    bracket_start_index = len(normalized_token)
+    for open_character, start_index, _end_index in groups:
+        if open_character == "[" and start_index >= search_start:
+            bracket_start_index = start_index
+            break
+
+    had_allele_bracket = bracket_start_index < len(normalized_token)
+    symbol = normalized_token[search_start:bracket_start_index].strip()
+    return symbol, had_allele_bracket
+
+
+def _resolve_chromosome_index_for_segment(
+    segment_text,
+    *,
+    insertion_mapping_path=None,
+    fbal_to_fbgn_path=None,
+    gene_map_table_path=None,
+):
+    normalized_segment = str(segment_text or "").strip()
+    if not normalized_segment:
+        return None
+
+    if ";" in normalized_segment:
+        # A semicolon surviving top-level splitting must be nested inside a
+        # bracket/paren group - the "a;b" of a compound rearrangement like
+        # "T(2;3)ap[Xa]" that genuinely spans two chromosomes in one
+        # segment. That can't be placed in a single chromosome slot, so
+        # decline rather than silently attribute it to whichever chromosome
+        # a token elsewhere in the segment happens to resolve to.
+        return None
+
+    site_chromosome_index = _get_landing_site_chromosome_map(insertion_mapping_path)
+    allele_chromosome_index = _get_allele_symbol_chromosome_map(
+        fbal_to_fbgn_path, gene_map_table_path
+    )
+    gene_chromosome_index = _get_gene_symbol_chromosome_map(gene_map_table_path)
+
+    for homolog in _split_top_level(normalized_segment, {"/"}, keep_empty=True):
+        for token in _split_top_level(homolog, {" "}, keep_empty=False):
+            cleaned_token = token.strip()
+            if not cleaned_token:
+                continue
+
+            site_name_candidate = _extract_site_name_candidate(cleaned_token)
+            if site_name_candidate and site_name_candidate in site_chromosome_index:
+                return site_chromosome_index[site_name_candidate]
+
+            if cleaned_token in allele_chromosome_index:
+                return allele_chromosome_index[cleaned_token]
+
+            bare_symbol, had_allele_bracket = _bare_gene_symbol(cleaned_token)
+            if had_allele_bracket and bare_symbol in gene_chromosome_index:
+                return gene_chromosome_index[bare_symbol]
+
+    return None
+
+
+def _place_segments_by_resolved_chromosome(chromosome_parts):
+    non_empty_segments = [
+        (index, segment)
+        for index, segment in enumerate(chromosome_parts)
+        if segment.strip()
+    ]
+
+    if not non_empty_segments:
+        return chromosome_parts + [""] * (4 - len(chromosome_parts)), None
+
+    resolved_indices = []
+    for _, segment in non_empty_segments:
+        chromosome_index = _resolve_chromosome_index_for_segment(segment)
+        if chromosome_index is None:
+            return None, (
+                f"Could not determine which chromosome '{segment}' belongs to "
+                "from FlyBase gene/allele or docking-site data"
+            )
+        resolved_indices.append(chromosome_index)
+
+    if len(set(resolved_indices)) != len(resolved_indices):
+        return None, (
+            "Multiple genotype segments resolved to the same chromosome; "
+            "cannot place unambiguously"
+        )
+
+    placed_parts = ["", "", "", ""]
+    for (_, segment), chromosome_index in zip(non_empty_segments, resolved_indices):
+        placed_parts[chromosome_index] = segment
+
+    return placed_parts, None
+
+
 def _split_top_level(text, separators, *, keep_empty=False):
     tokens = []
     current = []
@@ -597,10 +1010,14 @@ def normalize_external_stock_genotype(raw_genotype):
     if top_level_semicolon_count not in {1, 2, 3}:
         return False, "Genotype must be in the format xchromosome; chromosome2; chromosome3; chromosome4"
 
-    if len(chromosome_parts) < 4:
-        chromosome_parts = chromosome_parts + [""] * (4 - len(chromosome_parts))
-    elif len(chromosome_parts) > 4:
+    if len(chromosome_parts) > 4:
         return False, "Genotype must be in the format xchromosome; chromosome2; chromosome3; chromosome4"
+
+    if len(chromosome_parts) < 4:
+        resolved_parts, resolution_error = _place_segments_by_resolved_chromosome(chromosome_parts)
+        if resolution_error is not None:
+            return False, resolution_error
+        chromosome_parts = resolved_parts
 
     normalized_parts = []
     for chromosome_field in chromosome_parts[:4]:

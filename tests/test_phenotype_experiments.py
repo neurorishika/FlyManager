@@ -1159,6 +1159,7 @@ def test_parse_flybase_bulkdata_html_extracts_release_specific_downloads():
         <a href="https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/transposons/transgenic_construct_descriptions_fb_2026_01.tsv.gz">transgenic_construct_descriptions_fb_2026_01.tsv.gz</a>
         <a href="https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/alleles/split_system_combinations_fb_2026_01.tsv.gz">split_system_combinations_fb_2026_01.tsv.gz</a>
         <a href="https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/genes/gene_map_table_fb_2026_01.tsv.gz">gene_map_table_fb_2026_01.tsv.gz</a>
+        <a href="https://s3ftp.flybase.org/releases/FB2026_01/precomputed_files/insertions/insertion_mapping_fb_2026_01.tsv.gz">insertion_mapping_fb_2026_01.tsv.gz</a>
       </body>
     </html>
     """

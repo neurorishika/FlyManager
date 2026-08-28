@@ -14,7 +14,8 @@ from flymanager.utils.stock_sources import (
     _load_flybase_stock_indexes, build_external_stock_provider_link,
     build_stock_provider_metadata,
     collect_compatible_gene_metadata_from_flybase, enrich_stock_source_context,
-    find_external_stock_matches, get_external_stock_record)
+    find_external_stock_matches, get_external_stock_record,
+    normalize_external_stock_genotype)
 
 
 def _settings_payload():
@@ -71,6 +72,50 @@ def _write_flybase_stocks_file(path, rows):
         writer = csv.writer(handle, delimiter="\t")
         writer.writerow(header)
         writer.writerows(rows)
+
+
+def _write_flybase_insertion_mapping_file(path, rows):
+    with gzip.open(path, "wt", encoding="utf-8", newline="") as handle:
+        handle.write("## FlyBase Insertion Mapping Table\n")
+        handle.write(
+            "##insertion_symbol\tFBti#\tgenomic_location\trange\torientation\t"
+            "publications\testimated_cytogenetic_location\tobserved_cytogenetic_location\n"
+        )
+        for insertion_symbol, fbti, genomic_location, cyto in rows:
+            handle.write(f"{insertion_symbol}\t{fbti}\t{genomic_location}\tf\t0\tFBrf0000000\t{cyto}\t{cyto}\n")
+
+
+def _write_flybase_fbal_to_fbgn_file(path, rows):
+    with gzip.open(path, "wt", encoding="utf-8", newline="") as handle:
+        handle.write("# Generated from FlyBase release FB_TEST\n")
+        handle.write("#\tAlleleID\tAlleleSymbol\tGeneID\tGeneSymbol\n")
+        for allele_id, allele_symbol, gene_id, gene_symbol in rows:
+            handle.write(f"{allele_id}\t{allele_symbol}\t{gene_id}\t{gene_symbol}\n")
+
+
+def _write_flybase_gene_map_table_file(path, rows):
+    with gzip.open(path, "wt", encoding="utf-8", newline="") as handle:
+        handle.write("## FlyBase Gene Mapping Table\n")
+        handle.write(
+            "##organism_abbreviation\tcurrent_symbol\tprimary_FBid\t"
+            "recombination_loc\tcytogenetic_loc\tsequence_loc\n"
+        )
+        for symbol, fbgn, cyto, sequence_loc in rows:
+            handle.write(f"Dmel\t{symbol}\t{fbgn}\t0-[0]\t{cyto}\t{sequence_loc}\n")
+
+
+def _patch_flybase_chromosome_lookup(monkeypatch, tmp_path, *, insertion_rows=(), allele_rows=(), gene_rows=()):
+    insertion_path = tmp_path / "insertion_mapping.tsv.gz"
+    fbal_path = tmp_path / "fbal_to_fbgn.tsv.gz"
+    gene_map_path = tmp_path / "gene_map_table.tsv.gz"
+
+    _write_flybase_insertion_mapping_file(insertion_path, insertion_rows)
+    _write_flybase_fbal_to_fbgn_file(fbal_path, allele_rows)
+    _write_flybase_gene_map_table_file(gene_map_path, gene_rows)
+
+    monkeypatch.setattr("flymanager.utils.stock_sources.FLYBASE_INSERTION_MAPPING_PATH", insertion_path)
+    monkeypatch.setattr("flymanager.utils.stock_sources.FLYBASE_FBAL_TO_FBGN_PATH", fbal_path)
+    monkeypatch.setattr("flymanager.utils.stock_sources.FLYBASE_GENE_MAP_TABLE_PATH", gene_map_path)
 
 
 def _stock_metadata_lookup(name, _db):
@@ -146,7 +191,7 @@ def test_get_external_stock_record_marks_unsupported_flybase_record(tmp_path, mo
     assert "format xchromosome" in stock_data["supportReason"]
 
 
-def test_get_external_stock_record_pads_missing_trailing_chromosomes_for_compatible_flybase_record(tmp_path, monkeypatch):
+def test_get_external_stock_record_places_omitted_chromosome_marker_by_resolved_landing_site(tmp_path, monkeypatch):
     stocks_path = tmp_path / "stocks.tsv.gz"
     _write_flybase_stocks_file(
         stocks_path,
@@ -170,7 +215,7 @@ def test_get_external_stock_record_pads_missing_trailing_chromosomes_for_compati
     assert error is None
     assert stock_data["stockSource"] == "KYOTO"
     assert stock_data["supportStatus"] == "supported"
-    assert stock_data["genotype"] == "w[1118]; PBac{y[+mDint2] w[+mC]=UAS-hINHBB.N}VK00033; ; "
+    assert stock_data["genotype"] == "w[1118]; ; PBac{y[+mDint2] w[+mC]=UAS-hINHBB.N}VK00033; "
     assert stock_data["rawGenotype"] == "w[1118]; PBac{y[+mDint2] w[+mC]=UAS-hINHBB.N}VK00033"
 
 
@@ -228,6 +273,112 @@ def test_get_external_stock_record_rejects_multiple_top_level_homolog_states(tmp
     assert stock_data["supportReason"]
 
 
+def test_normalize_external_stock_genotype_places_landing_site_marker_on_true_chromosome_when_segment_omitted(tmp_path, monkeypatch):
+    _patch_flybase_chromosome_lookup(
+        monkeypatch,
+        tmp_path,
+        insertion_rows=[
+            ("PBac{y[+]-attP-9A}VK00005", "FBti0076428", "3L:17952108..17952108", "75A10"),
+        ],
+        gene_rows=[
+            ("w", "FBgn0003996", "3B1-3B4", "X:2685741..2687041(1)"),
+        ],
+    )
+
+    qc_passed, normalized_or_error = normalize_external_stock_genotype(
+        "w[1118]; PBac{y[+mDint2] w[+mC]=20XUAS-IVS-RSET-jGCaMP8m}VK00005"
+    )
+
+    assert qc_passed is True
+    assert normalized_or_error == (
+        "w[1118]; ; PBac{y[+mDint2] w[+mC]=20XUAS-IVS-RSET-jGCaMP8m}VK00005; "
+    )
+
+
+def test_normalize_external_stock_genotype_resolves_classical_alleles_via_gene_map(tmp_path, monkeypatch):
+    _patch_flybase_chromosome_lookup(
+        monkeypatch,
+        tmp_path,
+        gene_rows=[
+            ("w", "FBgn0003996", "3B1-3B4", "X:2685741..2687041(1)"),
+            ("cn", "FBgn0000337", "43E", "2R:9040000..9045000(1)"),
+        ],
+    )
+
+    qc_passed, normalized_or_error = normalize_external_stock_genotype("w[1118]; cn[1]")
+
+    assert qc_passed is True
+    assert normalized_or_error == "w[1118]; cn[1]; ; "
+
+
+def test_normalize_external_stock_genotype_resolves_landing_site_embedded_in_gene_disrupted_allele_symbol(tmp_path, monkeypatch):
+    _patch_flybase_chromosome_lookup(
+        monkeypatch,
+        tmp_path,
+        insertion_rows=[
+            ("P{CaryP}Msp300[attP40]", "FBti0114379", "2L:5108448..5108448", "25C6"),
+        ],
+        gene_rows=[
+            ("w", "FBgn0003996", "3B1-3B4", "X:2685741..2687041(1)"),
+        ],
+    )
+
+    qc_passed, normalized_or_error = normalize_external_stock_genotype(
+        "w[1118]; P{y[+t7.7] w[+mC]=10XUAS-IVS-mCD8::GFP}attP40"
+    )
+
+    assert qc_passed is True
+    assert normalized_or_error == (
+        "w[1118]; P{y[+t7.7] w[+mC]=10XUAS-IVS-mCD8::GFP}attP40; ; "
+    )
+
+
+def test_normalize_external_stock_genotype_resolves_allele_symbol_via_exact_fbal_to_fbgn_match(tmp_path, monkeypatch):
+    _patch_flybase_chromosome_lookup(
+        monkeypatch,
+        tmp_path,
+        allele_rows=[
+            ("FBal0012345", "l(2)k00516[k00516]", "FBgn0022161", "CG5885"),
+        ],
+        gene_rows=[
+            ("w", "FBgn0003996", "3B1-3B4", "X:2685741..2687041(1)"),
+            ("CG5885", "FBgn0022161", "34A", "2L:14000000..14001000(1)"),
+        ],
+    )
+
+    qc_passed, normalized_or_error = normalize_external_stock_genotype(
+        "w[1118]; l(2)k00516[k00516]"
+    )
+
+    assert qc_passed is True
+    assert normalized_or_error == "w[1118]; l(2)k00516[k00516]; ; "
+
+
+def test_normalize_external_stock_genotype_marks_unresolvable_random_insertion_unsupported(tmp_path, monkeypatch):
+    _patch_flybase_chromosome_lookup(
+        monkeypatch,
+        tmp_path,
+        gene_rows=[
+            ("w", "FBgn0003996", "3B1-3B4", "X:2685741..2687041(1)"),
+        ],
+    )
+
+    qc_passed, normalized_or_error = normalize_external_stock_genotype("w[1118]; P{GD2813}v10004")
+
+    assert qc_passed is False
+    assert "P{GD2813}v10004" in normalized_or_error
+
+
+def test_get_external_stock_record_resolves_bdsc_605073_uas_transgene_to_chromosome_3():
+    stock_data, error = get_external_stock_record("BDSC", "605073")
+
+    assert error is None
+    assert stock_data["supportStatus"] == "supported"
+    assert stock_data["genotype"] == (
+        "w[1118]; ; PBac{y[+mDint2] w[+mC]=20XUAS-IVS-RSET-jGCaMP8m}VK00005; "
+    )
+
+
 def test_collect_compatible_gene_metadata_from_flybase_harvests_supported_components(tmp_path, monkeypatch):
     stocks_path = tmp_path / "stocks.tsv.gz"
     _write_flybase_stocks_file(
@@ -272,12 +423,12 @@ def test_collect_compatible_gene_metadata_from_flybase_harvests_supported_compon
     assert summary["supported_rows"] == 1
     assert summary["unsupported_rows"] == 1
     assert gene_components[0] == ["w[1118]"]
-    assert gene_components[1] == ["PBac{y[+mDint2] w[+mC]=UAS-hINHBB.N}VK00033"]
-    assert gene_components[2] == []
+    assert gene_components[1] == []
+    assert gene_components[2] == ["PBac{y[+mDint2] w[+mC]=UAS-hINHBB.N}VK00033"]
     assert gene_components[3] == []
 
 
-def test_collect_compatible_gene_metadata_from_flybase_skips_rearrangement_false_positive_rows(tmp_path, monkeypatch):
+def test_collect_compatible_gene_metadata_from_flybase_skips_rearrangement_and_unresolvable_random_insertion_rows(tmp_path, monkeypatch):
     stocks_path = tmp_path / "stocks.tsv.gz"
     _write_flybase_stocks_file(
         stocks_path,
@@ -309,10 +460,10 @@ def test_collect_compatible_gene_metadata_from_flybase_skips_rearrangement_false
 
     assert summary["total_rows"] == 2
     assert summary["dmel_rows"] == 2
-    assert summary["supported_rows"] == 1
-    assert summary["unsupported_rows"] == 1
-    assert gene_components[0] == ["w[1118]"]
-    assert gene_components[1] == ["P{GD2813}v10004"]
+    assert summary["supported_rows"] == 0
+    assert summary["unsupported_rows"] == 2
+    assert gene_components[0] == []
+    assert gene_components[1] == []
     assert gene_components[2] == []
     assert gene_components[3] == []
 
