@@ -1212,6 +1212,9 @@ Append to `flymanager/utils/phenotypes/marker_catalog.py`:
 
 ```python
 _LOCK = threading.Lock()
+# Separate from _LOCK: serializes the refresh path so concurrent compiles
+# cannot install out of order. Always taken before _LOCK, never after.
+_REFRESH_LOCK = threading.Lock()
 _SNAPSHOT = None
 
 
@@ -2494,20 +2497,35 @@ def _overlay_documents(db):
 def refresh_catalog(db, *, force=False):
     """Recompile the snapshot from Mongo when the stored revision has moved.
 
+    The whole read-compile-install sequence is serialized on _REFRESH_LOCK.
+    Without it two threads can install out of order -- a slow compile of an
+    older revision overwriting a newer snapshot that already landed -- which
+    would make the served catalog go backward instead of converging. Production
+    runs gunicorn with 12 threads per worker, so these globals are genuinely
+    shared.
+
+    Installs by assigning under _LOCK rather than calling set_catalog:
+    threading.Lock is not reentrant, so calling set_catalog from inside a _LOCK
+    block would deadlock. Lock order is always _REFRESH_LOCK then _LOCK, and
+    nothing takes them the other way round.
+
     A compile failure propagates with the previous snapshot left installed:
     the request path must never be left without a catalog, and a half-built
     one would be worse than a stale one.
     """
-    global _SNAPSHOT_REVISION
+    global _SNAPSHOT, _SNAPSHOT_REVISION
 
-    revision = read_catalog_revision(db)
-    if not force and _SNAPSHOT is not None and _SNAPSHOT_REVISION == revision:
-        return _SNAPSHOT
+    with _REFRESH_LOCK:
+        revision = read_catalog_revision(db)
+        if not force and _SNAPSHOT is not None and _SNAPSHOT_REVISION == revision:
+            return _SNAPSHOT
 
-    snapshot = compile_catalog(load_shipped_catalog(), _overlay_documents(db))
-    set_catalog(snapshot)
-    _SNAPSHOT_REVISION = revision
-    return snapshot
+        snapshot = compile_catalog(load_shipped_catalog(), _overlay_documents(db))
+
+        with _LOCK:
+            _SNAPSHOT = snapshot
+            _SNAPSHOT_REVISION = revision
+        return snapshot
 
 
 def maybe_refresh_catalog(db, *, interval_seconds=DEFAULT_REFRESH_INTERVAL_SECONDS, now=None):
@@ -2517,6 +2535,10 @@ def maybe_refresh_catalog(db, *, interval_seconds=DEFAULT_REFRESH_INTERVAL_SECON
     """
     global _LAST_REVISION_CHECK
 
+    # Deliberately unlocked: this calls refresh_catalog, which takes
+    # _REFRESH_LOCK, so locking here would deadlock. Two threads both passing
+    # the gate is harmless -- refresh_catalog re-reads the revision inside its
+    # own critical section and the second one returns immediately.
     current = time.monotonic() if now is None else float(now)
     if _LAST_REVISION_CHECK is not None and (current - _LAST_REVISION_CHECK) < interval_seconds:
         return None
