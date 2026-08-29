@@ -390,6 +390,78 @@ def render_balancer_report_markdown(report):
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _catalog_row_from_balancer(document):
+    symbol = str(document.get("symbol") or "").strip()
+    payload = {
+        "family": document.get("family") or symbol,
+        "chromosome": document.get("chromosome"),
+        "default_markers": list(document.get("default_markers") or []),
+        "notes": list(document.get("notes") or []),
+        # Carried so balancer_selection keeps breakpoint-aware scoring once it
+        # stops reading the balancer_definitions staging collection.
+        "breakpoint_regions": list(document.get("breakpoint_regions") or []),
+        "breakpoint_text": document.get("breakpoint_text", ""),
+    }
+    return {
+        "Key": symbol,
+        "kind": "balancer",
+        "match": {"symbol": symbol, "aliases": list(document.get("aliases") or [])},
+        "payload": payload,
+        "sorting": {}, "audit": {}, "imaging": {"aliases": [], "images": []},
+        "expression": {},
+        "provenance": {"source": "bdsc_ingest"},
+        "origin": "curated",
+        "CuratedBy": "bdsc_ingest",
+    }
+
+
+def _bump_marker_catalog_revision(db):
+    """Bump markerCatalogRevision directly against ``db["settings"]``.
+
+    This deliberately does not import flymanager.utils.mongo.marker_definitions
+    (or anything else under flymanager.utils.mongo): that package has a hard
+    circular import on flymanager.app (utils.mongo -> utils.mongo.crosses ->
+    app.settings -> app/__init__ -> utils.mongo again), which only resolves
+    because every real caller happens to import flymanager.app first. This
+    module's ingest_balancer_definitions is also called from manage.py, a
+    standalone CLI script that never imports flymanager.app, so pulling in
+    flymanager.utils.mongo here would crash that path. marker_catalog.py's own
+    read_catalog_revision sidesteps the same cycle the same way, by touching
+    db["settings"] directly instead of going through the mongo package.
+    """
+    from flymanager.utils.phenotypes.marker_catalog import \
+        MARKER_CATALOG_REVISION_KEY
+
+    settings = db["settings"].find_one({}) or {}
+    revision = int(settings.get(MARKER_CATALOG_REVISION_KEY) or 0) + 1
+    db["settings"].update_one({}, {"$set": {MARKER_CATALOG_REVISION_KEY: revision}}, upsert=True)
+    return revision
+
+
+def _upsert_catalog_balancers(db, balancers):
+    """Mirror ingested balancers into marker_definitions.
+
+    A row a user has taken ownership of (origin "user") is left alone: the
+    ingest is a reference-data refresh, not an authority to overwrite someone's
+    deliberate override.
+    """
+    collection = db["marker_definitions"]
+    written = 0
+    for document in balancers:
+        row = _catalog_row_from_balancer(document)
+        if not row["Key"]:
+            continue
+        existing = collection.find_one({"Key": row["Key"]})
+        if existing is not None and existing.get("origin") == "user":
+            continue
+        collection.update_one({"Key": row["Key"]}, {"$set": row}, upsert=True)
+        written += 1
+
+    if written:
+        _bump_marker_catalog_revision(db)
+    return written
+
+
 def ingest_balancer_definitions(db, report, collection_name="balancer_definitions"):
     collection = db[collection_name]
     balancers = [deepcopy(document) for document in report["definitions"]["balancers"]]
@@ -402,6 +474,7 @@ def ingest_balancer_definitions(db, report, collection_name="balancer_definition
         "collection": collection_name,
         "inserted": len(balancers),
         "source_url": report["definitions"]["source_url"],
+        "catalog_rows": _upsert_catalog_balancers(db, balancers),
     }
 
 

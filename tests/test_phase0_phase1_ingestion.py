@@ -23,6 +23,16 @@ class FakeCollection:
     def insert_many(self, docs):
         self.documents.extend(dict(doc) for doc in docs)
 
+    def update_one(self, query, update, upsert=False):
+        for document in self.documents:
+            if self._matches(document, query):
+                document.update(update.get("$set", {}))
+                return
+        if upsert:
+            new_document = dict(query)
+            new_document.update(update.get("$set", {}))
+            self.documents.append(new_document)
+
     def create_index(self, keys, name=None):
         self.indexes.append({"keys": keys, "name": name})
 

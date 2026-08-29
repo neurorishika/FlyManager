@@ -1,9 +1,6 @@
 from flymanager.utils.constraints._shared import (DEFAULT_BALANCER_PRIORITY,
-                                                  deepcopy_documents,
                                                   extract_cytology_tokens,
-                                                  get_collection,
                                                   is_distal_to_gene,
-                                                  iter_collection_documents,
                                                   lookup_gene_map_record,
                                                   normalize_chromosome_label,
                                                   parse_cytology_point,
@@ -11,38 +8,22 @@ from flymanager.utils.constraints._shared import (DEFAULT_BALANCER_PRIORITY,
 from flymanager.utils.constraints.interchromosomal import \
     evaluate_interchromosomal_risk
 from flymanager.utils.constraints.marker_stability import score_sorting_markers
-from flymanager.utils.phenotypes.visual_markers import (
-    get_balancer_metadata, get_balancer_metadata_map)
+from flymanager.utils.phenotypes.visual_markers import get_balancer_metadata_map
 
 
 def _candidate_documents(chromosome, db):
-    candidates = {}
+    """Balancer candidates for a chromosome, from the marker catalog.
 
+    The balancer_definitions collection is an ingestion staging area only; its
+    contents reach here as catalog rows written by ingest_balancer_definitions,
+    so it is no longer read at resolution time. ``db`` is accepted and kept
+    unused because callers pass it positionally.
+    """
+    candidates = {}
     for symbol, metadata in get_balancer_metadata_map().items():
         if metadata.get("chromosome") != chromosome:
             continue
         candidates[symbol] = metadata
-
-    collection = get_collection(db, "balancer_definitions")
-    for document in deepcopy_documents(iter_collection_documents(collection)):
-        document_chromosome = normalize_chromosome_label(document.get("chromosome"))
-        if document_chromosome != chromosome:
-            continue
-
-        symbol = str(document.get("symbol") or "").strip()
-        if not symbol:
-            continue
-
-        hydrated = candidates.setdefault(symbol, {})
-        hydrated.update(document)
-
-        curated = get_balancer_metadata(symbol)
-        if curated is not None:
-            hydrated.setdefault("family", curated.get("family"))
-            hydrated.setdefault("default_markers", curated.get("default_markers", []))
-            hydrated.setdefault("notes", curated.get("notes", []))
-        hydrated["chromosome"] = chromosome
-
     return list(candidates.values())
 
 

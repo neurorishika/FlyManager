@@ -3,6 +3,10 @@ from flymanager.utils.constraints import (assess_marker_stability,
                                           evaluate_interchromosomal_risk,
                                           select_optimal_balancer,
                                           validate_target)
+from flymanager.utils.phenotypes import marker_catalog
+from flymanager.utils.phenotypes.data.balancer_ingest import \
+    ingest_balancer_definitions
+from tests.mongo_fakes import FakeDatabase as CatalogFakeDatabase
 
 
 class FakeCollection:
@@ -63,34 +67,43 @@ def test_evaluate_interchromosomal_risk_flags_three_balancers_as_high_risk():
 
 
 def test_select_optimal_balancer_prefers_candidate_with_closer_distal_breakpoint():
-    db = FakeDatabase()
-    db["flybase_gene_map"] = FakeCollection(
-        [
-            {
-                "current_symbol": "foo",
-                "cytogenetic_loc": "55C",
-                "recombination_loc": "2-55",
+    # balancer_definitions is an ingestion staging collection only; breakpoint
+    # data now has to reach balancer_selection through the marker catalog, so
+    # this seeds it the same way ingest_balancer_definitions would (Task 16).
+    marker_catalog.reset_catalog()
+    marker_catalog.reset_refresh_state()
+    try:
+        db = CatalogFakeDatabase({
+            "flybase_gene_map": [
+                {
+                    "current_symbol": "foo",
+                    "cytogenetic_loc": "55C",
+                    "recombination_loc": "2-55",
+                }
+            ],
+            "balancer_definitions": [],
+            "marker_definitions": [],
+            "settings": [{}],
+        })
+        ingest_balancer_definitions(db, {
+            "definitions": {
+                "source_url": "https://bdsc.example/balancers",
+                "balancers": [
+                    {"symbol": "CyO", "chromosome": 2,
+                     "default_markers": ["Cy", "cn", "pr"],
+                     "breakpoint_regions": ["22D", "58B"]},
+                    {"symbol": "SM6a", "chromosome": 2,
+                     "default_markers": ["al", "Cy", "cn", "speck"],
+                     "breakpoint_regions": ["50C", "56D"]},
+                ],
             }
-        ]
-    )
-    db["balancer_definitions"] = FakeCollection(
-        [
-            {
-                "symbol": "CyO",
-                "chromosome": "2",
-                "breakpoint_regions": ["22D", "58B"],
-                "marker_tokens": ["Cy", "cn", "pr"],
-            },
-            {
-                "symbol": "SM6a",
-                "chromosome": "2",
-                "breakpoint_regions": ["50C", "56D"],
-                "marker_tokens": ["al", "Cy", "cn", "speck"],
-            },
-        ]
-    )
+        })
+        marker_catalog.refresh_catalog(db, force=True)
 
-    selection = select_optimal_balancer("foo", 2, db)
+        selection = select_optimal_balancer("foo", 2, db)
+    finally:
+        marker_catalog.reset_catalog()
+        marker_catalog.reset_refresh_state()
 
     assert selection["selected_balancer"]["symbol"] == "SM6a"
     assert selection["used_fallback"] is False
