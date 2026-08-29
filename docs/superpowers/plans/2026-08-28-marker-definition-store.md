@@ -25,6 +25,7 @@
 - **The three legacy accessor signatures are frozen:** `get_visual_marker(symbol, allele_spec=None, token=None)`, `get_balancer_metadata(symbol)`, `get_reviewed_marker_alias(alias_token)`. Their return values must stay byte-identical to today's, including which optional keys are absent.
 - **Payload dicts are stored verbatim in snake_case.** See Deviations.
 - **The builder-calling tests need FlyBase reference data.** Tasks 11, 13 and 16 call `build_stock_phenotype_cache` / `build_cross_phenotype_cache` for real, which runs `compute_flybase_pipeline_signature()` and a full prediction. Existing cache tests mostly fabricate envelopes instead, so there is no precedent proving the builders run green and fast in a bare checkout. Before starting Task 11, confirm `data/flybase/` is populated and time one builder call; if it is slow or missing, say so rather than silently weakening the tests to fabricated envelopes.
+- **Genotype strings in tests must have four chromosome fields.** `qc_genotype` rejects anything else with "Genotype must be in the format xchromosome; chromosome2; chromosome3; chromosome4", and `compute_marker_phenotype` raises on a rejected genotype. Write `"w[1118]; CyO/Sp; +; +"`, never `"w[1118]; CyO/Sp"`.
 - Commit at the end of every task. Do not squash tasks together.
 
 ## Deviations from the spec
@@ -2640,7 +2641,7 @@ from flymanager.utils.phenotypes.predictor import (
     build_stock_phenotype_cache, get_cached_cross_phenotype,
     get_cached_stock_phenotype)
 
-GENOTYPE = "w[1118]; CyO/Sp"
+GENOTYPE = "w[1118]; CyO/Sp; +; +"
 
 
 @pytest.fixture(autouse=True)
@@ -3260,7 +3261,7 @@ def _db(stocks, crosses=()):
 
 
 def test_only_records_containing_an_affected_token_are_recomputed():
-    db = _db([_stock("A", "w[1118]; CyO/Sp"), _stock("B", "w[1118]; +")])
+    db = _db([_stock("A", "w[1118]; CyO/Sp; +; +"), _stock("B", "w[1118]; +; +; +")])
     _mutate_catalog_and_bump(db)
 
     result = rebuild_after_marker_change(db, ["Cy"])
@@ -3275,7 +3276,7 @@ def test_only_records_containing_an_affected_token_are_recomputed():
 
 
 def test_a_balancer_referencing_the_edited_marker_is_swept():
-    db = _db([_stock("A", "w[1118]; SM6a/Sp")])
+    db = _db([_stock("A", "w[1118]; SM6a/Sp; +; +")])
     _mutate_catalog_and_bump(db)
 
     rebuild_after_marker_change(db, ["Cy"])
@@ -3285,7 +3286,7 @@ def test_a_balancer_referencing_the_edited_marker_is_swept():
 
 
 def test_records_stale_for_other_reasons_are_not_stamped():
-    db = _db([_stock("C", "w[1118]; +", stale_genotype=True)])
+    db = _db([_stock("C", "w[1118]; +; +; +", stale_genotype=True)])
     _mutate_catalog_and_bump(db)
 
     rebuild_after_marker_change(db, ["Cy"])
@@ -3295,7 +3296,7 @@ def test_records_stale_for_other_reasons_are_not_stamped():
 
 
 def test_records_with_no_cache_are_left_alone_by_stamping():
-    db = _db([_stock("D", "w[1118]; +", cache=False)])
+    db = _db([_stock("D", "w[1118]; +; +; +", cache=False)])
     _mutate_catalog_and_bump(db)
 
     rebuild_after_marker_change(db, ["Cy"])
@@ -3304,7 +3305,7 @@ def test_records_with_no_cache_are_left_alone_by_stamping():
 
 
 def test_a_construct_marker_edit_rebuilds_everything():
-    db = _db([_stock("A", "w[1118]; CyO/Sp"), _stock("B", "w[1118]; +")])
+    db = _db([_stock("A", "w[1118]; CyO/Sp; +; +"), _stock("B", "w[1118]; +; +; +")])
     _mutate_catalog_and_bump(db)
 
     result = rebuild_after_marker_change(db, ["construct:w+"])
@@ -3317,7 +3318,7 @@ def test_a_construct_marker_edit_rebuilds_everything():
 
 
 def test_a_removed_balancer_alias_is_swept_when_the_prior_document_is_given():
-    db = _db([_stock("A", "w[1118]; Binsn/Y")])
+    db = _db([_stock("A", "w[1118]; Binsn/Y; +; +")])
     _mutate_catalog_and_bump(db)
     previous = {"Key": "Binsc", "kind": "balancer",
                 "match": {"symbol": "Binsc", "aliases": ["Binsn"]}}
@@ -3329,7 +3330,7 @@ def test_a_removed_balancer_alias_is_swept_when_the_prior_document_is_given():
 
 
 def test_deleting_a_shipped_override_rebuilds_everything():
-    db = _db([_stock("A", "w[1118]; CyO/Sp")])
+    db = _db([_stock("A", "w[1118]; CyO/Sp; +; +")])
     _mutate_catalog_and_bump(db)
 
     result = rebuild_after_marker_change(db, ["Cy"], deleted_override_keys=["Cy"])
@@ -3340,7 +3341,7 @@ def test_deleting_a_shipped_override_rebuilds_everything():
 def test_crosses_are_swept_on_both_genotype_fields():
     db = _db([], crosses=[{
         "_id": "X", "UniqueID": "X", "User": "admin", "AssignedTo": "",
-        "MaleGenotype": "w[1118]; +", "FemaleGenotype": "w[1118]; CyO/Sp",
+        "MaleGenotype": "w[1118]; +; +; +", "FemaleGenotype": "w[1118]; CyO/Sp; +; +",
     }])
     _mutate_catalog_and_bump(db)
 
@@ -3352,7 +3353,7 @@ def test_crosses_are_swept_on_both_genotype_fields():
 
 
 def test_an_empty_scope_stamps_without_rebuilding_anything():
-    db = _db([_stock("A", "w[1118]; CyO/Sp")])
+    db = _db([_stock("A", "w[1118]; CyO/Sp; +; +")])
     _mutate_catalog_and_bump(db)
 
     result = rebuild_after_marker_change(db, [])
