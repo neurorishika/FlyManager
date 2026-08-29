@@ -1,0 +1,1574 @@
+{
+  "ALLELE_VISUAL_MARKER_DICTIONARY": {
+    "Bl[1]": {
+      "body_part": "bristle",
+      "chromosome": 2,
+      "display_label": "Bl",
+      "dominance": "dominant",
+      "effect": "dominant abnormal thoracic macrochaetae",
+      "flybase_id": "FBgn0000193",
+      "gene_name": "Bristle",
+      "gene_stem": "Bl",
+      "phenotype_key": "Bl_1",
+      "reference_url": "https://flybase.org/reports/FBgn0000193.html",
+      "scoring_confidence": 0.77,
+      "source": "manual_dictionary"
+    },
+    "Dr[Mio]": {
+      "body_part": "eye",
+      "chromosome": 3,
+      "display_label": "Mio",
+      "dominance": "dominant",
+      "effect": "reduced drop-shaped eyes with locomotor defects",
+      "flybase_id": "FBgn0000492",
+      "gene_name": "Drop",
+      "gene_stem": "Dr",
+      "phenotype_key": "Dr_Mio",
+      "reference_url": "https://flybase.org/reports/FBgn0000492.html",
+      "scoring_confidence": 0.75,
+      "source": "manual_dictionary"
+    },
+    "Kr[If-1]": {
+      "body_part": "eye",
+      "chromosome": 2,
+      "display_label": "If",
+      "dominance": "dominant",
+      "effect": "irregular rough eye facets",
+      "flybase_id": "FBgn0001325",
+      "gene_name": "Kruppel",
+      "gene_stem": "Kr",
+      "phenotype_key": "Kr_If",
+      "reference_url": "https://flybase.org/reports/FBgn0001325.html",
+      "scoring_confidence": 0.74,
+      "source": "manual_dictionary"
+    },
+    "PPO1[Bc]": {
+      "body_part": "body",
+      "chromosome": 2,
+      "display_label": "Bc",
+      "dominance": "dominant",
+      "effect": "black-cells larval body phenotype",
+      "gene_name": "prophenoloxidase 1",
+      "gene_stem": "PPO1",
+      "phenotype_key": "PPO1_Bc",
+      "scoring_confidence": 0.72,
+      "source": "manual_dictionary"
+    },
+    "amos[Roi-1]": {
+      "body_part": "eye",
+      "chromosome": 2,
+      "display_label": "Roi",
+      "dominance": "dominant",
+      "effect": "roughoid eye morphology",
+      "gene_name": "amos",
+      "gene_stem": "amos",
+      "phenotype_key": "amos_Roi",
+      "scoring_confidence": 0.73,
+      "source": "manual_dictionary"
+    },
+    "l(2)me[1]": {
+      "body_part": "eye",
+      "chromosome": 2,
+      "display_label": "me",
+      "dominance": "recessive",
+      "effect": "eye morphology phenotype",
+      "gene_stem": "l(2)me",
+      "phenotype_key": "l2me_1",
+      "scoring_confidence": 0.55,
+      "source": "manual_dictionary"
+    },
+    "sna[Sco]": {
+      "body_part": "bristle",
+      "chromosome": 2,
+      "display_label": "Sco",
+      "dominance": "dominant",
+      "effect": "ectopic thoracic bristles",
+      "flybase_id": "FBgn0003448",
+      "gene_name": "snail",
+      "gene_stem": "sna",
+      "phenotype_key": "sna_Sco",
+      "reference_url": "https://flybase.org/reports/FBgn0003448.html",
+      "scoring_confidence": 0.73,
+      "source": "manual_dictionary"
+    },
+    "sr[1]": {
+      "body_part": "wing",
+      "chromosome": 3,
+      "display_label": "sr",
+      "dominance": "recessive",
+      "effect": "flightless wings from defective tendon attachment",
+      "flybase_id": "FBgn0003499",
+      "gene_name": "stripe",
+      "gene_stem": "sr",
+      "phenotype_key": "sr_1",
+      "reference_url": "https://flybase.org/reports/FBgn0003499.html",
+      "scoring_confidence": 0.79,
+      "source": "manual_dictionary"
+    },
+    "wg[Gla-1]": {
+      "body_part": "eye",
+      "chromosome": 2,
+      "display_label": "Gla",
+      "dominance": "dominant",
+      "effect": "glazed rough eyes with abnormal pigmentation",
+      "flybase_id": "FBgn0284084",
+      "gene_name": "wingless",
+      "gene_stem": "wg",
+      "phenotype_key": "wg_Gla",
+      "reference_url": "https://flybase.org/reports/FBgn0284084.html",
+      "scoring_confidence": 0.76,
+      "source": "manual_dictionary"
+    },
+    "wg[Sp-1]": {
+      "body_part": "wing",
+      "chromosome": 2,
+      "display_label": "Sp",
+      "dominance": "dominant",
+      "effect": "spade-shaped notched wings",
+      "flybase_id": "FBgn0284084",
+      "gene_name": "wingless",
+      "gene_stem": "wg",
+      "phenotype_key": "wg_Sp",
+      "reference_url": "https://flybase.org/reports/FBgn0284084.html",
+      "scoring_confidence": 0.78,
+      "source": "manual_dictionary"
+    }
+  },
+  "BALANCER_ALIASES": {
+    "Binsn": "Binsc",
+    "FM6B": "FM6"
+  },
+  "BALANCER_MARKERS": {
+    "Basc": [
+      "sc",
+      "Bar"
+    ],
+    "Bascy": [
+      "y",
+      "sc",
+      "Bar"
+    ],
+    "Binsc": [
+      "sc",
+      "Bar"
+    ],
+    "Binscy": [
+      "y",
+      "sc",
+      "Bar"
+    ],
+    "Binsinscy": [
+      "y",
+      "sc",
+      "sn",
+      "Bar"
+    ],
+    "CxD": [
+      "D"
+    ],
+    "CyO": [
+      "Cy",
+      "pr",
+      "cn"
+    ],
+    "FM0": [
+      "y",
+      "sc",
+      "v",
+      "f",
+      "Bar"
+    ],
+    "FM3": [
+      "y",
+      "sc",
+      "Bar"
+    ],
+    "FM4": [
+      "y",
+      "sc",
+      "Bar"
+    ],
+    "FM6": [
+      "y",
+      "sc",
+      "Bar"
+    ],
+    "FM7": [
+      "Bar"
+    ],
+    "FM7a": [
+      "y",
+      "sc",
+      "Bar"
+    ],
+    "FM7b": [
+      "y",
+      "sc",
+      "Bar"
+    ],
+    "FM7c": [
+      "y",
+      "sc",
+      "sn",
+      "Bar"
+    ],
+    "FM7d": [
+      "sc",
+      "Bar"
+    ],
+    "FM7h": [
+      "sc",
+      "Bar"
+    ],
+    "FM7i": [
+      "sc",
+      "Bar"
+    ],
+    "FM7j": [
+      "y",
+      "sc"
+    ],
+    "FM7k": [
+      "y",
+      "sc",
+      "sn",
+      "Bar"
+    ],
+    "MKRS": [
+      "ry",
+      "Sb"
+    ],
+    "MRS": [
+      "ry",
+      "Sb"
+    ],
+    "SM1": [
+      "al",
+      "Cy",
+      "cn",
+      "speck"
+    ],
+    "SM5": [
+      "al",
+      "Cy",
+      "lt",
+      "cn",
+      "speck"
+    ],
+    "SM6a": [
+      "al",
+      "Cy",
+      "cn",
+      "speck"
+    ],
+    "SM6b": [
+      "al",
+      "Cy",
+      "cn",
+      "speck"
+    ],
+    "TM1": [
+      "Sb"
+    ],
+    "TM2": [
+      "e"
+    ],
+    "TM3": [
+      "p",
+      "Ubx",
+      "e"
+    ],
+    "TM6": [
+      "Hu",
+      "Tb",
+      "e"
+    ],
+    "TM6B": [
+      "Hu",
+      "Tb",
+      "e"
+    ],
+    "TM6C": [
+      "e"
+    ],
+    "TM8": [
+      "st",
+      "Sb",
+      "e"
+    ],
+    "TM9": [
+      "st",
+      "Sb",
+      "e"
+    ],
+    "TMS": [
+      "ry",
+      "Sb"
+    ],
+    "winscy": [
+      "y",
+      "sc"
+    ]
+  },
+  "BALANCER_METADATA": {
+    "Basc": {
+      "chromosome": 1,
+      "default_markers": [
+        "sc",
+        "Bar"
+      ],
+      "family": "Basc",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "Basc"
+    },
+    "Bascy": {
+      "chromosome": 1,
+      "default_markers": [
+        "y",
+        "sc",
+        "Bar"
+      ],
+      "family": "Basc",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "Bascy"
+    },
+    "Binsc": {
+      "aliases": [
+        "Binsn"
+      ],
+      "chromosome": 1,
+      "default_markers": [
+        "sc",
+        "Bar"
+      ],
+      "family": "Binsc",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "Binsc"
+    },
+    "Binscy": {
+      "chromosome": 1,
+      "default_markers": [
+        "y",
+        "sc",
+        "Bar"
+      ],
+      "family": "Binsc",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "Binscy"
+    },
+    "Binsinscy": {
+      "chromosome": 1,
+      "default_markers": [
+        "y",
+        "sc",
+        "sn",
+        "Bar"
+      ],
+      "family": "Binsc",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "Binsinscy"
+    },
+    "CxD": {
+      "chromosome": 3,
+      "default_markers": [
+        "D"
+      ],
+      "family": "CxD",
+      "notes": [
+        "Modeled as a third-chromosome dominant marker balancer shorthand."
+      ],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "CxD"
+    },
+    "CyO": {
+      "chromosome": 2,
+      "default_markers": [
+        "Cy",
+        "pr",
+        "cn"
+      ],
+      "family": "CyO",
+      "notes": [
+        "Uses the cheat-sheet visible-marker set for the common second-chromosome balancer."
+      ],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "CyO"
+    },
+    "FM0": {
+      "chromosome": 1,
+      "default_markers": [
+        "y",
+        "sc",
+        "v",
+        "f",
+        "Bar"
+      ],
+      "family": "FM0",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "FM0"
+    },
+    "FM3": {
+      "chromosome": 1,
+      "default_markers": [
+        "y",
+        "sc",
+        "Bar"
+      ],
+      "family": "FM3",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "FM3"
+    },
+    "FM4": {
+      "chromosome": 1,
+      "default_markers": [
+        "y",
+        "sc",
+        "Bar"
+      ],
+      "family": "FM4",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "FM4"
+    },
+    "FM6": {
+      "aliases": [
+        "FM6B"
+      ],
+      "chromosome": 1,
+      "default_markers": [
+        "y",
+        "sc",
+        "Bar"
+      ],
+      "family": "FM6",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "FM6"
+    },
+    "FM7": {
+      "chromosome": 1,
+      "default_markers": [
+        "Bar"
+      ],
+      "family": "FM7",
+      "notes": [
+        "Bare FM7 is kept conservative; specific FM7 variants carry the fuller cheat-sheet marker sets."
+      ],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "FM7"
+    },
+    "FM7a": {
+      "chromosome": 1,
+      "default_markers": [
+        "y",
+        "sc",
+        "Bar"
+      ],
+      "family": "FM7",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "FM7a"
+    },
+    "FM7b": {
+      "chromosome": 1,
+      "default_markers": [
+        "y",
+        "sc",
+        "Bar"
+      ],
+      "family": "FM7",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "FM7b"
+    },
+    "FM7c": {
+      "chromosome": 1,
+      "default_markers": [
+        "y",
+        "sc",
+        "sn",
+        "Bar"
+      ],
+      "family": "FM7",
+      "notes": [
+        "Preserves the FM7c-specific sn marker instead of collapsing to generic FM7."
+      ],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "FM7c"
+    },
+    "FM7d": {
+      "chromosome": 1,
+      "default_markers": [
+        "sc",
+        "Bar"
+      ],
+      "family": "FM7",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "FM7d"
+    },
+    "FM7h": {
+      "chromosome": 1,
+      "default_markers": [
+        "sc",
+        "Bar"
+      ],
+      "family": "FM7",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "FM7h"
+    },
+    "FM7i": {
+      "chromosome": 1,
+      "default_markers": [
+        "sc",
+        "Bar"
+      ],
+      "family": "FM7",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "FM7i"
+    },
+    "FM7j": {
+      "chromosome": 1,
+      "default_markers": [
+        "y",
+        "sc"
+      ],
+      "family": "FM7",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "FM7j"
+    },
+    "FM7k": {
+      "chromosome": 1,
+      "default_markers": [
+        "y",
+        "sc",
+        "sn",
+        "Bar"
+      ],
+      "family": "FM7",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "FM7k"
+    },
+    "MKRS": {
+      "chromosome": 3,
+      "default_markers": [
+        "ry",
+        "Sb"
+      ],
+      "family": "MKRS",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "MKRS"
+    },
+    "MRS": {
+      "chromosome": 3,
+      "default_markers": [
+        "ry",
+        "Sb"
+      ],
+      "family": "MKRS",
+      "notes": [
+        "Treated as the same visible-marker set as MKRS for phenotype summaries."
+      ],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "MRS"
+    },
+    "SM1": {
+      "chromosome": 2,
+      "default_markers": [
+        "al",
+        "Cy",
+        "cn",
+        "speck"
+      ],
+      "family": "SM1",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "SM1"
+    },
+    "SM5": {
+      "chromosome": 2,
+      "default_markers": [
+        "al",
+        "Cy",
+        "lt",
+        "cn",
+        "speck"
+      ],
+      "family": "SM5",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "SM5"
+    },
+    "SM6a": {
+      "chromosome": 2,
+      "default_markers": [
+        "al",
+        "Cy",
+        "cn",
+        "speck"
+      ],
+      "family": "SM6",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "SM6a"
+    },
+    "SM6b": {
+      "chromosome": 2,
+      "default_markers": [
+        "al",
+        "Cy",
+        "cn",
+        "speck"
+      ],
+      "family": "SM6",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "SM6b"
+    },
+    "TM1": {
+      "chromosome": 3,
+      "default_markers": [
+        "Sb"
+      ],
+      "family": "TM1",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "TM1"
+    },
+    "TM2": {
+      "chromosome": 3,
+      "default_markers": [
+        "e"
+      ],
+      "family": "TM2",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "TM2"
+    },
+    "TM3": {
+      "chromosome": 3,
+      "default_markers": [
+        "p",
+        "Ubx",
+        "e"
+      ],
+      "family": "TM3",
+      "notes": [
+        "Bare TM3 follows the conservative BDSC core visible-marker set.",
+        "Explicit Sb[1] and Ser[1] in genotype strings are resolved separately rather than implied by TM3."
+      ],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "TM3"
+    },
+    "TM6": {
+      "chromosome": 3,
+      "default_markers": [
+        "Hu",
+        "Tb",
+        "e"
+      ],
+      "family": "TM6",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "TM6"
+    },
+    "TM6B": {
+      "chromosome": 3,
+      "default_markers": [
+        "Hu",
+        "Tb",
+        "e"
+      ],
+      "family": "TM6",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "TM6B"
+    },
+    "TM6C": {
+      "chromosome": 3,
+      "default_markers": [
+        "e"
+      ],
+      "family": "TM6",
+      "notes": [
+        "Uses the stripped-down TM6C visible core from the cheat sheet rather than the fuller TM6B shorthand."
+      ],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "TM6C"
+    },
+    "TM8": {
+      "chromosome": 3,
+      "default_markers": [
+        "st",
+        "Sb",
+        "e"
+      ],
+      "family": "TM8",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "TM8"
+    },
+    "TM9": {
+      "chromosome": 3,
+      "default_markers": [
+        "st",
+        "Sb",
+        "e"
+      ],
+      "family": "TM9",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "TM9"
+    },
+    "TMS": {
+      "chromosome": 3,
+      "default_markers": [
+        "ry",
+        "Sb"
+      ],
+      "family": "TMS",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "TMS"
+    },
+    "winscy": {
+      "chromosome": 1,
+      "default_markers": [
+        "y",
+        "sc"
+      ],
+      "family": "winscy",
+      "notes": [],
+      "source": "bdsc_cheat_sheet",
+      "symbol": "winscy"
+    }
+  },
+  "CRITICAL_MARKERS": [
+    "Cy",
+    "Sb",
+    "Tb",
+    "Hu",
+    "B",
+    "Adc",
+    "Bar",
+    "Bl",
+    "N",
+    "Ki",
+    "Pri",
+    "w",
+    "y",
+    "ca",
+    "e",
+    "cn",
+    "bw",
+    "p",
+    "red",
+    "speck",
+    "st",
+    "vg",
+    "Ser",
+    "D",
+    "Sp",
+    "sn",
+    "f",
+    "ey",
+    "v",
+    "sc",
+    "sev",
+    "pr",
+    "ry",
+    "cu",
+    "cv",
+    "Dr",
+    "L",
+    "mwh",
+    "al",
+    "ct",
+    "hry",
+    "lt",
+    "nub",
+    "ru",
+    "sr",
+    "Ubx"
+  ],
+  "KNOWN_BALANCER_SYMBOLS": [
+    "Basc",
+    "Bascy",
+    "Binsc",
+    "Binscy",
+    "Binsinscy",
+    "Binsn",
+    "CxD",
+    "CyO",
+    "FM0",
+    "FM3",
+    "FM4",
+    "FM6",
+    "FM6B",
+    "FM7",
+    "FM7a",
+    "FM7b",
+    "FM7c",
+    "FM7d",
+    "FM7h",
+    "FM7i",
+    "FM7j",
+    "FM7k",
+    "MKRS",
+    "MRS",
+    "SM1",
+    "SM5",
+    "SM6a",
+    "SM6b",
+    "TM1",
+    "TM2",
+    "TM3",
+    "TM6",
+    "TM6B",
+    "TM6C",
+    "TM8",
+    "TM9",
+    "TMS",
+    "winscy"
+  ],
+  "MARKER_NOTES": {
+    "B": [
+      "Bar/B-style eye-shape calls are treated as weaker standalone sorting markers."
+    ],
+    "Cy": [
+      "Curly wings are treated as the most reliable dominant balancer marker."
+    ],
+    "Sb": [
+      "Stubble is a useful balancer marker but less stable than Curly in routine sorting."
+    ],
+    "Tb": [
+      "Tubby is down-weighted because TM6B/Tb reversion is a known high-frequency risk."
+    ],
+    "mini-white": [
+      "mini-white eye pigmentation is dosage-sensitive and varies with insertion context."
+    ]
+  },
+  "MARKER_STABILITY_SCORES": {
+    "B": 0.4,
+    "Bar": 0.45,
+    "Cy": 0.95,
+    "Hu": 0.72,
+    "Sb": 0.8,
+    "Ser": 0.78,
+    "Tb": 0.5,
+    "Ubx": 0.68,
+    "e": 0.7,
+    "mini-white": 0.58
+  },
+  "PHENOTYPE_IMAGE_ALIASES": {
+    "B": [
+      "bar",
+      "b"
+    ],
+    "Bar": [
+      "bar",
+      "b"
+    ],
+    "Cy": [
+      "cy",
+      "cyo"
+    ],
+    "D": [
+      "d",
+      "dichaete"
+    ],
+    "Dr": [
+      "dr"
+    ],
+    "Dr_Mio": [
+      "drmio",
+      "mio"
+    ],
+    "Hu": [
+      "hu"
+    ],
+    "Kr_If": [
+      "if"
+    ],
+    "L": [
+      "l",
+      "lobe"
+    ],
+    "PPO1_Bc": [
+      "bc"
+    ],
+    "Sb": [
+      "sb",
+      "sb1"
+    ],
+    "Ser": [
+      "ser",
+      "ser1"
+    ],
+    "Tb": [
+      "tb"
+    ],
+    "Ubx": [
+      "ubx"
+    ],
+    "amos_Roi": [
+      "roi",
+      "roughoid"
+    ],
+    "epistasis:w_mini_white_rescue": [
+      "miniwhite",
+      "mini-white",
+      "wplus",
+      "w+"
+    ],
+    "l2me_1": [
+      "me"
+    ],
+    "mini_white": [
+      "w+",
+      "wplus",
+      "miniwhite",
+      "mini-white"
+    ],
+    "v_plus": [
+      "v+",
+      "vplus",
+      "v"
+    ],
+    "w_loss": [
+      "w-",
+      "wminus",
+      "w",
+      "white"
+    ],
+    "wa": [
+      "wa",
+      "whiteapricot",
+      "white-apricot"
+    ],
+    "wg_Gla": [
+      "gla"
+    ],
+    "wg_Sp": [
+      "sp"
+    ],
+    "y_plus": [
+      "y+",
+      "yplus",
+      "y"
+    ]
+  },
+  "REVIEWED_MARKER_ALIASES": {
+    "Gla": {
+      "alias_type": "allele_token",
+      "value": "wg[Gla-1]"
+    },
+    "If": {
+      "alias_type": "allele_token",
+      "value": "Kr[If-1]"
+    },
+    "Mio": {
+      "alias_type": "allele_token",
+      "value": "Dr[Mio]"
+    },
+    "OrCo-LexA": {
+      "alias_type": "construct_token",
+      "value": "P{Orco-LexA-VP16}unspecified"
+    },
+    "Orco-LexA": {
+      "alias_type": "construct_token",
+      "value": "P{Orco-LexA-VP16}unspecified"
+    },
+    "Sco": {
+      "alias_type": "allele_token",
+      "value": "sna[Sco]"
+    },
+    "w-": {
+      "alias_type": "allele_token",
+      "value": "w[*]"
+    }
+  },
+  "VISUAL_MARKER_DICTIONARY": {
+    "Adc": {
+      "body_part": "body",
+      "chromosome": 2,
+      "display_label": "Adc",
+      "dominance": "recessive",
+      "effect": "dark black body coloration",
+      "flybase_id": "FBgn0000153",
+      "gene_name": "Acidic amino acid decarboxylase",
+      "phenotype_key": "Adc",
+      "reference_url": "https://flybase.org/reports/FBgn0000153.html",
+      "scoring_confidence": 0.83,
+      "source": "manual_dictionary"
+    },
+    "B": {
+      "body_part": "eye",
+      "chromosome": 1,
+      "display_label": "B",
+      "dominance": "dominant",
+      "effect": "bar-shaped eyes",
+      "phenotype_key": "B",
+      "scoring_confidence": 0.92,
+      "source": "manual_dictionary"
+    },
+    "Bar": {
+      "body_part": "eye",
+      "chromosome": 1,
+      "display_label": "Bar",
+      "dominance": "dominant",
+      "effect": "bar-shaped reduced eyes",
+      "flybase_id": "FBgn0000154",
+      "gene_name": "Bar",
+      "phenotype_key": "Bar",
+      "reference_url": "https://flybase.org/reports/FBgn0000154.html",
+      "scoring_confidence": 0.9,
+      "source": "manual_dictionary"
+    },
+    "Bl": {
+      "body_part": "bristle",
+      "chromosome": 2,
+      "display_label": "Bl",
+      "dominance": "dominant",
+      "effect": "dominant abnormal macrochaetae",
+      "flybase_id": "FBgn0000193",
+      "gene_name": "Bristle",
+      "phenotype_key": "Bl",
+      "reference_url": "https://flybase.org/reports/FBgn0000193.html",
+      "scoring_confidence": 0.72,
+      "source": "manual_dictionary"
+    },
+    "Cy": {
+      "body_part": "wing",
+      "chromosome": 2,
+      "display_label": "Cy",
+      "dominance": "dominant",
+      "effect": "curly wings",
+      "homozygous_lethal": true,
+      "phenotype_key": "Cy",
+      "scoring_confidence": 0.98,
+      "source": "manual_dictionary"
+    },
+    "D": {
+      "body_part": "wing",
+      "chromosome": 3,
+      "display_label": "D",
+      "dominance": "dominant",
+      "effect": "dominant Dichaete wing posture marker",
+      "flybase_id": "FBgn0000411",
+      "gene_name": "Dichaete",
+      "phenotype_key": "D",
+      "reference_url": "https://flybase.org/reports/FBgn0000411.html",
+      "scoring_confidence": 0.78,
+      "source": "manual_dictionary"
+    },
+    "Dr": {
+      "body_part": "eye",
+      "chromosome": 3,
+      "display_label": "Dr",
+      "dominance": "dominant",
+      "effect": "drop-shaped reduced eyes",
+      "flybase_id": "FBgn0000492",
+      "gene_name": "Drop",
+      "phenotype_key": "Dr",
+      "reference_url": "https://flybase.org/reports/FBgn0000492.html",
+      "scoring_confidence": 0.79,
+      "source": "manual_dictionary"
+    },
+    "Hu": {
+      "body_part": "thorax",
+      "chromosome": 3,
+      "display_label": "Hu",
+      "dominance": "dominant",
+      "effect": "humeral bristle marker",
+      "phenotype_key": "Hu",
+      "scoring_confidence": 0.74,
+      "source": "manual_dictionary"
+    },
+    "Ki": {
+      "body_part": "bristle",
+      "chromosome": 3,
+      "display_label": "Ki",
+      "dominance": "dominant",
+      "effect": "kinked thoracic bristles",
+      "flybase_id": "FBgn0001307",
+      "gene_name": "Kinked",
+      "phenotype_key": "Ki",
+      "reference_url": "https://flybase.org/reports/FBgn0001307.html",
+      "scoring_confidence": 0.76,
+      "source": "manual_dictionary"
+    },
+    "L": {
+      "body_part": "eye",
+      "chromosome": 2,
+      "display_label": "L",
+      "dominance": "dominant",
+      "effect": "lobed reduced eyes",
+      "flybase_id": "FBgn0288433",
+      "gene_name": "Lobe",
+      "phenotype_key": "L",
+      "reference_url": "https://flybase.org/reports/FBgn0288433.html",
+      "scoring_confidence": 0.84,
+      "source": "manual_dictionary"
+    },
+    "N": {
+      "body_part": "wing",
+      "chromosome": 1,
+      "display_label": "N",
+      "dominance": "dominant",
+      "effect": "notched wing margin",
+      "flybase_id": "FBgn0004647",
+      "gene_name": "Notch",
+      "phenotype_key": "N",
+      "reference_url": "https://flybase.org/reports/FBgn0004647.html",
+      "scoring_confidence": 0.91,
+      "source": "manual_dictionary"
+    },
+    "Pri": {
+      "body_part": "bristle",
+      "chromosome": 3,
+      "display_label": "Pri",
+      "dominance": "dominant",
+      "effect": "prickly thoracic bristles",
+      "flybase_id": "FBgn0003142",
+      "gene_name": "Prickly",
+      "phenotype_key": "Pri",
+      "reference_url": "https://flybase.org/reports/FBgn0003142.html",
+      "scoring_confidence": 0.74,
+      "source": "manual_dictionary"
+    },
+    "Sb": {
+      "body_part": "bristle",
+      "chromosome": 3,
+      "display_label": "Sb",
+      "dominance": "dominant",
+      "effect": "short, thick bristles",
+      "phenotype_key": "Sb",
+      "scoring_confidence": 0.94,
+      "source": "manual_dictionary"
+    },
+    "Ser": {
+      "body_part": "wing",
+      "chromosome": 3,
+      "display_label": "Ser",
+      "dominance": "dominant",
+      "effect": "serrated wing margin",
+      "phenotype_key": "Ser",
+      "scoring_confidence": 0.82,
+      "source": "manual_dictionary"
+    },
+    "Tb": {
+      "body_part": "body",
+      "chromosome": 3,
+      "display_label": "Tb",
+      "dominance": "dominant",
+      "effect": "tubby body shape",
+      "phenotype_key": "Tb",
+      "scoring_confidence": 0.8,
+      "source": "manual_dictionary"
+    },
+    "Ubx": {
+      "body_part": "haltere",
+      "chromosome": 3,
+      "display_label": "Ubx",
+      "dominance": "dominant",
+      "effect": "homeotic haltere-to-wing transformation",
+      "flybase_id": "FBgn0003944",
+      "gene_name": "Ultrabithorax",
+      "phenotype_key": "Ubx",
+      "reference_url": "https://flybase.org/reports/FBgn0003944.html",
+      "scoring_confidence": 0.82,
+      "source": "manual_dictionary"
+    },
+    "al": {
+      "body_part": "antenna",
+      "chromosome": 2,
+      "display_label": "al",
+      "dominance": "recessive",
+      "effect": "reduced or missing aristae",
+      "flybase_id": "FBgn0000061",
+      "gene_name": "aristaless",
+      "phenotype_key": "al",
+      "reference_url": "https://flybase.org/reports/FBgn0000061.html",
+      "scoring_confidence": 0.72,
+      "source": "manual_dictionary"
+    },
+    "bw": {
+      "body_part": "eye",
+      "chromosome": 2,
+      "display_label": "bw",
+      "dominance": "recessive",
+      "effect": "brown eye pigment",
+      "phenotype_key": "bw",
+      "scoring_confidence": 0.82,
+      "source": "manual_dictionary"
+    },
+    "ca": {
+      "body_part": "eye",
+      "chromosome": 3,
+      "display_label": "ca",
+      "dominance": "recessive",
+      "effect": "wine-red eye color",
+      "flybase_id": "FBgn0000247",
+      "gene_name": "claret",
+      "phenotype_key": "ca",
+      "reference_url": "https://flybase.org/reports/FBgn0000247.html",
+      "scoring_confidence": 0.86,
+      "source": "manual_dictionary"
+    },
+    "car": {
+      "body_part": "eye",
+      "chromosome": 1,
+      "display_label": "car",
+      "dominance": "recessive",
+      "effect": "carnation eye color",
+      "phenotype_key": "car",
+      "scoring_confidence": 0.74,
+      "source": "manual_dictionary"
+    },
+    "cn": {
+      "body_part": "eye",
+      "chromosome": 2,
+      "display_label": "cn",
+      "dominance": "recessive",
+      "effect": "cinnabar eye color",
+      "phenotype_key": "cn",
+      "scoring_confidence": 0.83,
+      "source": "manual_dictionary"
+    },
+    "ct": {
+      "body_part": "wing",
+      "chromosome": 1,
+      "display_label": "ct",
+      "dominance": "recessive",
+      "effect": "cut wing margin with missing margin tissue",
+      "flybase_id": "FBgn0004198",
+      "gene_name": "cut",
+      "phenotype_key": "ct",
+      "reference_url": "https://flybase.org/reports/FBgn0004198.html",
+      "scoring_confidence": 0.84,
+      "source": "manual_dictionary"
+    },
+    "cu": {
+      "body_part": "wing",
+      "chromosome": 3,
+      "display_label": "cu",
+      "dominance": "recessive",
+      "effect": "wings curved upward",
+      "flybase_id": "FBgn0261808",
+      "gene_name": "curled",
+      "phenotype_key": "cu",
+      "reference_url": "https://flybase.org/reports/FBgn0261808.html",
+      "scoring_confidence": 0.83,
+      "source": "manual_dictionary"
+    },
+    "cv": {
+      "body_part": "wing",
+      "chromosome": 3,
+      "display_label": "cv",
+      "dominance": "recessive",
+      "effect": "missing crossveins",
+      "flybase_id": "FBgn0000394",
+      "gene_name": "crossveinless",
+      "phenotype_key": "cv",
+      "reference_url": "https://flybase.org/reports/FBgn0000394.html",
+      "scoring_confidence": 0.68,
+      "source": "manual_dictionary"
+    },
+    "e": {
+      "body_part": "body",
+      "chromosome": 3,
+      "display_label": "e",
+      "dominance": "recessive",
+      "effect": "ebony body color",
+      "phenotype_key": "e",
+      "scoring_confidence": 0.86,
+      "source": "manual_dictionary"
+    },
+    "ey": {
+      "body_part": "eye",
+      "chromosome": 4,
+      "display_label": "ey",
+      "dominance": "recessive",
+      "effect": "eye morphology marker",
+      "phenotype_key": "ey",
+      "scoring_confidence": 0.56,
+      "source": "manual_dictionary"
+    },
+    "f": {
+      "body_part": "bristle",
+      "chromosome": 1,
+      "display_label": "f",
+      "dominance": "recessive",
+      "effect": "dominant abnormal thoracic macrochaetae",
+      "phenotype_key": "f",
+      "scoring_confidence": 0.79,
+      "source": "manual_dictionary"
+    },
+    "hry": {
+      "body_part": "wing",
+      "chromosome": 3,
+      "display_label": "hry",
+      "dominance": "recessive",
+      "effect": "ectopic wing hairs and bristles",
+      "flybase_id": "FBgn0001168",
+      "gene_name": "hairy",
+      "phenotype_key": "hry",
+      "reference_url": "https://flybase.org/reports/FBgn0001168.html",
+      "scoring_confidence": 0.78,
+      "source": "manual_dictionary"
+    },
+    "lt": {
+      "body_part": "eye",
+      "chromosome": 2,
+      "display_label": "lt",
+      "dominance": "recessive",
+      "effect": "lightened eye pigment",
+      "flybase_id": "FBgn0002566",
+      "gene_name": "light",
+      "phenotype_key": "lt",
+      "reference_url": "https://flybase.org/reports/FBgn0002566.html",
+      "scoring_confidence": 0.72,
+      "source": "manual_dictionary"
+    },
+    "mwh": {
+      "body_part": "wing",
+      "chromosome": 3,
+      "display_label": "mwh",
+      "dominance": "recessive",
+      "effect": "multiple hairs per wing cell",
+      "flybase_id": "FBgn0264272",
+      "gene_name": "multiple wing hairs",
+      "phenotype_key": "mwh",
+      "reference_url": "https://flybase.org/reports/FBgn0264272.html",
+      "scoring_confidence": 0.58,
+      "source": "manual_dictionary"
+    },
+    "nub": {
+      "body_part": "wing",
+      "chromosome": 2,
+      "display_label": "nub",
+      "dominance": "recessive",
+      "effect": "reduced nubbin wings",
+      "flybase_id": "FBgn0085424",
+      "gene_name": "nubbin",
+      "phenotype_key": "nub",
+      "reference_url": "https://flybase.org/reports/FBgn0085424.html",
+      "scoring_confidence": 0.8,
+      "source": "manual_dictionary"
+    },
+    "p": {
+      "body_part": "eye",
+      "chromosome": 3,
+      "display_label": "p",
+      "dominance": "recessive",
+      "effect": "prune eye color",
+      "flybase_id": "FBgn0086679",
+      "gene_name": "prune",
+      "phenotype_key": "p",
+      "reference_url": "https://flybase.org/reports/FBgn0086679.html",
+      "scoring_confidence": 0.81,
+      "source": "manual_dictionary"
+    },
+    "pr": {
+      "body_part": "eye",
+      "chromosome": 2,
+      "display_label": "pr",
+      "dominance": "recessive",
+      "effect": "purple eye pigment",
+      "flybase_id": "FBgn0003141",
+      "gene_name": "purple",
+      "phenotype_key": "pr",
+      "reference_url": "https://flybase.org/reports/FBgn0003141.html",
+      "scoring_confidence": 0.79,
+      "source": "manual_dictionary"
+    },
+    "px": {
+      "body_part": "wing",
+      "chromosome": 2,
+      "display_label": "px",
+      "dominance": "recessive",
+      "effect": "plexus wing venation",
+      "phenotype_key": "px",
+      "scoring_confidence": 0.66,
+      "source": "manual_dictionary"
+    },
+    "red": {
+      "body_part": "eye",
+      "chromosome": 3,
+      "display_label": "red",
+      "dominance": "recessive",
+      "effect": "bright red eye color",
+      "flybase_id": "FBgn0285913",
+      "gene_name": "red",
+      "phenotype_key": "red",
+      "reference_url": "https://flybase.org/reports/FBgn0285913.html",
+      "scoring_confidence": 0.82,
+      "source": "manual_dictionary"
+    },
+    "ru": {
+      "body_part": "eye",
+      "chromosome": 3,
+      "display_label": "ru",
+      "dominance": "recessive",
+      "effect": "rough eye surface",
+      "flybase_id": "FBgn0003295",
+      "gene_name": "roughoid",
+      "phenotype_key": "ru",
+      "reference_url": "https://flybase.org/reports/FBgn0003295.html",
+      "scoring_confidence": 0.77,
+      "source": "manual_dictionary"
+    },
+    "ry": {
+      "body_part": "eye",
+      "chromosome": 3,
+      "display_label": "ry",
+      "dominance": "recessive",
+      "effect": "rosy eye color",
+      "flybase_id": "FBgn0003308",
+      "gene_name": "rosy",
+      "phenotype_key": "ry",
+      "reference_url": "https://flybase.org/reports/FBgn0003308.html",
+      "scoring_confidence": 0.72,
+      "source": "manual_dictionary"
+    },
+    "sc": {
+      "body_part": "bristle",
+      "chromosome": 1,
+      "display_label": "sc",
+      "dominance": "recessive",
+      "effect": "missing or reduced macrochaetae",
+      "flybase_id": "FBgn0004170",
+      "gene_name": "scute",
+      "phenotype_key": "sc",
+      "reference_url": "https://flybase.org/reports/FBgn0004170.html",
+      "scoring_confidence": 0.62,
+      "source": "manual_dictionary"
+    },
+    "sev": {
+      "body_part": "eye",
+      "chromosome": 3,
+      "display_label": "sev",
+      "dominance": "recessive",
+      "effect": "rough eyes with missing R7 photoreceptors",
+      "flybase_id": "FBgn0003366",
+      "gene_name": "sevenless",
+      "phenotype_key": "sev",
+      "reference_url": "https://flybase.org/reports/FBgn0003366.html",
+      "scoring_confidence": 0.55,
+      "source": "manual_dictionary"
+    },
+    "sn": {
+      "body_part": "bristle",
+      "chromosome": 1,
+      "display_label": "sn",
+      "dominance": "recessive",
+      "effect": "singed bristles",
+      "phenotype_key": "sn",
+      "scoring_confidence": 0.82,
+      "source": "manual_dictionary"
+    },
+    "speck": {
+      "body_part": "body",
+      "chromosome": 2,
+      "display_label": "speck",
+      "dominance": "recessive",
+      "effect": "speckled dark body spots",
+      "flybase_id": "FBgn0287831",
+      "gene_name": "speck",
+      "phenotype_key": "speck",
+      "reference_url": "https://flybase.org/reports/FBgn0287831.html",
+      "scoring_confidence": 0.73,
+      "source": "manual_dictionary"
+    },
+    "sr": {
+      "body_part": "wing",
+      "chromosome": 3,
+      "display_label": "sr",
+      "dominance": "recessive",
+      "effect": "abnormal wing posture or flight from tendon defects",
+      "flybase_id": "FBgn0003499",
+      "gene_name": "stripe",
+      "phenotype_key": "sr",
+      "reference_url": "https://flybase.org/reports/FBgn0003499.html",
+      "scoring_confidence": 0.68,
+      "source": "manual_dictionary"
+    },
+    "st": {
+      "body_part": "eye",
+      "chromosome": 3,
+      "display_label": "st",
+      "dominance": "recessive",
+      "effect": "scarlet eye color",
+      "phenotype_key": "st",
+      "scoring_confidence": 0.83,
+      "source": "manual_dictionary"
+    },
+    "v": {
+      "body_part": "eye",
+      "chromosome": 1,
+      "display_label": "v",
+      "dominance": "recessive",
+      "effect": "vermilion eye color",
+      "flybase_id": "FBgn0003965",
+      "gene_name": "vermilion",
+      "phenotype_key": "v",
+      "reference_url": "https://flybase.org/reports/FBgn0003965.html",
+      "scoring_confidence": 0.87,
+      "source": "manual_dictionary"
+    },
+    "vg": {
+      "body_part": "wing",
+      "chromosome": 2,
+      "display_label": "vg",
+      "dominance": "recessive",
+      "effect": "vestigial wings",
+      "phenotype_key": "vg",
+      "scoring_confidence": 0.88,
+      "source": "manual_dictionary"
+    },
+    "w": {
+      "body_part": "eye",
+      "chromosome": 1,
+      "display_label": "w",
+      "dominance": "recessive",
+      "effect": "white eyes",
+      "phenotype_key": "w_loss",
+      "scoring_confidence": 0.96,
+      "source": "manual_dictionary"
+    },
+    "wa": {
+      "body_part": "eye",
+      "chromosome": 1,
+      "display_label": "wa",
+      "dominance": "recessive",
+      "effect": "white-apricot eye color",
+      "gene_name": "white-apricot",
+      "phenotype_key": "wa",
+      "scoring_confidence": 0.71,
+      "source": "manual_dictionary"
+    },
+    "y": {
+      "body_part": "body",
+      "chromosome": 1,
+      "display_label": "y",
+      "dominance": "recessive",
+      "effect": "yellow body color",
+      "phenotype_key": "y",
+      "scoring_confidence": 0.9,
+      "source": "manual_dictionary"
+    }
+  }
+}

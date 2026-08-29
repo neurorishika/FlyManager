@@ -1,0 +1,3228 @@
+{
+  "catalogVersion": 1,
+  "definitions": [
+    {
+      "Key": "Adc",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "Adc"
+      },
+      "payload": {
+        "body_part": "body",
+        "effect": "dark black body coloration",
+        "dominance": "recessive",
+        "display_label": "Adc",
+        "phenotype_key": "Adc",
+        "chromosome": 2,
+        "scoring_confidence": 0.83
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "Acidic amino acid decarboxylase",
+        "flybaseId": "FBgn0000153",
+        "referenceUrl": "https://flybase.org/reports/FBgn0000153.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "B",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "B"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "bar-shaped eyes",
+        "dominance": "dominant",
+        "display_label": "B",
+        "phenotype_key": "B",
+        "chromosome": 1,
+        "scoring_confidence": 0.92
+      },
+      "sorting": {
+        "stabilityScore": 0.4,
+        "notes": [
+          "Bar/B-style eye-shape calls are treated as weaker standalone sorting markers."
+        ]
+      },
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [
+          "bar",
+          "b"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Bar",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "Bar"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "bar-shaped reduced eyes",
+        "dominance": "dominant",
+        "display_label": "Bar",
+        "phenotype_key": "Bar",
+        "chromosome": 1,
+        "scoring_confidence": 0.9
+      },
+      "sorting": {
+        "stabilityScore": 0.45,
+        "notes": []
+      },
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [
+          "bar",
+          "b"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "Bar",
+        "flybaseId": "FBgn0000154",
+        "referenceUrl": "https://flybase.org/reports/FBgn0000154.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Bl",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "Bl"
+      },
+      "payload": {
+        "body_part": "bristle",
+        "effect": "dominant abnormal macrochaetae",
+        "dominance": "dominant",
+        "display_label": "Bl",
+        "phenotype_key": "Bl",
+        "chromosome": 2,
+        "scoring_confidence": 0.72
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "Bristle",
+        "flybaseId": "FBgn0000193",
+        "referenceUrl": "https://flybase.org/reports/FBgn0000193.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Cy",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "Cy"
+      },
+      "payload": {
+        "body_part": "wing",
+        "effect": "curly wings",
+        "dominance": "dominant",
+        "display_label": "Cy",
+        "phenotype_key": "Cy",
+        "chromosome": 2,
+        "homozygous_lethal": true,
+        "scoring_confidence": 0.98
+      },
+      "sorting": {
+        "stabilityScore": 0.95,
+        "notes": [
+          "Curly wings are treated as the most reliable dominant balancer marker."
+        ]
+      },
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [
+          "cy",
+          "cyo"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "D",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "D"
+      },
+      "payload": {
+        "body_part": "wing",
+        "effect": "dominant Dichaete wing posture marker",
+        "dominance": "dominant",
+        "display_label": "D",
+        "phenotype_key": "D",
+        "chromosome": 3,
+        "scoring_confidence": 0.78
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [
+          "d",
+          "dichaete"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "Dichaete",
+        "flybaseId": "FBgn0000411",
+        "referenceUrl": "https://flybase.org/reports/FBgn0000411.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Dr",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "Dr"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "drop-shaped reduced eyes",
+        "dominance": "dominant",
+        "display_label": "Dr",
+        "phenotype_key": "Dr",
+        "chromosome": 3,
+        "scoring_confidence": 0.79
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [
+          "dr"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "Drop",
+        "flybaseId": "FBgn0000492",
+        "referenceUrl": "https://flybase.org/reports/FBgn0000492.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Hu",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "Hu"
+      },
+      "payload": {
+        "body_part": "thorax",
+        "effect": "humeral bristle marker",
+        "dominance": "dominant",
+        "display_label": "Hu",
+        "phenotype_key": "Hu",
+        "chromosome": 3,
+        "scoring_confidence": 0.74
+      },
+      "sorting": {
+        "stabilityScore": 0.72,
+        "notes": []
+      },
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [
+          "hu"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Ki",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "Ki"
+      },
+      "payload": {
+        "body_part": "bristle",
+        "effect": "kinked thoracic bristles",
+        "dominance": "dominant",
+        "display_label": "Ki",
+        "phenotype_key": "Ki",
+        "chromosome": 3,
+        "scoring_confidence": 0.76
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "Kinked",
+        "flybaseId": "FBgn0001307",
+        "referenceUrl": "https://flybase.org/reports/FBgn0001307.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "L",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "L"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "lobed reduced eyes",
+        "dominance": "dominant",
+        "display_label": "L",
+        "phenotype_key": "L",
+        "chromosome": 2,
+        "scoring_confidence": 0.84
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [
+          "l",
+          "lobe"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "Lobe",
+        "flybaseId": "FBgn0288433",
+        "referenceUrl": "https://flybase.org/reports/FBgn0288433.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "N",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "N"
+      },
+      "payload": {
+        "body_part": "wing",
+        "effect": "notched wing margin",
+        "dominance": "dominant",
+        "display_label": "N",
+        "phenotype_key": "N",
+        "chromosome": 1,
+        "scoring_confidence": 0.91
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "Notch",
+        "flybaseId": "FBgn0004647",
+        "referenceUrl": "https://flybase.org/reports/FBgn0004647.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Pri",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "Pri"
+      },
+      "payload": {
+        "body_part": "bristle",
+        "effect": "prickly thoracic bristles",
+        "dominance": "dominant",
+        "display_label": "Pri",
+        "phenotype_key": "Pri",
+        "chromosome": 3,
+        "scoring_confidence": 0.74
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "Prickly",
+        "flybaseId": "FBgn0003142",
+        "referenceUrl": "https://flybase.org/reports/FBgn0003142.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Sb",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "Sb"
+      },
+      "payload": {
+        "body_part": "bristle",
+        "effect": "short, thick bristles",
+        "dominance": "dominant",
+        "display_label": "Sb",
+        "phenotype_key": "Sb",
+        "chromosome": 3,
+        "scoring_confidence": 0.94
+      },
+      "sorting": {
+        "stabilityScore": 0.8,
+        "notes": [
+          "Stubble is a useful balancer marker but less stable than Curly in routine sorting."
+        ]
+      },
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [
+          "sb",
+          "sb1"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Ser",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "Ser"
+      },
+      "payload": {
+        "body_part": "wing",
+        "effect": "serrated wing margin",
+        "dominance": "dominant",
+        "display_label": "Ser",
+        "phenotype_key": "Ser",
+        "chromosome": 3,
+        "scoring_confidence": 0.82
+      },
+      "sorting": {
+        "stabilityScore": 0.78,
+        "notes": []
+      },
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [
+          "ser",
+          "ser1"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Tb",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "Tb"
+      },
+      "payload": {
+        "body_part": "body",
+        "effect": "tubby body shape",
+        "dominance": "dominant",
+        "display_label": "Tb",
+        "phenotype_key": "Tb",
+        "chromosome": 3,
+        "scoring_confidence": 0.8
+      },
+      "sorting": {
+        "stabilityScore": 0.5,
+        "notes": [
+          "Tubby is down-weighted because TM6B/Tb reversion is a known high-frequency risk."
+        ]
+      },
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [
+          "tb"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Ubx",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "Ubx"
+      },
+      "payload": {
+        "body_part": "haltere",
+        "effect": "homeotic haltere-to-wing transformation",
+        "dominance": "dominant",
+        "display_label": "Ubx",
+        "phenotype_key": "Ubx",
+        "chromosome": 3,
+        "scoring_confidence": 0.82
+      },
+      "sorting": {
+        "stabilityScore": 0.68,
+        "notes": []
+      },
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [
+          "ubx"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "Ultrabithorax",
+        "flybaseId": "FBgn0003944",
+        "referenceUrl": "https://flybase.org/reports/FBgn0003944.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "al",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "al"
+      },
+      "payload": {
+        "body_part": "antenna",
+        "effect": "reduced or missing aristae",
+        "dominance": "recessive",
+        "display_label": "al",
+        "phenotype_key": "al",
+        "chromosome": 2,
+        "scoring_confidence": 0.72
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "aristaless",
+        "flybaseId": "FBgn0000061",
+        "referenceUrl": "https://flybase.org/reports/FBgn0000061.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "bw",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "bw"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "brown eye pigment",
+        "dominance": "recessive",
+        "display_label": "bw",
+        "phenotype_key": "bw",
+        "chromosome": 2,
+        "scoring_confidence": 0.82
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "ca",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "ca"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "wine-red eye color",
+        "dominance": "recessive",
+        "display_label": "ca",
+        "phenotype_key": "ca",
+        "chromosome": 3,
+        "scoring_confidence": 0.86
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "claret",
+        "flybaseId": "FBgn0000247",
+        "referenceUrl": "https://flybase.org/reports/FBgn0000247.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "car",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "car"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "carnation eye color",
+        "dominance": "recessive",
+        "display_label": "car",
+        "phenotype_key": "car",
+        "chromosome": 1,
+        "scoring_confidence": 0.74
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "cn",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "cn"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "cinnabar eye color",
+        "dominance": "recessive",
+        "display_label": "cn",
+        "phenotype_key": "cn",
+        "chromosome": 2,
+        "scoring_confidence": 0.83
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "ct",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "ct"
+      },
+      "payload": {
+        "body_part": "wing",
+        "effect": "cut wing margin with missing margin tissue",
+        "dominance": "recessive",
+        "display_label": "ct",
+        "phenotype_key": "ct",
+        "chromosome": 1,
+        "scoring_confidence": 0.84
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "cut",
+        "flybaseId": "FBgn0004198",
+        "referenceUrl": "https://flybase.org/reports/FBgn0004198.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "cu",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "cu"
+      },
+      "payload": {
+        "body_part": "wing",
+        "effect": "wings curved upward",
+        "dominance": "recessive",
+        "display_label": "cu",
+        "phenotype_key": "cu",
+        "chromosome": 3,
+        "scoring_confidence": 0.83
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "curled",
+        "flybaseId": "FBgn0261808",
+        "referenceUrl": "https://flybase.org/reports/FBgn0261808.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "cv",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "cv"
+      },
+      "payload": {
+        "body_part": "wing",
+        "effect": "missing crossveins",
+        "dominance": "recessive",
+        "display_label": "cv",
+        "phenotype_key": "cv",
+        "chromosome": 3,
+        "scoring_confidence": 0.68
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "crossveinless",
+        "flybaseId": "FBgn0000394",
+        "referenceUrl": "https://flybase.org/reports/FBgn0000394.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "e",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "e"
+      },
+      "payload": {
+        "body_part": "body",
+        "effect": "ebony body color",
+        "dominance": "recessive",
+        "display_label": "e",
+        "phenotype_key": "e",
+        "chromosome": 3,
+        "scoring_confidence": 0.86
+      },
+      "sorting": {
+        "stabilityScore": 0.7,
+        "notes": []
+      },
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "ey",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "ey"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "eye morphology marker",
+        "dominance": "recessive",
+        "display_label": "ey",
+        "phenotype_key": "ey",
+        "chromosome": 4,
+        "scoring_confidence": 0.56
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "f",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "f"
+      },
+      "payload": {
+        "body_part": "bristle",
+        "effect": "dominant abnormal thoracic macrochaetae",
+        "dominance": "recessive",
+        "display_label": "f",
+        "phenotype_key": "f",
+        "chromosome": 1,
+        "scoring_confidence": 0.79
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "hry",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "hry"
+      },
+      "payload": {
+        "body_part": "wing",
+        "effect": "ectopic wing hairs and bristles",
+        "dominance": "recessive",
+        "display_label": "hry",
+        "phenotype_key": "hry",
+        "chromosome": 3,
+        "scoring_confidence": 0.78
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "hairy",
+        "flybaseId": "FBgn0001168",
+        "referenceUrl": "https://flybase.org/reports/FBgn0001168.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "lt",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "lt"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "lightened eye pigment",
+        "dominance": "recessive",
+        "display_label": "lt",
+        "phenotype_key": "lt",
+        "chromosome": 2,
+        "scoring_confidence": 0.72
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "light",
+        "flybaseId": "FBgn0002566",
+        "referenceUrl": "https://flybase.org/reports/FBgn0002566.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "mwh",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "mwh"
+      },
+      "payload": {
+        "body_part": "wing",
+        "effect": "multiple hairs per wing cell",
+        "dominance": "recessive",
+        "display_label": "mwh",
+        "phenotype_key": "mwh",
+        "chromosome": 3,
+        "scoring_confidence": 0.58
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "multiple wing hairs",
+        "flybaseId": "FBgn0264272",
+        "referenceUrl": "https://flybase.org/reports/FBgn0264272.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "nub",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "nub"
+      },
+      "payload": {
+        "body_part": "wing",
+        "effect": "reduced nubbin wings",
+        "dominance": "recessive",
+        "display_label": "nub",
+        "phenotype_key": "nub",
+        "chromosome": 2,
+        "scoring_confidence": 0.8
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "nubbin",
+        "flybaseId": "FBgn0085424",
+        "referenceUrl": "https://flybase.org/reports/FBgn0085424.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "p",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "p"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "prune eye color",
+        "dominance": "recessive",
+        "display_label": "p",
+        "phenotype_key": "p",
+        "chromosome": 3,
+        "scoring_confidence": 0.81
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "prune",
+        "flybaseId": "FBgn0086679",
+        "referenceUrl": "https://flybase.org/reports/FBgn0086679.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "pr",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "pr"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "purple eye pigment",
+        "dominance": "recessive",
+        "display_label": "pr",
+        "phenotype_key": "pr",
+        "chromosome": 2,
+        "scoring_confidence": 0.79
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "purple",
+        "flybaseId": "FBgn0003141",
+        "referenceUrl": "https://flybase.org/reports/FBgn0003141.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "px",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "px"
+      },
+      "payload": {
+        "body_part": "wing",
+        "effect": "plexus wing venation",
+        "dominance": "recessive",
+        "display_label": "px",
+        "phenotype_key": "px",
+        "chromosome": 2,
+        "scoring_confidence": 0.66
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "red",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "red"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "bright red eye color",
+        "dominance": "recessive",
+        "display_label": "red",
+        "phenotype_key": "red",
+        "chromosome": 3,
+        "scoring_confidence": 0.82
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "red",
+        "flybaseId": "FBgn0285913",
+        "referenceUrl": "https://flybase.org/reports/FBgn0285913.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "ru",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "ru"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "rough eye surface",
+        "dominance": "recessive",
+        "display_label": "ru",
+        "phenotype_key": "ru",
+        "chromosome": 3,
+        "scoring_confidence": 0.77
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "roughoid",
+        "flybaseId": "FBgn0003295",
+        "referenceUrl": "https://flybase.org/reports/FBgn0003295.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "ry",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "ry"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "rosy eye color",
+        "dominance": "recessive",
+        "display_label": "ry",
+        "phenotype_key": "ry",
+        "chromosome": 3,
+        "scoring_confidence": 0.72
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "rosy",
+        "flybaseId": "FBgn0003308",
+        "referenceUrl": "https://flybase.org/reports/FBgn0003308.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "sc",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "sc"
+      },
+      "payload": {
+        "body_part": "bristle",
+        "effect": "missing or reduced macrochaetae",
+        "dominance": "recessive",
+        "display_label": "sc",
+        "phenotype_key": "sc",
+        "chromosome": 1,
+        "scoring_confidence": 0.62
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "scute",
+        "flybaseId": "FBgn0004170",
+        "referenceUrl": "https://flybase.org/reports/FBgn0004170.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "sev",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "sev"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "rough eyes with missing R7 photoreceptors",
+        "dominance": "recessive",
+        "display_label": "sev",
+        "phenotype_key": "sev",
+        "chromosome": 3,
+        "scoring_confidence": 0.55
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "sevenless",
+        "flybaseId": "FBgn0003366",
+        "referenceUrl": "https://flybase.org/reports/FBgn0003366.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "sn",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "sn"
+      },
+      "payload": {
+        "body_part": "bristle",
+        "effect": "singed bristles",
+        "dominance": "recessive",
+        "display_label": "sn",
+        "phenotype_key": "sn",
+        "chromosome": 1,
+        "scoring_confidence": 0.82
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "speck",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "speck"
+      },
+      "payload": {
+        "body_part": "body",
+        "effect": "speckled dark body spots",
+        "dominance": "recessive",
+        "display_label": "speck",
+        "phenotype_key": "speck",
+        "chromosome": 2,
+        "scoring_confidence": 0.73
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "speck",
+        "flybaseId": "FBgn0287831",
+        "referenceUrl": "https://flybase.org/reports/FBgn0287831.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "sr",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "sr"
+      },
+      "payload": {
+        "body_part": "wing",
+        "effect": "abnormal wing posture or flight from tendon defects",
+        "dominance": "recessive",
+        "display_label": "sr",
+        "phenotype_key": "sr",
+        "chromosome": 3,
+        "scoring_confidence": 0.68
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "stripe",
+        "flybaseId": "FBgn0003499",
+        "referenceUrl": "https://flybase.org/reports/FBgn0003499.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "st",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "st"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "scarlet eye color",
+        "dominance": "recessive",
+        "display_label": "st",
+        "phenotype_key": "st",
+        "chromosome": 3,
+        "scoring_confidence": 0.83
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "v",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "v"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "vermilion eye color",
+        "dominance": "recessive",
+        "display_label": "v",
+        "phenotype_key": "v",
+        "chromosome": 1,
+        "scoring_confidence": 0.87
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "vermilion",
+        "flybaseId": "FBgn0003965",
+        "referenceUrl": "https://flybase.org/reports/FBgn0003965.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "vg",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "vg"
+      },
+      "payload": {
+        "body_part": "wing",
+        "effect": "vestigial wings",
+        "dominance": "recessive",
+        "display_label": "vg",
+        "phenotype_key": "vg",
+        "chromosome": 2,
+        "scoring_confidence": 0.88
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "w",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "w"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "white eyes",
+        "dominance": "recessive",
+        "display_label": "w",
+        "phenotype_key": "w_loss",
+        "chromosome": 1,
+        "scoring_confidence": 0.96
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [
+          "w-",
+          "wminus",
+          "w",
+          "white"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "wa",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "wa"
+      },
+      "payload": {
+        "body_part": "eye",
+        "effect": "white-apricot eye color",
+        "dominance": "recessive",
+        "display_label": "wa",
+        "phenotype_key": "wa",
+        "chromosome": 1,
+        "scoring_confidence": 0.71
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [
+          "wa",
+          "whiteapricot",
+          "white-apricot"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "white-apricot",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "y",
+      "kind": "gene_marker",
+      "match": {
+        "symbol": "y"
+      },
+      "payload": {
+        "body_part": "body",
+        "effect": "yellow body color",
+        "dominance": "recessive",
+        "display_label": "y",
+        "phenotype_key": "y",
+        "chromosome": 1,
+        "scoring_confidence": 0.9
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": ""
+      },
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Bl[1]",
+      "kind": "allele_marker",
+      "match": {
+        "token": "Bl[1]",
+        "geneStem": "Bl",
+        "alleleSpec": "1"
+      },
+      "payload": {
+        "gene_stem": "Bl",
+        "body_part": "bristle",
+        "effect": "dominant abnormal thoracic macrochaetae",
+        "dominance": "dominant",
+        "display_label": "Bl",
+        "phenotype_key": "Bl_1",
+        "chromosome": 2,
+        "scoring_confidence": 0.77
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "Bristle",
+        "flybaseId": "FBgn0000193",
+        "referenceUrl": "https://flybase.org/reports/FBgn0000193.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Dr[Mio]",
+      "kind": "allele_marker",
+      "match": {
+        "token": "Dr[Mio]",
+        "geneStem": "Dr",
+        "alleleSpec": "Mio"
+      },
+      "payload": {
+        "gene_stem": "Dr",
+        "body_part": "eye",
+        "effect": "reduced drop-shaped eyes with locomotor defects",
+        "dominance": "dominant",
+        "display_label": "Mio",
+        "phenotype_key": "Dr_Mio",
+        "chromosome": 3,
+        "scoring_confidence": 0.75
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [
+          "drmio",
+          "mio"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "Drop",
+        "flybaseId": "FBgn0000492",
+        "referenceUrl": "https://flybase.org/reports/FBgn0000492.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Kr[If-1]",
+      "kind": "allele_marker",
+      "match": {
+        "token": "Kr[If-1]",
+        "geneStem": "Kr",
+        "alleleSpec": "If-1"
+      },
+      "payload": {
+        "gene_stem": "Kr",
+        "body_part": "eye",
+        "effect": "irregular rough eye facets",
+        "dominance": "dominant",
+        "display_label": "If",
+        "phenotype_key": "Kr_If",
+        "chromosome": 2,
+        "scoring_confidence": 0.74
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [
+          "if"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "Kruppel",
+        "flybaseId": "FBgn0001325",
+        "referenceUrl": "https://flybase.org/reports/FBgn0001325.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "PPO1[Bc]",
+      "kind": "allele_marker",
+      "match": {
+        "token": "PPO1[Bc]",
+        "geneStem": "PPO1",
+        "alleleSpec": "Bc"
+      },
+      "payload": {
+        "gene_stem": "PPO1",
+        "body_part": "body",
+        "effect": "black-cells larval body phenotype",
+        "dominance": "dominant",
+        "display_label": "Bc",
+        "phenotype_key": "PPO1_Bc",
+        "chromosome": 2,
+        "scoring_confidence": 0.72
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [
+          "bc"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "prophenoloxidase 1",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "amos[Roi-1]",
+      "kind": "allele_marker",
+      "match": {
+        "token": "amos[Roi-1]",
+        "geneStem": "amos",
+        "alleleSpec": "Roi-1"
+      },
+      "payload": {
+        "gene_stem": "amos",
+        "body_part": "eye",
+        "effect": "roughoid eye morphology",
+        "dominance": "dominant",
+        "display_label": "Roi",
+        "phenotype_key": "amos_Roi",
+        "chromosome": 2,
+        "scoring_confidence": 0.73
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [
+          "roi",
+          "roughoid"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "amos",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "l(2)me[1]",
+      "kind": "allele_marker",
+      "match": {
+        "token": "l(2)me[1]",
+        "geneStem": "l(2)me",
+        "alleleSpec": "1"
+      },
+      "payload": {
+        "gene_stem": "l(2)me",
+        "body_part": "eye",
+        "effect": "eye morphology phenotype",
+        "dominance": "recessive",
+        "display_label": "me",
+        "phenotype_key": "l2me_1",
+        "chromosome": 2,
+        "scoring_confidence": 0.55
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [
+          "me"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "sna[Sco]",
+      "kind": "allele_marker",
+      "match": {
+        "token": "sna[Sco]",
+        "geneStem": "sna",
+        "alleleSpec": "Sco"
+      },
+      "payload": {
+        "gene_stem": "sna",
+        "body_part": "bristle",
+        "effect": "ectopic thoracic bristles",
+        "dominance": "dominant",
+        "display_label": "Sco",
+        "phenotype_key": "sna_Sco",
+        "chromosome": 2,
+        "scoring_confidence": 0.73
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "snail",
+        "flybaseId": "FBgn0003448",
+        "referenceUrl": "https://flybase.org/reports/FBgn0003448.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "sr[1]",
+      "kind": "allele_marker",
+      "match": {
+        "token": "sr[1]",
+        "geneStem": "sr",
+        "alleleSpec": "1"
+      },
+      "payload": {
+        "gene_stem": "sr",
+        "body_part": "wing",
+        "effect": "flightless wings from defective tendon attachment",
+        "dominance": "recessive",
+        "display_label": "sr",
+        "phenotype_key": "sr_1",
+        "chromosome": 3,
+        "scoring_confidence": 0.79
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "stripe",
+        "flybaseId": "FBgn0003499",
+        "referenceUrl": "https://flybase.org/reports/FBgn0003499.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "wg[Gla-1]",
+      "kind": "allele_marker",
+      "match": {
+        "token": "wg[Gla-1]",
+        "geneStem": "wg",
+        "alleleSpec": "Gla-1"
+      },
+      "payload": {
+        "gene_stem": "wg",
+        "body_part": "eye",
+        "effect": "glazed rough eyes with abnormal pigmentation",
+        "dominance": "dominant",
+        "display_label": "Gla",
+        "phenotype_key": "wg_Gla",
+        "chromosome": 2,
+        "scoring_confidence": 0.76
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [
+          "gla"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "wingless",
+        "flybaseId": "FBgn0284084",
+        "referenceUrl": "https://flybase.org/reports/FBgn0284084.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "wg[Sp-1]",
+      "kind": "allele_marker",
+      "match": {
+        "token": "wg[Sp-1]",
+        "geneStem": "wg",
+        "alleleSpec": "Sp-1"
+      },
+      "payload": {
+        "gene_stem": "wg",
+        "body_part": "wing",
+        "effect": "spade-shaped notched wings",
+        "dominance": "dominant",
+        "display_label": "Sp",
+        "phenotype_key": "wg_Sp",
+        "chromosome": 2,
+        "scoring_confidence": 0.78
+      },
+      "sorting": {},
+      "audit": {
+        "isProbeMarker": true,
+        "probeSymbol": "Sp"
+      },
+      "imaging": {
+        "aliases": [
+          "sp"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "geneName": "wingless",
+        "flybaseId": "FBgn0284084",
+        "referenceUrl": "https://flybase.org/reports/FBgn0284084.html",
+        "source": "manual_dictionary"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Gla",
+      "kind": "alias",
+      "match": {
+        "token": "Gla"
+      },
+      "payload": {
+        "alias_type": "allele_token",
+        "value": "wg[Gla-1]"
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {},
+      "origin": "shipped"
+    },
+    {
+      "Key": "If",
+      "kind": "alias",
+      "match": {
+        "token": "If"
+      },
+      "payload": {
+        "alias_type": "allele_token",
+        "value": "Kr[If-1]"
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {},
+      "origin": "shipped"
+    },
+    {
+      "Key": "Mio",
+      "kind": "alias",
+      "match": {
+        "token": "Mio"
+      },
+      "payload": {
+        "alias_type": "allele_token",
+        "value": "Dr[Mio]"
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {},
+      "origin": "shipped"
+    },
+    {
+      "Key": "OrCo-LexA",
+      "kind": "alias",
+      "match": {
+        "token": "OrCo-LexA"
+      },
+      "payload": {
+        "alias_type": "construct_token",
+        "value": "P{Orco-LexA-VP16}unspecified"
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {},
+      "origin": "shipped"
+    },
+    {
+      "Key": "Orco-LexA",
+      "kind": "alias",
+      "match": {
+        "token": "Orco-LexA"
+      },
+      "payload": {
+        "alias_type": "construct_token",
+        "value": "P{Orco-LexA-VP16}unspecified"
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {},
+      "origin": "shipped"
+    },
+    {
+      "Key": "Sco",
+      "kind": "alias",
+      "match": {
+        "token": "Sco"
+      },
+      "payload": {
+        "alias_type": "allele_token",
+        "value": "sna[Sco]"
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {},
+      "origin": "shipped"
+    },
+    {
+      "Key": "w-",
+      "kind": "alias",
+      "match": {
+        "token": "w-"
+      },
+      "payload": {
+        "alias_type": "allele_token",
+        "value": "w[*]"
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {},
+      "origin": "shipped"
+    },
+    {
+      "Key": "Basc",
+      "kind": "balancer",
+      "match": {
+        "symbol": "Basc",
+        "aliases": []
+      },
+      "payload": {
+        "family": "Basc",
+        "chromosome": 1,
+        "default_markers": [
+          "sc",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Bascy",
+      "kind": "balancer",
+      "match": {
+        "symbol": "Bascy",
+        "aliases": []
+      },
+      "payload": {
+        "family": "Basc",
+        "chromosome": 1,
+        "default_markers": [
+          "y",
+          "sc",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Binsc",
+      "kind": "balancer",
+      "match": {
+        "symbol": "Binsc",
+        "aliases": [
+          "Binsn"
+        ]
+      },
+      "payload": {
+        "family": "Binsc",
+        "chromosome": 1,
+        "default_markers": [
+          "sc",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Binscy",
+      "kind": "balancer",
+      "match": {
+        "symbol": "Binscy",
+        "aliases": []
+      },
+      "payload": {
+        "family": "Binsc",
+        "chromosome": 1,
+        "default_markers": [
+          "y",
+          "sc",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "Binsinscy",
+      "kind": "balancer",
+      "match": {
+        "symbol": "Binsinscy",
+        "aliases": []
+      },
+      "payload": {
+        "family": "Binsc",
+        "chromosome": 1,
+        "default_markers": [
+          "y",
+          "sc",
+          "sn",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "CxD",
+      "kind": "balancer",
+      "match": {
+        "symbol": "CxD",
+        "aliases": []
+      },
+      "payload": {
+        "family": "CxD",
+        "chromosome": 3,
+        "default_markers": [
+          "D"
+        ],
+        "notes": [
+          "Modeled as a third-chromosome dominant marker balancer shorthand."
+        ]
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "CyO",
+      "kind": "balancer",
+      "match": {
+        "symbol": "CyO",
+        "aliases": []
+      },
+      "payload": {
+        "family": "CyO",
+        "chromosome": 2,
+        "default_markers": [
+          "Cy",
+          "pr",
+          "cn"
+        ],
+        "notes": [
+          "Uses the cheat-sheet visible-marker set for the common second-chromosome balancer."
+        ]
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "FM0",
+      "kind": "balancer",
+      "match": {
+        "symbol": "FM0",
+        "aliases": []
+      },
+      "payload": {
+        "family": "FM0",
+        "chromosome": 1,
+        "default_markers": [
+          "y",
+          "sc",
+          "v",
+          "f",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "FM3",
+      "kind": "balancer",
+      "match": {
+        "symbol": "FM3",
+        "aliases": []
+      },
+      "payload": {
+        "family": "FM3",
+        "chromosome": 1,
+        "default_markers": [
+          "y",
+          "sc",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "FM4",
+      "kind": "balancer",
+      "match": {
+        "symbol": "FM4",
+        "aliases": []
+      },
+      "payload": {
+        "family": "FM4",
+        "chromosome": 1,
+        "default_markers": [
+          "y",
+          "sc",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "FM6",
+      "kind": "balancer",
+      "match": {
+        "symbol": "FM6",
+        "aliases": [
+          "FM6B"
+        ]
+      },
+      "payload": {
+        "family": "FM6",
+        "chromosome": 1,
+        "default_markers": [
+          "y",
+          "sc",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "FM7",
+      "kind": "balancer",
+      "match": {
+        "symbol": "FM7",
+        "aliases": []
+      },
+      "payload": {
+        "family": "FM7",
+        "chromosome": 1,
+        "default_markers": [
+          "Bar"
+        ],
+        "notes": [
+          "Bare FM7 is kept conservative; specific FM7 variants carry the fuller cheat-sheet marker sets."
+        ]
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "FM7a",
+      "kind": "balancer",
+      "match": {
+        "symbol": "FM7a",
+        "aliases": []
+      },
+      "payload": {
+        "family": "FM7",
+        "chromosome": 1,
+        "default_markers": [
+          "y",
+          "sc",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "FM7b",
+      "kind": "balancer",
+      "match": {
+        "symbol": "FM7b",
+        "aliases": []
+      },
+      "payload": {
+        "family": "FM7",
+        "chromosome": 1,
+        "default_markers": [
+          "y",
+          "sc",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "FM7c",
+      "kind": "balancer",
+      "match": {
+        "symbol": "FM7c",
+        "aliases": []
+      },
+      "payload": {
+        "family": "FM7",
+        "chromosome": 1,
+        "default_markers": [
+          "y",
+          "sc",
+          "sn",
+          "Bar"
+        ],
+        "notes": [
+          "Preserves the FM7c-specific sn marker instead of collapsing to generic FM7."
+        ]
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "FM7d",
+      "kind": "balancer",
+      "match": {
+        "symbol": "FM7d",
+        "aliases": []
+      },
+      "payload": {
+        "family": "FM7",
+        "chromosome": 1,
+        "default_markers": [
+          "sc",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "FM7h",
+      "kind": "balancer",
+      "match": {
+        "symbol": "FM7h",
+        "aliases": []
+      },
+      "payload": {
+        "family": "FM7",
+        "chromosome": 1,
+        "default_markers": [
+          "sc",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "FM7i",
+      "kind": "balancer",
+      "match": {
+        "symbol": "FM7i",
+        "aliases": []
+      },
+      "payload": {
+        "family": "FM7",
+        "chromosome": 1,
+        "default_markers": [
+          "sc",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "FM7j",
+      "kind": "balancer",
+      "match": {
+        "symbol": "FM7j",
+        "aliases": []
+      },
+      "payload": {
+        "family": "FM7",
+        "chromosome": 1,
+        "default_markers": [
+          "y",
+          "sc"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "FM7k",
+      "kind": "balancer",
+      "match": {
+        "symbol": "FM7k",
+        "aliases": []
+      },
+      "payload": {
+        "family": "FM7",
+        "chromosome": 1,
+        "default_markers": [
+          "y",
+          "sc",
+          "sn",
+          "Bar"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "MKRS",
+      "kind": "balancer",
+      "match": {
+        "symbol": "MKRS",
+        "aliases": []
+      },
+      "payload": {
+        "family": "MKRS",
+        "chromosome": 3,
+        "default_markers": [
+          "ry",
+          "Sb"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "MRS",
+      "kind": "balancer",
+      "match": {
+        "symbol": "MRS",
+        "aliases": []
+      },
+      "payload": {
+        "family": "MKRS",
+        "chromosome": 3,
+        "default_markers": [
+          "ry",
+          "Sb"
+        ],
+        "notes": [
+          "Treated as the same visible-marker set as MKRS for phenotype summaries."
+        ]
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "SM1",
+      "kind": "balancer",
+      "match": {
+        "symbol": "SM1",
+        "aliases": []
+      },
+      "payload": {
+        "family": "SM1",
+        "chromosome": 2,
+        "default_markers": [
+          "al",
+          "Cy",
+          "cn",
+          "speck"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "SM5",
+      "kind": "balancer",
+      "match": {
+        "symbol": "SM5",
+        "aliases": []
+      },
+      "payload": {
+        "family": "SM5",
+        "chromosome": 2,
+        "default_markers": [
+          "al",
+          "Cy",
+          "lt",
+          "cn",
+          "speck"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "SM6a",
+      "kind": "balancer",
+      "match": {
+        "symbol": "SM6a",
+        "aliases": []
+      },
+      "payload": {
+        "family": "SM6",
+        "chromosome": 2,
+        "default_markers": [
+          "al",
+          "Cy",
+          "cn",
+          "speck"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "SM6b",
+      "kind": "balancer",
+      "match": {
+        "symbol": "SM6b",
+        "aliases": []
+      },
+      "payload": {
+        "family": "SM6",
+        "chromosome": 2,
+        "default_markers": [
+          "al",
+          "Cy",
+          "cn",
+          "speck"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "TM1",
+      "kind": "balancer",
+      "match": {
+        "symbol": "TM1",
+        "aliases": []
+      },
+      "payload": {
+        "family": "TM1",
+        "chromosome": 3,
+        "default_markers": [
+          "Sb"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "TM2",
+      "kind": "balancer",
+      "match": {
+        "symbol": "TM2",
+        "aliases": []
+      },
+      "payload": {
+        "family": "TM2",
+        "chromosome": 3,
+        "default_markers": [
+          "e"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "TM3",
+      "kind": "balancer",
+      "match": {
+        "symbol": "TM3",
+        "aliases": []
+      },
+      "payload": {
+        "family": "TM3",
+        "chromosome": 3,
+        "default_markers": [
+          "p",
+          "Ubx",
+          "e"
+        ],
+        "notes": [
+          "Bare TM3 follows the conservative BDSC core visible-marker set.",
+          "Explicit Sb[1] and Ser[1] in genotype strings are resolved separately rather than implied by TM3."
+        ]
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "TM6",
+      "kind": "balancer",
+      "match": {
+        "symbol": "TM6",
+        "aliases": []
+      },
+      "payload": {
+        "family": "TM6",
+        "chromosome": 3,
+        "default_markers": [
+          "Hu",
+          "Tb",
+          "e"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "TM6B",
+      "kind": "balancer",
+      "match": {
+        "symbol": "TM6B",
+        "aliases": []
+      },
+      "payload": {
+        "family": "TM6",
+        "chromosome": 3,
+        "default_markers": [
+          "Hu",
+          "Tb",
+          "e"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "TM6C",
+      "kind": "balancer",
+      "match": {
+        "symbol": "TM6C",
+        "aliases": []
+      },
+      "payload": {
+        "family": "TM6",
+        "chromosome": 3,
+        "default_markers": [
+          "e"
+        ],
+        "notes": [
+          "Uses the stripped-down TM6C visible core from the cheat sheet rather than the fuller TM6B shorthand."
+        ]
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "TM8",
+      "kind": "balancer",
+      "match": {
+        "symbol": "TM8",
+        "aliases": []
+      },
+      "payload": {
+        "family": "TM8",
+        "chromosome": 3,
+        "default_markers": [
+          "st",
+          "Sb",
+          "e"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "TM9",
+      "kind": "balancer",
+      "match": {
+        "symbol": "TM9",
+        "aliases": []
+      },
+      "payload": {
+        "family": "TM9",
+        "chromosome": 3,
+        "default_markers": [
+          "st",
+          "Sb",
+          "e"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "TMS",
+      "kind": "balancer",
+      "match": {
+        "symbol": "TMS",
+        "aliases": []
+      },
+      "payload": {
+        "family": "TMS",
+        "chromosome": 3,
+        "default_markers": [
+          "ry",
+          "Sb"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "winscy",
+      "kind": "balancer",
+      "match": {
+        "symbol": "winscy",
+        "aliases": []
+      },
+      "payload": {
+        "family": "winscy",
+        "chromosome": 1,
+        "default_markers": [
+          "y",
+          "sc"
+        ],
+        "notes": []
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {
+        "source": "bdsc_cheat_sheet"
+      },
+      "origin": "shipped"
+    },
+    {
+      "Key": "construct:w+",
+      "kind": "construct_marker",
+      "match": {
+        "geneStem": "w",
+        "allelePrefix": "+"
+      },
+      "payload": {
+        "overrides": {
+          "dominance": "dominant",
+          "display_label": "mini-white",
+          "effect": "pigmented eyes from construct marker",
+          "phenotype_key": "mini_white",
+          "mini_white": true
+        }
+      },
+      "sorting": {
+        "stabilityScore": 0.58,
+        "notes": [
+          "mini-white eye pigmentation is dosage-sensitive and varies with insertion context."
+        ]
+      },
+      "audit": {},
+      "imaging": {
+        "aliases": [
+          "w+",
+          "wplus",
+          "miniwhite",
+          "mini-white"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {},
+      "origin": "shipped"
+    },
+    {
+      "Key": "construct:y+",
+      "kind": "construct_marker",
+      "match": {
+        "geneStem": "y",
+        "allelePrefix": "+"
+      },
+      "payload": {
+        "overrides": {
+          "dominance": "dominant",
+          "display_label": "y+",
+          "effect": "yellow rescue marker",
+          "phenotype_key": "y_plus"
+        }
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [
+          "y+",
+          "yplus",
+          "y"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {},
+      "origin": "shipped"
+    },
+    {
+      "Key": "construct:v+",
+      "kind": "construct_marker",
+      "match": {
+        "geneStem": "v",
+        "allelePrefix": "+"
+      },
+      "payload": {
+        "overrides": {
+          "body_part": "eye",
+          "dominance": "dominant",
+          "display_label": "v+",
+          "effect": "vermilion rescue marker",
+          "phenotype_key": "v_plus"
+        }
+      },
+      "sorting": {},
+      "audit": {},
+      "imaging": {
+        "aliases": [
+          "v+",
+          "vplus",
+          "v"
+        ],
+        "images": []
+      },
+      "expression": {},
+      "provenance": {},
+      "origin": "shipped"
+    }
+  ]
+}
