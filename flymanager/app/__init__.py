@@ -263,7 +263,26 @@ def create_app():
     def ensure_csp_nonce():
         generate_csp_nonce()
 
+    @app.before_request
+    def refresh_marker_catalog_if_stale():
+        """Converge this worker's marker catalog with Mongo, at most once per
+        interval. A failure here must never fail the request: the previous
+        snapshot stays installed and is at most one interval stale."""
+        from flymanager.utils.phenotypes.marker_catalog import \
+            maybe_refresh_catalog
+
+        try:
+            maybe_refresh_catalog(db)
+        except Exception as exc:
+            app.logger.warning("Unable to refresh the marker catalog: %s", exc)
+
     with app.app_context():
+        # Fail fast: a malformed shipped catalog must not become a 500 on a
+        # random later request, and must never produce partial predictions.
+        from flymanager.utils.phenotypes.marker_catalog import get_catalog
+
+        get_catalog()
+
         # --- Import and Register Blueprints ---
         from flymanager.app.routes import (auth, cross, data, flip, jobs,
                                            main, settings, stock, tray)

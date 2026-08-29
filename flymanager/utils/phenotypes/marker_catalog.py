@@ -13,6 +13,7 @@ phenotype pipeline's db-less contract: ``resolve_package_markers`` and the
 import hashlib
 import json
 import threading
+import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -295,6 +296,62 @@ def set_catalog(snapshot):
 
 def reset_catalog():
     """Drop the cached snapshot so the next get_catalog() recompiles."""
-    global _SNAPSHOT
+    global _SNAPSHOT, _SNAPSHOT_REVISION
     with _LOCK:
         _SNAPSHOT = None
+        _SNAPSHOT_REVISION = None
+
+
+MARKER_CATALOG_REVISION_KEY = "markerCatalogRevision"
+MARKER_DEFINITIONS_COLLECTION = "marker_definitions"
+DEFAULT_REFRESH_INTERVAL_SECONDS = 30
+
+_SNAPSHOT_REVISION = None
+_LAST_REVISION_CHECK = None
+
+
+def read_catalog_revision(db):
+    from flymanager.utils.mongo.settings import get_settings
+
+    return int((get_settings(db) or {}).get(MARKER_CATALOG_REVISION_KEY) or 0)
+
+
+def refresh_catalog(db, *, force=False):
+    """Recompile the snapshot from Mongo when the stored revision has moved.
+
+    A compile failure propagates with the previous snapshot left installed:
+    the request path must never be left without a catalog, and a half-built
+    one would be worse than a stale one.
+    """
+    global _SNAPSHOT_REVISION
+
+    revision = read_catalog_revision(db)
+    if not force and _SNAPSHOT is not None and _SNAPSHOT_REVISION == revision:
+        return _SNAPSHOT
+
+    overlay = list(db[MARKER_DEFINITIONS_COLLECTION].find({}))
+    snapshot = compile_catalog(load_shipped_catalog(), overlay)
+    set_catalog(snapshot)
+    _SNAPSHOT_REVISION = revision
+    return snapshot
+
+
+def maybe_refresh_catalog(db, *, interval_seconds=DEFAULT_REFRESH_INTERVAL_SECONDS, now=None):
+    """Probe the stored revision at most once per interval per process.
+
+    Returns the snapshot when the probe ran, or None when it was throttled.
+    """
+    global _LAST_REVISION_CHECK
+
+    current = time.monotonic() if now is None else float(now)
+    if _LAST_REVISION_CHECK is not None and (current - _LAST_REVISION_CHECK) < interval_seconds:
+        return None
+    _LAST_REVISION_CHECK = current
+    return refresh_catalog(db)
+
+
+def reset_refresh_state():
+    """Test hook: forget the snapshot revision and the throttle clock."""
+    global _SNAPSHOT_REVISION, _LAST_REVISION_CHECK
+    _SNAPSHOT_REVISION = None
+    _LAST_REVISION_CHECK = None
