@@ -231,7 +231,7 @@ def compile_catalog(shipped, overlay_documents=()):
     # Precomputed and immutable: these are read per token on the parsing hot
     # path, so they must not be rebuilt or copied on every lookup.
     snapshot["balancer_match_order"] = tuple(
-        sorted(snapshot["known_balancer_symbols"], key=len, reverse=True))
+        sorted(snapshot["known_balancer_symbols"], key=lambda s: (-len(s), s)))
     snapshot["gene_marker_symbols"] = frozenset(snapshot["gene_markers"])
     snapshot["allele_marker_tokens"] = frozenset(snapshot["allele_markers"])
     snapshot["probe_symbols"] = sorted(set(snapshot["probe_symbols"]))
