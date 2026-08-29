@@ -1,25 +1,11 @@
+from flymanager.utils.phenotypes.marker_catalog import get_catalog
 from flymanager.utils.phenotypes.visual_markers import get_visual_marker
 
-MARKER_STABILITY_SCORES = {
-    "Cy": 0.95,
-    "Sb": 0.8,
-    "Ser": 0.78,
-    "Hu": 0.72,
-    "e": 0.7,
-    "Ubx": 0.68,
-    "mini-white": 0.58,
-    "Tb": 0.5,
-    "Bar": 0.45,
-    "B": 0.4,
-}
+DEFAULT_STABILITY_SCORE = 0.68
 
-_MARKER_NOTES = {
-    "Cy": ["Curly wings are treated as the most reliable dominant balancer marker."],
-    "Sb": ["Stubble is a useful balancer marker but less stable than Curly in routine sorting."],
-    "mini-white": ["mini-white eye pigmentation is dosage-sensitive and varies with insertion context."],
-    "Tb": ["Tubby is down-weighted because TM6B/Tb reversion is a known high-frequency risk."],
-    "B": ["Bar/B-style eye-shape calls are treated as weaker standalone sorting markers."],
-}
+
+def _stability_entry(label):
+    return get_catalog()["stability"].get(label) or {}
 
 
 def _marker_label(marker_or_label):
@@ -37,19 +23,20 @@ def _marker_label(marker_or_label):
 
 def assess_marker_stability(marker_or_label, *, balancer_symbol=None):
     label = _marker_label(marker_or_label)
-    score = MARKER_STABILITY_SCORES.get(label)
+    entry = _stability_entry(label)
+    score = entry.get("score")
     marker = marker_or_label if isinstance(marker_or_label, dict) else None
 
     if score is None and marker is not None:
         curated = get_visual_marker(marker.get("gene_stem"), allele_spec=marker.get("allele_spec"), token=marker.get("token"))
         if curated is not None:
-            score = float(curated.get("scoring_confidence", 0.68))
+            score = float(curated.get("scoring_confidence", DEFAULT_STABILITY_SCORE))
 
     if score is None:
-        score = 0.68
+        score = DEFAULT_STABILITY_SCORE
 
     resolved_balancer = str(balancer_symbol or (marker or {}).get("balancer_symbol") or "").strip()
-    notes = list(_MARKER_NOTES.get(label, []))
+    notes = list(entry.get("notes") or [])
     if label == "Tb" and resolved_balancer in {"TM6B", "TM6"}:
         score = min(score, 0.35)
         notes.append("TM6B explicitly keeps Tb because the marker can revert at high frequency.")
@@ -73,7 +60,7 @@ def score_sorting_markers(markers):
     assessments = [assess_marker_stability(marker) for marker in markers or []]
     if not assessments:
         return {
-            "average_score": 0.68,
+            "average_score": DEFAULT_STABILITY_SCORE,
             "stability_label": "moderate",
             "weakest_marker": None,
             "markers": [],

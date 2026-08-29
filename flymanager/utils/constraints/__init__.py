@@ -3,12 +3,11 @@ from flymanager.utils.constraints.balancer_selection import \
 from flymanager.utils.constraints.interchromosomal import \
     evaluate_interchromosomal_risk
 from flymanager.utils.constraints.marker_stability import (
-    MARKER_STABILITY_SCORES, assess_marker_stability, score_sorting_markers)
+    assess_marker_stability, score_sorting_markers)
 from flymanager.utils.constraints.target_validation import validate_target
 from flymanager.utils.constraints.yield_estimator import estimate_target_yield
 
 __all__ = [
-    "MARKER_STABILITY_SCORES",
     "assess_marker_stability",
     "estimate_target_yield",
     "evaluate_interchromosomal_risk",
