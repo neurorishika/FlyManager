@@ -7,6 +7,8 @@ actually be affected, then stamps the new signature onto the rest.
 """
 import re
 
+from pymongo import UpdateOne
+
 UNSCOPABLE_KINDS = ("construct_marker",)
 
 
@@ -145,3 +147,103 @@ def build_affected_query(tokens, *, genotype_fields):
     # "sco" resolves to sna[Sco] and must be swept when that row is edited.
     return {"$or": [{field: {"$regex": pattern, "$options": "i"}}
                     for field in genotype_fields]}
+
+
+STOCK_GENOTYPE_FIELDS = ("Genotype",)
+CROSS_GENOTYPE_FIELDS = ("MaleGenotype", "FemaleGenotype")
+
+
+def stamp_current_caches(collection, *, cache_field, cache_getter, signature, query=None):
+    """Write the new catalog signature onto caches that are otherwise current.
+
+    A record is stamped only when ``cache_getter(record, strict=True)`` still
+    accepts it once the signature clause is ignored -- i.e. it is current on
+    version, pipeline signature and genotype. Records with no cache, or stale
+    for any other reason, are left for the next backfill.
+
+    This is what makes targeting worthwhile: without it the next force=False
+    backfill would recompute the whole collection anyway. The tradeoff is that
+    a bug in derive_affected_tokens becomes permanently invisible here rather
+    than self-correcting; the guarded force-recompute is the escape hatch.
+    """
+    operations = []
+    for record in collection.find(query or {}):
+        cache = record.get(cache_field)
+        if not isinstance(cache, dict):
+            continue
+        if cache.get("markerCatalogSignature") == signature:
+            # Already current -- typically a record the rebuild just wrote.
+            continue
+        probe = dict(record)
+        probe[cache_field] = dict(cache, markerCatalogSignature=signature)
+        if cache_getter(probe, strict=True) is None:
+            continue
+        operations.append(UpdateOne(
+            {"_id": record["_id"]},
+            {"$set": {f"{cache_field}.markerCatalogSignature": signature}},
+        ))
+
+    if operations:
+        collection.bulk_write(operations, ordered=False)
+    return len(operations)
+
+
+def rebuild_after_marker_change(db, keys, *, previous_documents=(), deleted_override_keys=()):
+    """Recompute the caches a marker edit can affect, then stamp the rest.
+
+    Runs after the catalog snapshot has already been refreshed, so
+    get_catalog()["signature"] is the post-edit signature.
+    """
+    from flymanager.app.services.standardization_backfill import (
+        backfill_cross_standardization_cache,
+        backfill_stock_standardization_cache)
+    from flymanager.app.services.stock_standardization import (
+        get_cached_cross_standardization, get_cached_stock_standardization)
+    from flymanager.utils.phenotypes.backfill import (
+        backfill_cross_phenotype_cache, backfill_stock_phenotype_cache)
+    from flymanager.utils.phenotypes.marker_catalog import get_catalog
+    from flymanager.utils.phenotypes.predictor import (
+        get_cached_cross_phenotype, get_cached_stock_phenotype)
+
+    snapshot = get_catalog()
+    signature = snapshot["signature"]
+    tokens = derive_affected_tokens(snapshot, keys,
+                                    previous_documents=previous_documents,
+                                    deleted_override_keys=deleted_override_keys)
+
+    result = {
+        "scope": "full" if tokens is None else "targeted",
+        "tokens": sorted(tokens) if tokens is not None else None,
+    }
+
+    plans = (
+        ("stocks", STOCK_GENOTYPE_FIELDS,
+         backfill_stock_phenotype_cache, get_cached_stock_phenotype,
+         backfill_stock_standardization_cache, get_cached_stock_standardization),
+        ("crosses", CROSS_GENOTYPE_FIELDS,
+         backfill_cross_phenotype_cache, get_cached_cross_phenotype,
+         backfill_cross_standardization_cache, get_cached_cross_standardization),
+    )
+
+    for (name, fields, phenotype_backfill, phenotype_getter,
+         standardization_backfill, standardization_getter) in plans:
+        collection = db[name]
+        query = None if tokens is None else build_affected_query(tokens, genotype_fields=fields)
+
+        rebuilt = 0
+        if tokens is None or query is not None:
+            phenotype_summary = phenotype_backfill(collection, query=query, force=True)
+            standardization_backfill(collection, query=query, force=True)
+            rebuilt = phenotype_summary["updated"]
+
+        stamped = stamp_current_caches(
+            collection, cache_field="PhenotypeCache",
+            cache_getter=phenotype_getter, signature=signature,
+        )
+        stamp_current_caches(
+            collection, cache_field="StandardizationCache",
+            cache_getter=standardization_getter, signature=signature,
+        )
+        result[name] = {"rebuilt": rebuilt, "stamped": stamped}
+
+    return result

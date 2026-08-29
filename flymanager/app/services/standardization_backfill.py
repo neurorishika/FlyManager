@@ -12,7 +12,7 @@ from flymanager.app.services.stock_standardization import (
 from flymanager.utils.materialized_cache import backfill_materialized_cache
 
 
-def backfill_stock_standardization_cache(collection, *, users=None, dry_run=False, force=False):
+def backfill_stock_standardization_cache(collection, *, users=None, query=None, dry_run=False, force=False):
     return backfill_materialized_cache(
         collection,
         cache_field="StandardizationCache",
@@ -20,12 +20,13 @@ def backfill_stock_standardization_cache(collection, *, users=None, dry_run=Fals
         cache_builder=lambda record: build_stock_standardization_cache(record.get("Genotype", "")),
         projection={"_id": 1, "User": 1, "AssignedTo": 1, "Genotype": 1, "StandardizationCache": 1},
         users=users,
+        query=query,
         dry_run=dry_run,
         force=force,
     )
 
 
-def backfill_cross_standardization_cache(collection, *, users=None, dry_run=False, force=False):
+def backfill_cross_standardization_cache(collection, *, users=None, query=None, dry_run=False, force=False):
     return backfill_materialized_cache(
         collection,
         cache_field="StandardizationCache",
@@ -43,6 +44,7 @@ def backfill_cross_standardization_cache(collection, *, users=None, dry_run=Fals
             "StandardizationCache": 1,
         },
         users=users,
+        query=query,
         dry_run=dry_run,
         force=force,
     )

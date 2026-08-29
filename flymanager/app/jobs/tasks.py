@@ -208,6 +208,33 @@ def task_backfill_phenotype_cache(key, username, *, users, scope_label):
     _run(key, work)
 
 
+def task_rebuild_marker_caches(key, username, *, keys, previous_documents=(),
+                               deleted_override_keys=()):
+    def work(app, db):
+        from flymanager.utils.phenotypes.marker_catalog import refresh_catalog
+        from flymanager.utils.phenotypes.marker_rebuild import \
+            rebuild_after_marker_change
+
+        # force=True rather than waiting out the before_request interval: the
+        # worker must see the edit that triggered this job.
+        refresh_catalog(db, force=True)
+        summary = rebuild_after_marker_change(
+            db, keys, previous_documents=previous_documents,
+            deleted_override_keys=deleted_override_keys)
+        write_activity(username, f"Rebuilt caches after marker change: {', '.join(keys) or 'catalog'}", db)
+        return {
+            "message": (
+                f"Marker cache rebuild ({summary['scope']}) complete: "
+                f"{summary['stocks']['rebuilt']} stocks and "
+                f"{summary['crosses']['rebuilt']} crosses recomputed, "
+                f"{summary['stocks']['stamped'] + summary['crosses']['stamped']} stamped."
+            ),
+            "summary": summary,
+        }
+
+    _run(key, work)
+
+
 def task_update_bloomington_stock(key, username):
     def work(app, db):
         from flymanager.app.services import bloomington as bloomington_service

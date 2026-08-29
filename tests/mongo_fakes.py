@@ -27,19 +27,23 @@ def _matches_operator_clause(actual, clause, *, field_present=True):
             if actual == operand:
                 return False
         elif operator == "$regex":
-            if actual is None or not re.search(operand, str(actual)):
+            flags = re.IGNORECASE if "i" in str(clause.get("$options", "")) else 0
+            if actual is None or not re.search(operand, str(actual), flags):
                 return False
+        elif operator == "$options":
+            continue  # consumed by the $regex branch above
         else:
             raise NotImplementedError(f"Unsupported query operator: {operator}")
     return True
 
 
 def _matches(record, query):
-    if "$and" in query:
-        return all(_matches(record, clause) for clause in query["$and"])
-    if "$or" in query:
-        return any(_matches(record, clause) for clause in query["$or"])
-    for key, value in (query or {}).items():
+    query = query or {}
+    if "$and" in query and not all(_matches(record, clause) for clause in query["$and"]):
+        return False
+    if "$or" in query and not any(_matches(record, clause) for clause in query["$or"]):
+        return False
+    for key, value in query.items():
         if key in ("$or", "$and"):
             continue
         if isinstance(value, dict) and any(k.startswith("$") for k in value):
@@ -50,6 +54,20 @@ def _matches(record, query):
         elif record.get(key) != value:
             return False
     return True
+
+
+def _apply_set(record, updates):
+    """Apply a $set document, honouring dotted paths like "Cache.field"."""
+    for field, value in (updates or {}).items():
+        if "." not in field:
+            record[field] = value
+            continue
+        head, _, tail = field.partition(".")
+        target = record.setdefault(head, {})
+        if not isinstance(target, dict):
+            target = {}
+            record[head] = target
+        _apply_set(target, {tail: value})
 
 
 class FakeCursor:
@@ -158,12 +176,12 @@ class FakeCollection:
     def update_one(self, query, update, upsert=False):
         for record in self._records:
             if _matches(record, query):
-                record.update(update.get("$set", {}))
+                _apply_set(record, update.get("$set", {}))
                 return SimpleNamespace(matched_count=1, modified_count=1, upserted_id=None)
         if upsert:
             # Insert a new document with the update
             new_doc = dict(query)
-            new_doc.update(update.get("$set", {}))
+            _apply_set(new_doc, update.get("$set", {}))
             self._records.append(new_doc)
             return SimpleNamespace(matched_count=0, modified_count=0, upserted_id=len(self._records))
         return SimpleNamespace(matched_count=0, modified_count=0, upserted_id=None)
@@ -177,9 +195,9 @@ class FakeCollection:
             if _matches(record, query):
                 if not return_after:
                     before = dict(record)
-                    record.update(update.get("$set", {}))
+                    _apply_set(record, update.get("$set", {}))
                     return before
-                record.update(update.get("$set", {}))
+                _apply_set(record, update.get("$set", {}))
                 return dict(record)
         return None
 
@@ -207,7 +225,7 @@ class FakeCollection:
             update = operation._doc
             for record in self._records:
                 if _matches(record, query):
-                    record.update(update.get("$set", {}))
+                    _apply_set(record, update.get("$set", {}))
                     modified += 1
                     break
         return SimpleNamespace(modified_count=modified)
