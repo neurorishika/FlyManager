@@ -13,8 +13,8 @@ from flymanager.utils.phenotypes.flybase_pipeline import (
     resolve_flybase_data_dir, resolve_flybase_phenotype_cache_path)
 from flymanager.utils.phenotypes.parser import parse_gene_package
 from flymanager.utils.phenotypes.visual_markers import (
-    ALLELE_VISUAL_MARKER_DICTIONARY, REVIEWED_MARKER_ALIASES,
-    VISUAL_MARKER_DICTIONARY)
+    get_allele_marker_tokens, get_gene_marker_symbols,
+    get_reviewed_marker_alias)
 
 DEFAULT_CANDIDATE_LIMIT = 6
 MIN_FUZZY_SCORE = 55
@@ -394,8 +394,8 @@ def review_stock_standardization(genotype, *, token_search_overrides=None, candi
     alias_index = cache.get("marker_alias_index", {})
     ambiguous_aliases = cache.get("ambiguous_marker_aliases", {})
 
-    known_gene_stems = set(VISUAL_MARKER_DICTIONARY)
-    known_allele_tokens = set(ALLELE_VISUAL_MARKER_DICTIONARY)
+    known_gene_stems = get_gene_marker_symbols()
+    known_allele_tokens = get_allele_marker_tokens()
     issues = {}
 
     for package in _iter_genotype_packages(genotype_text):
@@ -429,7 +429,7 @@ def review_stock_standardization(genotype, *, token_search_overrides=None, candi
         recommended_replacement = ""
         recommended_source = ""
 
-        reviewed_alias = REVIEWED_MARKER_ALIASES.get(token)
+        reviewed_alias = get_reviewed_marker_alias(token)
         if reviewed_alias is not None:
             recommended_replacement = str(reviewed_alias.get("value") or "").strip()
             recommended_source = "reviewed_alias"

@@ -7,8 +7,7 @@ from flymanager.utils.phenotypes.flybase_pipeline import (
     lookup_flybase_marker_alias)
 from flymanager.utils.phenotypes.parser import parse_gene_package
 from flymanager.utils.phenotypes.visual_markers import (
-    BALANCER_MARKERS, get_balancer_metadata, get_reviewed_marker_alias,
-    get_visual_marker)
+    get_balancer_metadata, get_reviewed_marker_alias, get_visual_marker)
 
 ALLELE_TOKEN_RE = re.compile(r"^(?P<gene>[A-Za-z0-9.+*()_-]+)\[(?P<allele>[^\]]+)\]$")
 
@@ -143,7 +142,7 @@ def resolve_package_markers(package_str, data_dir=None, cache_path=None, db=None
 
     for balancer in parsed["balancers"]:
         metadata = get_balancer_metadata(balancer["symbol"]) or {}
-        for marker_symbol in metadata.get("default_markers", BALANCER_MARKERS.get(balancer["symbol"], [])):
+        for marker_symbol in metadata.get("default_markers", []):
             marker = get_visual_marker(marker_symbol)
             if marker is None:
                 continue

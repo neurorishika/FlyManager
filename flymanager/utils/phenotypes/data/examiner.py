@@ -11,8 +11,8 @@ from flymanager.utils.phenotypes.flybase_pipeline import \
 from flymanager.utils.phenotypes.parser import parse_gene_package
 from flymanager.utils.phenotypes.resolver import resolve_package_markers
 from flymanager.utils.phenotypes.visual_markers import (
-    ALLELE_VISUAL_MARKER_DICTIONARY, CRITICAL_MARKERS, REVIEWED_MARKER_ALIASES,
-    VISUAL_MARKER_DICTIONARY)
+    get_allele_marker_tokens, get_gene_marker_symbols,
+    get_probe_marker_symbols, get_reviewed_marker_alias)
 
 EXPECTED_FLYBASE_FILES = {
     "genotype_phenotype_data": "genotype_phenotype_data",
@@ -116,7 +116,7 @@ def summarize_tsv_file(file_path, sample_size=5):
 
 def examine_flybase_directory(data_dir, markers=None):
     data_dir = Path(data_dir)
-    markers = markers or CRITICAL_MARKERS
+    markers = markers or get_probe_marker_symbols()
     summaries = {}
     located_files = {}
 
@@ -592,8 +592,8 @@ def _render_standardization_entries(counter, *, samples_by_token, replacement_ma
 
 def _audit_stock_standardization_rows(rows, *, genotype_field, cache_path=None):
     alias_index, ambiguous_aliases = _load_cached_alias_indexes(cache_path)
-    known_gene_stems = set(VISUAL_MARKER_DICTIONARY)
-    known_allele_tokens = set(ALLELE_VISUAL_MARKER_DICTIONARY)
+    known_gene_stems = get_gene_marker_symbols()
+    known_allele_tokens = get_allele_marker_tokens()
 
     summary = Counter()
     safe_replacement_counter = Counter()
@@ -633,8 +633,9 @@ def _audit_stock_standardization_rows(rows, *, genotype_field, cache_path=None):
 
                 normalized = _normalize_unresolved_token(token)
                 replacement = None
-                if token in REVIEWED_MARKER_ALIASES:
-                    replacement = REVIEWED_MARKER_ALIASES[token].get("value")
+                reviewed_alias = get_reviewed_marker_alias(token)
+                if reviewed_alias is not None:
+                    replacement = reviewed_alias.get("value")
                 else:
                     replacement = (alias_index.get(normalized) or {}).get("canonical_token")
 

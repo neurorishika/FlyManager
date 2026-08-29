@@ -29,7 +29,7 @@ from flymanager.utils.phenotypes.predictor import (
     annotate_offspring_predictions, predict_individual_phenotype,
     predict_stock_phenotype, summarize_parent_phenotypes)
 from flymanager.utils.phenotypes.resolver import resolve_package_markers
-from flymanager.utils.phenotypes.visual_markers import (BALANCER_MARKERS,
+from flymanager.utils.phenotypes.visual_markers import (get_balancer_markers,
                                                         get_balancer_metadata)
 
 
@@ -228,7 +228,7 @@ def test_resolve_package_markers_combines_balancer_and_manual_dictionary_hits():
 
 @pytest.mark.parametrize(
     ("balancer_symbol", "expected_markers"),
-    sorted(BALANCER_MARKERS.items()),
+    sorted(get_balancer_markers().items()),
 )
 def test_resolve_package_markers_matches_balancer_marker_table(balancer_symbol, expected_markers):
     resolved = resolve_package_markers(balancer_symbol)

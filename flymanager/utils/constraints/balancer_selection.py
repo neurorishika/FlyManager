@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 from flymanager.utils.constraints._shared import (DEFAULT_BALANCER_PRIORITY,
                                                   deepcopy_documents,
                                                   extract_cytology_tokens,
@@ -13,17 +11,17 @@ from flymanager.utils.constraints._shared import (DEFAULT_BALANCER_PRIORITY,
 from flymanager.utils.constraints.interchromosomal import \
     evaluate_interchromosomal_risk
 from flymanager.utils.constraints.marker_stability import score_sorting_markers
-from flymanager.utils.phenotypes.visual_markers import (BALANCER_METADATA,
-                                                        get_balancer_metadata)
+from flymanager.utils.phenotypes.visual_markers import (
+    get_balancer_metadata, get_balancer_metadata_map)
 
 
 def _candidate_documents(chromosome, db):
     candidates = {}
 
-    for symbol, metadata in BALANCER_METADATA.items():
+    for symbol, metadata in get_balancer_metadata_map().items():
         if metadata.get("chromosome") != chromosome:
             continue
-        candidates[symbol] = deepcopy(metadata)
+        candidates[symbol] = metadata
 
     collection = get_collection(db, "balancer_definitions")
     for document in deepcopy_documents(iter_collection_documents(collection)):
