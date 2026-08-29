@@ -12,6 +12,7 @@ phenotype pipeline's db-less contract: ``resolve_package_markers`` and the
 """
 import hashlib
 import json
+import threading
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -263,3 +264,36 @@ def compute_marker_catalog_signature(snapshot):
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:32]
+
+
+_LOCK = threading.Lock()
+_SNAPSHOT = None
+
+
+def get_catalog():
+    """Return the current compiled snapshot, compiling shipped-only if needed.
+
+    Never queries Mongo. Callers on the phenotype resolution path use this;
+    the overlay is folded in out-of-band by refresh_catalog().
+    """
+    global _SNAPSHOT
+    if _SNAPSHOT is None:
+        with _LOCK:
+            if _SNAPSHOT is None:
+                _SNAPSHOT = compile_catalog(load_shipped_catalog(), [])
+    return _SNAPSHOT
+
+
+def set_catalog(snapshot):
+    """Install a compiled snapshot. Used by refresh_catalog and by tests."""
+    global _SNAPSHOT
+    with _LOCK:
+        _SNAPSHOT = snapshot
+    return snapshot
+
+
+def reset_catalog():
+    """Drop the cached snapshot so the next get_catalog() recompiles."""
+    global _SNAPSHOT
+    with _LOCK:
+        _SNAPSHOT = None
