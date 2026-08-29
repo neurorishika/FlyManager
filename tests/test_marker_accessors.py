@@ -86,3 +86,18 @@ def test_hot_path_accessors_return_immutable_values():
     assert isinstance(visual_markers.get_allele_marker_tokens(), frozenset)
     assert isinstance(visual_markers.get_known_balancer_symbols(), frozenset)
     assert isinstance(visual_markers.get_balancer_match_order(), tuple)
+
+
+def test_legacy_constant_shims_are_gone():
+    """The shims froze marker data at import; nothing may depend on them again."""
+    for name in (
+        "CRITICAL_MARKERS",
+        "VISUAL_MARKER_DICTIONARY",
+        "ALLELE_VISUAL_MARKER_DICTIONARY",
+        "REVIEWED_MARKER_ALIASES",
+        "BALANCER_METADATA",
+        "BALANCER_ALIASES",
+        "BALANCER_MARKERS",
+        "KNOWN_BALANCER_SYMBOLS",
+    ):
+        assert not hasattr(visual_markers, name), f"{name} should have been deleted"

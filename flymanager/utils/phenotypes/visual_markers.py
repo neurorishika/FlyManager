@@ -114,15 +114,3 @@ def get_reviewed_marker_alias(alias_token):
     return deepcopy(get_catalog()["aliases"].get(str(alias_token or "").strip()))
 
 
-# --- Temporary import-time compatibility shims -----------------------------
-# Deleted in Task 6 once every consumer uses the accessors above. These
-# reproduce the old import-time snapshot behaviour exactly, including the
-# fact that they do not follow a later catalog refresh.
-CRITICAL_MARKERS = get_probe_marker_symbols()
-VISUAL_MARKER_DICTIONARY = get_gene_marker_dictionary()
-ALLELE_VISUAL_MARKER_DICTIONARY = get_allele_marker_dictionary()
-REVIEWED_MARKER_ALIASES = get_reviewed_marker_aliases()
-BALANCER_METADATA = get_balancer_metadata_map()
-BALANCER_ALIASES = get_balancer_aliases()
-BALANCER_MARKERS = get_balancer_markers()
-KNOWN_BALANCER_SYMBOLS = get_known_balancer_symbols()
