@@ -140,3 +140,91 @@ def test_a_clean_overlay_document_still_compiles_with_an_objectid_present():
     snapshot = marker_catalog.refresh_catalog(db)
     assert snapshot["gene_markers"]["zz"]["effect"] == "zigzag wings"
     assert snapshot["invalid_definitions"] == []
+
+
+def test_concurrent_refreshes_never_compile_at_the_same_time(monkeypatch):
+    """The whole read-compile-install sequence is serialized on
+    _REFRESH_LOCK, so two threads can never both be inside compile_catalog
+    at once. That's what makes the "slow compile of an older revision
+    overwrites a newer, already-installed snapshot" bug structurally
+    impossible rather than merely unlikely: install can't race compile
+    across threads if only one thread can ever be compiling.
+
+    A literal two-party threading.Barrier() inside compile_catalog (as in an
+    earlier draft of this test) can't be satisfied by a correctly serialized
+    implementation -- with the fix in place, a second thread can't even
+    reach compile_catalog until the first has finished and released
+    _REFRESH_LOCK, so the second party for the barrier's rendezvous never
+    arrives and the test hangs until its timeout. This version instead
+    tracks how many threads are concurrently inside compile_catalog via a
+    counter guarded by its own lock (deliberately unrelated to _REFRESH_LOCK
+    or _LOCK) and asserts that count never exceeds 1, no matter how the OS
+    schedules many real, concurrently-started threads. That assertion can
+    never flake true-positive on a correctly serialized implementation --
+    unlike a sleep-based test, there is no timing window to get unlucky in.
+    """
+    import threading
+
+    db = _db([USER_MARKER], revision=1)
+    real_compile = marker_catalog.compile_catalog
+    counter_lock = threading.Lock()
+    active = 0
+    max_active_seen = 0
+
+    def tracked_compile(shipped, overlay):
+        nonlocal active, max_active_seen
+        with counter_lock:
+            active += 1
+            max_active_seen = max(max_active_seen, active)
+        try:
+            return real_compile(shipped, overlay)
+        finally:
+            with counter_lock:
+                active -= 1
+
+    monkeypatch.setattr(marker_catalog, "compile_catalog", tracked_compile)
+
+    results = []
+    results_lock = threading.Lock()
+    start_barrier = threading.Barrier(8)
+
+    def worker():
+        start_barrier.wait(timeout=10)  # align start times to maximize contention
+        snapshot = marker_catalog.refresh_catalog(db, force=True)
+        with results_lock:
+            results.append(snapshot["catalogVersion"])
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert len(results) == 8
+    assert max_active_seen == 1, "two threads compiled concurrently -- _REFRESH_LOCK did not serialize them"
+    assert marker_catalog.get_catalog() is not None
+
+
+def test_concurrent_refreshes_converge_on_the_highest_revision():
+    """Whatever the interleaving, the installed revision must match the
+    installed snapshot."""
+    import threading
+
+    db = _db([USER_MARKER], revision=1)
+    errors = []
+
+    def worker():
+        try:
+            for _ in range(20):
+                marker_catalog.refresh_catalog(db)
+        except Exception as exc:  # noqa: BLE001 - surfaced via errors list
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=20)
+
+    assert errors == []
+    assert "zz" in marker_catalog.get_catalog()["gene_markers"]

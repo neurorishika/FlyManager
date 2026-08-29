@@ -275,6 +275,13 @@ def compute_marker_catalog_signature(snapshot):
 
 _LOCK = threading.Lock()
 _SNAPSHOT = None
+# Serializes the whole read-compile-install sequence in refresh_catalog, so
+# only one thread compiles at a time. Distinct from _LOCK (which only
+# guards the snapshot pointer itself) because threading.Lock is not
+# reentrant: refresh_catalog must hold this lock while it briefly takes
+# _LOCK to install, and get_catalog()/set_catalog() must remain callable
+# independently without ever needing _REFRESH_LOCK.
+_REFRESH_LOCK = threading.Lock()
 
 
 def get_catalog():
@@ -349,27 +356,46 @@ def _overlay_documents(db):
 def refresh_catalog(db, *, force=False):
     """Recompile the snapshot from Mongo when the stored revision has moved.
 
+    The whole read-compile-install sequence is serialized on _REFRESH_LOCK.
+    Without it two threads can install out of order -- a slow compile of an
+    older revision overwriting a newer snapshot that already landed -- which
+    would make the served catalog go backward instead of converging.
+
     A compile failure propagates with the previous snapshot left installed:
     the request path must never be left without a catalog, and a half-built
     one would be worse than a stale one.
     """
-    global _SNAPSHOT_REVISION
+    global _SNAPSHOT, _SNAPSHOT_REVISION
 
-    revision = read_catalog_revision(db)
-    if not force and _SNAPSHOT is not None and _SNAPSHOT_REVISION == revision:
-        return _SNAPSHOT
+    with _REFRESH_LOCK:
+        revision = read_catalog_revision(db)
+        if not force and _SNAPSHOT is not None and _SNAPSHOT_REVISION == revision:
+            return _SNAPSHOT
 
-    overlay = _overlay_documents(db)
-    snapshot = compile_catalog(load_shipped_catalog(), overlay)
-    set_catalog(snapshot)
-    _SNAPSHOT_REVISION = revision
-    return snapshot
+        snapshot = compile_catalog(load_shipped_catalog(), _overlay_documents(db))
+
+        # Assigns _SNAPSHOT directly rather than calling set_catalog(): that
+        # helper takes _LOCK itself, and threading.Lock is not reentrant, so
+        # calling it from inside this _REFRESH_LOCK block while also nesting
+        # into _LOCK below would deadlock.
+        with _LOCK:
+            _SNAPSHOT = snapshot
+            _SNAPSHOT_REVISION = revision
+        return snapshot
 
 
 def maybe_refresh_catalog(db, *, interval_seconds=DEFAULT_REFRESH_INTERVAL_SECONDS, now=None):
     """Probe the stored revision at most once per interval per process.
 
     Returns the snapshot when the probe ran, or None when it was throttled.
+
+    The throttle check-then-set below is intentionally unlocked. It doesn't
+    need to be: once refresh_catalog serializes properly, two threads both
+    passing the throttle gate is harmless -- the second to enter
+    refresh_catalog's critical section just re-reads the same revision,
+    finds it already installed, and returns immediately. Locking the
+    throttle here would also deadlock, since this function calls
+    refresh_catalog, which takes _REFRESH_LOCK itself.
     """
     global _LAST_REVISION_CHECK
 
