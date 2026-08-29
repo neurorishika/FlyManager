@@ -185,6 +185,9 @@ scripts/rclone.conf
 
 # keep the shipped marker catalog (tracked reference data, never written at runtime)
 !data/markers
+
+# local FlyBase reference data (untracked bulk downloads; a symlink in agent worktrees)
+data/flybase
 # agent scratch: git worktrees and subagent-driven-development ledgers
 .claude/worktrees/
 .superpowers/
