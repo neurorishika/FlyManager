@@ -202,16 +202,18 @@ def _search_haystack(document):
     ) if value)
 
 
-def list_marker_definitions(db, *, kind=None, origin=None, search=None):
+def list_marker_definitions(db, *, kind=None, origin=None, search=None, username=None):
     """The merged shipped+overlay catalog view, newest layer winning by Key.
 
-    Each row carries `origin` and `editable_by_user`: whether a regular
-    (non-admin) user -- namely its creator -- could edit this row as it
-    stands. That's true only while origin == "user"; once promoted to
-    curated (or if it's shipped) only an admin can touch it. This is a
-    property of the row, not of the viewer, so it is not username-scoped --
-    routes still gate individual writes through can_edit_marker_definition
-    with the actual requesting user.
+    Each row carries `origin` and `editable_by_user`: whether THIS VIEWER
+    (`username`) may edit this particular row right now, per
+    `can_edit_marker_definition`. It is viewer-scoped, not a static property
+    of the row's origin -- a curated row is editable by admin but not by its
+    original creator, and a user row is editable by its creator or admin but
+    not by anyone else. Task 15's list view renders an Edit action straight
+    off this flag, so it must answer "would a write by this viewer succeed",
+    not "is this a user-origin row" -- otherwise the UI offers an action
+    that 403s, or hides one that would have worked.
     """
     shipped, _ = _shipped_definitions()
     merged = {key: dict(deepcopy(definition), origin="shipped")
@@ -225,7 +227,7 @@ def list_marker_definitions(db, *, kind=None, origin=None, search=None):
     rows = []
     for key in sorted(merged):
         document = dict(merged[key])
-        document["editable_by_user"] = document.get("origin") == "user"
+        document["editable_by_user"] = can_edit_marker_definition(document, username)
         if kind and document.get("kind") != kind:
             continue
         if origin and document.get("origin") != origin:

@@ -146,9 +146,13 @@ def test_a_shipped_definition_cannot_be_edited_or_deleted_directly(db):
     assert delete_exc.value.status_code == 409
 
 
+def _flag(rows, key):
+    return next(row["editable_by_user"] for row in rows if row["Key"] == key)
+
+
 def test_list_merges_shipped_and_overlay_with_edit_flags(db):
     create_marker_definition(db, _definition(), username="alice")
-    rows = list_marker_definitions(db)
+    rows = list_marker_definitions(db, username="alice")
     by_key = {row["Key"]: row for row in rows}
     assert by_key["Cy"]["origin"] == "shipped"
     assert by_key["Cy"]["editable_by_user"] is False
@@ -156,12 +160,27 @@ def test_list_merges_shipped_and_overlay_with_edit_flags(db):
     assert by_key["zz"]["editable_by_user"] is True
 
 
+def test_edit_flags_are_scoped_to_the_viewer(db):
+    """Task 15 renders an Edit action from this flag, so it must answer
+    'may this viewer edit this row', not 'is this a user row' -- otherwise
+    the UI offers an action that will 403."""
+    create_marker_definition(db, _definition(), username="alice")
+
+    assert _flag(list_marker_definitions(db, username="alice"), "zz") is True
+    assert _flag(list_marker_definitions(db, username="bob"), "zz") is False
+    assert _flag(list_marker_definitions(db, username="admin"), "zz") is True
+
+    promote_marker_definition(db, "zz", username="admin")
+    assert _flag(list_marker_definitions(db, username="alice"), "zz") is False
+    assert _flag(list_marker_definitions(db, username="admin"), "zz") is True
+
+
 def test_list_filters_by_kind_origin_and_search(db):
     create_marker_definition(db, _definition(), username="alice")
-    assert {row["Key"] for row in list_marker_definitions(db, origin="user")} == {"zz"}
+    assert {row["Key"] for row in list_marker_definitions(db, origin="user", username="alice")} == {"zz"}
     assert all(row["kind"] == "balancer"
-               for row in list_marker_definitions(db, kind="balancer"))
-    assert {row["Key"] for row in list_marker_definitions(db, search="zigzag")} == {"zz"}
+               for row in list_marker_definitions(db, kind="balancer", username="alice"))
+    assert {row["Key"] for row in list_marker_definitions(db, search="zigzag", username="alice")} == {"zz"}
 
 
 def test_can_edit_marker_definition_rules():
