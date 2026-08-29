@@ -1,26 +1,31 @@
 # flymanager/app/routes/main.py
+import os
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-from flask import (Blueprint, current_app, jsonify, redirect, render_template,
-                   request, session, url_for)
+from flask import (Blueprint, current_app, flash, jsonify, redirect,
+                   render_template, request, session, url_for)
 
 from flymanager.app import db
 from flymanager.app.routes.auth import admin_required, login_required
 from flymanager.app.routes.explorer_utils import (
     get_explorer_pagination_state, paginate_explorer_records)
-from flymanager.app.security import get_json_payload, limiter
+from flymanager.app.security import (get_json_payload, limiter,
+                                     normalize_identifier_list, parse_int_value)
 from flymanager.app.services import flybase as flybase_service
 from flymanager.app.services.scheduler import schedule_daily_flip_reminders
 from flymanager.app.services.stock_standardization import (
     get_cached_cross_standardization, get_cached_stock_standardization,
     summarize_genotype_standardization)
+from flymanager.utils.labels import generate_label_pdf
 from flymanager.utils.mongo import (OperationLockConflict,
                                     get_accessible_crosses,
                                     get_accessible_stocks, get_flip_in,
                                     get_flip_schedule, get_settings,
                                     get_tray_occupancy, get_user_activities,
-                                    get_user_trays, hold_operation_lock)
+                                    get_user_initials, get_user_trays,
+                                    hold_operation_lock, write_activity)
+from flymanager.utils.mongo_records import delete_owned_documents_if_status
 from flymanager.utils.utils import get_datetime_from_str
 
 bp = Blueprint('main', __name__)  # Remove url_prefix to handle root URL
@@ -1169,3 +1174,175 @@ def update_theme():
 @bp.route('/user_guide')
 def user_guide():
     return render_template('utilities/user_guide.html')
+
+
+@bp.route("/generate_labels", methods=["POST"])
+@login_required
+@limiter.limit("10 per hour")
+def generate_labels():
+    """Generate a single label PDF for a mixed cart of stocks and crosses.
+
+    The shared explorer cart can hold both item types at once, so this
+    route (unlike the old per-type stock/cross label routes it replaces)
+    merges accessible stocks and crosses by (uid, type) pairs and hands
+    generate_label_pdf() one combined, tray-ordered list.
+    """
+    username = session.get("username")
+    fallback_redirect = request.referrer or url_for("main.home")
+    try:
+        selected_uids_str = request.form.get("selected_uids")
+        item_types_str = request.form.get("item_types")
+        quantities_str = request.form.get("quantities")
+        blank_spaces = parse_int_value(
+            request.form.get("blank_spaces", 0),
+            field_name="Blank spaces",
+            minimum=0,
+            maximum=200,
+        )
+
+        if not selected_uids_str or not item_types_str or not quantities_str:
+            flash("Missing selected items, types, or quantities.", "error")
+            return redirect(fallback_redirect)
+
+        selected_uids = selected_uids_str.split(",")
+        item_types = item_types_str.split(",")
+        quantities = [int(q) for q in quantities_str.split(",")]
+
+        if not (len(selected_uids) == len(item_types) == len(quantities)):
+            flash("Mismatch between selected items, types, and quantities.", "error")
+            return redirect(fallback_redirect)
+
+        if not set(item_types) <= {"stock", "cross"}:
+            flash("Invalid item type in label selection.", "error")
+            return redirect(fallback_redirect)
+
+        user_initials = get_user_initials(username, db)
+
+        record_maps = {
+            "stock": {str(s["UniqueID"]): s for s in get_accessible_stocks(username, db)},
+            "cross": {str(c["UniqueID"]): c for c in get_accessible_crosses(username, db)},
+        }
+
+        selected_items = []
+        selected_item_types = []
+        for uid, item_type, quantity in zip(selected_uids, item_types, quantities):
+            record = record_maps[item_type].get(uid)
+            if record and quantity > 0:
+                selected_items.extend([record] * quantity)
+                selected_item_types.extend([item_type] * quantity)
+
+        if not selected_items:
+            flash("No valid items selected for label generation.", "warning")
+            return redirect(fallback_redirect)
+
+        # Sort the combined stock+cross selection by TrayID/TrayPosition so
+        # labels print in physical tray order regardless of item type.
+        order = sorted(
+            range(len(selected_items)),
+            key=lambda i: (
+                str(selected_items[i].get("TrayID", "")),
+                int(float(selected_items[i].get("TrayPosition") or 0)),
+            ),
+        )
+        selected_items = [selected_items[i] for i in order]
+        selected_item_types = [selected_item_types[i] for i in order]
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        pdf_filename = f"{username}_labels_{timestamp}.pdf"
+        labels_dir = os.path.join(current_app.static_folder, "generated_labels")
+        os.makedirs(labels_dir, exist_ok=True)
+        pdf_full_path = os.path.join(labels_dir, pdf_filename)
+
+        generate_label_pdf(
+            pdf_full_path,
+            user_initials,
+            selected_items,
+            selected_item_types,
+            blank_spaces,
+            len(selected_items),
+        )
+
+        pdf_url = url_for("static", filename=f"generated_labels/{pdf_filename}")
+
+        write_activity(
+            username, f"Generated labels for {len(selected_items)} items", db
+        )
+
+        return redirect(pdf_url)
+    except ValueError as ve:
+        flash(f"Invalid input: {ve}", "error")
+        return redirect(fallback_redirect)
+    except Exception as e:
+        current_app.logger.exception("Error generating labels for %s: %s", username, e)
+        flash(f"Error generating labels: {e}", "error")
+        return redirect(fallback_redirect)
+
+
+@bp.route("/delete_items_permanently", methods=["POST"])
+@login_required
+@limiter.limit("10 per hour")
+def delete_items_permanently():
+    """Permanently delete a mixed cart of stocks/crosses.
+
+    Only items with Status "No longer maintained" are deleted; everything
+    else is reported as skipped. ``itemTypes`` is a list parallel to
+    ``uniqueIDs`` since the underlying delete only touches one collection
+    (stocks or crosses) at a time.
+
+    Expected JSON payload:
+    {
+        "uniqueIDs": ["uid1", "uid2", ...],
+        "itemTypes": ["stock", "cross", ...]
+    }
+    """
+    username = session.get("username")
+    try:
+        data = get_json_payload()
+        unique_ids = normalize_identifier_list(data.get("uniqueIDs", []), field_name="uniqueIDs")
+        item_types = data.get("itemTypes", [])
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
+
+    if len(item_types) != len(unique_ids):
+        return jsonify({"success": False, "message": "Mismatch between items and item types"}), 400
+    if not set(item_types) <= {"stock", "cross"}:
+        return jsonify({"success": False, "message": "Invalid item type"}), 400
+
+    uids_by_type = {"stock": [], "cross": []}
+    for uid, item_type in zip(unique_ids, item_types):
+        uids_by_type[item_type].append(uid)
+
+    deleted_uids = []
+    skipped_uids = []
+    for item_type, collection_name in (("stock", "stocks"), ("cross", "crosses")):
+        type_uids = uids_by_type[item_type]
+        if not type_uids:
+            continue
+        type_deleted, type_skipped = delete_owned_documents_if_status(
+            collection_name, username, type_uids, db, required_status="No longer maintained",
+        )
+        deleted_uids.extend(type_deleted)
+        skipped_uids.extend(type_skipped)
+
+    if deleted_uids:
+        activity_documents = [
+            {
+                "user": username,
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "activity": f"Permanently deleted item {uid}",
+            }
+            for uid in deleted_uids
+        ]
+        db["activity"].insert_many(activity_documents)
+
+    deleted_count = len(deleted_uids)
+    skipped_count = len(skipped_uids)
+
+    return jsonify(
+        {
+            "success": True,
+            "deleted": deleted_count,
+            "skipped": skipped_count,
+            "message": f'Successfully deleted {deleted_count} items with status "No longer maintained". Skipped {skipped_count} items.',
+        }
+    )

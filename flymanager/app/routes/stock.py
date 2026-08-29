@@ -20,25 +20,22 @@ from flymanager.app.routes.explorer_utils import (
     get_explorer_pagination_state, paginate_explorer_records,
     set_flip_display_fields)
 from flymanager.app.security import (csrf, get_json_payload, limiter,
-                                     normalize_identifier_list,
                                      normalize_optional_text, parse_int_value,
                                      require_confirmation)
 from flymanager.app.services.stock_standardization import \
     review_stock_standardization
 from flymanager.app.settings import DEFAULT_STOCK_PROPERTY_VALUES
 from flymanager.utils.genetics import qc_genotype
-from flymanager.utils.labels import generate_label_pdf
 from flymanager.utils.mongo import (OperationLockConflict, add_metadata,
                                     add_to_stock, edit_stock,
                                     get_accessible_documents_page,
                                     get_accessible_stock,
                                     get_accessible_stocks, get_direct_reports,
                                     get_eclosion_in, get_flip_in, get_metadata,
-                                    get_user_initials, hold_operation_lock,
+                                    hold_operation_lock,
                                     update_document_assignment,
                                     update_stock_vials, write_activity)
 from flymanager.utils.mongo_records import (current_timestamp,
-                                              delete_owned_documents_if_status,
                                               diff_candidate_against_record)
 from flymanager.utils.phenotypes.image_library import \
     select_prediction_reference_images
@@ -1964,96 +1961,6 @@ def autopopulate_series_replicate_ids():
         return jsonify({"error": "An internal error occurred."}), 500
 
 
-@bp.route("/generate_labels", methods=["POST"])
-@login_required
-@limiter.limit("10 per hour")
-def generate_stock_labels():
-    """Endpoint to generate stock labels based on selected stocks and quantities."""
-    username = session.get("username")
-    try:
-        selected_uids_str = request.form.get("selected_uids")
-        quantities_str = request.form.get("quantities")
-        blank_spaces = parse_int_value(
-            request.form.get("blank_spaces", 0),
-            field_name="Blank spaces",
-            minimum=0,
-            maximum=200,
-        )
-
-        if not selected_uids_str or not quantities_str:
-            flash("Missing selected stocks or quantities.", "error")
-            return redirect(url_for("stock.stock_explorer"))
-
-        selected_uids = selected_uids_str.split(",")
-        quantities = [int(q) for q in quantities_str.split(",")]
-
-        if len(selected_uids) != len(quantities):
-            flash("Mismatch between selected stocks and quantities.", "error")
-            return redirect(url_for("stock.stock_explorer"))
-
-        user_initials = get_user_initials(username, db)
-        all_stocks = get_accessible_stocks(username, db)  # Fetch all visible stocks
-
-        # Filter and duplicate based on selection and quantities
-        selected_stocks_data = []
-        stock_map = {
-            str(s.get("UniqueID")): s for s in all_stocks
-        }  # Map for quick lookup
-
-        for uid, quantity in zip(selected_uids, quantities):
-            stock = stock_map.get(uid)
-            if stock and quantity > 0:
-                selected_stocks_data.extend([stock] * quantity)
-
-        if not selected_stocks_data:
-            flash("No valid stocks selected for label generation.", "warning")
-            return redirect(url_for("stock.stock_explorer"))
-
-        # Sort for printing (optional, but good practice)
-        selected_stocks_data = sorted(
-            selected_stocks_data,
-            key=lambda x: (
-                str(x.get("TrayID", "")),
-                int(float(x.get("TrayPosition", "0") or "0")),
-            ),
-        )
-
-        # Generate PDF
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename_base = f"{username}_stock_labels_{timestamp}"
-        pdf_filename = f"{filename_base}.pdf"
-        # Ensure the target directory exists (using UPLOAD_FOLDER for generated files?)
-        labels_dir = os.path.join(current_app.static_folder, "generated_labels")
-        os.makedirs(labels_dir, exist_ok=True)
-        pdf_full_path = os.path.join(labels_dir, pdf_filename)
-
-        generate_label_pdf(
-            pdf_full_path,  # Pass full path instead of just filename
-            user_initials,
-            selected_stocks_data,
-            ["stock"] * len(selected_stocks_data),  # Type identifier
-            blank_spaces,
-            len(selected_stocks_data),
-        )
-
-        pdf_url = url_for("static", filename=f"generated_labels/{pdf_filename}")
-
-        # Log activity
-        write_activity(
-            username, f"Generated {len(selected_stocks_data)} stock labels", db
-        )
-
-        # Redirect to the generated PDF file
-        return redirect(pdf_url)
-
-    except ValueError as ve:
-        flash(f"Invalid input: {ve}", "error")
-        return redirect(url_for("stock.stock_explorer"))
-    except Exception as e:
-        current_app.logger.exception("Error generating stock labels for %s: %s", username, e)
-        flash(f"Error generating labels: {e}", "error")
-        return redirect(url_for("stock.stock_explorer"))
-
 
 # Moved from cross blueprint as it queries stocks
 @bp.route("/get_genotype_for_uid/<unique_id>")
@@ -2147,59 +2054,3 @@ def get_stock_data_for_uid(unique_id):
         )
         return jsonify({"error": "Internal server error"}), 500
 
-
-@bp.route("/delete_permanently", methods=["POST"])
-@login_required
-@limiter.limit("10 per hour")
-def delete_stock_permanently():
-    """
-    Permanently delete stocks that have the 'No longer maintained' status.
-    Only stocks with this status will be deleted, all others will be skipped.
-
-    Expected JSON payload:
-    {
-        "uniqueIDs": ["uid1", "uid2", ...]
-    }
-
-    Returns:
-    JSON response with success status, count of deleted items, and count of skipped items.
-    """
-    username = session.get("username")
-    try:
-        data = get_json_payload()
-        unique_ids = normalize_identifier_list(data.get("uniqueIDs", []), field_name="uniqueIDs")
-    except ValueError as exc:
-        return jsonify({"success": False, "message": str(exc)}), 400
-
-    if not unique_ids:
-        return (
-            jsonify(
-                {"success": False, "message": "No stock IDs provided for deletion"}
-            ),
-            400,
-        )
-    deleted_uids, skipped_uids = delete_owned_documents_if_status(
-        "stocks", username, unique_ids, db, required_status="No longer maintained",
-    )
-    if deleted_uids:
-        activity_documents = [
-            {
-                "user": username,
-                "timestamp": current_timestamp(),
-                "activity": f"Permanently deleted stock {uid}",
-            }
-            for uid in deleted_uids
-        ]
-        db["activity"].insert_many(activity_documents)
-
-    deleted_count = len(deleted_uids)
-    skipped_count = len(skipped_uids)
-
-    return jsonify(
-        {
-            "success": True,
-            "deleted": deleted_count,
-            "skipped": skipped_count,
-            "message": f'Successfully deleted {deleted_count} stocks with status "No longer maintained". Skipped {skipped_count} stocks.',
-        }
-    )

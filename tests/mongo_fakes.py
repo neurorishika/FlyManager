@@ -254,3 +254,9 @@ class FakeDatabase:
     def __getitem__(self, name):
         self.data.setdefault(name, [])
         return FakeCollection(self, name)
+
+    def __getattr__(self, name):
+        # Mirror pymongo.Database, which supports both db["name"] and db.name.
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return self[name]

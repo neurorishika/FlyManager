@@ -268,8 +268,12 @@ def _status_updates(document, status, comment):
     return updates
 
 
-def bulk_remove_from_tray_records(user, item_type, uids, db, *, progress_cb=None):
-    """Remove many items from their trays.
+def bulk_remove_from_tray_records(user, uids, item_types, db, *, progress_cb=None):
+    """Remove many items (a mix of stocks and crosses) from their trays.
+
+    ``item_types`` is a list parallel to ``uids`` - each item is removed
+    according to its own type, so a single call can cover a cart that mixes
+    stocks and crosses.
 
     Tray removal also refreshes vials (via ``edit_stock``/``edit_cross``), so
     this preserves that exact per-item behaviour through ``move_item_to_tray``
@@ -279,7 +283,7 @@ def bulk_remove_from_tray_records(user, item_type, uids, db, *, progress_cb=None
     results = {"success": [], "failed": []}
     total = len(uids)
 
-    for index, uid in enumerate(uids):
+    for index, (uid, item_type) in enumerate(zip(uids, item_types)):
         try:
             if move_item_to_tray(user, item_type, uid, "", "", db):
                 results["success"].append({"uid": uid, "type": item_type})

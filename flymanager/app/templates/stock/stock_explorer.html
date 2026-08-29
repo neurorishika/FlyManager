@@ -434,8 +434,9 @@
     </div>
 </div>
 
-<form id="generateLabelsForm" method="post" action="{{ url_for('stock.generate_stock_labels') }}" target="_blank">
+<form id="generateLabelsForm" method="post" action="{{ url_for('main.generate_labels') }}" target="_blank">
     <input type="hidden" name="selected_uids" id="selectedUids">
+    <input type="hidden" name="item_types" id="itemTypes">
     <input type="hidden" name="quantities" id="quantities">
 </form>
 
@@ -556,7 +557,7 @@
     const bulkFlipUrl = "{{ url_for('flip.bulk_flip_route') }}";
     const bulkStatusUrl = "{{ url_for('flip.bulk_status_change_route') }}";
     const bulkRemoveFromTrayUrl = "{{ url_for('tray.bulk_remove_from_tray') }}";
-    const deleteStockUrl = "{{ url_for('stock.delete_stock_permanently') }}";
+    const deletePermanentlyUrl = "{{ url_for('main.delete_items_permanently') }}";
     const stockSelectionUrl = "{{ url_for('stock.stock_explorer_selection') }}";
     const reverseSearchUrlBase = "{{ url_for('stock.reverse_search_stock', unique_id='UNIQUE_ID_PLACEHOLDER') }}";
     const markOrderedUrl = "{{ url_for('stock.mark_ordered_stocks') }}";

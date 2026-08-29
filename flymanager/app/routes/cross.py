@@ -1,5 +1,3 @@
-import datetime
-
 from flask import (Blueprint, current_app, flash, jsonify, redirect,
                    render_template, request, session, url_for)
 from fuzzywuzzy import fuzz
@@ -11,12 +9,9 @@ from flymanager.app.routes.explorer_utils import (
     compute_explorer_scope_counts, get_explorer_filter_state,
     get_explorer_pagination_state, paginate_explorer_records,
     set_flip_display_fields)
-from flymanager.app.security import (get_json_payload, limiter,
-                                     normalize_identifier_list,
-                                     parse_int_value, require_confirmation)
+from flymanager.app.security import get_json_payload, limiter, require_confirmation
 from flymanager.app.settings import DEFAULT_CROSS_PROPERTY_VALUES
 from flymanager.utils.genetics import qc_genotype
-from flymanager.utils.labels import generate_label_pdf
 from flymanager.utils.mongo import (OperationLockConflict, add_metadata,
                                     add_to_cross, edit_cross,
                                     get_accessible_cross,
@@ -25,10 +20,9 @@ from flymanager.utils.mongo import (OperationLockConflict, add_metadata,
                                     get_all_genotypes,
                                     get_direct_reports, get_eclosion_in,
                                     get_flip_in, get_metadata,
-                                    get_user_initials, hold_operation_lock,
+                                    hold_operation_lock,
                                     update_cross_vials,
                                     update_document_assignment, write_activity)
-from flymanager.utils.mongo_records import delete_owned_documents_if_status
 from flymanager.utils.phenotypes.image_library import \
     select_prediction_reference_images
 from flymanager.utils.phenotypes.predictor import (build_cross_phenotype_cache,
@@ -1003,119 +997,3 @@ def refresh_cross_phenotype(unique_id):
         flash(str(exc), "warning")
     return redirect(url_for("cross.view_cross", unique_id=unique_id))
 
-
-@bp.route("/generate_cross_labels", methods=["POST"])
-@login_required
-@limiter.limit("10 per hour")
-def generate_cross_labels():
-    selected_uids = request.form.get("selected_uids").split(",")
-    blank_spaces = parse_int_value(
-        request.form.get("blank_spaces", 0),
-        field_name="Blank spaces",
-        minimum=0,
-        maximum=200,
-    )
-    quantities = request.form.get("quantities").split(",")
-
-    # get the user's initials
-    username = session.get("username")
-    user_initials = get_user_initials(username, db)
-
-    # get the selected stocks
-    crosses = get_accessible_crosses(username, db)
-    selected_crosses = [
-        cross for cross in crosses if str(cross["UniqueID"]) in selected_uids
-    ]
-
-    # Sort the selected stocks by TrayID and TrayPosition
-    selected_crosses = sorted(
-        selected_crosses,
-        key=lambda x: (
-            x["TrayID"],
-            int(float(x["TrayPosition"])) if x["TrayPosition"] != "" else 0,
-        ),
-    )
-
-    # duplicate the selected stocks based on the quantities
-    selected_crosses = [
-        cross
-        for cross, quantity in zip(selected_crosses, quantities)
-        for _ in range(int(quantity))
-    ]
-
-    # generate the labels
-    filename = datetime.datetime.now().strftime("%Y-%m-%d")
-    generate_label_pdf(
-        filename,
-        user_initials,
-        selected_crosses,
-        ["cross"] * len(selected_crosses),
-        blank_spaces,
-        len(selected_crosses),
-    )
-
-    pdf_file_path = "/static/generated_labels/{}.pdf".format(filename)
-
-    # write the activity to the user's activity sheet
-    write_activity(
-        username, "Generated labels for {} crosses".format(len(selected_crosses)), db
-    )
-
-    return redirect(pdf_file_path)
-
-
-@bp.route("/delete_cross_permanently", methods=["POST"])
-@login_required
-@limiter.limit("10 per hour")
-def delete_cross_permanently():
-    """
-    Permanently delete crosses that have the 'No longer maintained' status.
-    Only crosses with this status will be deleted, all others will be skipped.
-
-    Expected JSON payload:
-    {
-        "uniqueIDs": ["uid1", "uid2", ...]
-    }
-
-    Returns:
-    JSON response with success status, count of deleted items, and count of skipped items.
-    """
-    username = session.get("username")
-    try:
-        data = get_json_payload()
-        unique_ids = normalize_identifier_list(data.get("uniqueIDs", []), field_name="uniqueIDs")
-    except ValueError as exc:
-        return jsonify({"success": False, "message": str(exc)}), 400
-
-    if not unique_ids:
-        return (
-            jsonify(
-                {"success": False, "message": "No cross IDs provided for deletion"}
-            ),
-            400,
-        )
-    deleted_uids, skipped_uids = delete_owned_documents_if_status(
-        "crosses", username, unique_ids, db, required_status="No longer maintained",
-    )
-    if deleted_uids:
-        activity_documents = [
-            {
-                "user": username,
-                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "activity": f"Permanently deleted cross {uid}",
-            }
-            for uid in deleted_uids
-        ]
-        db["activity"].insert_many(activity_documents)
-
-    deleted_count = len(deleted_uids)
-    skipped_count = len(skipped_uids)
-
-    return jsonify(
-        {
-            "success": True,
-            "deleted": deleted_count,
-            "skipped": skipped_count,
-            "message": f'Successfully deleted {deleted_count} crosses with status "No longer maintained". Skipped {skipped_count} crosses.',
-        }
-    )

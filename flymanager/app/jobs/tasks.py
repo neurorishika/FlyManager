@@ -106,14 +106,14 @@ def task_bulk_status_change(key, username, uids, status, comment=None):
     _run(key, work)
 
 
-def task_bulk_remove_from_tray(key, username, item_type, uids):
+def task_bulk_remove_from_tray(key, username, uids, item_types):
     def work(app, db):
         from flymanager.utils.mongo.bulk_operations import bulk_remove_from_tray_records
 
         results = bulk_remove_from_tray_records(
             username,
-            item_type,
             uids,
+            item_types,
             db,
             progress_cb=_throttled_progress(db, key),
         )
@@ -121,7 +121,7 @@ def task_bulk_remove_from_tray(key, username, item_type, uids):
         if succeeded:
             write_activity(
                 username,
-                f"Bulk removed {succeeded} {item_type}s from trays",
+                f"Bulk removed {succeeded} items from trays",
                 db,
             )
         return {

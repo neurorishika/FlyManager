@@ -304,6 +304,7 @@
             return {
                 id: item.id || item.uid,
                 quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+                type: item.type || config.itemType,
                 identifier: item.identifier || '',
                 name: item.name || '',
                 uid: item.uid,
@@ -523,7 +524,9 @@
             container.className = 'cart-item';
 
             const label = document.createElement('span');
-            label.textContent = `${item.identifier} - ${item.name}`;
+            const itemType = item.type || config.itemType;
+            const typeTag = itemType === 'cross' ? 'Cross' : 'Stock';
+            label.textContent = `(${typeTag}) ${item.identifier} - ${item.name}`;
 
             const quantityInput = document.createElement('input');
             quantityInput.type = 'number';
@@ -1245,6 +1248,9 @@
                         uniqueIDs: cart.map(function(item) {
                             return item.uid;
                         }),
+                        itemTypes: cart.map(function(item) {
+                            return item.type || config.itemType;
+                        }),
                     })
                         .then(function(data) {
                             $('#deleteConfirmModal').modal('hide');
@@ -1406,6 +1412,9 @@
                     document.getElementById('selectedUids').value = cart.map(function(item) {
                         return item.uid;
                     }).join(',');
+                    document.getElementById('itemTypes').value = cart.map(function(item) {
+                        return item.type || config.itemType;
+                    }).join(',');
                     document.getElementById('quantities').value = cart.map(function(item) {
                         return item.quantity;
                     }).join(',');
@@ -1456,7 +1465,7 @@
                         return;
                     }
 
-                    if (!beginBulkOperation('bulk-flip', `Flipping ${cart.length} ${config.itemType}${cart.length === 1 ? '' : 's'}...`, 'Flipping...')) {
+                    if (!beginBulkOperation('bulk-flip', `Flipping ${cart.length} item${cart.length === 1 ? '' : 's'}...`, 'Flipping...')) {
                         return;
                     }
 
@@ -1506,7 +1515,7 @@
                         return;
                     }
 
-                    if (!beginBulkOperation('bulk-status', `Changing ${cart.length} ${config.itemType}${cart.length === 1 ? '' : 's'} to ${status}...`, 'Updating...')) {
+                    if (!beginBulkOperation('bulk-status', `Changing ${cart.length} item${cart.length === 1 ? '' : 's'} to ${status}...`, 'Updating...')) {
                         return;
                     }
 
@@ -1546,12 +1555,14 @@
                         return;
                     }
 
-                    if (!beginBulkOperation('bulk-remove-from-tray', `Removing ${cart.length} ${config.itemType}${cart.length === 1 ? '' : 's'} from trays...`, 'Removing...')) {
+                    if (!beginBulkOperation('bulk-remove-from-tray', `Removing ${cart.length} item${cart.length === 1 ? '' : 's'} from trays...`, 'Removing...')) {
                         return;
                     }
 
                     createJsonRequest(config.bulkRemoveFromTrayUrl, {
-                        item_type: config.itemType,
+                        item_types: cart.map(function(item) {
+                            return item.type || config.itemType;
+                        }),
                         uniqueIDs: cart.map(function(item) {
                             return item.uid;
                         }),

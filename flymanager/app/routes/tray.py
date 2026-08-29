@@ -270,7 +270,7 @@ def delete_tray_route(tray_id):
         return redirect(url_for('tray.tray_management'))
     
     # Check if tray is empty
-    occupancy = get_tray_occupancy(user, tray_id, db)
+    occupancy = get_tray_occupancy(user, tray['TrayID'], db)
     if occupancy:
         flash("Cannot delete tray that contains items", "error")
         return redirect(url_for('tray.view_tray', tray_id=tray_id))
@@ -340,17 +340,23 @@ def move_to_tray_route():
 @login_required
 @limiter.limit('20 per minute')
 def bulk_remove_from_tray():
-    """Queues a background job that removes the selected items from their trays."""
+    """Queues a background job that removes the selected items from their trays.
+
+    ``item_types`` is a list parallel to ``uniqueIDs`` so a single call can
+    cover a cart that mixes stocks and crosses.
+    """
     try:
         data = get_json_payload()
-        item_type = normalize_optional_text(data.get('item_type'), field_name='Item type', max_length=16)
         unique_ids = normalize_identifier_list(data.get('uniqueIDs', []), field_name='uniqueIDs')
+        item_types = data.get('item_types', [])
     except ValueError as exc:
         return jsonify({"success": False, "queued": False, "message": str(exc)}), 400
-    if item_type not in {'stock', 'cross'}:
-        return jsonify({"success": False, "queued": False, "message": "Invalid item type"}), 400
     if not unique_ids:
         return jsonify({"success": False, "queued": False, "message": "No items selected."}), 400
+    if len(item_types) != len(unique_ids):
+        return jsonify({"success": False, "queued": False, "message": "Mismatch between items and item types"}), 400
+    if not set(item_types) <= {'stock', 'cross'}:
+        return jsonify({"success": False, "queued": False, "message": "Invalid item type"}), 400
 
     user = session.get('username')
     key = f"bulk-remove-from-tray:user:{user}"
@@ -364,11 +370,11 @@ def bulk_remove_from_tray():
             kwargs={
                 "key": key,
                 "username": user,
-                "item_type": item_type,
                 "uids": unique_ids,
+                "item_types": item_types,
             },
             ttl_seconds=1800,
-            metadata={"route": "bulk_remove_from_tray", "uid_count": len(unique_ids), "item_type": item_type},
+            metadata={"route": "bulk_remove_from_tray", "uid_count": len(unique_ids)},
             conflict_message="A tray removal for you is already running. Please wait for it to finish before starting another.",
         )
     except OperationLockConflict as exc:

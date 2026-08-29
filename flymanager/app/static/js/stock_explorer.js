@@ -4,6 +4,7 @@ function buildStockCardCartItem(index, card) {
     return {
         id: index,
         quantity: 1,
+        type: 'stock',
         identifier: metaPills.length > 0 ? metaPills[0].textContent.trim() : 'Unassigned',
         name: card.querySelector('h5').textContent.trim(),
         uid: card.querySelector('.stock-item-submeta i').textContent.trim(),
@@ -61,6 +62,7 @@ function buildStockTableCartItem(index, row, card) {
     return {
         id: index,
         quantity: 1,
+        type: 'stock',
         identifier: row.querySelector('.tray-cell').textContent.trim() || `${seriesId} / No tray`,
         name: row.querySelector('td:nth-child(4)').textContent.trim(),
         uid: card.querySelector('.stock-item-submeta i').textContent.trim(),
@@ -69,7 +71,7 @@ function buildStockTableCartItem(index, row, card) {
 
 window.initializeExplorer({
     itemType: 'stock',
-    cartStorageKey: 'cart',
+    cartStorageKey: 'explorerCart',
     viewStorageKey: 'stockViewMode',
     itemSelector: '.stock-item',
     cardCheckboxSelector: '.stock-selection-checkbox',
@@ -82,7 +84,7 @@ window.initializeExplorer({
     viewUrlBase: viewStockUrlBase,
     duplicateUrlBase: addStockUrlBase,
     selectionUrl: stockSelectionUrl,
-    deleteUrl: deleteStockUrl,
+    deleteUrl: deletePermanentlyUrl,
     bulkFlipUrl: bulkFlipUrl,
     bulkStatusUrl: bulkStatusUrl,
     bulkRemoveFromTrayUrl: bulkRemoveFromTrayUrl,
