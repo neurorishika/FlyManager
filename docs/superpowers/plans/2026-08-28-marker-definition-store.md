@@ -4604,7 +4604,13 @@ def _catalog_row_from_balancer(document):
     symbol = str(document.get("symbol") or "").strip()
     payload = {
         "family": document.get("family") or symbol,
-        "chromosome": document.get("chromosome"),
+        # Normalized, not raw: the BDSC parser's _normalize_chromosome emits
+        # strings ("X", "2"), while _candidate_documents compares against the
+        # int from normalize_chromosome_label. Storing the raw string means
+        # "2" != 2, so every ingested balancer is silently dropped from
+        # scoring -- and re-ingesting a shipped symbol clobbers its working
+        # row. Test with a STRING chromosome; an int fixture hides this.
+        "chromosome": normalize_chromosome_label(document.get("chromosome")),
         "default_markers": list(document.get("default_markers") or []),
         "notes": list(document.get("notes") or []),
         # Carried so balancer_selection keeps breakpoint-aware scoring once it
