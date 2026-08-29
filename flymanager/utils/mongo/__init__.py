@@ -37,6 +37,12 @@ from flymanager.utils.mongo.helpers import (add_metadata, delete_metadata,
                                             get_eclosion_in, get_flip_in,
                                             get_flip_schedule, get_metadata,
                                             preload_metadata_cache)
+# Marker definition CRUD (ownership, promotion)
+from flymanager.utils.mongo.marker_definitions import (
+    MarkerDefinitionError, bump_marker_catalog_revision,
+    can_edit_marker_definition, create_marker_definition,
+    delete_marker_definition, get_marker_definition, list_marker_definitions,
+    promote_marker_definition, update_marker_definition)
 from flymanager.utils.mongo.operation_locks import (OperationLockConflict,
                                                     get_job_status,
                                                     hold_operation_lock,
@@ -164,4 +170,14 @@ __all__ = [
     # Settings functions
     "get_settings",
     "update_settings",
+    # Marker definition CRUD (ownership, promotion)
+    "MarkerDefinitionError",
+    "list_marker_definitions",
+    "get_marker_definition",
+    "create_marker_definition",
+    "update_marker_definition",
+    "delete_marker_definition",
+    "promote_marker_definition",
+    "bump_marker_catalog_revision",
+    "can_edit_marker_definition",
 ]

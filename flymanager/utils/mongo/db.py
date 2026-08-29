@@ -74,6 +74,8 @@ def ensure_mongo_indexes(db):
     db["operation_locks"].create_index("key", unique=True, name="operation_locks_key")
     db["operation_locks"].create_index("expires_at", expireAfterSeconds=0, name="operation_locks_expires_at")
 
+    db["marker_definitions"].create_index("Key", unique=True, name="marker_definitions_key")
+
 
 def ping_database(db):
     """Return True when the MongoDB connection is healthy, else False."""
