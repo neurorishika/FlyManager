@@ -415,6 +415,22 @@ def refresh_flybase_reference_data(
                 "crosses": None,
             }
             if renew_phenotype_caches:
+                # These backfills stamp markerCatalogSignature, so this process
+                # must be holding a current marker catalog first. Neither of
+                # this function's entry points guarantees that: the monthly
+                # scheduler tick runs outside any request, so Task 10's
+                # before_request hook never fires for it. A refresh failure
+                # must not abort a reference-data refresh that has already
+                # done its real work.
+                try:
+                    from flymanager.utils.phenotypes.marker_catalog import \
+                        refresh_catalog
+
+                    refresh_catalog(db)
+                except Exception:
+                    app.logger.exception(
+                        "Unable to refresh the marker catalog before rebuilding phenotype caches"
+                    )
                 try:
                     phenotype_backfill_summary = {
                         "stocks": backfill_stock_phenotype_cache(

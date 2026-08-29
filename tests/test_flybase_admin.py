@@ -417,3 +417,102 @@ def test_refresh_flybase_reference_data_rebuilds_phenotype_cache_and_renews_reco
     assert report["phenotype_cache_report"]["rebuilt"] is True
     assert report["phenotype_backfill_summary"]["stocks"]["updated"] == 5
     assert report["unresolved_token_report"]["top_ambiguous_unresolved_tokens"] == [("Zip", 2)]
+
+
+def test_flybase_refresh_updates_the_marker_catalog_before_rebuilding_caches(monkeypatch, tmp_path):
+    """The monthly scheduler tick runs outside any request, so nothing else
+    refreshes this process's catalog before it force-rebuilds every cache."""
+    monkeypatch.setenv("ENABLE_SCHEDULER", "0")
+    app = _make_app(monkeypatch)
+
+    fake_bundle = {
+        "release": "FB2026_01",
+        "downloads": {
+            "stocks": {"filename": "stocks_FB2026_01.tsv"},
+        },
+    }
+
+    calls = []
+
+    def _fake_refresh_catalog(db, **kwargs):
+        calls.append("refresh_catalog")
+
+    def _fake_stock_backfill(*args, **kwargs):
+        calls.append("backfill_stock_phenotype_cache")
+        return {"scanned": 5, "updated": 5, "skipped_valid": 0}
+
+    with patch("flymanager.app.db", {"stocks": object(), "crosses": object()}), patch(
+        "flymanager.app.services.flybase.discover_latest_flybase_downloads",
+        return_value=fake_bundle,
+    ), patch(
+        "flymanager.app.services.flybase.download_flybase_bundle",
+        return_value={"release": "FB2026_01", "results": []},
+    ), patch(
+        "flymanager.app.services.flybase.examine_flybase_directory",
+        return_value={"summary": {}},
+    ), patch(
+        "flymanager.app.services.flybase.render_flybase_examination_markdown",
+        return_value="# report\n",
+    ), patch(
+        "flymanager.app.services.flybase.audit_bloomington_csv",
+        return_value={
+            "csv_path": str(tmp_path / "bloomington.csv"),
+            "ambiguous_unresolved_total": 2,
+            "ambiguous_unresolved_unique": 1,
+            "unknown_unresolved_total": 1,
+            "unknown_unresolved_unique": 1,
+            "top_ambiguous_unresolved_tokens": [("Zip", 2)],
+            "top_unknown_unresolved_tokens": [("Mystery", 1)],
+        },
+    ), patch(
+        "flymanager.app.services.flybase.render_unresolved_token_curation_markdown",
+        return_value="# unresolved\n",
+    ), patch(
+        "flymanager.app.services.flybase.update_gene_metadata_from_flybase",
+        return_value={"supported_rows": 12},
+    ), patch(
+        "flymanager.app.services.flybase.discover_bdsc_balancers",
+        return_value={"definitions": {"summary": {"total_balancers": 6}}},
+    ), patch(
+        "flymanager.app.services.flybase.write_balancer_report_files",
+        return_value={
+            "json_path": str(tmp_path / "BALANCER_DEFINITIONS.json"),
+            "markdown_path": str(tmp_path / "BALANCER_REPORT.md"),
+        },
+    ), patch(
+        "flymanager.app.services.flybase.ingest_balancer_definitions",
+        return_value={"inserted": 6},
+    ), patch(
+        "flymanager.app.services.flybase.ingest_flybase_bundle",
+        return_value={"collections": {"flybase_phenotypes": {"inserted": 7}}},
+    ), patch(
+        "flymanager.app.services.flybase.build_flybase_phenotype_cache",
+        return_value={
+            "cache_path": str(tmp_path / "PHENOTYPE_EVIDENCE_CACHE.json"),
+            "rebuilt": True,
+            "source_kind": "mongo_ingest",
+            "summary": {"cached_alleles": 3},
+        },
+    ), patch(
+        "flymanager.utils.phenotypes.marker_catalog.refresh_catalog",
+        side_effect=_fake_refresh_catalog,
+    ), patch(
+        "flymanager.app.services.flybase.backfill_stock_phenotype_cache",
+        side_effect=_fake_stock_backfill,
+    ), patch(
+        "flymanager.app.services.flybase.backfill_cross_phenotype_cache",
+        return_value={"scanned": 3, "updated": 3, "skipped_valid": 0},
+    ), patch(
+        "flymanager.app.services.flybase.backfill_stock_standardization_cache",
+        return_value={"scanned": 5, "updated": 5, "skipped_valid": 0},
+    ), patch(
+        "flymanager.app.services.flybase.backfill_cross_standardization_cache",
+        return_value={"scanned": 3, "updated": 3, "skipped_valid": 0},
+    ):
+        refresh_flybase_reference_data(app, data_dir=tmp_path)
+
+    assert calls == ["refresh_catalog", "backfill_stock_phenotype_cache"], (
+        "the marker catalog must be refreshed before the first cache-writing "
+        "backfill runs, or a stale worker snapshot recomputes against the "
+        "wrong marker set"
+    )
