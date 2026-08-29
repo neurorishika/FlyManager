@@ -101,3 +101,27 @@ def test_an_invalid_overlay_row_is_skipped_not_fatal():
         _db([USER_MARKER, {"Key": "", "kind": "gene_marker"}], revision=1))
     assert "zz" in snapshot["gene_markers"]
     assert len(snapshot["invalid_definitions"]) == 1
+
+
+def test_reading_the_revision_never_writes_to_settings():
+    """The probe runs on every request; it must not create a settings document."""
+    db = FakeDatabase({"marker_definitions": [], "settings": []})
+    assert marker_catalog.read_catalog_revision(db) == 0
+    assert db["settings"].count_documents({}) == 0
+
+
+def test_bson_values_do_not_churn_the_signature():
+    """A stray ObjectId must not make every read look like a content change,
+    which would invalidate every materialized cache in the collection."""
+    from bson import ObjectId
+
+    def build():
+        db = _db([dict(USER_MARKER, _id=ObjectId(),
+                       payload=dict(USER_MARKER["payload"], ref=ObjectId()))],
+                 revision=1)
+        marker_catalog.reset_catalog()
+        marker_catalog.reset_refresh_state()
+        return marker_catalog.refresh_catalog(db)["signature"]
+
+    first, second = build(), build()
+    assert first == second

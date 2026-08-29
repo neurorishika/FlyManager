@@ -311,9 +311,35 @@ _LAST_REVISION_CHECK = None
 
 
 def read_catalog_revision(db):
-    from flymanager.utils.mongo.settings import get_settings
+    """Current catalog revision from the settings singleton.
 
-    return int((get_settings(db) or {}).get(MARKER_CATALOG_REVISION_KEY) or 0)
+    Reads the collection directly rather than going through
+    flymanager.utils.mongo.settings.get_settings: that helper INSERTS a
+    default settings document when none exists, and this runs on the
+    request path where a probe must never write. It also avoids importing
+    the mongo package, which has a circular-import cycle with the app
+    package.
+    """
+    document = db["settings"].find_one({}) or {}
+    return int(document.get(MARKER_CATALOG_REVISION_KEY) or 0)
+
+
+def _overlay_documents(db):
+    """Fetch overlay documents with BSON types normalized out.
+
+    compute_marker_catalog_signature serializes with default=str, so a
+    stray ObjectId or datetime would be stringified into the signature and
+    churn it on every read -- invalidating every materialized cache in the
+    collection for no real change. Dropping _id and coercing the rest via
+    the same JSON round-trip the signature uses keeps the snapshot to plain
+    JSON types.
+    """
+    documents = []
+    for document in db[MARKER_DEFINITIONS_COLLECTION].find({}):
+        document = dict(document)
+        document.pop("_id", None)
+        documents.append(json.loads(json.dumps(document, default=str)))
+    return documents
 
 
 def refresh_catalog(db, *, force=False):
@@ -329,7 +355,7 @@ def refresh_catalog(db, *, force=False):
     if not force and _SNAPSHOT is not None and _SNAPSHOT_REVISION == revision:
         return _SNAPSHOT
 
-    overlay = list(db[MARKER_DEFINITIONS_COLLECTION].find({}))
+    overlay = _overlay_documents(db)
     snapshot = compile_catalog(load_shipped_catalog(), overlay)
     set_catalog(snapshot)
     _SNAPSHOT_REVISION = revision
