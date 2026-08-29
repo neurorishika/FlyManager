@@ -7,8 +7,9 @@ from flymanager.utils.phenotypes.flybase_pipeline import \
     compute_flybase_pipeline_signature
 from flymanager.utils.phenotypes.identifiability import \
     annotate_progeny_identifiability
+from flymanager.utils.phenotypes.marker_catalog import get_catalog
 
-PHENOTYPE_CACHE_VERSION = 2
+PHENOTYPE_CACHE_VERSION = 3
 
 
 def _cache_timestamp():
@@ -417,6 +418,7 @@ def build_stock_phenotype_cache(genotype):
         "version": PHENOTYPE_CACHE_VERSION,
         "computedAt": _cache_timestamp(),
         "pipelineSignature": compute_flybase_pipeline_signature(),
+        "markerCatalogSignature": get_catalog()["signature"],
         "genotype": genotype,
         "prediction": predict_stock_phenotype(genotype),
     }
@@ -435,6 +437,10 @@ def get_cached_stock_phenotype(record, strict=True):
     genotype match is still checked, since that's a correctness guard
     (has this record actually changed genotype since it was cached), not a
     staleness policy.
+
+    The strict check covers both the FlyBase pipeline signature and the
+    marker catalog signature: either one drifting is enough to force a
+    recompute.
     """
     cache = record.get("PhenotypeCache")
     genotype = str(record.get("Genotype", ""))
@@ -445,6 +451,8 @@ def get_cached_stock_phenotype(record, strict=True):
         if cache.get("version") != PHENOTYPE_CACHE_VERSION:
             return None
         if cache.get("pipelineSignature") and str(cache.get("pipelineSignature", "")) != compute_flybase_pipeline_signature():
+            return None
+        if cache.get("markerCatalogSignature") and str(cache.get("markerCatalogSignature", "")) != get_catalog()["signature"]:
             return None
     if str(cache.get("genotype", "")) != genotype:
         return None
@@ -514,6 +522,7 @@ def build_cross_phenotype_cache(male_genotype, female_genotype):
         "version": PHENOTYPE_CACHE_VERSION,
         "computedAt": _cache_timestamp(),
         "pipelineSignature": compute_flybase_pipeline_signature(),
+        "markerCatalogSignature": get_catalog()["signature"],
         "maleGenotype": male_genotype,
         "femaleGenotype": female_genotype,
         "parentPhenotypes": simulation["parent_phenotypes"],
@@ -538,6 +547,8 @@ def get_cached_cross_phenotype(record, strict=True):
         if cache.get("version") != PHENOTYPE_CACHE_VERSION:
             return None
         if cache.get("pipelineSignature") and str(cache.get("pipelineSignature", "")) != compute_flybase_pipeline_signature():
+            return None
+        if cache.get("markerCatalogSignature") and str(cache.get("markerCatalogSignature", "")) != get_catalog()["signature"]:
             return None
     if str(cache.get("maleGenotype", "")) != male_genotype:
         return None

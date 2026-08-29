@@ -11,6 +11,7 @@ from fuzzywuzzy import fuzz
 from flymanager.utils.phenotypes.flybase_pipeline import (
     compute_flybase_pipeline_signature, get_flybase_phenotype_cache,
     resolve_flybase_data_dir, resolve_flybase_phenotype_cache_path)
+from flymanager.utils.phenotypes.marker_catalog import get_catalog
 from flymanager.utils.phenotypes.parser import parse_gene_package
 from flymanager.utils.phenotypes.visual_markers import (
     get_allele_marker_tokens, get_gene_marker_symbols,
@@ -489,7 +490,7 @@ def review_stock_standardization(genotype, *, token_search_overrides=None, candi
 # triggers the expensive fuzzy candidate scan.
 # ---------------------------------------------------------------------------
 
-STANDARDIZATION_CACHE_VERSION = 1
+STANDARDIZATION_CACHE_VERSION = 2
 
 
 def _standardization_cache_timestamp():
@@ -536,6 +537,7 @@ def build_stock_standardization_cache(genotype):
         "version": STANDARDIZATION_CACHE_VERSION,
         "computedAt": _standardization_cache_timestamp(),
         "pipelineSignature": compute_flybase_pipeline_signature(),
+        "markerCatalogSignature": get_catalog()["signature"],
         "genotype": genotype_text,
         "summary": summarize_genotype_standardization(genotype_text),
     }
@@ -548,6 +550,7 @@ def build_cross_standardization_cache(male_genotype, female_genotype):
         "version": STANDARDIZATION_CACHE_VERSION,
         "computedAt": _standardization_cache_timestamp(),
         "pipelineSignature": compute_flybase_pipeline_signature(),
+        "markerCatalogSignature": get_catalog()["signature"],
         "maleGenotype": male_text,
         "femaleGenotype": female_text,
         "male": summarize_genotype_standardization(male_text),
@@ -559,9 +562,10 @@ def _standardization_cache_is_current(cache, strict):
     """Shared version/signature staleness check.
 
     strict=True (backfill/refresh paths) also requires the cache version and
-    FlyBase pipeline signature to match the current pipeline. strict=False
-    (ordinary read paths) serves whatever is stored; only the genotype match is
-    still enforced by the callers as a correctness guard.
+    both the FlyBase pipeline signature and the marker catalog signature to
+    match the current pipeline/catalog. strict=False (ordinary read paths)
+    serves whatever is stored; only the genotype match is still enforced by
+    the callers as a correctness guard.
     """
     if not isinstance(cache, dict):
         return False
@@ -571,6 +575,9 @@ def _standardization_cache_is_current(cache, strict):
         return False
     signature = str(cache.get("pipelineSignature", ""))
     if signature and signature != compute_flybase_pipeline_signature():
+        return False
+    catalog_signature = str(cache.get("markerCatalogSignature", ""))
+    if catalog_signature and catalog_signature != get_catalog()["signature"]:
         return False
     return True
 
