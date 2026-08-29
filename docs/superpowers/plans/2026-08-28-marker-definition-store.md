@@ -4337,9 +4337,11 @@ def delete_marker(key):
     _after_write([key],
                  previous_documents=[_serializable(previous)] if previous else (),
                  deleted_override_keys=[key] if result["restored_shipped"] else ())
-    if request.is_json:
-        return jsonify({"status": "success", **result}), 200
-    return redirect(url_for("markers.marker_catalog"))
+    # Always JSON. The detail page submits delete and promote via fetch and
+    # redirects client-side (base.html's global fetch wrapper attaches the
+    # CSRF header), so a redirect here would only make sense to a browser that
+    # is not the one making the call.
+    return jsonify({"status": "success", **result}), 200
 
 
 @bp.post("/markers/<path:key>/promote")
@@ -4352,9 +4354,8 @@ def promote_marker(key):
         return _error_response(exc)
 
     _after_write([key])
-    if request.is_json:
-        return jsonify({"status": "success", "key": key}), 200
-    return redirect(url_for("markers.marker_detail", key=key))
+    # Always JSON, for the same reason as delete above.
+    return jsonify({"status": "success", "key": key}), 200
 ```
 
 Register it in `flymanager/app/__init__.py` alongside the others (no `url_prefix`; the routes carry `/markers` themselves, matching how `settings.bp` and `jobs.bp` are registered):
