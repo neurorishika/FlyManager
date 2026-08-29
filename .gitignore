@@ -182,3 +182,6 @@ scripts/rclone.conf
 
 # keep data/phenotypes_images
 !data/phenotype_images
+# agent scratch: git worktrees and subagent-driven-development ledgers
+.claude/worktrees/
+.superpowers/
