@@ -36,6 +36,8 @@
             {% set current_section_label = 'Dashboard' %}
         {% elif current_endpoint == 'main.standardization_reviewer' %}
             {% set current_section_label = 'Reviewer' %}
+        {% elif current_endpoint.startswith('markers.') %}
+            {% set current_section_label = 'Markers' %}
         {% elif current_endpoint == 'flip.flip_schedule_display' %}
             {% set current_section_label = 'Schedule' %}
         {% elif current_endpoint.startswith('flip.') %}
@@ -112,6 +114,9 @@
                                 <a class="dropdown-item" href="{{ url_for('main.standardization_reviewer') }}">
                                     <i class="fas fa-stethoscope"></i> Genotype reviewer
                                 </a>
+                                <a class="dropdown-item" href="{{ url_for('markers.marker_catalog') }}">
+                                    <i class="fas fa-tags"></i> Marker catalog
+                                </a>
                                 <a class="dropdown-item" href="{{ url_for('main.user_guide') }}">
                                     <i class="fas fa-book"></i> User guide
                                 </a>
@@ -157,6 +162,10 @@
                     <a href="{{ url_for('main.standardization_reviewer') }}" class="header-nav-link{% if current_endpoint == 'main.standardization_reviewer' %} is-active{% endif %}">
                         <i class="fas fa-stethoscope"></i>
                         <span>Reviewer</span>
+                    </a>
+                    <a href="{{ url_for('markers.marker_catalog') }}" class="header-nav-link{% if current_endpoint.startswith('markers.') %} is-active{% endif %}">
+                        <i class="fas fa-tags"></i>
+                        <span>Markers</span>
                     </a>
                     <a href="{{ url_for('stock.stock_explorer') }}" class="header-nav-link{% if current_endpoint.startswith('stock.') %} is-active{% endif %}">
                         <i class="fas fa-box-open"></i>

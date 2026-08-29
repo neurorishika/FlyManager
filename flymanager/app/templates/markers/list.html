@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Marker Catalog{% endblock %}
+
+{% block content %}
+<div class="app-panel app-page-header">
+    <div>
+        <p class="app-kicker">Phenotype Markers</p>
+        <h1 class="app-page-title">Marker Catalog</h1>
+        <p class="app-page-subtitle">Every gene, allele, alias, balancer, and construct marker the phenotype
+            predictor knows about. Shipped rows come from the version-controlled catalog file; user and curated
+            rows are additions and overrides stored in Mongo. Any change here recomputes stored predictions for
+            everyone.</p>
+    </div>
+    <div class="app-chip-row">
+        <span class="app-chip"><i class="fas fa-dna"></i> {{ definitions|length }} definition(s) shown</span>
+    </div>
+</div>
+
+{% if invalid_definitions %}
+<div class="alert alert-warning" role="alert">
+    <strong>{{ invalid_definitions|length }} overlay definition(s) could not be loaded and were skipped.</strong>
+    <ul class="mb-0 pl-3">
+        {% for entry in invalid_definitions %}
+        <li><code>{{ entry.Key or "(no key)" }}</code>: {{ entry.errors|join("; ") }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<div class="app-panel">
+    <form method="get" action="{{ url_for('markers.marker_catalog') }}" class="form-inline app-toolbar flex-wrap">
+        <label class="mr-2 mb-0" for="markerSearch">Search</label>
+        <input type="search" id="markerSearch" name="q" class="form-control mr-3 mb-2" value="{{ search_query }}" placeholder="Key, label, effect, body part">
+        <label class="mr-2 mb-0" for="markerKind">Kind</label>
+        <select id="markerKind" name="kind" class="form-control mr-3 mb-2">
+            <option value="">All kinds</option>
+            {% for kind in kinds %}
+            <option value="{{ kind }}" {% if kind == selected_kind %}selected{% endif %}>{{ kind }}</option>
+            {% endfor %}
+        </select>
+        <label class="mr-2 mb-0" for="markerOrigin">Origin</label>
+        <select id="markerOrigin" name="origin" class="form-control mr-3 mb-2">
+            <option value="">All origins</option>
+            {% for origin in ("shipped", "user", "curated") %}
+            <option value="{{ origin }}" {% if origin == selected_origin %}selected{% endif %}>{{ origin }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary mb-2"><i class="fas fa-filter"></i> Filter</button>
+        {% if search_query or selected_kind or selected_origin %}
+        <a href="{{ url_for('markers.marker_catalog') }}" class="btn btn-outline-secondary mb-2 ml-2">Clear</a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="app-panel">
+    {% if definitions %}
+    <div class="table-responsive">
+        <table class="table table-striped align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Key</th>
+                    <th>Kind</th>
+                    <th>Label</th>
+                    <th>Body part</th>
+                    <th>Chromosome</th>
+                    <th>Origin</th>
+                    <th>Defined by</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for definition in definitions %}
+                <tr>
+                    <td><a href="{{ url_for('markers.marker_detail', key=definition.Key) }}"><code>{{ definition.Key }}</code></a></td>
+                    <td>{{ definition.kind }}</td>
+                    <td>{{ definition.get("payload", {}).get("display_label", "") }}</td>
+                    <td>{{ definition.get("payload", {}).get("body_part", "") }}</td>
+                    <td>{{ definition.get("payload", {}).get("chromosome", "") }}</td>
+                    <td>
+                        <span class="badge badge-{{ 'secondary' if definition.origin == 'shipped' else 'success' if definition.origin == 'curated' else 'info' }}">
+                            {{ definition.origin }}
+                        </span>
+                    </td>
+                    <td>{{ definition.CreatedBy or "FlyManager" }}</td>
+                    <td>
+                        {% if definition.editable_by_user %}
+                        <a href="{{ url_for('markers.marker_detail', key=definition.Key) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                        {% elif definition.origin == "shipped" %}
+                        <a href="{{ url_for('markers.marker_detail', key=definition.Key) }}" class="btn btn-sm btn-outline-secondary">Override</a>
+                        {% else %}
+                        <a href="{{ url_for('markers.marker_detail', key=definition.Key) }}" class="btn btn-sm btn-outline-secondary">View</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="app-page-subtitle mb-0">No marker definitions match this filter.</p>
+    {% endif %}
+</div>
+
+<div class="app-panel">
+    <div class="app-action-card">
+        <div>
+            <h6 class="mb-1">Add a New Marker Definition</h6>
+            <p class="text-muted mb-0">Create a brand-new gene, allele, alias, balancer, or construct marker. `match` and `payload`
+                are edited as raw JSON so the form works the same way for every marker kind; leave a section as
+                <code>{}</code> to accept its defaults. See an existing definition's detail page for the shape to copy.</p>
+        </div>
+        <form method="POST" action="{{ url_for('markers.create_marker') }}" class="app-form-shell">
+            <div class="form-group mb-2">
+                <label for="newMarkerKey">Key</label>
+                <input type="text" class="form-control" id="newMarkerKey" name="Key" required>
+            </div>
+            <div class="form-group mb-2">
+                <label for="newMarkerKind">Kind</label>
+                <select class="form-control" id="newMarkerKind" name="kind" required>
+                    {% for kind in kinds %}
+                    <option value="{{ kind }}">{{ kind }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group mb-2">
+                <label for="newMarkerMatch">match</label>
+                <textarea class="form-control" id="newMarkerMatch" name="match" rows="2">{}</textarea>
+            </div>
+            <div class="form-group mb-2">
+                <label for="newMarkerPayload">payload</label>
+                <textarea class="form-control" id="newMarkerPayload" name="payload" rows="4">{}</textarea>
+            </div>
+            <div class="form-group mb-2">
+                <label for="newMarkerProvenance">provenance</label>
+                <textarea class="form-control" id="newMarkerProvenance" name="provenance" rows="2">{"source": "user"}</textarea>
+            </div>
+            <div class="app-button-row justify-content-end">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Create Marker</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

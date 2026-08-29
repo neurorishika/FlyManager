@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block title %}Marker: {{ definition.Key }}{% endblock %}
+
+{% block content %}
+<div class="app-panel app-page-header">
+    <div>
+        <p class="app-kicker">Phenotype Markers</p>
+        <h1 class="app-page-title"><code>{{ definition.Key }}</code></h1>
+        <p class="app-page-subtitle">{{ definition.get("payload", {}).get("display_label", definition.Key) }} &mdash;
+            {{ definition.kind }}</p>
+    </div>
+    <div class="app-chip-row">
+        <span class="app-chip badge badge-{{ 'secondary' if definition.origin == 'shipped' else 'success' if definition.origin == 'curated' else 'info' }}">
+            {{ definition.origin }}
+        </span>
+        <a href="{{ url_for('markers.marker_catalog') }}" class="app-chip"><i class="fas fa-arrow-left"></i> Back to catalog</a>
+    </div>
+</div>
+
+<div class="app-settings-grid">
+    <div>
+        <div class="app-panel">
+            <div class="app-form-section">
+                <div>
+                    <h2 class="app-form-section-title">Overview</h2>
+                    <p class="app-form-section-copy">The fields the phenotype predictor reads directly.</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            <tr><th scope="row">Key</th><td><code>{{ definition.Key }}</code></td></tr>
+                            <tr><th scope="row">Kind</th><td>{{ definition.kind }}</td></tr>
+                            <tr><th scope="row">Display label</th><td>{{ definition.get("payload", {}).get("display_label", "") or "—" }}</td></tr>
+                            <tr><th scope="row">Body part</th><td>{{ definition.get("payload", {}).get("body_part", "") or "—" }}</td></tr>
+                            <tr><th scope="row">Chromosome</th><td>{{ definition.get("payload", {}).get("chromosome", "") or "—" }}</td></tr>
+                            <tr>
+                                <th scope="row">Origin</th>
+                                <td>
+                                    <span class="badge badge-{{ 'secondary' if definition.origin == 'shipped' else 'success' if definition.origin == 'curated' else 'info' }}">
+                                        {{ definition.origin }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr><th scope="row">Defined by</th><td>{{ definition.CreatedBy or "FlyManager" }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="app-panel mt-3">
+            <div class="app-form-section">
+                <div>
+                    <h2 class="app-form-section-title">Audit Trail</h2>
+                    <p class="app-form-section-copy">Attribution is the safety mechanism for global-immediate
+                        visibility: any user's edit is live for every user right away, so who-did-what-when is not
+                        decoration.</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            <tr><th scope="row">Created by</th><td>{{ definition.CreatedBy or "—" }}</td></tr>
+                            <tr><th scope="row">Created at</th><td>{{ definition.CreatedAt or "—" }}</td></tr>
+                            <tr><th scope="row">Updated by</th><td>{{ definition.UpdatedBy or "—" }}</td></tr>
+                            <tr><th scope="row">Updated at</th><td>{{ definition.UpdatedAt or "—" }}</td></tr>
+                            <tr><th scope="row">Curated by</th><td>{{ definition.CuratedBy or "—" }}</td></tr>
+                            <tr><th scope="row">Curated at</th><td>{{ definition.CuratedAt or "—" }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="app-panel mt-3">
+            <div class="app-form-section">
+                <div>
+                    <h2 class="app-form-section-title">Envelope</h2>
+                    <p class="app-form-section-copy">The full stored document, section by section.</p>
+                </div>
+
+                <div class="form-group mb-2">
+                    <label>match</label>
+                    <pre class="app-inline-note mb-0">{{ definition.get("match", {}) | tojson(indent=2) }}</pre>
+                </div>
+                <div class="form-group mb-2">
+                    <label>payload</label>
+                    <pre class="app-inline-note mb-0">{{ definition.get("payload", {}) | tojson(indent=2) }}</pre>
+                </div>
+                <div class="form-group mb-2">
+                    <label>sorting</label>
+                    <pre class="app-inline-note mb-0">{{ definition.get("sorting", {}) | tojson(indent=2) }}</pre>
+                </div>
+                <div class="form-group mb-2">
+                    <label>audit</label>
+                    <pre class="app-inline-note mb-0">{{ definition.get("audit", {}) | tojson(indent=2) }}</pre>
+                </div>
+                <div class="form-group mb-2">
+                    <label>imaging</label>
+                    <pre class="app-inline-note mb-0">{{ definition.get("imaging", {}) | tojson(indent=2) }}</pre>
+                    <small class="text-muted">Image aliases live here; <code>imaging.images</code> is intentionally
+                        empty in this release &mdash; a later slice (marker images) fills it in.</small>
+                </div>
+                <div class="form-group mb-2">
+                    <label>expression</label>
+                    <pre class="app-inline-note mb-0">{{ definition.get("expression", {}) | tojson(indent=2) }}</pre>
+                    <small class="text-muted">Expression-system pairing (Gal4/UAS, LexA/LexAop, QF/QUAS) is
+                        intentionally empty in this release &mdash; a later slice (expression systems) fills it
+                        in.</small>
+                </div>
+                <div class="form-group mb-0">
+                    <label>provenance</label>
+                    <pre class="app-inline-note mb-0">{{ definition.get("provenance", {}) | tojson(indent=2) }}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        {% if can_promote %}
+        <div class="app-panel">
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1">Promote to Curated</h6>
+                    <p class="text-muted mb-0">Marks this user-submitted definition as reviewed and endorsed. Curated
+                        rows can no longer be edited by their original creator &mdash; only an admin can change them
+                        after this.</p>
+                </div>
+                <form method="POST" action="{{ url_for('markers.promote_marker', key=definition.Key) }}"
+                      data-ajax-action data-redirect-url="{{ url_for('markers.marker_detail', key=definition.Key) }}"
+                      data-confirm-message="Promote {{ definition.Key }} to curated? Its creator will no longer be able to edit it directly.">
+                    <button type="submit" class="btn btn-success"><i class="fas fa-check-circle"></i> Promote to Curated</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if can_edit %}
+        <div class="app-panel mt-3">
+            <div class="app-form-shell">
+                <div class="app-form-section">
+                    <div>
+                        <h2 class="app-form-section-title">Edit Definition</h2>
+                        <p class="app-form-section-copy">Every section below is submitted on save, even the ones you
+                            do not touch, so an edit never resets a section to empty.</p>
+                    </div>
+                    <form method="POST" action="{{ url_for('markers.update_marker', key=definition.Key) }}">
+                        <div class="form-group mb-2">
+                            <label for="editKind">kind</label>
+                            <select class="form-control" id="editKind" name="kind">
+                                {% for kind in kinds %}
+                                <option value="{{ kind }}" {% if kind == definition.kind %}selected{% endif %}>{{ kind }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="editMatch">match</label>
+                            <textarea class="form-control" id="editMatch" name="match" rows="2">{{ definition.get("match", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="editPayload">payload</label>
+                            <textarea class="form-control" id="editPayload" name="payload" rows="6">{{ definition.get("payload", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="editSorting">sorting</label>
+                            <textarea class="form-control" id="editSorting" name="sorting" rows="2">{{ definition.get("sorting", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="editAudit">audit</label>
+                            <textarea class="form-control" id="editAudit" name="audit" rows="2">{{ definition.get("audit", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="editImaging">imaging <small class="text-muted">(images filled by a later slice)</small></label>
+                            <textarea class="form-control" id="editImaging" name="imaging" rows="2">{{ definition.get("imaging", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="editExpression">expression <small class="text-muted">(filled by a later slice)</small></label>
+                            <textarea class="form-control" id="editExpression" name="expression" rows="2">{{ definition.get("expression", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="editProvenance">provenance</label>
+                            <textarea class="form-control" id="editProvenance" name="provenance" rows="2">{{ definition.get("provenance", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="app-button-row justify-content-end">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="app-panel mt-3">
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1 text-danger">Delete Definition</h6>
+                    <p class="text-muted mb-0">
+                        {% if definition.overridesShipped %}
+                        This removes your override; the shipped definition for <code>{{ definition.Key }}</code>
+                        takes effect again.
+                        {% else %}
+                        This permanently removes <code>{{ definition.Key }}</code> from the catalog.
+                        {% endif %}
+                    </p>
+                </div>
+                <form method="POST" action="{{ url_for('markers.delete_marker', key=definition.Key) }}"
+                      data-ajax-action data-redirect-url="{{ url_for('markers.marker_catalog') }}"
+                      data-confirm-message="Delete the definition for {{ definition.Key }}? This cannot be undone.">
+                    <button type="submit" class="btn btn-outline-danger"><i class="fas fa-trash"></i> Delete Definition</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if is_shipped %}
+        <div class="app-panel mt-3">
+            <div class="app-form-shell">
+                <div class="app-form-section">
+                    <div>
+                        <h2 class="app-form-section-title">Override This Definition</h2>
+                        <p class="app-form-section-copy">This is a shipped, read-only definition. Saving here creates
+                            a Mongo overlay for <code>{{ definition.Key }}</code> that takes precedence over the
+                            shipped file everywhere the marker is matched. Every section is prefilled with the
+                            shipped values so you only need to change what you actually want different.</p>
+                    </div>
+                    <form method="POST" action="{{ url_for('markers.create_marker') }}">
+                        <input type="hidden" name="Key" value="{{ definition.Key }}">
+                        <div class="form-group mb-2">
+                            <label for="overrideKind">kind</label>
+                            <select class="form-control" id="overrideKind" name="kind">
+                                {% for kind in kinds %}
+                                <option value="{{ kind }}" {% if kind == definition.kind %}selected{% endif %}>{{ kind }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="overrideMatch">match</label>
+                            <textarea class="form-control" id="overrideMatch" name="match" rows="2">{{ definition.get("match", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="overridePayload">payload</label>
+                            <textarea class="form-control" id="overridePayload" name="payload" rows="6">{{ definition.get("payload", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="overrideSorting">sorting</label>
+                            <textarea class="form-control" id="overrideSorting" name="sorting" rows="2">{{ definition.get("sorting", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="overrideAudit">audit</label>
+                            <textarea class="form-control" id="overrideAudit" name="audit" rows="2">{{ definition.get("audit", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="overrideImaging">imaging <small class="text-muted">(images filled by a later slice)</small></label>
+                            <textarea class="form-control" id="overrideImaging" name="imaging" rows="2">{{ definition.get("imaging", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="overrideExpression">expression <small class="text-muted">(filled by a later slice)</small></label>
+                            <textarea class="form-control" id="overrideExpression" name="expression" rows="2">{{ definition.get("expression", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="form-group mb-2">
+                            <label for="overrideProvenance">provenance</label>
+                            <textarea class="form-control" id="overrideProvenance" name="provenance" rows="2">{{ definition.get("provenance", {}) | tojson(indent=2) }}</textarea>
+                        </div>
+                        <div class="app-button-row justify-content-end">
+                            <button type="submit" class="btn btn-warning"><i class="fas fa-code-branch"></i> Override</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+    // Delete/Promote always return a JSON body (so a bare API POST gets a
+    // clean 200 instead of a redirect that only makes sense to a browser),
+    // so the confirm-and-navigate flow those actions need in the UI has to
+    // be done with a fetch instead of a native form submission. The global
+    // fetch() wrapper defined further down base.html still attaches the
+    // CSRF header to this call since it runs after page load, not before.
+    document.addEventListener('submit', function (event) {
+        var form = event.target;
+        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-ajax-action')) {
+            return;
+        }
+        event.preventDefault();
+        var confirmMessage = form.dataset.confirmMessage;
+        if (confirmMessage && !window.confirm(confirmMessage)) {
+            return;
+        }
+        fetch(form.action, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+        }).then(function (response) {
+            return response.json().then(function (data) {
+                if (!response.ok) {
+                    throw new Error((data && data.message) || 'Request failed.');
+                }
+                return data;
+            });
+        }).then(function () {
+            window.location.href = form.dataset.redirectUrl || window.location.href;
+        }).catch(function (error) {
+            window.alert(error.message || 'Request failed.');
+        });
+    });
+</script>
+{% endblock %}

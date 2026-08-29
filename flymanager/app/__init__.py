@@ -285,7 +285,7 @@ def create_app():
 
         # --- Import and Register Blueprints ---
         from flymanager.app.routes import (auth, cross, data, flip, jobs,
-                                           main, settings, stock, tray)
+                                           main, markers, settings, stock, tray)
 
         app.register_blueprint(main.bp)
         app.register_blueprint(auth.bp)
@@ -296,6 +296,7 @@ def create_app():
         app.register_blueprint(tray.bp, url_prefix="/tray")
         app.register_blueprint(settings.bp)
         app.register_blueprint(jobs.bp)
+        app.register_blueprint(markers.bp)
 
         if env_flag("WARM_PAGE_CACHES_ON_STARTUP", True):
             try:
