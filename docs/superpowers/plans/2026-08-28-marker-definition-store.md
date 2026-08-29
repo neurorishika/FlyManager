@@ -2840,6 +2840,14 @@ def test_the_worker_envelope_refreshes_the_catalog_before_running(monkeypatch):
 
 `task_rebuild_marker_caches` (Task 13) keeps its own `force=True` refresh: it must see the specific edit that triggered it, not merely a revision-current snapshot.
 
+**One more entry point, found in Task 11's review.** `refresh_flybase_reference_data`
+(`flymanager/app/services/flybase.py:298`) force-rebuilds all four caches when
+`renew_phenotype_caches` is set, and it is reached from a monthly APScheduler cron job registered in
+the **web** process (`app/__init__.py:367`). A scheduler tick is not a request, so the
+`before_request` hook never fires for it, and it is not an RQ task, so `_run` does not cover it
+either. Add the same guarded `refresh_catalog(db)` at the top of that function's
+`if renew_phenotype_caches:` block, before the first backfill call.
+
 - [ ] **Step 6: Run the tests**
 
 Run: `python -m pytest tests/test_marker_catalog_signature_plumbing.py tests/test_background_jobs.py tests/test_phenotype_cache_persistence.py tests/test_standardization_cache.py tests/test_phenotype_backfill.py -q -p no:cacheprovider`
