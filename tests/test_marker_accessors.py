@@ -77,3 +77,12 @@ def test_accessors_follow_a_replaced_snapshot():
     )]
     marker_catalog.set_catalog(marker_catalog.compile_catalog(edited, overlay))
     assert visual_markers.get_visual_marker("Cy")["effect"] == "edited effect"
+
+
+def test_hot_path_accessors_return_immutable_values():
+    """These deliberately do not copy, so they must be immutable — otherwise a
+    caller can corrupt the shared process-wide snapshot for everyone."""
+    assert isinstance(visual_markers.get_gene_marker_symbols(), frozenset)
+    assert isinstance(visual_markers.get_allele_marker_tokens(), frozenset)
+    assert isinstance(visual_markers.get_known_balancer_symbols(), frozenset)
+    assert isinstance(visual_markers.get_balancer_match_order(), tuple)

@@ -139,7 +139,7 @@ def _empty_snapshot():
         "balancer_aliases": {},
         "balancer_markers": {},
         "balancers_referencing": {},
-        "known_balancer_symbols": set(),
+        "known_balancer_symbols": frozenset(),
         "balancer_match_order": (),
         "gene_marker_symbols": frozenset(),
         "allele_marker_tokens": frozenset(),
@@ -228,7 +228,8 @@ def compile_catalog(shipped, overlay_documents=()):
             if lookup_key:
                 snapshot["image_aliases"][lookup_key] = image_aliases
 
-    snapshot["known_balancer_symbols"] = set(snapshot["balancers"]) | set(snapshot["balancer_aliases"])
+    snapshot["known_balancer_symbols"] = frozenset(
+        set(snapshot["balancers"]) | set(snapshot["balancer_aliases"]))
     # Precomputed and immutable: these are read per token on the parsing hot
     # path, so they must not be rebuilt or copied on every lookup.
     snapshot["balancer_match_order"] = tuple(
