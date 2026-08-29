@@ -2884,7 +2884,7 @@ git commit -m "feat: stamp and check the marker catalog signature on both cache 
 **Two ways this silently under-computes, both of which must be handled here** — because Task 13 then *stamps* whatever this misses, making the staleness permanent rather than self-correcting:
 
 1. **Removals are invisible in the post-edit snapshot.** Editing balancer `Binsc` to drop its alias `Binsn` yields the affected set `{Binsc}`. Records whose genotype says `Binsn` — recognised by the parser before the edit, unrecognised after — are never swept. The derivation therefore also takes the **pre-edit documents** and unions their own identifying tokens (`Key`, `match.symbol`, `match.aliases`, `match.token`, `payload.value`) into the set. Reverse references do not need the old snapshot: a change to a balancer's `default_markers` only affects records containing that balancer, which its own symbol already sweeps.
-2. **Genotypes reach a marker through case-insensitive alias resolution.** `resolver.py` resolves leftover tokens via `lookup_flybase_marker_alias`, whose index is lowercase-normalised (`flybase_pipeline.py`), then hydrates the marker from the catalog. A genotype containing `sco` resolves to `sna[Sco]`, so editing that allele row must sweep `sco` too. The query is therefore built with `$options: "i"`.
+2. **Genotypes reach a marker through a SECOND alias mechanism the catalog cannot see.** `resolver.py:240-266` falls back to `lookup_flybase_marker_alias`, backed by `marker_alias_index` in the FlyBase evidence cache. `_build_marker_alias_index` (`flybase_pipeline.py:811`) maps a normalised bare allele spec to a canonical token — `"bc"` -> `"PPO1[Bc]"` — which is then hydrated straight out of the catalog. So a stock genotyped `CyO, Bc` depends on catalog row `PPO1[Bc]` with no catalog alias row anywhere in between. At least `PPO1[Bc]`, `amos[Roi-1]` and `wg[Sp-1]` are exposed this way. The derivation must therefore union in the reverse of that index (`_flybase_alias_tokens`), and because its keys are lowercase-normalised the query is built with `$options: "i"`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3047,6 +3047,11 @@ def derive_affected_tokens(snapshot, keys, *, previous_documents=(), deleted_ove
         definition = definitions.get(key)
         if definition is not None and definition.get("kind") in UNSCOPABLE_KINDS:
             return None
+        # Keyed by geneStem, deliberately: a construct marker is built from the
+        # gene marker of the same stem, so editing gene marker w changes every
+        # P{...}w[+mC] in the collection. Those live inside construct bodies and
+        # cannot be scoped by token, so this is a correct full rebuild, not a
+        # missed optimization.
         if key in (snapshot.get("construct_markers") or {}):
             return None
 
@@ -3069,6 +3074,7 @@ def derive_affected_tokens(snapshot, keys, *, previous_documents=(), deleted_ove
         # Aliases that resolve *to* this key, and the target this key
         # resolves to, both change what a genotype containing either means.
         tokens.update(aliases_by_target.get(key, set()))
+        tokens.update(_flybase_alias_tokens(key))
         definition = definitions.get(key)
         if definition is not None and definition.get("kind") == "alias":
             target = str((definition.get("payload") or {}).get("value") or "").strip()
