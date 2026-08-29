@@ -70,6 +70,26 @@ def _apply_set(record, updates):
         _apply_set(target, {tail: value})
 
 
+def _apply_inc(record, increments):
+    """Apply an $inc document; a missing field increments from 0, like real Mongo."""
+    for field, amount in (increments or {}).items():
+        if "." not in field:
+            record[field] = (record.get(field) or 0) + amount
+            continue
+        head, _, tail = field.partition(".")
+        target = record.setdefault(head, {})
+        if not isinstance(target, dict):
+            target = {}
+            record[head] = target
+        _apply_inc(target, {tail: amount})
+
+
+def _apply_update(record, update):
+    """Apply the subset of update operators this fake supports."""
+    _apply_set(record, update.get("$set", {}))
+    _apply_inc(record, update.get("$inc", {}))
+
+
 class FakeCursor:
     def __init__(self, records, projection=None):
         self._records = list(records)
@@ -186,7 +206,7 @@ class FakeCollection:
             return SimpleNamespace(matched_count=0, modified_count=0, upserted_id=len(self._records))
         return SimpleNamespace(matched_count=0, modified_count=0, upserted_id=None)
 
-    def find_one_and_update(self, query, update, return_document="AFTER"):
+    def find_one_and_update(self, query, update, return_document="AFTER", upsert=False):
         # `return_document` may be the literal string "AFTER" or the real
         # pymongo.ReturnDocument.AFTER enum member; a plain `!= "AFTER"`
         # string comparison never matches the enum form, so check both.
@@ -195,10 +215,15 @@ class FakeCollection:
             if _matches(record, query):
                 if not return_after:
                     before = dict(record)
-                    _apply_set(record, update.get("$set", {}))
+                    _apply_update(record, update)
                     return before
-                _apply_set(record, update.get("$set", {}))
+                _apply_update(record, update)
                 return dict(record)
+        if upsert:
+            new_doc = dict(query)
+            _apply_update(new_doc, update)
+            self._records.append(new_doc)
+            return dict(new_doc) if return_after else None
         return None
 
     def delete_one(self, query):

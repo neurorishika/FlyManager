@@ -48,6 +48,40 @@ def test_cross_phenotype_cache_carries_the_catalog_signature():
     assert cache["markerCatalogSignature"] == marker_catalog.get_catalog()["signature"]
 
 
+def test_cross_cache_stamps_the_signature_it_was_actually_computed_against(monkeypatch):
+    """Regression: build_cross_phenotype_cache used to call simulate_cross()
+    BEFORE reading get_catalog()["signature"]. Production runs multi-threaded
+    (gunicorn --threads 12), so another thread's before_request refresh can
+    install a new snapshot in between -- yielding a prediction computed
+    against the OLD catalog but stamped with the NEW signature, which every
+    strict read then accepts as current forever (it never self-corrects,
+    unlike a genuinely stale cache).
+
+    This stands in for that race by swapping the snapshot from inside
+    simulate_cross (as if another thread's refresh landed mid-call) and
+    checks the stamped signature is the one in effect BEFORE the swap --
+    i.e. the one the prediction was actually computed against -- not the one
+    installed while simulate_cross was running.
+    """
+    import flymanager.utils.crossing.simulator as simulator_module
+
+    original_signature = marker_catalog.get_catalog()["signature"]
+    real_simulate_cross = simulator_module.simulate_cross
+
+    def racing_simulate_cross(*args, **kwargs):
+        result = real_simulate_cross(*args, **kwargs)
+        _mutate_catalog()  # stand-in for another thread's mid-call refresh
+        return result
+
+    monkeypatch.setattr(simulator_module, "simulate_cross", racing_simulate_cross)
+
+    cache = build_cross_phenotype_cache(GENOTYPE, GENOTYPE)
+
+    assert marker_catalog.get_catalog()["signature"] != original_signature, \
+        "sanity check: the simulated race must actually have moved the signature"
+    assert cache["markerCatalogSignature"] == original_signature
+
+
 def test_strict_read_rejects_a_stale_catalog_signature():
     record = {"Genotype": GENOTYPE, "PhenotypeCache": build_stock_phenotype_cache(GENOTYPE)}
     assert get_cached_stock_phenotype(record, strict=True) is not None

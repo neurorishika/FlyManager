@@ -112,6 +112,51 @@ def test_a_flybase_alias_spelling_is_swept(monkeypatch):
     assert {"PPO1[Bc]", "bc"} <= tokens
 
 
+def test_a_flybase_alias_gene_stem_fallback_is_swept(monkeypatch):
+    """resolver._resolve_alias_marker parses a FlyBase-index canonical token
+    as gene[allele] and, when THAT EXACT allele token has no catalog row of
+    its own, falls back to get_visual_marker(gene_stem) -- so the bare
+    FlyBase spelling ends up served from the GENE marker row, not from
+    anything spelled "Sb[1]". Only matching canonical_token == key (as
+    the older, narrower version of this helper did) misses that: editing the
+    gene marker "Sb" must still sweep "sb1" even though the index's
+    canonical_token for it is "Sb[1]", not "Sb".
+
+    Uses "Sb" rather than "w" deliberately: "w" is one of this catalog's
+    construct-marker gene stems (construct:w+), which makes any edit to it
+    unscopable for an unrelated reason (UNSCOPABLE_KINDS) and would make
+    this test pass for the wrong reason regardless of the fallback fix.
+    """
+    monkeypatch.setattr(
+        "flymanager.utils.phenotypes.flybase_pipeline.get_flybase_phenotype_cache",
+        lambda *args, **kwargs: {"marker_alias_index": {"sb1": {"canonical_token": "Sb[1]"}}},
+    )
+    snapshot = _snapshot()
+    assert "Sb[1]" not in (snapshot.get("allele_markers") or {}), (
+        "sanity check: the gene-stem fallback only fires when there is no "
+        "allele-specific row for the canonical token"
+    )
+    tokens = derive_affected_tokens(snapshot, ["Sb"])
+    assert {"Sb", "sb1"} <= tokens
+
+
+def test_the_gene_stem_fallback_does_not_fire_when_an_allele_row_exists(monkeypatch):
+    """If the canonical token DOES have its own allele-marker row, resolver.py
+    resolves through that row directly rather than falling back to the gene
+    marker -- editing the gene marker must not over-sweep an alias that
+    never actually depended on it."""
+    monkeypatch.setattr(
+        "flymanager.utils.phenotypes.flybase_pipeline.get_flybase_phenotype_cache",
+        lambda *args, **kwargs: {"marker_alias_index": {"gla-1": {"canonical_token": "wg[Gla-1]"}}},
+    )
+    snapshot = _snapshot()
+    assert "wg[Gla-1]" in (snapshot.get("allele_markers") or {}), (
+        "sanity check: wg[Gla-1] must be an allele-specific row for this test to mean anything"
+    )
+    tokens = derive_affected_tokens(snapshot, ["wg"])
+    assert "gla-1" not in tokens
+
+
 def test_an_unreadable_flybase_cache_does_not_break_scoping(monkeypatch):
     """The marker write path must not fail because reference data is absent."""
     def boom(*args, **kwargs):

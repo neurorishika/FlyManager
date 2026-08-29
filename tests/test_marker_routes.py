@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch
 
 import pytest
@@ -115,12 +116,77 @@ def test_create_enqueues_a_rebuild_and_refreshes_the_catalog(app, fake_db):
     assert marker_catalog.get_catalog()["gene_markers"]["zz"]["effect"] == "zigzag wings"
 
 
+def test_creating_an_override_of_a_shipped_key_carries_previous_documents(app, fake_db):
+    """create_marker is the override path for a shipped key (_require_editable
+    409s any other in-place edit of one). The pre-edit state is the shipped
+    row, which exists nowhere the rebuild scoping can see once the overlay
+    row shadows it -- so it must be captured and threaded through exactly
+    like update_marker/delete_marker already do, or a rebuild after
+    overriding a shipped balancer's markers can never sweep the genotypes
+    that depended on the old (shipped) marker set."""
+    with patch("flymanager.app.routes.markers.db", fake_db), \
+         patch("flymanager.app.routes.markers.enqueue_job") as enqueue:
+        response = _client(app, fake_db).post("/markers", json=_payload("Cy"))
+    assert response.status_code == 201
+    previous_documents = enqueue.call_args.kwargs["kwargs"]["previous_documents"]
+    assert previous_documents, "overriding a shipped key must carry its pre-edit state"
+    assert previous_documents[0]["Key"] == "Cy"
+    assert previous_documents[0]["origin"] == "shipped"
+
+
+def test_creating_a_brand_new_marker_carries_no_previous_documents(app, fake_db):
+    """A genuinely new key has no pre-edit state to sweep -- previous_documents
+    must stay empty rather than the override path's fix accidentally
+    fabricating one."""
+    with patch("flymanager.app.routes.markers.db", fake_db), \
+         patch("flymanager.app.routes.markers.enqueue_job") as enqueue:
+        response = _client(app, fake_db).post("/markers", json=_payload("zz"))
+    assert response.status_code == 201
+    assert enqueue.call_args.kwargs["kwargs"]["previous_documents"] == []
+
+
 def test_duplicate_create_returns_409(app, fake_db):
     with patch("flymanager.app.routes.markers.db", fake_db), \
          patch("flymanager.app.routes.markers.enqueue_job"):
         client = _client(app, fake_db)
         client.post("/markers", json=_payload())
         assert client.post("/markers", json=_payload()).status_code == 409
+
+
+def test_a_malformed_form_field_gets_a_real_redirect_not_a_stub(app, fake_db):
+    """A non-JSON POST that fails to parse must get a genuine 3xx the browser
+    will actually follow. redirect() paired with a non-3xx status makes
+    Werkzeug send its raw "Redirecting..." stub body instead of redirecting,
+    so a non-JS caller would see a blank stub rather than the flashed error
+    on the page they land on."""
+    with patch("flymanager.app.routes.markers.db", fake_db), \
+         patch("flymanager.app.routes.markers.enqueue_job"):
+        response = _client(app, fake_db).post(
+            "/markers",
+            data={"Key": "zz", "kind": "gene_marker", "payload": "{not valid json"},
+        )
+    assert response.status_code == 302
+    assert response.headers.get("Location")
+
+
+def test_a_duplicate_form_create_gets_a_real_redirect_not_a_stub(app, fake_db):
+    """Same as above, but through the MarkerDefinitionError -> _error_response
+    path (a 409, not a 400) rather than the inline ValueError handler."""
+    payload = _payload()
+    form_payload = {
+        "Key": payload["Key"],
+        "kind": payload["kind"],
+        "match": json.dumps(payload["match"]),
+        "payload": json.dumps(payload["payload"]),
+        "provenance": json.dumps(payload["provenance"]),
+    }
+    with patch("flymanager.app.routes.markers.db", fake_db), \
+         patch("flymanager.app.routes.markers.enqueue_job"):
+        client = _client(app, fake_db)
+        client.post("/markers", data=form_payload)
+        response = client.post("/markers", data=form_payload)
+    assert response.status_code == 302
+    assert response.headers.get("Location")
 
 
 def test_update_by_a_non_creator_returns_403(app, fake_db):
@@ -145,7 +211,16 @@ def test_promote_requires_admin(app, fake_db):
     with patch("flymanager.app.routes.markers.db", fake_db), \
          patch("flymanager.app.routes.markers.enqueue_job"):
         _client(app, fake_db, "alice").post("/markers", json=_payload())
-        assert _client(app, fake_db, "alice").post("/markers/zz/promote").status_code == 403
+        # JSON caller: the status code is still meaningful on that branch.
+        json_response = _client(app, fake_db, "alice").post(
+            "/markers/zz/promote", json={})
+        assert json_response.status_code == 403
+        # Non-JSON (plain form) caller: a real 3xx redirect the browser will
+        # follow, not redirect() paired with a 403 -- that pairing makes
+        # Werkzeug send its raw "Redirecting..." stub instead of an actual
+        # redirect, so a non-JS caller would never see the flashed message.
+        form_response = _client(app, fake_db, "alice").post("/markers/zz/promote")
+        assert form_response.status_code == 302
         assert _client(app, fake_db, "admin").post("/markers/zz/promote").status_code == 200
 
 

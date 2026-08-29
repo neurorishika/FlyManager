@@ -119,8 +119,12 @@ def _after_write(keys, *, previous_documents=(), deleted_override_keys=()):
 def _error_response(exc):
     if request.is_json:
         return jsonify({"status": "error", "message": str(exc)}), exc.status_code
+    # A plain 302, not (redirect(...), status): pairing redirect() with a
+    # non-3xx status makes Werkzeug send its raw "Redirecting..." stub body
+    # instead of actually redirecting, so a non-JS caller sees a blank stub
+    # rather than the flashed message on the page it lands on.
     flash(str(exc), "danger")
-    return redirect(url_for("markers.marker_catalog")), exc.status_code
+    return redirect(url_for("markers.marker_catalog"))
 
 
 @bp.get("/markers")
@@ -172,16 +176,27 @@ def marker_detail(key):
 def create_marker():
     try:
         payload = get_json_payload() if request.is_json else _parse_form_document(request.form)
+        # Captured before the write: when this Key is a shipped key,
+        # create_marker_definition is the OVERRIDE path (_require_editable
+        # 409s any other attempt to edit a shipped row in place), and the
+        # pre-edit state is the shipped row, which exists nowhere the
+        # rebuild scoping can see once the overlay row shadows it. Merging
+        # it in the same way update_marker does also stops a partial JSON
+        # override from silently blanking the shipped row's
+        # sorting/audit/imaging sections.
+        previous = get_marker_definition(db, (payload or {}).get("Key"))
+        payload = _merge_with_existing(payload, previous)
         created = create_marker_definition(db, payload, username=session.get("username"))
     except ValueError as exc:
         if request.is_json:
             return jsonify({"status": "error", "message": str(exc)}), 400
         flash(str(exc), "danger")
-        return redirect(url_for("markers.marker_catalog")), 400
+        return redirect(url_for("markers.marker_catalog"))
     except MarkerDefinitionError as exc:
         return _error_response(exc)
 
-    _after_write([created["Key"]])
+    _after_write([created["Key"]],
+                 previous_documents=[_serializable(previous)] if previous else ())
     if request.is_json:
         return jsonify({"status": "success", "key": created["Key"]}), 201
     # Form path returns a plain 302; a 201 with a Location header is not
@@ -206,7 +221,7 @@ def update_marker(key):
         if request.is_json:
             return jsonify({"status": "error", "message": str(exc)}), 400
         flash(str(exc), "danger")
-        return redirect(url_for("markers.marker_detail", key=key)), 400
+        return redirect(url_for("markers.marker_detail", key=key))
     except MarkerDefinitionError as exc:
         return _error_response(exc)
 

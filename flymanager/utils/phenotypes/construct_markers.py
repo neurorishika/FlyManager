@@ -16,8 +16,14 @@ def construct_marker_pattern():
     entries = get_catalog()["construct_markers"]
     if not entries:
         return None
+    # Longest-first with a lexicographic tie-break for equal-length stems, so
+    # iteration order (a dict, not guaranteed stable across catalog rebuilds)
+    # can never flip which of two same-length stems matches first. No stems
+    # are the same length today, so this has no behavioural effect yet -- see
+    # marker_catalog.balancer_match_order for the same fix applied earlier on
+    # this branch.
     alternatives = "|".join(
-        re.escape(stem) for stem in sorted(entries, key=len, reverse=True) if stem
+        re.escape(stem) for stem in sorted(entries, key=lambda s: (-len(s), s)) if stem
     )
     if not alternatives:
         return None

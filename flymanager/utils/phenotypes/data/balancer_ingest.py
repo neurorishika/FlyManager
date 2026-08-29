@@ -8,7 +8,9 @@ from pathlib import Path
 
 from flymanager.utils.constraints._shared import normalize_chromosome_label
 from flymanager.utils.phenotypes.data.downloads import DEFAULT_TIMEOUT_SECONDS
+from flymanager.utils.phenotypes.marker_catalog import load_shipped_catalog
 from flymanager.utils.phenotypes.parser import parse_gene_package
+from flymanager.utils.phenotypes.visual_markers import get_visual_marker
 
 BALANCER_DEFS_URL = "https://bdsc.indiana.edu/stocks/balancers/balancer_defs.html"
 BALANCER_INTRO_URL = "https://bdsc.indiana.edu/stocks/balancers/balancer_intro.html"
@@ -393,6 +395,33 @@ def render_balancer_report_markdown(report):
 
 def _catalog_row_from_balancer(document):
     symbol = str(document.get("symbol") or "").strip()
+
+    # The real parser (parse_bdsc_balancer_definitions_html) emits `notes` as
+    # a single normalized string, not a list. Iterating a string with
+    # list(...) explodes it one character per "note", so a plain string must
+    # be wrapped instead. Callers that already supply a list (or nothing)
+    # pass straight through.
+    notes = document.get("notes")
+    if isinstance(notes, str):
+        notes_list = [notes] if notes.strip() else []
+    else:
+        notes_list = list(notes or [])
+
+    # The real parser never emits `default_markers` either -- it emits
+    # `marker_tokens`, a heuristic split of the definitions-table text. Only
+    # keep tokens that actually resolve to a catalog marker, so a garbled
+    # scrape (stray punctuation, a breakpoint fragment, ...) never invents a
+    # marker key that doesn't exist. A caller that supplies `default_markers`
+    # directly is trusted as-is.
+    default_markers = document.get("default_markers")
+    if default_markers is not None:
+        default_markers = list(default_markers)
+    else:
+        default_markers = [
+            token for token in (document.get("marker_tokens") or [])
+            if get_visual_marker(token) is not None
+        ]
+
     payload = {
         "family": document.get("family") or symbol,
         # normalize_chromosome_label is what _candidate_documents compares
@@ -403,8 +432,8 @@ def _catalog_row_from_balancer(document):
         # shipped symbol would overwrite its working int-typed row with a
         # broken string-typed one.
         "chromosome": normalize_chromosome_label(document.get("chromosome")),
-        "default_markers": list(document.get("default_markers") or []),
-        "notes": list(document.get("notes") or []),
+        "default_markers": default_markers,
+        "notes": notes_list,
         # Carried so balancer_selection keeps breakpoint-aware scoring once it
         # stops reading the balancer_definitions staging collection.
         "breakpoint_regions": list(document.get("breakpoint_regions") or []),
@@ -462,8 +491,23 @@ def _upsert_catalog_balancers(db, balancers):
     of an already-working shipped balancer -- with one that can never be
     selected. Leaving the existing row (or writing nothing for a new symbol)
     is strictly safer than persisting known-broken data.
+
+    A row whose Key matches a SHIPPED definition (data/markers/catalog.json)
+    is never written with the scraped match/payload either, even though it is
+    not "user"-owned: the shipped catalog is hand-curated, and the scrape's
+    marker/alias extraction is heuristic and lossy (see _catalog_row_from_balancer).
+    Overwriting the shipped row here would replace curated content with a
+    worse guess purely because a re-scrape happened to run -- exactly the bug
+    this ingest exists to avoid (a prior version of this function did that,
+    and silently stripped every ingested shipped balancer of its markers).
+    Only the breakpoint fields, which the shipped catalog never carries, are
+    genuinely new and get merged in.
     """
     collection = db["marker_definitions"]
+    shipped_by_key = {
+        definition["Key"]: definition
+        for definition in load_shipped_catalog()["definitions"]
+    }
     written = 0
     for document in balancers:
         row = _catalog_row_from_balancer(document)
@@ -472,6 +516,16 @@ def _upsert_catalog_balancers(db, balancers):
         existing = collection.find_one({"Key": row["Key"]})
         if existing is not None and existing.get("origin") == "user":
             continue
+
+        shipped_row = shipped_by_key.get(row["Key"])
+        if shipped_row is not None:
+            row["match"] = deepcopy(shipped_row.get("match") or {})
+            row["payload"] = dict(
+                deepcopy(shipped_row.get("payload") or {}),
+                breakpoint_regions=row["payload"]["breakpoint_regions"],
+                breakpoint_text=row["payload"]["breakpoint_text"],
+            )
+
         collection.update_one({"Key": row["Key"]}, {"$set": row}, upsert=True)
         written += 1
 

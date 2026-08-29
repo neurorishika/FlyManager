@@ -513,6 +513,17 @@ def build_cross_phenotype_cache(male_genotype, female_genotype):
         evaluate_cross_directions, simulate_cross,
         summarize_direction_evaluation)
 
+    # Read the catalog signature BEFORE running the simulation. Production
+    # runs multi-threaded (gunicorn --threads 12); another thread's
+    # before_request refresh can install a new snapshot between two
+    # get_catalog() calls, so a prediction must be paired with the signature
+    # of the snapshot it was actually computed against, not a snapshot read
+    # afterward. Getting this order backwards means a prediction computed
+    # against the OLD catalog gets stamped with the NEW signature, and every
+    # strict read (get_cached_cross_phenotype) then accepts it as current
+    # forever -- it never self-corrects, unlike a cache that fails stale in
+    # the safe direction.
+    catalog_signature = get_catalog()["signature"]
     simulation = simulate_cross(male_genotype, female_genotype)
     direction_evaluation = summarize_direction_evaluation(
         evaluate_cross_directions(male_genotype, female_genotype)
@@ -522,7 +533,7 @@ def build_cross_phenotype_cache(male_genotype, female_genotype):
         "version": PHENOTYPE_CACHE_VERSION,
         "computedAt": _cache_timestamp(),
         "pipelineSignature": compute_flybase_pipeline_signature(),
-        "markerCatalogSignature": get_catalog()["signature"],
+        "markerCatalogSignature": catalog_signature,
         "maleGenotype": male_genotype,
         "femaleGenotype": female_genotype,
         "parentPhenotypes": simulation["parent_phenotypes"],

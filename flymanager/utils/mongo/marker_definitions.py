@@ -8,8 +8,9 @@ worker processes converge on the change.
 from copy import deepcopy
 from datetime import datetime, timezone
 
+from pymongo import ReturnDocument
+
 from flymanager.utils.mongo.activity import write_activity
-from flymanager.utils.mongo.settings import get_settings, update_settings
 from flymanager.utils.phenotypes.marker_catalog import (
     MARKER_CATALOG_REVISION_KEY, MARKER_DEFINITIONS_COLLECTION,
     load_shipped_catalog, validate_definition)
@@ -39,9 +40,28 @@ def _shipped_definitions():
 
 
 def bump_marker_catalog_revision(db):
-    revision = int((get_settings(db) or {}).get(MARKER_CATALOG_REVISION_KEY) or 0) + 1
-    update_settings({MARKER_CATALOG_REVISION_KEY: revision}, db)
-    return revision
+    """Atomically increment markerCatalogRevision and return the new value.
+
+    Was read-modify-write through settings.update_settings, which (a)
+    swallows any exception and returns False with nobody checking it, so a
+    failed bump left other worker processes never converging on the edit
+    while the rebuild job (force=True) stamped the new signature anyway, and
+    (b) is not atomic: two concurrent writers can both read revision N and
+    both write N+1, losing a bump. $inc against the collection directly is
+    atomic and self-verifying -- find_one_and_update either returns the
+    incremented document or raises, there is no silent False to ignore.
+    """
+    result = db["settings"].find_one_and_update(
+        {},
+        {"$inc": {MARKER_CATALOG_REVISION_KEY: 1}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    if not isinstance(result, dict) or MARKER_CATALOG_REVISION_KEY not in result:
+        raise RuntimeError(
+            "Failed to bump markerCatalogRevision: find_one_and_update "
+            f"returned {result!r}")
+    return int(result[MARKER_CATALOG_REVISION_KEY])
 
 
 def can_edit_marker_definition(document, username):

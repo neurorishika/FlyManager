@@ -11,6 +11,11 @@ from pymongo import UpdateOne
 
 UNSCOPABLE_KINDS = ("construct_marker",)
 
+# Mirrors resolver.ALLELE_TOKEN_RE: a canonical token spelled "gene[allele]".
+# Used to find the gene stem when a FlyBase-index canonical token itself has
+# no allele-specific catalog row (see _flybase_alias_tokens below).
+_ALLELE_TOKEN_RE = re.compile(r"^(?P<gene>[A-Za-z0-9.+*()_-]+)\[(?P<allele>[^\]]+)\]$")
+
 
 def _own_tokens(document):
     """Tokens by which a definition can appear in a genotype, from the
@@ -24,7 +29,7 @@ def _own_tokens(document):
     return {token for token in tokens if token}
 
 
-def _flybase_alias_tokens(key):
+def _flybase_alias_tokens(key, snapshot):
     """Genotype spellings the FlyBase evidence index resolves to this key.
 
     resolver.py falls back to a second alias mechanism beyond the catalog's
@@ -32,6 +37,17 @@ def _flybase_alias_tokens(key):
     ("bc") to a canonical token ("PPO1[Bc]"), which is then hydrated from the
     catalog. A genotype using the bare spelling therefore depends on this
     catalog row, and editing the row must sweep that spelling too.
+
+    That hydration has two paths, mirroring resolver._resolve_alias_marker:
+    the canonical token can resolve directly (its own allele-marker row), OR
+    -- when the canonical token is spelled "gene[allele]" but that exact
+    allele token has no catalog row -- get_visual_marker falls back to the
+    GENE marker row for the stem. In that second case the bare FlyBase
+    spelling is served from the gene marker, so editing the gene marker must
+    sweep it too, even though its canonical_token != the gene's key.
+    Over-sweeping here (matching more than strictly necessary) is the safe
+    direction; missing it leaves a record permanently stale once the rebuild
+    stamps it current.
 
     Read-only and in-process (the evidence cache is memoized), so this adds
     no database access. A missing or unreadable cache yields no extra
@@ -47,11 +63,18 @@ def _flybase_alias_tokens(key):
     except Exception:
         return set()
 
-    return {
-        alias
-        for alias, record in index.items()
-        if str((record or {}).get("canonical_token") or "") == key
-    }
+    allele_markers = (snapshot or {}).get("allele_markers") or {}
+    tokens = set()
+    for alias, record in index.items():
+        canonical_token = str((record or {}).get("canonical_token") or "")
+        if canonical_token == key:
+            tokens.add(alias)
+            continue
+        match = _ALLELE_TOKEN_RE.match(canonical_token)
+        if (match and match.group("gene") == key
+                and canonical_token not in allele_markers):
+            tokens.add(alias)
+    return tokens
 
 
 def derive_affected_tokens(snapshot, keys, *, previous_documents=(), deleted_override_keys=()):
@@ -106,7 +129,7 @@ def derive_affected_tokens(snapshot, keys, *, previous_documents=(), deleted_ove
         # bare allele spec through the FlyBase evidence index straight into
         # this key. Its keys are lowercase-normalised, which is fine because
         # build_affected_query matches case-insensitively.
-        tokens.update(_flybase_alias_tokens(key))
+        tokens.update(_flybase_alias_tokens(key, snapshot))
         definition = definitions.get(key)
         if definition is not None and definition.get("kind") == "alias":
             target = str((definition.get("payload") or {}).get("value") or "").strip()

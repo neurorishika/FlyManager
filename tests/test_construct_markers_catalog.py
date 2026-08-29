@@ -1,8 +1,10 @@
 import pytest
 
+from flymanager.utils.phenotypes import construct_markers
 from flymanager.utils.phenotypes import marker_catalog
 from flymanager.utils.phenotypes.construct_markers import (
-    extract_construct_marker_symbols, extract_construct_markers)
+    construct_marker_pattern, extract_construct_marker_symbols,
+    extract_construct_markers)
 
 
 @pytest.fixture(autouse=True)
@@ -72,3 +74,19 @@ def test_a_user_defined_construct_marker_is_matched_and_applied():
 
 def test_a_stem_with_no_base_marker_is_skipped():
     assert extract_construct_markers("P{x}q[+]") == []
+
+
+def test_equal_length_stems_get_a_deterministic_alternation_order(monkeypatch):
+    """construct_marker_pattern sorts stems longest-first so a longer stem is
+    never shadowed by a prefix of it, but used to break ties on `entries`'
+    (a dict's) iteration order, which is not guaranteed stable across a
+    catalog rebuild -- the same class of bug already fixed for
+    marker_catalog.balancer_match_order. Same-length stems must come out in
+    a fixed order (alphabetical) regardless of how they were inserted."""
+    monkeypatch.setattr(
+        construct_markers, "get_catalog",
+        lambda: {"construct_markers": {"zz": {}, "aa": {}, "mm": {}}})
+
+    pattern = construct_marker_pattern()
+
+    assert pattern.pattern == r"(?P<stem>aa|mm|zz)\[(?P<allele>\+[^\]]*)\]"

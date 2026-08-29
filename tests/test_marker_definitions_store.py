@@ -198,3 +198,25 @@ def test_can_edit_marker_definition_rules():
 def test_bump_is_monotonic(db):
     assert bump_marker_catalog_revision(db) == 1
     assert bump_marker_catalog_revision(db) == 2
+
+
+def test_a_bump_that_does_not_apply_raises_instead_of_returning_silently(db, monkeypatch):
+    """bump_marker_catalog_revision used to be read-modify-write through
+    settings.update_settings, which catches any exception internally and
+    just returns False -- a value the old bump never even looked at. A
+    failed write therefore left the caller believing the bump succeeded
+    (it returned a plausible-looking revision number) while other worker
+    processes never converged on the edit, and the marker rebuild job
+    (force=True) went on to stamp the new signature anyway.
+
+    It is now a single atomic find_one_and_update($inc, upsert=True); if
+    that call somehow doesn't hand back a document carrying the revision
+    field, the failure must be loud (raise), not silently swallowed into a
+    number nobody can trust.
+    """
+    from tests.mongo_fakes import FakeCollection
+
+    monkeypatch.setattr(FakeCollection, "find_one_and_update",
+                        lambda self, *args, **kwargs: None)
+    with pytest.raises(Exception):
+        bump_marker_catalog_revision(db)
