@@ -6,6 +6,7 @@ from copy import deepcopy
 from html.parser import HTMLParser
 from pathlib import Path
 
+from flymanager.utils.constraints._shared import normalize_chromosome_label
 from flymanager.utils.phenotypes.data.downloads import DEFAULT_TIMEOUT_SECONDS
 from flymanager.utils.phenotypes.parser import parse_gene_package
 
@@ -394,7 +395,14 @@ def _catalog_row_from_balancer(document):
     symbol = str(document.get("symbol") or "").strip()
     payload = {
         "family": document.get("family") or symbol,
-        "chromosome": document.get("chromosome"),
+        # normalize_chromosome_label is what _candidate_documents compares
+        # against ("X" -> 1, "2" -> 2, ...). The real BDSC parser
+        # (_normalize_chromosome above) emits strings ("X", "1".."4"), never
+        # ints; storing the raw string here made every ingested balancer
+        # silently invisible to scoring ("2" != 2), and re-ingesting a
+        # shipped symbol would overwrite its working int-typed row with a
+        # broken string-typed one.
+        "chromosome": normalize_chromosome_label(document.get("chromosome")),
         "default_markers": list(document.get("default_markers") or []),
         "notes": list(document.get("notes") or []),
         # Carried so balancer_selection keeps breakpoint-aware scoring once it
@@ -444,12 +452,22 @@ def _upsert_catalog_balancers(db, balancers):
     A row a user has taken ownership of (origin "user") is left alone: the
     ingest is a reference-data refresh, not an authority to overwrite someone's
     deliberate override.
+
+    A row whose chromosome does not normalize (an unparseable scrape, or a
+    genuinely off-catalog chromosome label) is skipped outright rather than
+    written with payload.chromosome == None: candidate matching would never
+    select it either way (None never equals the int normalize_chromosome_label
+    produces for a real chromosome), but writing it would still silently
+    clobber a previously-good row for the same symbol -- e.g. a bad re-scrape
+    of an already-working shipped balancer -- with one that can never be
+    selected. Leaving the existing row (or writing nothing for a new symbol)
+    is strictly safer than persisting known-broken data.
     """
     collection = db["marker_definitions"]
     written = 0
     for document in balancers:
         row = _catalog_row_from_balancer(document)
-        if not row["Key"]:
+        if not row["Key"] or row["payload"]["chromosome"] is None:
             continue
         existing = collection.find_one({"Key": row["Key"]})
         if existing is not None and existing.get("origin") == "user":

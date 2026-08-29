@@ -89,10 +89,10 @@ def test_select_optimal_balancer_prefers_candidate_with_closer_distal_breakpoint
             "definitions": {
                 "source_url": "https://bdsc.example/balancers",
                 "balancers": [
-                    {"symbol": "CyO", "chromosome": 2,
+                    {"symbol": "CyO", "chromosome": "2",
                      "default_markers": ["Cy", "cn", "pr"],
                      "breakpoint_regions": ["22D", "58B"]},
-                    {"symbol": "SM6a", "chromosome": 2,
+                    {"symbol": "SM6a", "chromosome": "2",
                      "default_markers": ["al", "Cy", "cn", "speck"],
                      "breakpoint_regions": ["50C", "56D"]},
                 ],

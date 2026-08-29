@@ -20,8 +20,12 @@ def _report():
     return {
         "definitions": {
             "source_url": "https://bdsc.example/balancers",
+            # _normalize_chromosome (the real BDSC parser) emits strings
+            # ("X", "1".."4"), never ints. Seeding an int here would hide a
+            # chromosome-type mismatch between the catalog row and the int
+            # normalize_chromosome_label produces for candidate matching.
             "balancers": [
-                {"symbol": "ZZ7", "chromosome": 3, "family": "ZZ7",
+                {"symbol": "ZZ7", "chromosome": "3", "family": "ZZ7",
                  "default_markers": ["Sb"], "notes": ["From BDSC."]},
             ],
         }
@@ -106,3 +110,36 @@ def test_the_staging_collection_is_no_longer_read():
         "marker_definitions": [], "settings": [{}]})
     marker_catalog.refresh_catalog(db, force=True)
     assert "STALE" not in {c.get("symbol") for c in _candidate_documents(3, db)}
+
+
+def test_a_string_chromosome_from_the_real_parser_still_reaches_scoring():
+    """_normalize_chromosome emits strings ("2"), but candidate matching
+    compares against the int from normalize_chromosome_label. Storing the
+    raw string silently drops every ingested balancer from scoring."""
+    db = FakeDatabase({"balancer_definitions": [], "marker_definitions": [],
+                       "settings": [{}]})
+    report = _report()
+    report["definitions"]["balancers"][0]["chromosome"] = "3"
+    ingest_balancer_definitions(db, report)
+    marker_catalog.refresh_catalog(db, force=True)
+
+    assert "ZZ7" in {c.get("symbol") for c in _candidate_documents(3, db)}
+
+
+def test_re_ingesting_a_shipped_balancer_does_not_drop_it_from_candidates():
+    """Re-ingest must not clobber a working shipped row with an
+    incompatible chromosome type."""
+    db = FakeDatabase({"balancer_definitions": [], "marker_definitions": [],
+                       "settings": [{}]})
+    marker_catalog.refresh_catalog(db, force=True)
+    assert "CyO" in {c.get("symbol") for c in _candidate_documents(2, db)}
+
+    report = _report()
+    report["definitions"]["balancers"][0] = {
+        "symbol": "CyO", "chromosome": "2", "family": "CyO",
+        "default_markers": ["Cy", "pr", "cn"], "notes": [],
+    }
+    ingest_balancer_definitions(db, report)
+    marker_catalog.refresh_catalog(db, force=True)
+
+    assert "CyO" in {c.get("symbol") for c in _candidate_documents(2, db)}
