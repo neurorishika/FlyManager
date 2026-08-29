@@ -97,3 +97,26 @@ def test_build_affected_query_covers_every_field():
 
 def test_build_affected_query_with_no_tokens_matches_nothing():
     assert build_affected_query(set(), genotype_fields=("Genotype",)) is None
+
+
+def test_a_flybase_alias_spelling_is_swept(monkeypatch):
+    """resolver.py resolves a bare allele spec through the FlyBase alias
+    index straight into a catalog row, so editing that row must sweep the
+    bare spelling. Missing it would leave those records stale forever once
+    the rebuild stamps them as current."""
+    monkeypatch.setattr(
+        "flymanager.utils.phenotypes.flybase_pipeline.get_flybase_phenotype_cache",
+        lambda *args, **kwargs: {"marker_alias_index": {"bc": {"canonical_token": "PPO1[Bc]"}}},
+    )
+    tokens = derive_affected_tokens(_snapshot(), ["PPO1[Bc]"])
+    assert {"PPO1[Bc]", "bc"} <= tokens
+
+
+def test_an_unreadable_flybase_cache_does_not_break_scoping(monkeypatch):
+    """The marker write path must not fail because reference data is absent."""
+    def boom(*args, **kwargs):
+        raise RuntimeError("evidence cache unavailable")
+
+    monkeypatch.setattr(
+        "flymanager.utils.phenotypes.flybase_pipeline.get_flybase_phenotype_cache", boom)
+    assert derive_affected_tokens(_snapshot(), ["Cy"]) >= {"Cy", "CyO"}

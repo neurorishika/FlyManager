@@ -22,6 +22,36 @@ def _own_tokens(document):
     return {token for token in tokens if token}
 
 
+def _flybase_alias_tokens(key):
+    """Genotype spellings the FlyBase evidence index resolves to this key.
+
+    resolver.py falls back to a second alias mechanism beyond the catalog's
+    own alias rows: a FlyBase-derived index mapping a bare allele spec
+    ("bc") to a canonical token ("PPO1[Bc]"), which is then hydrated from the
+    catalog. A genotype using the bare spelling therefore depends on this
+    catalog row, and editing the row must sweep that spelling too.
+
+    Read-only and in-process (the evidence cache is memoized), so this adds
+    no database access. A missing or unreadable cache yields no extra
+    tokens rather than raising: this runs on the marker write path, and
+    failing a save because reference data is absent would be worse than
+    over-rebuilding, which the caller can always force.
+    """
+    from flymanager.utils.phenotypes.flybase_pipeline import \
+        get_flybase_phenotype_cache
+
+    try:
+        index = get_flybase_phenotype_cache().get("marker_alias_index") or {}
+    except Exception:
+        return set()
+
+    return {
+        alias
+        for alias, record in index.items()
+        if str((record or {}).get("canonical_token") or "") == key
+    }
+
+
 def derive_affected_tokens(snapshot, keys, *, previous_documents=(), deleted_override_keys=()):
     """Genotype substrings whose records must be recomputed for these key edits.
 
@@ -43,6 +73,11 @@ def derive_affected_tokens(snapshot, keys, *, previous_documents=(), deleted_ove
         definition = definitions.get(key)
         if definition is not None and definition.get("kind") in UNSCOPABLE_KINDS:
             return None
+        # Keyed by geneStem, deliberately: a construct marker is built from the
+        # gene marker of the same stem, so editing gene marker w changes every
+        # P{...}w[+mC] in the collection. Those live inside construct bodies and
+        # cannot be scoped by token, so this is a correct full rebuild, not a
+        # missed optimization.
         if key in (snapshot.get("construct_markers") or {}):
             return None
 
@@ -65,6 +100,11 @@ def derive_affected_tokens(snapshot, keys, *, previous_documents=(), deleted_ove
         # Aliases that resolve *to* this key, and the target this key
         # resolves to, both change what a genotype containing either means.
         tokens.update(aliases_by_target.get(key, set()))
+        # Second, independent alias mechanism: resolver.py also resolves a
+        # bare allele spec through the FlyBase evidence index straight into
+        # this key. Its keys are lowercase-normalised, which is fine because
+        # build_affected_query matches case-insensitively.
+        tokens.update(_flybase_alias_tokens(key))
         definition = definitions.get(key)
         if definition is not None and definition.get("kind") == "alias":
             target = str((definition.get("payload") or {}).get("value") or "").strip()
