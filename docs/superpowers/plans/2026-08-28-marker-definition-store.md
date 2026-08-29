@@ -19,11 +19,12 @@
   python -m pytest tests/ -q -p no:cacheprovider --ignore=tests/new_feature_exploration
   ```
   Importing `flymanager.app` connects to Mongo at import time, so a reachable Mongo is required for anything that imports the app. `tests/new_feature_exploration/` always gets ignored.
-- **Baseline failures:** the suite has ~15 pre-existing failures unrelated to this work. Establish the baseline count before Task 1 (`git stash -u`, run, unstash) and do not let it increase. Never "fix" a pre-existing failure as part of a task; note it and move on.
+- **Baseline failures:** the suite has 15-16 pre-existing failures unrelated to this work (the recorded figure has moved; measure, do not assume). Establish the baseline count before Task 1 (`git stash -u`, run, unstash) and do not let it increase. Never "fix" a pre-existing failure as part of a task; note it and move on.
 - **The resolution path must stay db-less.** `resolve_package_markers`, `get_visual_marker`, `get_balancer_metadata`, `get_reviewed_marker_alias`, `parse_gene_package` and everything they call must never take or use a `db` handle. They read the compiled snapshot only.
 - **`data/markers/catalog.json` is never written at runtime.** Only `scripts/generate_marker_catalog.py` and hand edits touch it. All runtime writes go to Mongo.
 - **The three legacy accessor signatures are frozen:** `get_visual_marker(symbol, allele_spec=None, token=None)`, `get_balancer_metadata(symbol)`, `get_reviewed_marker_alias(alias_token)`. Their return values must stay byte-identical to today's, including which optional keys are absent.
 - **Payload dicts are stored verbatim in snake_case.** See Deviations.
+- **The builder-calling tests need FlyBase reference data.** Tasks 11, 13 and 16 call `build_stock_phenotype_cache` / `build_cross_phenotype_cache` for real, which runs `compute_flybase_pipeline_signature()` and a full prediction. Existing cache tests mostly fabricate envelopes instead, so there is no precedent proving the builders run green and fast in a bare checkout. Before starting Task 11, confirm `data/flybase/` is populated and time one builder call; if it is slow or missing, say so rather than silently weakening the tests to fabricated envelopes.
 - Commit at the end of every task. Do not squash tasks together.
 
 ## Deviations from the spec
@@ -227,6 +228,13 @@ def test_balancer_aliases_are_indexed_and_listed_on_the_canonical_row():
     assert snapshot["balancer_aliases"] == {"Binsn": "Binsc"}
     assert snapshot["balancers"]["Binsc"]["aliases"] == ["Binsn"]
     assert snapshot["known_balancer_symbols"] == {"Binsc", "Binsn"}
+
+
+def test_precomputed_hot_path_indexes():
+    snapshot = compile_catalog(_shipped([GENE_ROW, ALLELE_ROW, ALIASED_BALANCER_ROW]), [])
+    assert snapshot["gene_marker_symbols"] == frozenset({"Cy"})
+    assert snapshot["allele_marker_tokens"] == frozenset({"wg[Sp-1]"})
+    assert snapshot["balancer_match_order"] == ("Binsc", "Binsn")
 
 
 def test_balancer_without_aliases_has_no_aliases_key():
@@ -495,6 +503,9 @@ def _empty_snapshot():
         "balancer_markers": {},
         "balancers_referencing": {},
         "known_balancer_symbols": set(),
+        "balancer_match_order": (),
+        "gene_marker_symbols": frozenset(),
+        "allele_marker_tokens": frozenset(),
         "construct_markers": {},
         "stability": {},
         "image_aliases": {},
@@ -581,6 +592,12 @@ def compile_catalog(shipped, overlay_documents=()):
                 snapshot["image_aliases"][lookup_key] = image_aliases
 
     snapshot["known_balancer_symbols"] = set(snapshot["balancers"]) | set(snapshot["balancer_aliases"])
+    # Precomputed and immutable: these are read per token on the parsing hot
+    # path, so they must not be rebuilt or copied on every lookup.
+    snapshot["balancer_match_order"] = tuple(
+        sorted(snapshot["known_balancer_symbols"], key=len, reverse=True))
+    snapshot["gene_marker_symbols"] = frozenset(snapshot["gene_markers"])
+    snapshot["allele_marker_tokens"] = frozenset(snapshot["allele_markers"])
     snapshot["probe_symbols"] = sorted(set(snapshot["probe_symbols"]))
     snapshot["signature"] = compute_marker_catalog_signature(snapshot)
     return snapshot
@@ -615,7 +632,7 @@ def compute_marker_catalog_signature(snapshot):
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `python -m pytest tests/test_marker_catalog_compile.py -q -p no:cacheprovider`
-Expected: PASS (24 tests)
+Expected: PASS (21 tests)
 
 - [ ] **Step 5: Commit**
 
@@ -796,8 +813,14 @@ PROVENANCE_KEYS = (("geneName", "gene_name"), ("flybaseId", "flybase_id"),
 
 
 def _load_module(relative_path, name):
-    """Load a module by path so this script works without importing the
-    flymanager package (whose __init__ chain pulls in pymongo and Mongo)."""
+    """Load a module by path, so the pre-migration literals can be read even
+    once the package-level names have moved.
+
+    Note this does not fully avoid importing flymanager: marker_stability.py
+    imports visual_markers, which pulls in the phenotypes package __init__ and
+    hence pymongo. That chain opens no Mongo connection, so it is fine -- but
+    if it ever does, read the two literals with ast.literal_eval instead of
+    adding a database dependency to a migration script."""
     spec = importlib.util.spec_from_file_location(name, REPO_ROOT / relative_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -1240,14 +1263,18 @@ def get_allele_marker_dictionary():
 
 
 def get_gene_marker_symbols():
-    """Set of known gene symbols. Cheaper than copying the whole dictionary,
-    which is all the membership-test callers actually need."""
-    return set(get_catalog()["gene_markers"])
+    """Immutable set of known gene symbols.
+
+    Returns the snapshot's precomputed frozenset rather than a fresh copy:
+    membership tests are all the callers need, and this runs per token during
+    a full backfill.
+    """
+    return get_catalog()["gene_marker_symbols"]
 
 
 def get_allele_marker_tokens():
-    """Set of known allele tokens."""
-    return set(get_catalog()["allele_markers"])
+    """Immutable set of known allele tokens."""
+    return get_catalog()["allele_marker_tokens"]
 
 
 def get_reviewed_marker_aliases():
@@ -1272,7 +1299,12 @@ def get_balancer_markers():
 
 def get_known_balancer_symbols():
     """Every balancer symbol and alias the parser should recognise."""
-    return set(get_catalog()["known_balancer_symbols"])
+    return get_catalog()["known_balancer_symbols"]
+
+
+def get_balancer_match_order():
+    """Balancer symbols longest-first, precomputed on the snapshot."""
+    return get_catalog()["balancer_match_order"]
 
 
 def get_probe_marker_symbols():
@@ -1447,6 +1479,7 @@ In `flymanager/utils/phenotypes/parser.py`, replace the import block and the two
 
 ```python
 from flymanager.utils.phenotypes.visual_markers import (get_balancer_aliases,
+                                                        get_balancer_match_order,
                                                         get_balancer_metadata,
                                                         get_known_balancer_symbols)
 
@@ -1465,8 +1498,13 @@ def known_balancer_symbols():
 
 
 def balancer_match_order():
-    """Symbols longest-first, so In(2LR)SM6a matches SM6a before SM6."""
-    return tuple(sorted(known_balancer_symbols(), key=len, reverse=True))
+    """Symbols longest-first, so In(2LR)SM6a matches SM6a before SM6.
+
+    Read straight off the snapshot, which precomputes the ordering: this runs
+    once per In(...) token and re-sorting 38 symbols each time was measurable
+    during a full backfill.
+    """
+    return get_balancer_match_order()
 ```
 
 Then update the three users:
@@ -1786,7 +1824,10 @@ git commit -m "refactor: drop the import-time marker constant shims"
 
 **Files:**
 - Modify: `flymanager/utils/constraints/marker_stability.py:1-22,38-56`
+- Modify: `flymanager/utils/constraints/__init__.py:5-6,10-11`
 - Test: `tests/test_marker_stability_catalog.py`
+
+**Sequencing trap:** `constraints/__init__.py:5-6` imports `MARKER_STABILITY_SCORES` and re-exports it in `__all__`, and `flymanager/utils/crossing/simulator.py` imports the `constraints` package. Deleting the constant without editing `__init__.py` breaks the import of nearly the whole suite with `ImportError: cannot import name 'MARKER_STABILITY_SCORES'`. Nothing outside `__init__.py` and `marker_stability.py` itself references the name (verified by grep), so removing it from both the import and `__all__` is the whole fix.
 
 **Interfaces:**
 - Consumes: `marker_catalog.get_catalog()["stability"]` — `{display_label: {"score": float, "notes": [str]}}`.
@@ -1892,6 +1933,8 @@ def _stability_entry(label):
     return get_catalog()["stability"].get(label) or {}
 ```
 
+Then in `flymanager/utils/constraints/__init__.py`, drop `MARKER_STABILITY_SCORES` from both the `marker_stability` import list and `__all__`, leaving `assess_marker_stability` and `score_sorting_markers`.
+
 `_marker_label` is unchanged. In `assess_marker_stability`:
 
 ```python
@@ -1920,13 +1963,14 @@ The rest of the function and `score_sorting_markers` are unchanged; replace the 
 
 - [ ] **Step 4: Run the tests**
 
-Run: `python -m pytest tests/test_marker_stability_catalog.py tests/test_constraints.py -q -p no:cacheprovider`
-Expected: the new file PASSES (7 tests); `test_constraints.py` at baseline.
+Run: `python -m pytest tests/test_marker_stability_catalog.py tests/test_constraints.py tests/test_crossing_simulator.py -q -p no:cacheprovider`
+Expected: the new file PASSES (7 tests); the other two at baseline. An `ImportError` here means the `constraints/__init__.py` edit was missed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add flymanager/utils/constraints/marker_stability.py tests/test_marker_stability_catalog.py
+git add flymanager/utils/constraints/marker_stability.py \
+        flymanager/utils/constraints/__init__.py tests/test_marker_stability_catalog.py
 git commit -m "refactor: source marker stability scores from the catalog"
 ```
 
@@ -2685,16 +2729,65 @@ def _standardization_cache_is_current(cache, strict):
     return True
 ```
 
-- [ ] **Step 5: Run the tests**
+- [ ] **Step 5: Refresh the catalog in every background task**
 
-Run: `python -m pytest tests/test_marker_catalog_signature_plumbing.py tests/test_phenotype_cache_persistence.py tests/test_standardization_cache.py tests/test_phenotype_backfill.py -q -p no:cacheprovider`
-Expected: the new file PASSES (8 tests). The three existing files may have tests asserting `PHENOTYPE_CACHE_VERSION == 2` or a literal envelope — update those assertions to the new version; that is an intended consequence of the bump, not a regression. Any other failure must match baseline.
+**This step is not optional and the two above are dangerous without it.** The `before_request` hook from Task 10 only runs in the web process. The RQ worker builds its app once (`jobs/__init__.py:46-58`) and its snapshot is whatever `create_app` compiled — shipped-only, with no overlay. Three existing worker tasks write phenotype/standardization caches: `task_backfill_phenotype_cache` (`jobs/tasks.py:156`), `_rebuild_caches_after_flybase_refresh` (`:231`) and `task_force_recompute_cache` (`:302`). Once Step 3 makes those caches carry and compare the catalog signature, a worker with a stale snapshot recomputes records **with the wrong marker set** and stamps a signature the web process then rejects — the two processes ping-pong, rebuilding the collection against each other.
 
-- [ ] **Step 6: Commit**
+Fix it once, in the shared task envelope `_run` (`jobs/tasks.py:21-35`), so it cannot be forgotten by a future task:
+
+```python
+def _run(key, work):
+    """Shared mark-running/succeeded/failed envelope for every task below."""
+    app = get_worker_app()
+    with app.app_context():
+        from flymanager.app import db
+        from flymanager.utils.phenotypes.marker_catalog import refresh_catalog
+
+        # The worker has no before_request hook, so its marker catalog would
+        # otherwise stay at whatever create_app compiled -- shipped-only, with
+        # no overlay. Any task that writes a materialized cache must not run
+        # against a stale marker set.
+        try:
+            refresh_catalog(db)
+        except Exception:
+            app.logger.exception("Unable to refresh the marker catalog before job %s", key)
+
+        mark_job_running(db, key)
+```
+
+Then add a test to `tests/test_marker_catalog_signature_plumbing.py`:
+
+```python
+def test_the_worker_envelope_refreshes_the_catalog_before_running(monkeypatch):
+    """A worker that skipped this would recompute every cache against the
+    shipped-only marker set and stamp a signature the web process rejects."""
+    from flymanager.app.jobs import tasks
+
+    calls = []
+    monkeypatch.setattr(
+        "flymanager.utils.phenotypes.marker_catalog.refresh_catalog",
+        lambda db, **kwargs: calls.append("refreshed"))
+    monkeypatch.setattr(tasks, "mark_job_running", lambda *a, **k: calls.append("running"))
+    monkeypatch.setattr(tasks, "mark_job_succeeded", lambda *a, **k: None)
+
+    tasks._run("job-key", lambda app, db: {"ok": True})
+
+    assert calls[0] == "refreshed", "the refresh must happen before the job body"
+```
+
+`task_rebuild_marker_caches` (Task 13) keeps its own `force=True` refresh: it must see the specific edit that triggered it, not merely a revision-current snapshot.
+
+- [ ] **Step 6: Run the tests**
+
+Run: `python -m pytest tests/test_marker_catalog_signature_plumbing.py tests/test_background_jobs.py tests/test_phenotype_cache_persistence.py tests/test_standardization_cache.py tests/test_phenotype_backfill.py -q -p no:cacheprovider`
+Expected: the new file PASSES (9 tests). The other files may have tests asserting `PHENOTYPE_CACHE_VERSION == 2` or a literal envelope — update those assertions to the new version; that is an intended consequence of the bump, not a regression. Any other failure must match baseline.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add flymanager/utils/phenotypes/predictor.py \
         flymanager/app/services/stock_standardization.py \
+        flymanager/app/jobs/tasks.py \
         tests/test_marker_catalog_signature_plumbing.py
 git commit -m "feat: stamp and check the marker catalog signature on both cache envelopes"
 ```
@@ -2710,12 +2803,17 @@ git commit -m "feat: stamp and check the marker catalog signature on both cache 
 **Interfaces:**
 - Consumes: `marker_catalog.get_catalog()` indexes `definitions`, `balancers_referencing`, `balancers`, `aliases_by_target`, `construct_markers`.
 - Produces:
-  - `derive_affected_tokens(snapshot, keys, *, deleted_override_keys=()) -> set[str] | None` — `None` means "not scopable, rebuild everything".
-  - `build_affected_query(tokens, *, genotype_fields) -> dict` — a `$or` of `$regex` clauses over the given fields.
+  - `derive_affected_tokens(snapshot, keys, *, previous_documents=(), deleted_override_keys=()) -> set[str] | None` — `None` means "not scopable, rebuild everything".
+  - `build_affected_query(tokens, *, genotype_fields) -> dict | None` — a `$or` of case-insensitive `$regex` clauses over the given fields.
 
 **The reverse-reference problem:** balancers resolve their markers by key reference (`resolver.py`, the `default_markers` loop). Editing `Cy` therefore changes every record containing `CyO`, `SM1`, `SM5`, `SM6a` or `SM6b`, none of which contains the literal string `Cy` as a separate token. Missing that closure means silently stale predictions — the exact failure the signature exists to catch, defeated by the targeting.
 
 **Deliberate direction of error:** matching is substring, not token-aware. Editing `B` sweeps most of the collection. Extra rebuilds are wasted work; missed rebuilds are wrong data.
+
+**Two ways this silently under-computes, both of which must be handled here** — because Task 13 then *stamps* whatever this misses, making the staleness permanent rather than self-correcting:
+
+1. **Removals are invisible in the post-edit snapshot.** Editing balancer `Binsc` to drop its alias `Binsn` yields the affected set `{Binsc}`. Records whose genotype says `Binsn` — recognised by the parser before the edit, unrecognised after — are never swept. The derivation therefore also takes the **pre-edit documents** and unions their own identifying tokens (`Key`, `match.symbol`, `match.aliases`, `match.token`, `payload.value`) into the set. Reverse references do not need the old snapshot: a change to a balancer's `default_markers` only affects records containing that balancer, which its own symbol already sweeps.
+2. **Genotypes reach a marker through case-insensitive alias resolution.** `resolver.py` resolves leftover tokens via `lookup_flybase_marker_alias`, whose index is lowercase-normalised (`flybase_pipeline.py`), then hydrates the marker from the catalog. A genotype containing `sco` resolves to `sna[Sco]`, so editing that allele row must sweep `sco` too. The query is therefore built with `$options: "i"`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2772,6 +2870,22 @@ def test_an_unknown_key_still_yields_its_own_token():
     assert derive_affected_tokens(_snapshot(), ["nosuchmarker"]) == {"nosuchmarker"}
 
 
+def test_a_removed_balancer_alias_is_swept_via_the_previous_document():
+    """Post-edit the alias is gone, so only the pre-edit document knows a
+    genotype saying 'Binsn' is now affected."""
+    previous = {"Key": "Binsc", "kind": "balancer",
+                "match": {"symbol": "Binsc", "aliases": ["Binsn"]}}
+    tokens = derive_affected_tokens(_snapshot(), ["Binsc"], previous_documents=[previous])
+    assert {"Binsc", "Binsn"} <= tokens
+
+
+def test_a_removed_alias_row_is_swept_via_its_previous_target():
+    previous = {"Key": "Gla", "kind": "alias", "match": {"token": "Gla"},
+                "payload": {"alias_type": "allele_token", "value": "wg[Gla-1]"}}
+    tokens = derive_affected_tokens(_snapshot(), ["Gla"], previous_documents=[previous])
+    assert {"Gla", "wg[Gla-1]"} <= tokens
+
+
 def test_a_construct_marker_edit_is_not_scopable():
     assert derive_affected_tokens(_snapshot(), ["construct:w+"]) is None
 
@@ -2788,6 +2902,13 @@ def test_build_affected_query_escapes_regex_metacharacters():
     query = build_affected_query({"wg[Gla-1]"}, genotype_fields=("Genotype",))
     pattern = query["$or"][0]["Genotype"]["$regex"]
     assert r"\[" in pattern and r"\]" in pattern
+
+
+def test_build_affected_query_is_case_insensitive():
+    """Genotypes reach markers through the lowercase-normalised FlyBase alias
+    index, so 'sco' must match a sweep of 'Sco'."""
+    query = build_affected_query({"Sco"}, genotype_fields=("Genotype",))
+    assert query["$or"][0]["Genotype"]["$options"] == "i"
 
 
 def test_build_affected_query_covers_every_field():
@@ -2822,7 +2943,19 @@ import re
 UNSCOPABLE_KINDS = ("construct_marker",)
 
 
-def derive_affected_tokens(snapshot, keys, *, deleted_override_keys=()):
+def _own_tokens(document):
+    """Tokens by which a definition can appear in a genotype, from the
+    document alone -- no snapshot needed, so this also works for a pre-edit
+    document whose values no longer exist in the current catalog."""
+    match = (document or {}).get("match") or {}
+    payload = (document or {}).get("payload") or {}
+    tokens = {str(document.get("Key") or ""), str(match.get("symbol") or ""),
+              str(match.get("token") or ""), str(payload.get("value") or "")}
+    tokens.update(str(alias) for alias in (match.get("aliases") or []))
+    return {token for token in tokens if token}
+
+
+def derive_affected_tokens(snapshot, keys, *, previous_documents=(), deleted_override_keys=()):
     """Genotype substrings whose records must be recomputed for these key edits.
 
     Returns None when the change cannot be scoped and the caller must rebuild
@@ -2847,6 +2980,14 @@ def derive_affected_tokens(snapshot, keys, *, deleted_override_keys=()):
             return None
 
     tokens = set()
+    # Pre-edit documents first: a removed alias or a renamed symbol exists
+    # nowhere in the post-edit snapshot, so only the old document can tell us
+    # which genotypes just stopped resolving the way they used to.
+    for document in previous_documents or []:
+        if (document or {}).get("kind") in UNSCOPABLE_KINDS:
+            return None
+        tokens.update(_own_tokens(document))
+
     balancers = snapshot.get("balancers") or {}
     balancers_referencing = snapshot.get("balancers_referencing") or {}
     aliases_by_target = snapshot.get("aliases_by_target") or {}
@@ -2892,13 +3033,17 @@ def build_affected_query(tokens, *, genotype_fields):
         return None
 
     pattern = "|".join(re.escape(token) for token in tokens)
-    return {"$or": [{field: {"$regex": pattern}} for field in genotype_fields]}
+    # Case-insensitive on purpose: the resolver reaches markers through the
+    # lowercase-normalised FlyBase alias index, so a genotype spelling of
+    # "sco" resolves to sna[Sco] and must be swept when that row is edited.
+    return {"$or": [{field: {"$regex": pattern, "$options": "i"}}
+                    for field in genotype_fields]}
 ```
 
 - [ ] **Step 4: Run the tests**
 
 Run: `python -m pytest tests/test_marker_rebuild_scope.py -q -p no:cacheprovider`
-Expected: PASS (12 tests)
+Expected: PASS (15 tests)
 
 - [ ] **Step 5: Commit**
 
@@ -2920,9 +3065,9 @@ git commit -m "feat: derive rebuild scope from marker edits with reverse-referen
 **Interfaces:**
 - Consumes: `derive_affected_tokens`, `build_affected_query` (Task 12); `backfill_stock_phenotype_cache` / `backfill_cross_phenotype_cache` (`flymanager/utils/phenotypes/backfill.py`, both accept a `query=` passthrough via `backfill_materialized_cache`); `backfill_stock_standardization_cache` / `backfill_cross_standardization_cache`; `get_cached_*` staleness predicates; `marker_catalog.get_catalog()["signature"]`.
 - Produces:
-  - `rebuild_after_marker_change(db, keys, *, deleted_override_keys=()) -> dict` with keys `scope` (`"targeted"`/`"full"`), `tokens`, and per-collection `{rebuilt, stamped}` counts.
+  - `rebuild_after_marker_change(db, keys, *, previous_documents=(), deleted_override_keys=()) -> dict` with keys `scope` (`"targeted"`/`"full"`), `tokens`, and per-collection `{rebuilt, stamped}` counts.
   - `stamp_current_caches(collection, *, cache_field, cache_getter, signature, query=None) -> int`.
-  - `tasks.task_rebuild_marker_caches(key, username, *, keys, deleted_override_keys)`.
+  - `tasks.task_rebuild_marker_caches(key, username, *, keys, previous_documents=(), deleted_override_keys=())`.
 
 **The stamping risk, stated plainly:** after a targeted rebuild, records that were *not* affected but are otherwise current get the new signature written onto them without recomputation. Without this the next `force=False` backfill rebuilds the whole collection anyway and the targeting buys nothing. The cost is that a bug in `derive_affected_tokens` is permanently hidden instead of self-correcting on the next backfill. Mitigations: the reverse-reference closure test in Task 12, and the existing guarded force-recompute (typed phrase + 24h cooldown, `cache_force_refresh.py`) as the escape hatch.
 
@@ -2946,6 +3091,17 @@ def _apply_set(record, updates):
 ```
 
 Use `_apply_set(record, update.get("$set", {}))` in `update_one`, `find_one_and_update` and `bulk_write` in place of every `record.update(update.get("$set", {}))`.
+
+`_matches_operator_clause` also raises `NotImplementedError` on any operator it does not know, and Task 12's query pairs `$regex` with `$options: "i"`. Teach it that pair:
+
+```python
+        elif operator == "$regex":
+            flags = re.IGNORECASE if "i" in str(clause.get("$options", "")) else 0
+            if actual is None or not re.search(operand, str(actual), flags):
+                return False
+        elif operator == "$options":
+            continue  # consumed by the $regex branch above
+```
 
 And fix `_matches` so `$or`/`$and` combine with sibling keys instead of short-circuiting:
 
@@ -3078,7 +3234,21 @@ def test_a_construct_marker_edit_rebuilds_everything():
 
     assert result["scope"] == "full"
     assert result["stocks"]["rebuilt"] == 2
+    # Nothing left to stamp: the rebuild already wrote the new signature onto
+    # every record, and stamping skips caches that already carry it.
     assert result["stocks"]["stamped"] == 0
+
+
+def test_a_removed_balancer_alias_is_swept_when_the_prior_document_is_given():
+    db = _db([_stock("A", "w[1118]; Binsn/Y")])
+    _mutate_catalog_and_bump(db)
+    previous = {"Key": "Binsc", "kind": "balancer",
+                "match": {"symbol": "Binsc", "aliases": ["Binsn"]}}
+
+    result = rebuild_after_marker_change(db, ["Binsc"], previous_documents=[previous])
+
+    assert "Binsn" in result["tokens"]
+    assert result["stocks"]["rebuilt"] == 1
 
 
 def test_deleting_a_shipped_override_rebuilds_everything():
@@ -3149,6 +3319,9 @@ def stamp_current_caches(collection, *, cache_field, cache_getter, signature, qu
         cache = record.get(cache_field)
         if not isinstance(cache, dict):
             continue
+        if cache.get("markerCatalogSignature") == signature:
+            # Already current -- typically a record the rebuild just wrote.
+            continue
         probe = dict(record)
         probe[cache_field] = dict(cache, markerCatalogSignature=signature)
         if cache_getter(probe, strict=True) is None:
@@ -3163,7 +3336,7 @@ def stamp_current_caches(collection, *, cache_field, cache_getter, signature, qu
     return len(operations)
 
 
-def rebuild_after_marker_change(db, keys, *, deleted_override_keys=()):
+def rebuild_after_marker_change(db, keys, *, previous_documents=(), deleted_override_keys=()):
     """Recompute the caches a marker edit can affect, then stamp the rest.
 
     Runs after the catalog snapshot has already been refreshed, so
@@ -3183,6 +3356,7 @@ def rebuild_after_marker_change(db, keys, *, deleted_override_keys=()):
     snapshot = get_catalog()
     signature = snapshot["signature"]
     tokens = derive_affected_tokens(snapshot, keys,
+                                    previous_documents=previous_documents,
                                     deleted_override_keys=deleted_override_keys)
 
     result = {
@@ -3232,7 +3406,8 @@ Note the ordering: rebuild first (which writes fresh caches carrying the new sig
 In `flymanager/app/jobs/tasks.py`:
 
 ```python
-def task_rebuild_marker_caches(key, username, *, keys, deleted_override_keys=()):
+def task_rebuild_marker_caches(key, username, *, keys, previous_documents=(),
+                               deleted_override_keys=()):
     def work(app, db):
         from flymanager.utils.phenotypes.marker_catalog import refresh_catalog
         from flymanager.utils.phenotypes.marker_rebuild import \
@@ -3242,7 +3417,8 @@ def task_rebuild_marker_caches(key, username, *, keys, deleted_override_keys=())
         # worker must see the edit that triggered this job.
         refresh_catalog(db, force=True)
         summary = rebuild_after_marker_change(
-            db, keys, deleted_override_keys=deleted_override_keys)
+            db, keys, previous_documents=previous_documents,
+            deleted_override_keys=deleted_override_keys)
         write_activity(username, f"Rebuilt caches after marker change: {', '.join(keys) or 'catalog'}", db)
         return {
             "message": (
@@ -3260,7 +3436,7 @@ def task_rebuild_marker_caches(key, username, *, keys, deleted_override_keys=())
 - [ ] **Step 6: Run the tests**
 
 Run: `python -m pytest tests/test_marker_rebuild_execution.py tests/test_mongo_fakes.py tests/test_bulk_operations.py tests/test_phenotype_backfill.py tests/test_materialized_cache_errors.py -q -p no:cacheprovider`
-Expected: the new file PASSES (8 tests); the fakes-dependent files at baseline — the `_matches` and `$set` fixes are strictly more correct, so any new failure there is a test that was relying on the bug and needs its expectation examined, not the fix reverted.
+Expected: the new file PASSES (9 tests); the fakes-dependent files at baseline — the `_matches` and `$set` fixes are strictly more correct, so any new failure there is a test that was relying on the bug and needs its expectation examined, not the fix reverted.
 
 - [ ] **Step 7: Commit**
 
@@ -3437,12 +3613,15 @@ def test_delete_of_a_missing_key_is_404(db):
 
 
 def test_a_shipped_definition_cannot_be_edited_or_deleted_directly(db):
+    """Both paths go through _require_editable, which reports a shipped key as
+    409 ("create an override instead") rather than 404: the key does exist,
+    it is just not editable in place."""
     with pytest.raises(MarkerDefinitionError) as exc:
         update_marker_definition(db, "Sb", _definition("Sb"), username="admin")
     assert exc.value.status_code == 409
     with pytest.raises(MarkerDefinitionError) as delete_exc:
         delete_marker_definition(db, "Sb", username="admin")
-    assert delete_exc.value.status_code == 404
+    assert delete_exc.value.status_code == 409
 
 
 def test_list_merges_shipped_and_overlay_with_edit_flags(db):
@@ -3622,6 +3801,7 @@ def update_marker_definition(db, key, document, *, username):
     existing = _require_editable(db, key, username)
 
     candidate = dict(existing)
+    candidate.pop("_id", None)  # never $set the immutable _id on a real Mongo
     candidate.update(_normalized(document))
     candidate["Key"] = key
     errors = validate_definition(candidate)
@@ -3738,6 +3918,8 @@ git commit -m "feat: add marker definition CRUD with ownership and promotion"
 
 - [ ] **Step 1: Write the failing test**
 
+Note the autouse fixture below disables the Task 10 `before_request` hook: it closes over `flymanager.app.db` (the real client), not the blueprint's patched `db`, so left alone it silently recompiles the snapshot from real Mongo mid-request. Patch the name on the `marker_catalog` module, which is what `app/__init__.py` imports inside the hook.
+
 Create `tests/test_marker_routes.py`, following the `_make_app` pattern in `tests/test_phenotype_routes.py` (patch `flymanager.app.get_settings`, set the env vars, `app.config.update(TESTING=True)`), and patching `flymanager.app.routes.markers.db` with a `FakeDatabase`:
 
 ```python
@@ -3776,9 +3958,14 @@ def fake_db():
 
 
 @pytest.fixture(autouse=True)
-def _reset_catalog():
+def _reset_catalog(monkeypatch):
     marker_catalog.reset_catalog()
     marker_catalog.reset_refresh_state()
+    # The Task 10 before_request hook closes over the real module-global `db`,
+    # not the patched blueprint one, so without this it recompiles from the
+    # real Mongo and discards whatever the test installed.
+    monkeypatch.setattr(marker_catalog, "maybe_refresh_catalog",
+                        lambda db, **kwargs: None)
     yield
     marker_catalog.reset_catalog()
     marker_catalog.reset_refresh_state()
@@ -3920,7 +4107,14 @@ from flymanager.utils.phenotypes.marker_catalog import MARKER_KINDS, refresh_cat
 bp = Blueprint("markers", __name__)
 
 
-def _after_write(keys, *, deleted_override_keys=()):
+def _serializable(document):
+    """Drop the ObjectId so the document survives RQ's job serialisation."""
+    stripped = dict(document or {})
+    stripped.pop("_id", None)
+    return stripped
+
+
+def _after_write(keys, *, previous_documents=(), deleted_override_keys=()):
     """Refresh locally, then hand the cache rebuild to the worker.
 
     A queue conflict means a rebuild is already in flight; the definition
@@ -3940,6 +4134,7 @@ def _after_write(keys, *, deleted_override_keys=()):
             label="Marker catalog cache rebuild",
             func=job_tasks.task_rebuild_marker_caches,
             kwargs={"key": job_key, "username": username, "keys": list(keys),
+                    "previous_documents": list(previous_documents),
                     "deleted_override_keys": list(deleted_override_keys)},
         )
     except OperationLockConflict as exc:
@@ -4005,13 +4200,19 @@ def create_marker():
     _after_write([created["Key"]])
     if request.is_json:
         return jsonify({"status": "success", "key": created["Key"]}), 201
-    return redirect(url_for("markers.marker_detail", key=created["Key"])), 201
+    # Form path returns a plain 302; a 201 with a Location header is not
+    # followed by browsers.
+    return redirect(url_for("markers.marker_detail", key=created["Key"]))
 
 
 @bp.post("/markers/<path:key>")
 @login_required
 @limiter.limit("60 per hour")
 def update_marker(key):
+    # Captured before the write: an edit that removes an alias or renames a
+    # symbol leaves no trace of the old value in the new snapshot, and the
+    # rebuild scope has to sweep genotypes that used the old spelling.
+    previous = get_marker_definition(db, key)
     try:
         payload = get_json_payload() if request.is_json else request.form.to_dict()
         update_marker_definition(db, key, payload, username=session.get("username"))
@@ -4020,7 +4221,7 @@ def update_marker(key):
     except MarkerDefinitionError as exc:
         return _error_response(exc)
 
-    _after_write([key])
+    _after_write([key], previous_documents=[_serializable(previous)] if previous else ())
     if request.is_json:
         return jsonify({"status": "success", "key": key}), 200
     return redirect(url_for("markers.marker_detail", key=key))
@@ -4030,12 +4231,14 @@ def update_marker(key):
 @login_required
 @limiter.limit("60 per hour")
 def delete_marker(key):
+    previous = get_marker_definition(db, key)
     try:
         result = delete_marker_definition(db, key, username=session.get("username"))
     except MarkerDefinitionError as exc:
         return _error_response(exc)
 
     _after_write([key],
+                 previous_documents=[_serializable(previous)] if previous else (),
                  deleted_override_keys=[key] if result["restored_shipped"] else ())
     if request.is_json:
         return jsonify({"status": "success", **result}), 200
@@ -4186,7 +4389,10 @@ git commit -m "feat: add the marker catalog UI and write routes"
 
 **Files:**
 - Modify: `flymanager/utils/phenotypes/data/balancer_ingest.py:393-405`
+- Modify: `flymanager/utils/constraints/balancer_selection.py:20-48`
 - Test: `tests/test_balancer_ingest_catalog.py`
+
+**The trap the spec did not spell out:** `_candidate_documents` merges the `balancer_definitions` collection in, and `breakpoint_regions` / `breakpoint_text` come **only** from those documents — `_breakpoint_assessment` (`balancer_selection.py:71-72`) reads them, and they are surfaced in the result at `:184-185`. Deleting the staging read without carrying those fields into the catalog row silently degrades breakpoint-aware balancer scoring to the "no gene cytology" fallback. So the catalog `balancer` payload gains `breakpoint_regions` and `breakpoint_text`, and only then does the staging read go.
 
 **Interfaces:**
 - Consumes: `marker_catalog`, `bump_marker_catalog_revision`.
@@ -4303,6 +4509,10 @@ def _catalog_row_from_balancer(document):
         "chromosome": document.get("chromosome"),
         "default_markers": list(document.get("default_markers") or []),
         "notes": list(document.get("notes") or []),
+        # Carried so balancer_selection keeps breakpoint-aware scoring once it
+        # stops reading the balancer_definitions staging collection.
+        "breakpoint_regions": list(document.get("breakpoint_regions") or []),
+        "breakpoint_text": document.get("breakpoint_text", ""),
     }
     return {
         "Key": symbol,
@@ -4346,20 +4556,72 @@ def _upsert_catalog_balancers(db, balancers):
 
 and call it from `ingest_balancer_definitions` just before the return, adding `"catalog_rows": _upsert_catalog_balancers(db, balancers)` to the returned summary.
 
-- [ ] **Step 4: Run the tests**
+- [ ] **Step 4: Stop reading the staging collection at resolution time**
+
+In `flymanager/utils/constraints/balancer_selection.py`, delete the whole `balancer_definitions` block from `_candidate_documents` (the `get_collection(db, "balancer_definitions")` loop and its `hydrated` merge), leaving only the catalog loop from Task 5:
+
+```python
+def _candidate_documents(chromosome, db):
+    """Balancer candidates for a chromosome, from the marker catalog.
+
+    The balancer_definitions collection is an ingestion staging area only; its
+    contents reach here as catalog rows written by ingest_balancer_definitions,
+    so it is no longer read at resolution time.
+    """
+    candidates = {}
+    for symbol, metadata in get_balancer_metadata_map().items():
+        if metadata.get("chromosome") != chromosome:
+            continue
+        candidates[symbol] = metadata
+    return list(candidates.values())
+```
+
+`db` is now unused by this function; keep the parameter (its callers pass it positionally) and note that in the docstring, or thread the removal through the call sites — do not change the signature halfway.
+
+Add the test that this actually kept working:
+
+```python
+def test_breakpoint_data_survives_the_move_to_the_catalog():
+    db = FakeDatabase({"balancer_definitions": [], "marker_definitions": [],
+                       "settings": [{}]})
+    report = _report()
+    report["definitions"]["balancers"][0]["breakpoint_regions"] = ["61A", "89E"]
+    report["definitions"]["balancers"][0]["breakpoint_text"] = "In(3LR)61A;89E"
+    ingest_balancer_definitions(db, report)
+    marker_catalog.refresh_catalog(db, force=True)
+
+    candidate = next(c for c in _candidate_documents(3, db) if c["symbol"] == "ZZ7")
+    assert candidate["breakpoint_regions"] == ["61A", "89E"]
+    assert candidate["breakpoint_text"] == "In(3LR)61A;89E"
+
+
+def test_the_staging_collection_is_no_longer_read():
+    """A row present only in balancer_definitions must not reach scoring."""
+    db = FakeDatabase({
+        "balancer_definitions": [{"symbol": "STALE", "chromosome": 3}],
+        "marker_definitions": [], "settings": [{}]})
+    marker_catalog.refresh_catalog(db, force=True)
+    assert "STALE" not in {c.get("symbol") for c in _candidate_documents(3, db)}
+```
+
+Without the second test, `test_the_ingested_balancer_resolves_through_the_catalog` passes vacuously — ZZ7 would arrive via the staging read even if the catalog path were broken.
+
+- [ ] **Step 5: Run the tests**
 
 Run: `python -m pytest tests/test_balancer_ingest_catalog.py tests/test_phase0_phase1_ingestion.py tests/test_constraints.py -q -p no:cacheprovider`
-Expected: the new file PASSES (5 tests); the others at baseline.
+Expected: the new file PASSES (7 tests); the others at baseline.
 
-- [ ] **Step 5: Run the full suite one final time**
+- [ ] **Step 6: Run the full suite one final time**
 
 Run the full command from Global Constraints.
 Expected: baseline failure count. Investigate every new failure before committing.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add flymanager/utils/phenotypes/data/balancer_ingest.py tests/test_balancer_ingest_catalog.py
+git add flymanager/utils/phenotypes/data/balancer_ingest.py \
+        flymanager/utils/constraints/balancer_selection.py \
+        tests/test_balancer_ingest_catalog.py
 git commit -m "feat: mirror ingested balancer definitions into the marker catalog"
 ```
 
