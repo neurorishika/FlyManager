@@ -3,37 +3,26 @@ import os
 import re
 from pathlib import Path
 
+from flymanager.utils.phenotypes.marker_catalog import get_catalog
+
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_IMAGE_LIBRARY_PATH = REPO_ROOT / "data" / "phenotype_images"
 DEFAULT_MANIFEST_FILENAME = "manifest.json"
 
-PHENOTYPE_IMAGE_ALIASES = {
-    "B": ["bar", "b"],
-    "Bar": ["bar", "b"],
-    "Cy": ["cy", "cyo"],
-    "D": ["d", "dichaete"],
-    "Dr": ["dr"],
-    "Dr_Mio": ["drmio", "mio"],
-    "Hu": ["hu"],
-    "Kr_If": ["if"],
-    "L": ["l", "lobe"],
-    "l2me_1": ["me"],
-    "amos_Roi": ["roi", "roughoid"],
+# The one phenotype key with no marker definition behind it: epistasis.py
+# mints it at runtime for the mini-white-rescues-white rule. Epistasis rules
+# stay in Python (see the spec's Out of scope), so its image aliases stay here.
+EPISTASIS_IMAGE_ALIASES = {
     "epistasis:w_mini_white_rescue": ["miniwhite", "mini-white", "wplus", "w+"],
-    "PPO1_Bc": ["bc"],
-    "Sb": ["sb", "sb1"],
-    "Ser": ["ser", "ser1"],
-    "Tb": ["tb"],
-    "Ubx": ["ubx"],
-    "wg_Gla": ["gla"],
-    "wg_Sp": ["sp"],
-    "wa": ["wa", "whiteapricot", "white-apricot"],
-    "mini_white": ["w+", "wplus", "miniwhite", "mini-white"],
-    "w_loss": ["w-", "wminus", "w", "white"],
-    "y_plus": ["y+", "yplus", "y"],
-    "v_plus": ["v+", "vplus", "v"],
 }
+
+
+def _phenotype_image_aliases():
+    aliases = dict(get_catalog()["image_aliases"])
+    aliases.update(EPISTASIS_IMAGE_ALIASES)
+    return aliases
+
 
 BODY_PART_ALIASES = {
     "wing": {"wing", "wings"},
@@ -166,8 +155,9 @@ def _marker_aliases(marker):
         normalized = _normalize_key(marker.get(field))
         if normalized:
             aliases.add(normalized)
+    alias_table = _phenotype_image_aliases()
     for lookup_key in (marker.get("phenotype_key"), marker.get("display_label")):
-        for alias in PHENOTYPE_IMAGE_ALIASES.get(str(lookup_key), []):
+        for alias in alias_table.get(str(lookup_key), []):
             normalized = _normalize_key(alias)
             if normalized:
                 aliases.add(normalized)
