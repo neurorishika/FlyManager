@@ -100,6 +100,11 @@ def validate_definition(document):
     if kind == "construct_marker" and not isinstance(payload.get("overrides", {}), dict):
         errors.append("construct_marker payload.overrides must be an object")
 
+    try:
+        json.dumps(document, sort_keys=True)
+    except (TypeError, ValueError):
+        errors.append("definition contains values that are not JSON-serializable")
+
     return errors
 
 
@@ -325,20 +330,19 @@ def read_catalog_revision(db):
 
 
 def _overlay_documents(db):
-    """Fetch overlay documents with BSON types normalized out.
+    """Fetch overlay documents, dropping the Mongo _id.
 
-    compute_marker_catalog_signature serializes with default=str, so a
-    stray ObjectId or datetime would be stringified into the signature and
-    churn it on every read -- invalidating every materialized cache in the
-    collection for no real change. Dropping _id and coercing the rest via
-    the same JSON round-trip the signature uses keeps the snapshot to plain
-    JSON types.
+    _id is excluded from the signature anyway, and carrying an ObjectId into
+    the compiled snapshot serves no purpose. Everything else is passed
+    through as stored: a document holding values that are not JSON types is
+    invalid, and validate_definition rejects it so compile_catalog can
+    record it in invalid_definitions rather than silently altering it.
     """
     documents = []
     for document in db[MARKER_DEFINITIONS_COLLECTION].find({}):
         document = dict(document)
         document.pop("_id", None)
-        documents.append(json.loads(json.dumps(document, default=str)))
+        documents.append(document)
     return documents
 
 

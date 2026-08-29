@@ -110,9 +110,11 @@ def test_reading_the_revision_never_writes_to_settings():
     assert db["settings"].count_documents({}) == 0
 
 
-def test_bson_values_do_not_churn_the_signature():
-    """A stray ObjectId must not make every read look like a content change,
-    which would invalidate every materialized cache in the collection."""
+def test_a_document_with_bson_values_is_rejected_not_silently_altered():
+    """A stray ObjectId in a payload is invalid data. Skipping it keeps the
+    signature stable (so it cannot churn every materialized cache) and
+    records it as invalid so the /markers UI can show it, rather than
+    silently serving a marker that differs from what is stored."""
     from bson import ObjectId
 
     def build():
@@ -121,7 +123,20 @@ def test_bson_values_do_not_churn_the_signature():
                  revision=1)
         marker_catalog.reset_catalog()
         marker_catalog.reset_refresh_state()
-        return marker_catalog.refresh_catalog(db)["signature"]
+        return marker_catalog.refresh_catalog(db)
 
     first, second = build(), build()
-    assert first == second
+    assert first["signature"] == second["signature"]
+    assert "zz" not in first["gene_markers"]
+    assert [entry["Key"] for entry in first["invalid_definitions"]] == ["zz"]
+
+
+def test_a_clean_overlay_document_still_compiles_with_an_objectid_present():
+    """Only the offending value is a problem -- a normal document that merely
+    carries a Mongo _id must still compile."""
+    from bson import ObjectId
+
+    db = _db([dict(USER_MARKER, _id=ObjectId())], revision=1)
+    snapshot = marker_catalog.refresh_catalog(db)
+    assert snapshot["gene_markers"]["zz"]["effect"] == "zigzag wings"
+    assert snapshot["invalid_definitions"] == []
