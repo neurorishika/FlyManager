@@ -1,15 +1,37 @@
 import re
 
+from flymanager.utils.phenotypes.marker_catalog import get_catalog
 from flymanager.utils.phenotypes.visual_markers import get_visual_marker
 
-CONSTRUCT_MARKER_RE = re.compile(r"(?P<stem>[wyv])\[(?P<allele>\+[^\]]*)\]")
 CONSTRUCT_PREFIX_RE = re.compile(r"^(?P<kind>[A-Za-z0-9]+)\{")
 
 
+def construct_marker_pattern():
+    """Regex matching any catalogued construct-marker stem plus its allele prefix.
+
+    Built per call from the catalog rather than frozen at import, so a
+    user-defined construct marker is matched as soon as it is saved. Stems are
+    sorted longest-first so a longer stem is never shadowed by a prefix of it.
+    """
+    entries = get_catalog()["construct_markers"]
+    if not entries:
+        return None
+    alternatives = "|".join(
+        re.escape(stem) for stem in sorted(entries, key=len, reverse=True) if stem
+    )
+    if not alternatives:
+        return None
+    return re.compile(rf"(?P<stem>{alternatives})\[(?P<allele>\+[^\]]*)\]")
+
+
 def extract_construct_marker_symbols(construct_token):
+    pattern = construct_marker_pattern()
+    if pattern is None:
+        return []
+
     markers = []
     seen = set()
-    for match in CONSTRUCT_MARKER_RE.finditer(construct_token or ""):
+    for match in pattern.finditer(construct_token or ""):
         symbol = match.group("stem")
         allele = match.group("allele")
         key = (symbol, allele)
@@ -22,6 +44,7 @@ def extract_construct_marker_symbols(construct_token):
 
 def extract_construct_markers(construct_token):
     construct_markers = []
+    entries = get_catalog()["construct_markers"]
     construct_type_match = CONSTRUCT_PREFIX_RE.match(construct_token or "")
     construct_type = construct_type_match.group("kind") if construct_type_match else "construct"
 
@@ -32,35 +55,9 @@ def extract_construct_markers(construct_token):
         if base_marker is None:
             continue
 
-        if stem == "w":
-            base_marker.update(
-                {
-                    "dominance": "dominant",
-                    "display_label": "mini-white",
-                    "effect": "pigmented eyes from construct marker",
-                    "phenotype_key": "mini_white",
-                    "mini_white": True,
-                }
-            )
-        elif stem == "y":
-            base_marker.update(
-                {
-                    "dominance": "dominant",
-                    "display_label": "y+",
-                    "effect": "yellow rescue marker",
-                    "phenotype_key": "y_plus",
-                }
-            )
-        elif stem == "v":
-            base_marker.update(
-                {
-                    "body_part": "eye",
-                    "dominance": "dominant",
-                    "display_label": "v+",
-                    "effect": "vermilion rescue marker",
-                    "phenotype_key": "v_plus",
-                }
-            )
+        overrides = (entries.get(stem) or {}).get("overrides") or {}
+        if overrides:
+            base_marker.update(overrides)
 
         base_marker.update(
             {
