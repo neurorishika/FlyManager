@@ -2051,7 +2051,10 @@ def test_a_user_marker_contributes_its_image_aliases():
 
     aliases = image_library._marker_aliases({"phenotype_key": "zz", "display_label": "zz"})
     assert "zigzag" in aliases
-    assert "zzwing" in aliases
+    # _normalize_key maps "-" to "minus" (and "+" to "plus"), so "zz-wing"
+    # normalizes to "zzminuswing", not "zzwing". That is pre-existing behaviour:
+    # the shipped mini_white entry works around it by listing both spellings.
+    assert "zzminuswing" in aliases
 
 
 def test_legacy_alias_table_is_gone():
