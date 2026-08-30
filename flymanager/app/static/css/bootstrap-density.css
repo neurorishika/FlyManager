@@ -28,6 +28,21 @@
     --placeholder-color-focus: var(--muted-text);
 }
 
+/* Tagify's suggestion dropdown reads its colours from :root vars that
+   tagify.css hard-codes to white/black. The .tagify block above only
+   themes the tags themselves, so the dropdown stayed light-on-white and
+   ignored the dark theme entirely. */
+:root {
+    --tagify-dd-bg-color: var(--card-bg);
+    --tagify-dd-text-color: var(--text-color);
+    --tagify-dd-color-primary: var(--accent-color);
+}
+
+.tagify__dropdown__wrapper {
+    border-color: var(--border-color);
+    box-shadow: var(--surface-shadow);
+}
+
 label {
     font-weight: 600;
 }

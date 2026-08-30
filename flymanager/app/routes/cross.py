@@ -868,6 +868,8 @@ def view_cross(unique_id):
                     parent_phenotypes=parent_phenotypes,
                     predicted_offspring=predicted_offspring,
                     phenotype_cache_meta=phenotype_cache_meta,
+                    can_edit_record=can_edit_record,
+                    direct_reports=direct_reports,
                     error=error_message,
                     message="No changes detected.",
                 )

@@ -249,7 +249,9 @@ def test_stock_view_renders_assigned_record_read_only(monkeypatch):
     assert response.status_code == 200
     assert "Owner & Maintainer" in page
     assert "Owned by lead" in page
-    assert 'id="enableEditBtn"' not in page
+    # The per-field edit buttons are always rendered and disabled client-side;
+    # the server-gated signal that this viewer cannot edit is the Save button.
+    assert 'id="saveTopBtn"' not in page
 
 
 def test_cross_view_renders_assigned_record_read_only(monkeypatch):

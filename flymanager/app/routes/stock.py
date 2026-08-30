@@ -1414,6 +1414,8 @@ def view_stock(unique_id):
                     species_list=species_list,
                     stock_data=stock_data,
                     stock_phenotype=stock_phenotype,
+                    can_edit_record=can_edit_record,
+                    direct_reports=direct_reports,
                     error=error_message,
                 )
 

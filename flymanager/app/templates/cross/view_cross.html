@@ -1,5 +1,9 @@
 {% extends 'base.html' %}
 
+{% block head %}
+<link href="{{ url_for('static', filename='vendor/tagify/tagify.css') }}" rel="stylesheet" type="text/css" />
+{% endblock %}
+
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/view_cross.css') }}">
 {% endblock %}
@@ -212,7 +216,7 @@
                     <div class="input-group">
                         <input type="text" class="form-control" id="maleUniqueID" name="maleUniqueID" disabled>
                         <div class="input-group-append">
-                            <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-secondary app-field-edit" data-edit-target="maleUniqueID" aria-label="Edit Male Unique ID"><i class="fas fa-edit"></i></button>
                         </div>
                     </div>
                 </div>
@@ -221,7 +225,7 @@
                     <div class="input-group">
                         <input type="text" id="maleGenotype" name="maleGenotype" class="form-control tag-input">
                         <div class="input-group-append">
-                            <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-secondary app-field-edit" data-edit-target="maleGenotype" aria-label="Edit Male Genotype"><i class="fas fa-edit"></i></button>
                         </div>
                     </div>
                 </div>
@@ -235,7 +239,7 @@
                     <div class="input-group">
                         <input type="text" class="form-control" id="femaleUniqueID" name="femaleUniqueID" disabled>
                         <div class="input-group-append">
-                            <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-secondary app-field-edit" data-edit-target="femaleUniqueID" aria-label="Edit Female Unique ID"><i class="fas fa-edit"></i></button>
                         </div>
                     </div>
                 </div>
@@ -244,7 +248,7 @@
                     <div class="input-group">
                         <input type="text" id="femaleGenotype" name="femaleGenotype" class="form-control tag-input">
                         <div class="input-group-append">
-                            <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-secondary app-field-edit" data-edit-target="femaleGenotype" aria-label="Edit Female Genotype"><i class="fas fa-edit"></i></button>
                         </div>
                     </div>
                 </div>
@@ -270,7 +274,7 @@
                             <option value="No longer maintained">No longer maintained</option>
                         </select>
                         <div class="input-group-append">
-                            <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-secondary app-field-edit" data-edit-target="status" aria-label="Edit Status"><i class="fas fa-edit"></i></button>
                         </div>
                     </div>
                 </div>
@@ -282,7 +286,7 @@
                     <div class="input-group">
                         <input type="text" id="foodType" name="foodType" class="form-control tag-input">
                         <div class="input-group-append">
-                            <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-secondary app-field-edit" data-edit-target="foodType" aria-label="Edit Food Type"><i class="fas fa-edit"></i></button>
                         </div>
                     </div>
                 </div>
@@ -291,7 +295,7 @@
                     <div class="input-group">
                         <input type="text" class="form-control" id="name" name="name" disabled>
                         <div class="input-group-append">
-                            <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-secondary app-field-edit" data-edit-target="name" aria-label="Edit Cross Name"><i class="fas fa-edit"></i></button>
                         </div>
                     </div>
                 </div>
@@ -302,7 +306,7 @@
                 <div class="input-group">
                     <textarea class="form-control" id="comments" name="comments" rows="3" disabled></textarea>
                     <div class="input-group-append">
-                        <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                        <button type="button" class="btn btn-secondary app-field-edit" data-edit-target="comments" aria-label="Edit Comments"><i class="fas fa-edit"></i></button>
                     </div>
                 </div>
             </div>
@@ -313,7 +317,7 @@
                     <div class="input-group">
                         <input type="number" class="form-control" id="vialLifetime" name="vialLifetime">
                         <div class="input-group-append">
-                            <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-secondary app-field-edit" data-edit-target="vialLifetime" aria-label="Edit Vial Lifetime (days)"><i class="fas fa-edit"></i></button>
                         </div>
                     </div>
                 </div>
@@ -322,7 +326,7 @@
                     <div class="input-group">
                         <input type="number" class="form-control" id="flipFrequency" name="flipFrequency">
                         <div class="input-group-append">
-                            <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-secondary app-field-edit" data-edit-target="flipFrequency" aria-label="Edit Flip Frequency (days)"><i class="fas fa-edit"></i></button>
                         </div>
                     </div>
                 </div>
@@ -331,7 +335,7 @@
                     <div class="input-group">
                         <input type="number" class="form-control" id="developmentalTime" name="developmentalTime">
                         <div class="input-group-append">
-                            <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-secondary app-field-edit" data-edit-target="developmentalTime" aria-label="Edit Mating->Virgin Adult (days)"><i class="fas fa-edit"></i></button>
                         </div>
                     </div>
                 </div>
@@ -340,7 +344,7 @@
                     <div class="input-group">
                         <input type="number" class="form-control" id="maxCrossLifetime" name="maxCrossLifetime">
                         <div class="input-group-append">
-                            <button type="button" class="btn btn-secondary"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-secondary app-field-edit" data-edit-target="maxCrossLifetime" aria-label="Edit Max Cross Lifetime (days)"><i class="fas fa-edit"></i></button>
                         </div>
                     </div>
                 </div>
@@ -488,7 +492,7 @@
 {% block scripts %}
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.min.js') }}"></script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.polyfills.min.js') }}"></script>
-<link href="{{ url_for('static', filename='vendor/tagify/tagify.css') }}" rel="stylesheet" type="text/css" />
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/field_edit.js') }}"></script>
 <script nonce="{{ csp_nonce }}">
     document.addEventListener("DOMContentLoaded", function() {
 
@@ -521,27 +525,27 @@
         return instance;
     }
     
-    // Initialize Tagify for Male and Female Genotypes
-    let tagifyMaleGenotype = createTagifyInstance('#maleGenotype', null, {
-        whitelist: {{ genotypes | tojson }},
-        maxTags: 1,
-        delimiters: null
-    }, [], true);
+    const TAG_FIELD_CONFIG = {
+        maleGenotype: { whitelist: {{ genotypes | tojson }}, maxTags: 1, delimiters: null },
+        femaleGenotype: { whitelist: {{ genotypes | tojson }}, maxTags: 1, delimiters: null },
+        foodType: { whitelist: {{ food_types | tojson }}, maxTags: 1 }
+    };
 
-    let tagifyFemaleGenotype = createTagifyInstance('#femaleGenotype', null, {
-        whitelist: {{ genotypes | tojson }},
-        maxTags: 1,
-        delimiters: null
-    }, [], true);
+    function storedValues(fieldId) {
+        switch (fieldId) {
+            case 'maleGenotype': return [crossData.maleGenotype];
+            case 'femaleGenotype': return [crossData.femaleGenotype];
+            case 'foodType': return [crossData.foodType];
+            default: return [];
+        }
+    }
 
-    let tagifyFoodType = createTagifyInstance('#foodType', null, {
-        whitelist: {{ food_types | tojson }},
-        maxTags: 1
-    }, [], true);
-
-    // Disable all edit-form input fields by default
-    document.querySelectorAll('#crossViewForm input:not(.tag-input), #crossViewForm textarea, #crossViewForm select').forEach(input => {
-        input.disabled = true;
+    // Tagify instances keyed by the id of the input they wrap, so a single
+    // field can be rebuilt in writable mode without touching the others.
+    const tagifyInstances = {};
+    Object.keys(TAG_FIELD_CONFIG).forEach(fieldId => {
+        tagifyInstances[fieldId] = createTagifyInstance(
+            '#' + fieldId, null, TAG_FIELD_CONFIG[fieldId], [], true);
     });
 
     // Populate the form with cross data
@@ -572,15 +576,11 @@
             }
         }
 
-        // Populate genotypes for Male and Female
-        tagifyMaleGenotype.removeAllTags();
-        tagifyMaleGenotype.addTags([crossData.maleGenotype]);
-        tagifyFemaleGenotype.removeAllTags();
-        tagifyFemaleGenotype.addTags([crossData.femaleGenotype]);
-
-        // Populate food type
-        tagifyFoodType.removeAllTags();
-        tagifyFoodType.addTags([crossData.foodType]);
+        // Populate the tag-backed fields from the stored record
+        Object.keys(TAG_FIELD_CONFIG).forEach(fieldId => {
+            tagifyInstances[fieldId].removeAllTags();
+            tagifyInstances[fieldId].addTags(storedValues(fieldId));
+        });
         
         // Set species values (with default fallback)
         document.getElementById('maleSpecies').value = crossData.maleSpecies || "D. melanogaster";
@@ -615,64 +615,19 @@
         }
     }
 
-    // Make fields editable when "Edit" button is clicked
-    const editButtons = document.querySelectorAll('.input-group-append button');
-    if (!canEditRecord) {
-        editButtons.forEach(button => {
-            button.disabled = true;
-        });
-    }
-
-    editButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            if (!canEditRecord) {
-                return;
-            }
-
-            const inputField = this.closest('.input-group').querySelector('input, textarea, select');
-
-            if (inputField && inputField.classList.contains('tag-input')) {
-        
-                if (inputField.id === 'maleGenotype') {
-                    tagifyMaleGenotype = createTagifyInstance('#maleGenotype', tagifyMaleGenotype, {
-                        whitelist: {{ genotypes | tojson }},
-                        maxTags: 1,
-                        delimiters: null
-                    }, getTagifyValues(tagifyMaleGenotype, [crossData.maleGenotype]), false);
-                } else if (inputField.id === 'femaleGenotype') {
-                    tagifyFemaleGenotype = createTagifyInstance('#femaleGenotype', tagifyFemaleGenotype, {
-                        whitelist: {{ genotypes | tojson }},
-                        maxTags: 1,
-                        delimiters: null
-                    }, getTagifyValues(tagifyFemaleGenotype, [crossData.femaleGenotype]), false);
-                } else if (inputField.id === 'foodType') {
-                    tagifyFoodType = createTagifyInstance('#foodType', tagifyFoodType, {
-                        whitelist: {{ food_types | tojson }},
-                        maxTags: 1
-                    }, getTagifyValues(tagifyFoodType, [crossData.foodType]), false);
-                }
-
-            } else {
-                inputField.disabled = false;  // Enable normal input fields
-            }
-
-            this.disabled = true;  // Disable the "Edit" button
-        });
-    });
-
-    // Confirm before submitting the form
-    document.getElementById('crossViewForm').addEventListener('submit', function(event) {
-        if (!canEditRecord) {
-            return;
-        }
-
-        if (!confirm('Are you sure you want to submit the changes?')) {
-            event.preventDefault();  // Prevent form submission if user cancels
-        } else {
-            // Re-enable all input fields before submitting
-            document.querySelectorAll('#crossViewForm input, #crossViewForm textarea, #crossViewForm select').forEach(input => {
-                input.disabled = false;
-            });
+    initFieldEdit({
+        form: document.getElementById('crossViewForm'),
+        canEdit: canEditRecord,
+        confirmMessage: 'Are you sure you want to submit the changes?',
+        onTagEdit: function(field) {
+            const existing = tagifyInstances[field.id];
+            tagifyInstances[field.id] = createTagifyInstance(
+                '#' + field.id,
+                existing,
+                TAG_FIELD_CONFIG[field.id],
+                getTagifyValues(existing, storedValues(field.id)),
+                false
+            );
         }
     });
 });

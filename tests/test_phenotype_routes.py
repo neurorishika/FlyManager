@@ -369,7 +369,17 @@ def test_stock_view_route_renders_phenotype_preview(monkeypatch, tmp_path):
     assert "Refreshing this stock phenotype cache..." in body
     assert "field.classList.contains('tag-input')" in body
     assert "element.removeAttribute('disabled');" in body
-    assert "initializeTagify(true);" not in body
+    # Editing is per-field: every editable control ships an edit button that
+    # unlocks just that control, driven by the shared field_edit.js module.
+    # There is no page-wide "enable editing" mode.
+    assert "/static/js/field_edit.js" in body
+    assert 'data-edit-target="genotypeX"' in body
+    assert 'data-edit-target="sourceID"' in body
+    assert 'id="enableEditBtn"' not in body
+    # tagify.css must load in <head>, before bootstrap-density.css, or
+    # tagify's own light-theme defaults win and the tags go unreadable in
+    # dark mode.
+    assert body.index("vendor/tagify/tagify.css") < body.index("css/bootstrap-density.css")
 
 
 def test_old_stock_phenotype_image_route_is_retired(monkeypatch):
@@ -1092,6 +1102,14 @@ def test_cross_view_route_renders_parent_and_offspring_phenotypes(monkeypatch, t
     assert re.search(r'id="femaleGenotype"[^>]*disabled', body) is None
     assert re.search(r'id="foodType"[^>]*disabled', body) is None
     assert "input._tagify" not in body
+    # Same per-field edit contract as the stock viewer (shared field_edit.js).
+    assert "/static/js/field_edit.js" in body
+    assert 'data-edit-target="maleGenotype"' in body
+    assert 'data-edit-target="comments"' in body
+    # tagify.css must load in <head>, before bootstrap-density.css, or
+    # tagify's own light-theme defaults win and the tags go unreadable in
+    # dark mode.
+    assert body.index("vendor/tagify/tagify.css") < body.index("css/bootstrap-density.css")
 
 
 def test_stock_refresh_route_skips_duplicate_refresh(monkeypatch):
