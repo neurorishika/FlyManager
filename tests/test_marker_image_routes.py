@@ -75,6 +75,55 @@ def test_image_routes_require_login_and_validate_marker(monkeypatch):
         assert response.status_code == 404
 
 
+def test_serving_route_returns_304_when_the_client_revalidates(monkeypatch):
+    """The immutable cache header is only half of it.
+
+    Without conditional=True the ETag is set but never honoured, so every
+    revalidating client re-downloads the bytes.
+    """
+    app = _app(monkeypatch)
+    shipped = db["marker_images"].find_one({"origin": "shipped"})
+    assert shipped
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["username"] = "image-test-user"
+
+        first = client.get(f"/markers/images/{shipped['imageId']}")
+        assert first.status_code == 200
+        assert len(first.data) > 0
+
+        again = client.get(f"/markers/images/{shipped['imageId']}",
+                           headers={"If-None-Match": first.headers["ETag"]})
+        assert again.status_code == 304
+        assert not again.data
+
+
+def test_oversized_upload_flashes_on_markers_but_not_elsewhere(monkeypatch):
+    """MAX_CONTENT_LENGTH is 8MB app-wide, so the 413 handler is global.
+
+    It must stay out of the way outside this blueprint: a large data import
+    should not be told about a 2MB image limit or redirected.
+    """
+    app = _app(monkeypatch)
+    app.config["MAX_CONTENT_LENGTH"] = 2048
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["username"] = "image-test-user"
+        payload = b"x" * 8192
+
+        on_markers = client.post(
+            "/markers/Sb/images",
+            data={"image": (io.BytesIO(payload), "big.png")},
+            content_type="multipart/form-data")
+        assert on_markers.status_code == 302
+
+        elsewhere = client.post(
+            "/data/upload",
+            data={"file": (io.BytesIO(payload), "big.xlsx")},
+            content_type="multipart/form-data")
+        assert elsewhere.status_code == 413
+
+
 def test_non_admin_cannot_delete_shipped_image(monkeypatch):
     app = _app(monkeypatch)
     shipped = db["marker_images"].find_one({"origin": "shipped"})
