@@ -84,10 +84,68 @@ def _apply_inc(record, increments):
         _apply_inc(target, {tail: amount})
 
 
+def _array_at(record, field):
+    """Resolve a dotted path to (container, key), creating dicts on the way."""
+    head, _, tail = field.partition(".")
+    if not tail:
+        return record, head
+    target = record.setdefault(head, {})
+    if not isinstance(target, dict):
+        target = {}
+        record[head] = target
+    return _array_at(target, tail)
+
+
+def _apply_add_to_set(record, additions):
+    """Apply $addToSet; appends only when absent, like real Mongo."""
+    for field, value in (additions or {}).items():
+        container, key = _array_at(record, field)
+        values = list(container.get(key) or [])
+        if value not in values:
+            values.append(value)
+        container[key] = values
+
+
+def _apply_pull(record, removals):
+    """Apply $pull for scalar equality matches."""
+    for field, value in (removals or {}).items():
+        container, key = _array_at(record, field)
+        container[key] = [
+            item for item in (container.get(key) or []) if item != value
+        ]
+
+
+SUPPORTED_UPDATE_OPERATORS = {"$set", "$inc", "$addToSet", "$pull"}
+
+
+def _reject_unsupported_operators(update):
+    """Fail loudly on an operator the fake cannot model.
+
+    Silently ignoring one turns a broken production write into a green test.
+    """
+    unsupported = {
+        key for key in (update or {})
+        if key.startswith("$") and key not in SUPPORTED_UPDATE_OPERATORS
+    }
+    if unsupported:
+        raise NotImplementedError(
+            f"FakeCollection does not implement {sorted(unsupported)}; "
+            "add it to _apply_update rather than letting the write vanish."
+        )
+
+
 def _apply_update(record, update):
-    """Apply the subset of update operators this fake supports."""
+    """Apply the subset of update operators this fake supports.
+
+    Any operator used by production code MUST be handled here. An unhandled
+    operator is silently dropped, which makes a broken write look like a
+    passing test -- that is how a no-op $inc revision bump and a no-op
+    $addToSet both reached review.
+    """
     _apply_set(record, update.get("$set", {}))
     _apply_inc(record, update.get("$inc", {}))
+    _apply_add_to_set(record, update.get("$addToSet", {}))
+    _apply_pull(record, update.get("$pull", {}))
 
 
 class FakeCursor:
@@ -194,14 +252,15 @@ class FakeCollection:
         return SimpleNamespace(inserted_ids=list(range(len(documents))))
 
     def update_one(self, query, update, upsert=False):
+        _reject_unsupported_operators(update)
         for record in self._records:
             if _matches(record, query):
-                _apply_set(record, update.get("$set", {}))
+                _apply_update(record, update)
                 return SimpleNamespace(matched_count=1, modified_count=1, upserted_id=None)
         if upsert:
             # Insert a new document with the update
             new_doc = dict(query)
-            _apply_set(new_doc, update.get("$set", {}))
+            _apply_update(new_doc, update)
             self._records.append(new_doc)
             return SimpleNamespace(matched_count=0, modified_count=0, upserted_id=len(self._records))
         return SimpleNamespace(matched_count=0, modified_count=0, upserted_id=None)
