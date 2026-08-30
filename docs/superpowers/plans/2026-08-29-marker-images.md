@@ -19,6 +19,54 @@ pytest.
 
 **Spec:** `docs/superpowers/specs/2026-08-29-marker-images-design.md`
 
+## Verified Facts About This Codebase
+
+Every line below was checked against the code at `697ab49`. Do not re-derive
+them, and do not assume anything resembling them without checking.
+
+- **The markers blueprint has NO url_prefix.** `__init__.py:299` is
+  `app.register_blueprint(markers.bp)`, and `markers.py:27` is
+  `Blueprint("markers", __name__)`. Slice A's rules therefore spell the prefix
+  out: `@bp.get("/markers")`, `@bp.get("/markers/<path:key>")`. **Every new
+  rule must begin with `/markers`.** A rule of `/<path:key>/images` would still
+  match `/markers/Sb[1]/images` — because `path:` spans slashes — binding the
+  image to the nonexistent key `markers/Sb[1]`. Silent corruption, not a 404.
+- **`base_dir=` IS passed at all five call sites**: `cross.py:97,112,143` and
+  `stock.py:62,71`, each as
+  `base_dir=current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH")`. Removing
+  the parameter without editing these is a `TypeError` in every prediction view.
+- **There is no `tests/conftest.py`.** No `client`, `logged_in_client` or
+  `seeded_image` fixture exists anywhere. `test_phenotype_routes.py` builds
+  clients inline and gets a CSRF token via a module-local
+  `_get_authenticated_csrf_token(client)` (line 272).
+- **CSRF is enforced globally**: `__init__.py:179` sets
+  `WTF_CSRF_CHECK_DEFAULT = True`, `security.py:9` installs `CSRFProtect()`.
+  Every POST — in tests and in templates — needs a token or it 400s.
+- **`FakeCollection.update_one` ignores `$inc`.** `mongo_fakes.py:196-207`
+  applies only `$set`. `$inc` works solely through `find_one_and_update`
+  (`mongo_fakes.py:209+`, which accepts both `"AFTER"` and `ReturnDocument.AFTER`).
+- **`write_activity(user, activity, db)`** — `utils/mongo/activity.py:3`. Three
+  positional arguments, `db` **last**, no separate event-type field.
+- **The revision bump lives in `utils/mongo/marker_definitions.py:40-63`**, not
+  in `marker_catalog.py`. It uses `find_one_and_update` with `$inc`,
+  `upsert=True`, `ReturnDocument.AFTER`, and raises if the result is malformed.
+- **`refresh_catalog` serializes read-compile-install on a dedicated
+  `_REFRESH_LOCK`** (`marker_catalog.py:356-383`), explicitly so a slow compile
+  of an older revision cannot overwrite a newer snapshot. Production is
+  `gunicorn --workers 1 --threads 12`, so this matters.
+- **`catalog.json` payload keys are snake_case**: `body_part`, `chromosome`,
+  `display_label`, `dominance`, `effect`, `phenotype_key`,
+  `scoring_confidence`. There is no `geneStem` or `gene_stem` key.
+- **The `before_request` probe to extend is `refresh_marker_catalog_if_stale`**
+  at `__init__.py:266-277`; it calls `maybe_refresh_catalog(db)` and swallows
+  exceptions so a refresh failure never fails a request. Jobs call
+  `refresh_catalog` at `jobs/tasks.py:33`.
+- **Already correct, do not "fix":** `FakeDatabase.__getattr__`
+  (`mongo_fakes.py:301`) auto-creates unseeded collections; `find` supports
+  projections (line 166); `ensure_mongo_indexes` is at `utils/mongo/db.py:51`;
+  `limiter` is already imported in `markers.py:17`; the endpoints
+  `markers.marker_detail` and `markers.marker_catalog` exist.
+
 ## Global Constraints
 
 - **Normalization contract, applied to every image without exception:** WebP,
@@ -63,7 +111,7 @@ pytest.
 | `data/markers/images/` | **Create** (254 webp + `index.json`). `data/phenotype_images/` is **deleted**. |
 
 Tasks are ordered so nothing is deleted until its replacement passes tests.
-Task 8 is the only irreversible step and has its own gate.
+Task 8 Step 9 is the only irreversible step and has its own gate.
 
 ---
 
@@ -524,11 +572,11 @@ def _marker_stubs():
         payload = definition.get("payload") or {}
         stubs.append(
             {
+                # Payload keys are snake_case; there is no gene_stem key.
                 "key": key,
-                "phenotype_key": payload.get("phenotypeKey"),
-                "display_label": payload.get("displayLabel"),
-                "gene_stem": payload.get("geneStem"),
-                "body_part": payload.get("bodyPart"),
+                "phenotype_key": payload.get("phenotype_key"),
+                "display_label": payload.get("display_label"),
+                "body_part": payload.get("body_part"),
                 "effect": payload.get("effect"),
             }
         )
@@ -570,10 +618,12 @@ python scripts/capture_image_scoring_baseline.py
 
 Expected: a few hundred records, a substantial fraction with matches. If
 **zero** records have matches, the marker stub field names are wrong — compare
-against `_marker_aliases` in `image_library.py:145-164`, which reads
+against `_marker_aliases` (`image_library.py:145-164`), which reads
 `phenotype_key`, `display_label`, `gene_stem`, `allele_token`,
-`balancer_symbol`, `alias_token`. Fix and re-run before continuing; a baseline
-of all-empty matches proves nothing.
+`balancer_symbol` and `alias_token` off the *marker stub*. Only the first four
+have counterparts in `catalog.json` payloads; the stub simply omits the rest.
+Fix and re-run before continuing — a baseline of all-empty matches proves
+nothing.
 
 - [ ] **Step 3: Write the parity test**
 
@@ -753,7 +803,14 @@ Expected: FAIL — `ModuleNotFoundError: ... image_catalog`
 ```python
 import threading
 
+from pymongo import ReturnDocument
+
 _LOCK = threading.Lock()
+# Serializes read-compile-install so a slow compile of an older revision
+# cannot overwrite a newer snapshot that already landed. Production runs
+# `gunicorn --workers 1 --threads 12`; marker_catalog.refresh_catalog
+# (marker_catalog.py:356-383) guards the same race for the same reason.
+_REFRESH_LOCK = threading.Lock()
 _SNAPSHOT = {"entries": [], "by_marker_key": {}, "revision": -1}
 
 SETTINGS_FIELD = "markerImageRevision"
@@ -798,30 +855,58 @@ def set_image_catalog_for_testing(snapshot):
 
 
 def read_image_revision(db):
-    document = db.settings.find_one({}) or {}
+    document = db["settings"].find_one({}) or {}
     return int(document.get(SETTINGS_FIELD) or 0)
 
 
 def bump_image_revision(db):
-    db.settings.update_one({}, {"$inc": {SETTINGS_FIELD: 1}}, upsert=True)
-    return read_image_revision(db)
+    """Atomically increment markerImageRevision and return the new value.
+
+    find_one_and_update, not update_one: `$inc` is atomic here and the call
+    is self-verifying (it returns the incremented document or raises), and
+    FakeCollection.update_one applies only `$set` so `$inc` through it is a
+    silent no-op. This mirrors bump_marker_catalog_revision at
+    utils/mongo/marker_definitions.py:40-63.
+    """
+    result = db["settings"].find_one_and_update(
+        {},
+        {"$inc": {SETTINGS_FIELD: 1}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    if not isinstance(result, dict) or SETTINGS_FIELD not in result:
+        raise RuntimeError(
+            f"Failed to bump {SETTINGS_FIELD}: find_one_and_update "
+            f"returned {result!r}"
+        )
+    return int(result[SETTINGS_FIELD])
 
 
 def refresh_image_catalog(db, *, force=False):
+    """Recompile from Mongo when the stored revision has moved.
+
+    The whole read-compile-install sequence is serialized, for the reason
+    given on _REFRESH_LOCK. A compile failure propagates with the previous
+    snapshot left installed.
+    """
     global _SNAPSHOT
-    revision = read_image_revision(db)
-    if not force and revision == _SNAPSHOT.get("revision"):
-        return _SNAPSHOT
-    documents = list(db.marker_images.find({}))
-    snapshot = compile_image_catalog(documents, revision=revision)
-    with _LOCK:
-        _SNAPSHOT = snapshot
-    return snapshot
+
+    with _REFRESH_LOCK:
+        revision = read_image_revision(db)
+        if not force and revision == _SNAPSHOT.get("revision"):
+            return _SNAPSHOT
+        documents = list(db["marker_images"].find({}))
+        snapshot = compile_image_catalog(documents, revision=revision)
+        # Assign directly rather than via set_image_catalog_for_testing:
+        # threading.Lock is not reentrant and that helper takes _LOCK itself.
+        with _LOCK:
+            _SNAPSHOT = snapshot
+        return snapshot
 ```
 
-If `FakeDatabase` does not support `$inc` with `upsert=True` on an empty
-collection, read-modify-write instead of `$inc` — but check first: slice A's
-`marker_catalog` already bumps a revision this way, so follow whatever it does.
+Use `db["settings"]` / `db["marker_images"]` subscript access rather than
+attribute access, matching slice A and working identically on `FakeDatabase`
+(`mongo_fakes.py:301` auto-creates unseeded collections either way).
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -830,21 +915,38 @@ Expected: PASS (5 passed)
 
 - [ ] **Step 5: Assert the no-Mongo invariant explicitly**
 
-```python
-def test_get_image_catalog_never_touches_the_database():
-    class ExplodingDatabase:
-        def __getattr__(self, name):
-            raise AssertionError(f"get_image_catalog touched db.{name}")
+The invariant is that `get_image_catalog` reads no database. Assert it by
+source inspection rather than by a mock that is never wired to anything:
 
+```python
+def test_get_image_catalog_returns_the_installed_snapshot():
     from flymanager.utils.phenotypes import image_catalog
 
     snapshot = compile_image_catalog([_entry("a", ["Sb[1]"])])
     image_catalog.set_image_catalog_for_testing(snapshot)
     assert image_catalog.get_image_catalog() is snapshot
+
+
+def test_get_image_catalog_body_contains_no_database_access():
+    """The resolution path has no db handle; keep it that way.
+
+    See marker-catalog-invariants: get_catalog() must never query Mongo, and
+    the same rule binds the image catalog because the scorer runs on that
+    same db-free path.
+    """
+    import inspect
+
+    from flymanager.utils.phenotypes import image_catalog
+
+    source = inspect.getsource(image_catalog.get_image_catalog)
+    for forbidden in ("db", "find(", "find_one", "settings"):
+        assert forbidden not in source, (
+            f"get_image_catalog references {forbidden!r}"
+        )
 ```
 
 Run: `python -m pytest tests/test_marker_image_catalog.py -q`
-Expected: PASS (6 passed)
+Expected: PASS (7 passed)
 
 - [ ] **Step 6: Commit**
 
@@ -870,8 +972,20 @@ git commit -m "feat: compile marker image entries into a process-global snapshot
 
 - [ ] **Step 1: Write the builder**
 
-It reads the existing manifest and scan exactly as `image_library.py` does, so
-the derived `match` fields are identical to what the current scorer sees.
+**The builder must not import from `image_library.py`.** Task 7 deletes
+`_image_entries` and `resolve_phenotype_image_library_path`, and Task 8's
+rollback ("rebuild the seed") has to still work after that. So the script
+**vendors its own frozen copies** of the manifest and scan readers. Copy them
+verbatim from `image_library.py:56-143` as it stands right now, before Task 7
+touches it. They are a snapshot of a thing being deleted; duplication is the
+point.
+
+**Entry order matters.** `_image_entries` returns manifest entries first, then
+sorted scan entries, and the selector keeps the *first* entry on a score tie
+(`if score > best_score`). If the seed sets every `sortOrder` to 0, the catalog
+orders by `imageId` — a content hash, effectively random — and ties resolve to
+a different image than they do today. So `sortOrder` records the original
+index.
 
 ```python
 """One-time developer tool: build the committed marker image seed.
@@ -879,30 +993,39 @@ the derived `match` fields are identical to what the current scorer sees.
 Reads data/phenotype_images/ (manifest + scan) and writes data/markers/images/
 containing normalized WebP files plus index.json. Deterministic: running it
 twice produces byte-identical output.
+
+The manifest/scan readers below are FROZEN COPIES of image_library.py's, taken
+before that module was rewritten to read from the catalog. Do not re-import
+them: this script has to keep working after those functions are deleted, so
+that the seed can be rebuilt if the migration has to be rolled back.
 """
 import json
 import shutil
 from pathlib import Path
 
-from flymanager.utils.phenotypes.image_library import (
-    _image_entries,
-    resolve_phenotype_image_library_path,
-)
 from flymanager.utils.phenotypes.image_normalize import normalize_image
 
 OUTPUT_DIR = Path("data/markers/images")
+SOURCE_DIR = Path("data/phenotype_images")
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+
+# --- frozen copies: _normalize_key, _manifest_entries, _scanned_entries,
+# --- _image_entries, copied verbatim from image_library.py:48-143.
+# --- (paste them here unchanged)
 
 
 def main():
-    source = resolve_phenotype_image_library_path()
-    entries = sorted(_image_entries(source), key=lambda e: e["relative_path"])
+    source = SOURCE_DIR
+    # Preserve _image_entries' order exactly: manifest entries first, then
+    # sorted scan entries. Do NOT re-sort — the order breaks score ties.
+    entries = _image_entries(source)
 
     if OUTPUT_DIR.exists():
         shutil.rmtree(OUTPUT_DIR)
     OUTPUT_DIR.mkdir(parents=True)
 
     index = []
-    for entry in entries:
+    for position, entry in enumerate(entries):
         raw = (source / entry["relative_path"]).read_bytes()
         normalized = normalize_image(raw, max_bytes=None)
         image_id = f"img_{normalized.sha256[:16]}"
@@ -932,25 +1055,45 @@ def main():
                     "provenance": entry.get("provenance", ""),
                     "sourceName": entry.get("source_name", ""),
                     "sourceUrl": entry.get("source_url", ""),
+                    # Kept so the Task 7 parity test can map a returned
+                    # imageId back to the path the old scorer selected.
+                    "sourcePath": entry["relative_path"],
                     "priority": int(entry.get("priority", 0) or 0),
-                    "sortOrder": 0,
+                    # Preserves _image_entries' order so score ties resolve
+                    # to the same image they do today.
+                    "sortOrder": position,
                 },
                 "origin": "shipped",
             }
         )
 
-    # Identical bytes collapse to one imageId; keep the first, union its aliases.
+    # Byte-identical files collapse to one imageId. Union the aliases, but
+    # REFUSE to merge when stem or bodyPart differ: the old scorer saw two
+    # distinct match surfaces and silently keeping one changes results.
     merged = {}
+    conflicts = []
     for record in index:
         existing = merged.get(record["imageId"])
         if existing is None:
             merged[record["imageId"]] = record
             continue
+        for field in ("stem", "bodyPart"):
+            if existing["match"][field] != record["match"][field]:
+                conflicts.append(
+                    (record["imageId"], field,
+                     existing["match"][field], record["match"][field])
+                )
         existing["match"]["aliases"] = sorted(
             set(existing["match"]["aliases"]) | set(record["match"]["aliases"])
         )
 
-    output = sorted(merged.values(), key=lambda r: r["imageId"])
+    if conflicts:
+        raise SystemExit(
+            "Byte-identical images disagree on stem/bodyPart; merging them "
+            f"would change matching. Resolve before seeding: {conflicts}"
+        )
+
+    output = sorted(merged.values(), key=lambda r: r["display"]["sortOrder"])
     (OUTPUT_DIR / "index.json").write_text(
         json.dumps(output, indent=1, sort_keys=True), encoding="utf-8"
     )
@@ -1362,6 +1505,8 @@ entries.
 - [ ] **Step 1: Write the failing test**
 
 ```python
+import pytest
+
 from flymanager.utils.phenotypes import image_catalog
 from flymanager.utils.phenotypes.image_catalog import compile_image_catalog
 from flymanager.utils.phenotypes.image_library import (
@@ -1393,6 +1538,19 @@ def _entry(image_id, *, marker_keys=(), aliases=(), stem="", body_part="wing",
 
 def _install(entries):
     image_catalog.set_image_catalog_for_testing(compile_image_catalog(entries))
+
+
+@pytest.fixture(autouse=True)
+def _reset_catalog():
+    """The snapshot is process-global, so tests leak into each other.
+
+    Without this, whichever module runs last wins and the parity test can
+    score against a three-entry fixture catalog.
+    """
+    yield
+    image_catalog.set_image_catalog_for_testing(
+        {"entries": [], "by_marker_key": {}, "revision": -1}
+    )
 
 
 def test_exact_marker_key_beats_a_stem_exact_fuzzy_match():
@@ -1597,33 +1755,102 @@ Expected: PASS (5 passed)
 
 - [ ] **Step 5: Point the parity test at the migrated path**
 
-The Task 3 baseline compares `relative_path`; the new matches carry
-`image_id`. Bridge them by mapping seed `imageId` back to the source path.
-Update `tests/test_marker_image_scoring_parity.py` to load the seed index and
-build `{imageId: file}`, then rewrite the capture fixture once so it stores
-`image_id` instead. Because the seed builder derives `imageId` from the source
-file's normalized bytes, the mapping is exact.
+Two things must change, and the first is easy to miss: the rewritten selector
+reads **only** `get_image_catalog()`, which is empty in a unit test. The parity
+test must build a snapshot from the seed index itself, or it will compare
+"no matches" against "no matches" and pass while proving nothing.
 
-Regenerate the fixture through the **new** code path only after confirming the
-old and new selections agree image-for-image. Concretely: add a temporary
-assertion comparing the old fixture's `relative_path` list against the new
-`image_id` list mapped through the seed index, run it, and only then rewrite
-the fixture.
+The bridge from `relative_path` to `image_id` needs a mapping the seed does not
+currently record. Add `"sourcePath": entry["relative_path"]` to each record in
+the Task 5 builder's `index` (inside `display`), rebuild the seed, then:
+
+```python
+import json
+from pathlib import Path
+
+import pytest
+
+from flymanager.utils.phenotypes import image_catalog
+from flymanager.utils.phenotypes.image_catalog import compile_image_catalog
+from flymanager.utils.phenotypes.image_library import (
+    select_phenotype_reference_images,
+)
+
+BASELINE = Path("tests/fixtures/image_scoring_baseline.json")
+SEED_DIR = Path("data/markers/images")
+
+
+@pytest.fixture(autouse=True)
+def _seed_catalog():
+    """Install the shipped seed as the catalog for this module.
+
+    The selector is db-free and reads only the process-global snapshot, so
+    without this the parity test scores against an empty catalog.
+    """
+    records = json.loads((SEED_DIR / "index.json").read_text(encoding="utf-8"))
+    entries = [
+        {**record, "storageId": f"seed-{record['imageId']}"}
+        for record in records
+    ]
+    image_catalog.set_image_catalog_for_testing(compile_image_catalog(entries))
+    yield
+
+
+def test_image_matching_reproduces_the_captured_baseline():
+    records = json.loads(BASELINE.read_text(encoding="utf-8"))
+    seed = json.loads((SEED_DIR / "index.json").read_text(encoding="utf-8"))
+    path_for_image = {
+        record["imageId"]: record["display"]["sourcePath"] for record in seed
+    }
+
+    assert any(record["matches"] for record in records), \
+        "baseline captured no matches at all"
+
+    mismatches = []
+    for record in records:
+        actual = select_phenotype_reference_images([record["marker"]], limit=6)
+        expected = [match["relative_path"] for match in record["matches"]]
+        got = [path_for_image.get(match["image_id"]) for match in actual]
+        if got != expected:
+            mismatches.append((record["marker"]["key"], expected, got))
+
+    assert not mismatches, (
+        f"{len(mismatches)} markers changed: {mismatches[:5]}"
+    )
+```
+
+The fixture captured in Task 3 is **not** regenerated. Regenerating it through
+the new code path would make the test assert that the new behavior equals
+itself, which is worthless — the whole point is that it still holds the *old*
+answers.
 
 Run: `PYTHONHASHSEED=random python -m pytest tests/test_marker_image_scoring_parity.py -q`
 Expected: PASS. **If it fails, stop and report the mismatching markers** — a
 regression here is exactly the failure mode this slice was designed to avoid.
+Do not "fix" it by rewriting the fixture.
 
 - [ ] **Step 6: Update the templates and route callers**
 
-`cross.py:95,110,141` and `stock.py:60,69` call these functions; none passes
-`base_dir`, so they need no change. The templates that render matches do:
-find them and replace the `relative_path` / `url_for('stock.phenotype_reference_image', ...)`
-usage with `match.image_url`.
+**All five call sites DO pass `base_dir`** and will `TypeError` until fixed —
+`cross.py:97,112,143` and `stock.py:62,71`, each as
+`base_dir=current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH")`. Delete that
+argument at every one, and drop the now-unused `current_app` import if nothing
+else in the file uses it.
+
+```bash
+grep -n "base_dir" flymanager/app/routes/cross.py flymanager/app/routes/stock.py
+```
+
+Expected after editing: no matches.
+
+Then the templates that render matches:
 
 ```bash
 grep -rn "relative_path\|phenotype_reference_image" flymanager/app/templates/
 ```
+
+Replace `url_for('stock.phenotype_reference_image', relative_path=...)` with
+`match.image_url`.
 
 - [ ] **Step 7: Run the full suite**
 
@@ -1663,15 +1890,26 @@ still on disk.
 - Produces: routes `POST /markers/<key>/images`,
   `POST /markers/images/<image_id>/delete`, `GET /markers/images/<image_id>`.
 
-- [ ] **Step 1: Write the failing route tests**
+- [ ] **Step 1: Build the test scaffolding — none exists**
 
-Follow the login/client helpers already used in `tests/test_phenotype_routes.py`
-rather than inventing new ones — read that file's fixtures first.
+There is no `tests/conftest.py` and no `client` / `logged_in_client` /
+`seeded_image` fixture anywhere in the suite. `test_phenotype_routes.py` builds
+clients inline and CSRF is enforced globally, so every POST needs a token.
+Write these module-local helpers at the top of
+`tests/test_marker_image_routes.py`, following that file's existing pattern —
+read `test_phenotype_routes.py:265-280` first and copy how it obtains a token.
 
 ```python
 import io
+import re
+from unittest.mock import patch
 
+import pytest
 from PIL import Image
+
+from flymanager.app import create_app, db
+from flymanager.utils.phenotypes import image_catalog
+from flymanager.utils.phenotypes.image_catalog import compile_image_catalog
 
 
 def _png(color=(1, 2, 3)):
@@ -1680,28 +1918,148 @@ def _png(color=(1, 2, 3)):
     return buffer.getvalue()
 
 
+def _extract_csrf_token(response_text):
+    match = re.search(r'<meta name="csrf-token" content="([^"]+)"', response_text)
+    assert match, "CSRF token meta tag not found"
+    return match.group(1)
+
+
+@pytest.fixture
+def client():
+    app = create_app()
+    app.config["TESTING"] = True
+    with app.test_client() as test_client:
+        yield test_client
+
+
+def _login(test_client, username="testuser"):
+    with test_client.session_transaction() as session:
+        session["username"] = username
+        session["logged_in"] = True
+
+
+@pytest.fixture
+def logged_in_client(client):
+    _login(client)
+    return client
+
+
+@pytest.fixture
+def admin_client(client):
+    _login(client, username="admin")
+    return client
+
+
+@pytest.fixture
+def csrf(logged_in_client):
+    with patch("flymanager.app.routes.flip.get_available_ports", return_value=[]):
+        response = logged_in_client.get("/flip/")
+    return _extract_csrf_token(response.get_data(as_text=True))
+
+
+@pytest.fixture
+def seeded_image():
+    """Insert one shipped-origin image entry plus its bytes, then clean up."""
+    from flymanager.utils.phenotypes.image_normalize import normalize_image
+    from flymanager.utils.phenotypes.image_store import GridFSImageStore
+
+    normalized = normalize_image(_png((7, 7, 7)))
+    store = GridFSImageStore(db)
+    storage_id = store.put(normalized.data, content_type=normalized.content_type)
+    document = {
+        "imageId": f"img_{normalized.sha256[:16]}",
+        "storageId": storage_id,
+        "sha256": normalized.sha256,
+        "contentType": "image/webp",
+        "bytes": normalized.bytes,
+        "width": normalized.width,
+        "height": normalized.height,
+        "match": {"markerKeys": ["Sb[1]"], "aliases": [], "stem": "sb",
+                  "bodyPart": "bristle", "manifestEntry": True,
+                  "sourceCollection": "library"},
+        "display": {"label": "Sb", "caption": "", "credit": "Test credit",
+                    "provenance": "", "priority": 1, "sortOrder": 0},
+        "origin": "shipped",
+        "UploadedBy": "system",
+    }
+    db["marker_images"].delete_many({"imageId": document["imageId"]})
+    db["marker_images"].insert_one(document)
+    image_catalog.refresh_image_catalog(db, force=True)
+    yield document
+    db["marker_images"].delete_many({"imageId": document["imageId"]})
+    store.delete(storage_id)
+
+
+@pytest.fixture(autouse=True)
+def _reset_image_catalog():
+    yield
+    image_catalog.set_image_catalog_for_testing(
+        {"entries": [], "by_marker_key": {}, "revision": -1}
+    )
+```
+
+Check `create_app` is the real factory name and that the session keys match
+what `login_required` reads (`flymanager/app/routes/auth.py`) before relying on
+`_login`.
+
+- [ ] **Step 2: Write the failing route tests**
+
+Note every POST passes a CSRF token, and every URL starts with `/markers` —
+the blueprint has no url_prefix.
+
+```python
 def test_upload_requires_login(client):
     response = client.post("/markers/Sb%5B1%5D/images")
     assert response.status_code in (302, 401)
 
 
-def test_upload_stores_a_normalized_entry(logged_in_client):
+def test_upload_stores_a_normalized_entry(logged_in_client, csrf):
     response = logged_in_client.post(
         "/markers/Sb%5B1%5D/images",
-        data={"image": (io.BytesIO(_png()), "photo.png")},
+        data={"image": (io.BytesIO(_png()), "photo.png"), "csrf_token": csrf},
         content_type="multipart/form-data",
     )
     assert response.status_code in (200, 302)
+    assert db["marker_images"].find_one({"match.markerKeys": "Sb[1]"}) is not None
 
 
-def test_upload_rejects_a_non_image(logged_in_client):
+def test_upload_binds_to_the_exact_marker_key(logged_in_client, csrf):
+    """Guards against a `/<path:key>/images` rule swallowing the prefix.
+
+    `path:` converters span slashes, so a rule missing its /markers prefix
+    still matches this URL — with key="markers/Sb[1]".
+    """
+    logged_in_client.post(
+        "/markers/Sb%5B1%5D/images",
+        data={"image": (io.BytesIO(_png((4, 5, 6))), "p.png"), "csrf_token": csrf},
+        content_type="multipart/form-data",
+    )
+    keys = [
+        key
+        for document in db["marker_images"].find({})
+        for key in (document.get("match") or {}).get("markerKeys") or []
+    ]
+    assert "markers/Sb[1]" not in keys
+
+
+def test_upload_rejects_an_unknown_marker(logged_in_client, csrf):
+    response = logged_in_client.post(
+        "/markers/NotAMarker/images",
+        data={"image": (io.BytesIO(_png()), "p.png"), "csrf_token": csrf},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 404
+
+
+def test_upload_rejects_a_non_image(logged_in_client, csrf):
     response = logged_in_client.post(
         "/markers/Sb%5B1%5D/images",
-        data={"image": (io.BytesIO(b"not an image"), "evil.png")},
+        data={"image": (io.BytesIO(b"not an image"), "evil.png"),
+              "csrf_token": csrf},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
-    assert b"not a readable image" in response.data.lower() or response.status_code == 400
+    assert b"not a readable image" in response.data.lower()
 
 
 def test_serving_route_returns_bytes_and_an_etag(logged_in_client, seeded_image):
@@ -1711,29 +2069,54 @@ def test_serving_route_returns_bytes_and_an_etag(logged_in_client, seeded_image)
     assert "immutable" in response.headers["Cache-Control"]
 
 
+def test_serving_route_honours_if_none_match(logged_in_client, seeded_image):
+    response = logged_in_client.get(
+        f"/markers/images/{seeded_image['imageId']}",
+        headers={"If-None-Match": f'"{seeded_image["sha256"]}"'},
+    )
+    assert response.status_code == 304
+
+
+def test_serving_route_requires_login(client, seeded_image):
+    response = client.get(f"/markers/images/{seeded_image['imageId']}")
+    assert response.status_code in (302, 401)
+
+
 def test_serving_route_404s_for_an_unknown_id(logged_in_client):
     assert logged_in_client.get("/markers/images/img_nope").status_code == 404
 
 
-def test_deleting_a_shipped_image_requires_admin(logged_in_client, seeded_image):
+def test_deleting_a_shipped_image_is_refused_for_non_admins(
+    logged_in_client, csrf, seeded_image
+):
     response = logged_in_client.post(
-        f"/markers/images/{seeded_image['imageId']}/delete"
+        f"/markers/images/{seeded_image['imageId']}/delete",
+        data={"csrf_token": csrf},
     )
-    assert response.status_code in (403, 302)
+    assert response.status_code == 403
+    assert db["marker_images"].find_one({"imageId": seeded_image["imageId"]})
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [ ] **Step 3: Run to verify they fail**
 
 Run: `python -m pytest tests/test_marker_image_routes.py -q`
 Expected: FAIL — 404s, because the routes do not exist.
 
-- [ ] **Step 3: Add the routes**
+- [ ] **Step 4: Add the routes**
+
+> Every rule spells out `/markers`: the blueprint is registered without a
+> url_prefix (`__init__.py:299`), matching slice A's `@bp.get("/markers/<path:key>")`.
 
 ```python
-@bp.route("/<path:key>/images", methods=["POST"])
+@bp.post("/markers/<path:key>/images")
 @login_required
 @limiter.limit("20 per minute")
 def upload_marker_image(key):
+    # Bind only to a marker that exists, so a typo cannot mint an orphan
+    # entry that no detail page will ever render.
+    if key not in get_catalog()["definitions"]:
+        abort(404)
+
     uploaded = request.files.get("image")
     if uploaded is None:
         flash("No image was submitted.", "error")
@@ -1759,21 +2142,21 @@ def upload_marker_image(key):
         display={"caption": request.form.get("caption", "").strip()},
     )
     refresh_image_catalog(db, force=True)
+    # write_activity(user, activity, db) -- three args, db LAST.
     write_activity(
-        db,
         session.get("username", ""),
-        "marker_image_upload",
         f"Uploaded image {entry['imageId']} for marker {key}",
+        db,
     )
     flash("Image uploaded.", "success")
     return redirect(url_for("markers.marker_detail", key=key))
 
 
-@bp.route("/images/<image_id>", methods=["GET"])
+@bp.get("/markers/images/<image_id>")
 @login_required
 @limiter.limit("60 per minute")
 def serve_marker_image(image_id):
-    entry = db.marker_images.find_one({"imageId": image_id})
+    entry = db["marker_images"].find_one({"imageId": image_id})
     if entry is None:
         abort(404)
     try:
@@ -1785,17 +2168,23 @@ def serve_marker_image(image_id):
         )
         abort(404)
 
-    response = send_file(stream, mimetype=entry.get("contentType", "image/webp"))
+    response = send_file(
+        stream,
+        mimetype=entry.get("contentType", "image/webp"),
+        # conditional=True is what turns the ETag into a 304 instead of
+        # re-sending the bytes to every client that revalidates.
+        conditional=True,
+    )
     response.set_etag(entry["sha256"])
     # imageId derives from content, so a given id's bytes never change.
     response.headers["Cache-Control"] = "private, max-age=31536000, immutable"
-    return response
+    return response.make_conditional(request)
 
 
-@bp.route("/images/<image_id>/delete", methods=["POST"])
+@bp.post("/markers/images/<image_id>/delete")
 @login_required
 def delete_marker_image(image_id):
-    entry = db.marker_images.find_one({"imageId": image_id})
+    entry = db["marker_images"].find_one({"imageId": image_id})
     if entry is None:
         abort(404)
 
@@ -1806,23 +2195,32 @@ def delete_marker_image(image_id):
     if not is_admin and entry.get("UploadedBy") != username:
         abort(403)
 
-    db.marker_images.delete_one({"imageId": image_id})
-    GridFSImageStore(db).delete(entry["storageId"])
+    # An entry bound to several markers (identical bytes uploaded twice) is
+    # unbound from this one rather than destroyed for everyone.
+    marker_keys = list((entry.get("match") or {}).get("markerKeys") or [])
+    unbind_key = request.form.get("marker_key", "").strip()
+    if unbind_key and len(marker_keys) > 1 and unbind_key in marker_keys:
+        marker_keys.remove(unbind_key)
+        db["marker_images"].update_one(
+            {"imageId": image_id}, {"$set": {"match.markerKeys": marker_keys}}
+        )
+    else:
+        db["marker_images"].delete_one({"imageId": image_id})
+        GridFSImageStore(db).delete(entry["storageId"])
+
     bump_image_revision(db)
     refresh_image_catalog(db, force=True)
-    write_activity(
-        db, username, "marker_image_delete", f"Deleted marker image {image_id}"
-    )
+    write_activity(username, f"Deleted marker image {image_id}", db)
     flash("Image deleted.", "success")
     return redirect(request.referrer or url_for("markers.marker_catalog"))
 ```
 
-Check the actual blueprint name, `write_activity` signature, and
-`marker_detail` / `marker_catalog` endpoint names against the existing
-`routes/markers.py` from slice A before writing this — the names above follow
-the spec, but slice A's file is the authority.
+Imports this needs in `markers.py`: `abort`, `request`, `send_file`,
+`url_for`, `flash`, `redirect`, `session`; `write_activity` from
+`flymanager.utils.mongo.activity`; `get_catalog` from `marker_catalog`; and the
+new image modules. `limiter` is already imported at `markers.py:17`.
 
-- [ ] **Step 4: Wire up app startup**
+- [ ] **Step 5: Wire up app startup**
 
 In `flymanager/app/__init__.py`:
 
@@ -1833,16 +2231,30 @@ In `flymanager/app/__init__.py`:
 3. Extend the existing marker-catalog `before_request` probe to also call
    `refresh_image_catalog(db)`. Reuse the same 30-second throttle rather than
    adding a second timer.
-4. In the RQ worker's `_run` envelope and `refresh_flybase_reference_data`,
-   where `refresh_catalog(db)` is already called, add
-   `refresh_image_catalog(db)` — background jobs do not get `before_request`.
+4. In the RQ worker's `_run` envelope (`jobs/tasks.py:33`, where
+   `refresh_catalog(db)` is already called) and in
+   `refresh_flybase_reference_data`, add `refresh_image_catalog(db)` —
+   background jobs never run `before_request`.
+5. Add a 413 handler. `MAX_CONTENT_LENGTH` is 8 MB app-wide
+   (`__init__.py:171-173`), so anything above that is rejected by Werkzeug
+   **before** the route's own 2 MB check runs, and the user would otherwise
+   get a bare error page instead of the flash message the 2-8 MB path gives:
 
-- [ ] **Step 5: Remove the old serving route**
+   ```python
+   @app.errorhandler(413)
+   def handle_payload_too_large(error):
+       flash("That file is too large. Images must be 2 MB or smaller.", "error")
+       return redirect(request.referrer or url_for("main.home")), 302
+   ```
+
+   Check whether a 413 handler already exists before adding a second.
+
+- [ ] **Step 6: Remove the old serving route**
 
 Delete `phenotype_reference_image` from `flymanager/app/routes/stock.py:210-222`
 and its now-unused `send_file` / `Path` imports if nothing else uses them.
 
-- [ ] **Step 6: Run the route tests, then the full suite**
+- [ ] **Step 7: Run the route tests, then the full suite**
 
 Run: `python -m pytest tests/test_marker_image_routes.py -q`
 Expected: PASS
@@ -1850,7 +2262,7 @@ Expected: PASS
 Then the full command from Global Constraints.
 Expected: no more than the 15 baseline failures.
 
-- [ ] **Step 7: Verify the signature isolation invariant**
+- [ ] **Step 8: Verify the signature isolation invariant**
 
 This is the slice's headline guarantee; assert it directly. Add to
 `tests/test_marker_image_routes.py`:
@@ -1878,18 +2290,28 @@ grep -rn "rebuild_after_marker_change\|derive_affected_tokens" \
 
 Expected: matches only in marker-definition handlers, never in an image handler.
 
-- [ ] **Step 8: Delete the old library — the irreversible step**
+- [ ] **Step 9: Delete the old library — the irreversible step**
 
 ```bash
 git rm -r data/phenotype_images
 ```
 
-Then re-run the full suite. Expected: still no more than 15 failures. If the
-parity test fails now, the seed is missing images the filesystem was still
-supplying — restore with `git checkout HEAD -- data/phenotype_images`, rebuild
-the seed, and investigate before proceeding.
+Then re-run the full suite. Expected: still no more than 15 failures.
 
-- [ ] **Step 9: Update the operational docs**
+If the parity test fails now, the seed is missing images the filesystem was
+still supplying. Recover with:
+
+```bash
+git checkout HEAD~1 -- data/phenotype_images
+python scripts/build_marker_image_seed.py
+```
+
+This works only because Task 5's builder vendors its own frozen manifest and
+scan readers instead of importing them from `image_library.py`, which Task 7
+rewrote. If the builder still imports `_image_entries`, the rollback is
+already broken — fix that before running Step 9, not after.
+
+- [ ] **Step 10: Update the operational docs**
 
 In `BACKUP_AND_RECOVERY.md:78-105`, move shipped phenotype images from the
 state-archive scope to the Mongo-archive scope. State the tradeoff explicitly:
@@ -1897,7 +2319,7 @@ image bytes now ride Mongo dumps (+~4.5 MB per archive), the state archive
 shrinks by ~120 MB, and the committed seed means a fresh deploy still
 self-populates without a restore.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
 git add -A
@@ -1970,6 +2392,8 @@ and match its classes and structure rather than introducing new styling.
           {% if image.origin == 'user' or session['username'] == 'admin' %}
             <form method="post"
                   action="{{ url_for('markers.delete_marker_image', image_id=image.imageId) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="marker_key" value="{{ marker.Key }}">
               <button type="submit">Delete</button>
             </form>
           {% endif %}
@@ -1983,6 +2407,7 @@ and match its classes and structure rather than introducing new styling.
   <form method="post"
         action="{{ url_for('markers.upload_marker_image', key=marker.Key) }}"
         enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="file" name="image" accept="image/*" required>
     <input type="text" name="caption" placeholder="Caption (optional)">
     <button type="submit">Upload image</button>
@@ -2076,5 +2501,5 @@ Spec coverage check against the design document:
 Known gap accepted deliberately: the spec calls for a `marker_images` unique
 index on `imageId` and secondary indexes on `match.markerKeys` and `sha256`.
 These belong with the project's other index declarations in
-`ensure_mongo_indexes`; add them there during Task 8 Step 4 rather than as a
+`ensure_mongo_indexes`; add them there during Task 8 Step 5 (app startup wiring) rather than as a
 separate task.
