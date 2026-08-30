@@ -5,11 +5,10 @@ import os
 import re
 import traceback
 from datetime import datetime
-from pathlib import Path
 from urllib.parse import unquote
 
 from flask import (Blueprint, current_app, flash, jsonify, redirect,
-                   render_template, request, send_file, session, url_for)
+                   render_template, request, session, url_for)
 from fuzzywuzzy import fuzz
 
 from flymanager.app import db
@@ -59,7 +58,6 @@ PROVIDER_MATCH_CACHE_VERSION = 1
 def _get_stock_reference_images(prediction):
     return select_prediction_reference_images(
         prediction,
-        base_dir=current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH"),
     )
 
 
@@ -68,7 +66,6 @@ def _decorate_prediction_for_view(prediction, *, image_limit=None):
         **prediction,
         "reference_images": select_prediction_reference_images(
             prediction,
-            base_dir=current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH"),
             limit=image_limit,
         ),
         "provenance_summary": prediction.get(
@@ -205,21 +202,6 @@ def _build_stock_standardization_overview_row(stock):
         "topTokens": top_tokens,
         "recommendedReplacements": recommended_replacements[:3],
     }
-
-
-@bp.route("/phenotype_image/<path:relative_path>")
-@login_required
-@limiter.limit("60 per minute")
-def phenotype_reference_image(relative_path):
-    library_root = Path(current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH", "")).resolve()
-    candidate_path = (library_root / relative_path).resolve()
-    try:
-        candidate_path.relative_to(library_root)
-    except ValueError:
-        return redirect(url_for("main.home"))
-    if not candidate_path.is_file():
-        return redirect(url_for("main.home"))
-    return send_file(candidate_path)
 
 
 def _get_phenotype_preview_metadata():
@@ -2053,4 +2035,3 @@ def get_stock_data_for_uid(unique_id):
             "Error in get_stock_data_for_uid for %s: %s", unique_id, e
         )
         return jsonify({"error": "Internal server error"}), 500
-

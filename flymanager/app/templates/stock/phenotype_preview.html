@@ -146,7 +146,7 @@
                     {% for image in preview_prediction.reference_images %}
                     <div class="stock-phenotype-image-card">
                         <div class="stock-phenotype-image-media">
-                            <img src="{{ url_for('stock.phenotype_reference_image', relative_path=image.relative_path) }}" alt="Reference image for {{ image.display_label }}">
+                            <img src="{{ image.image_url }}" alt="Reference image for {{ image.display_label }}">
                         </div>
                         <div class="stock-phenotype-image-card-body">
                             <div class="stock-phenotype-image-card-title">{{ image.display_label }}</div>

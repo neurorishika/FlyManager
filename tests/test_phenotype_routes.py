@@ -10,6 +10,20 @@ from flymanager.utils.phenotypes.image_library import \
 from flymanager.utils.phenotypes.predictor import PHENOTYPE_CACHE_VERSION
 from tests.mongo_fakes import FakeDatabase
 
+MARKER_IMAGE_SEED = json.loads(
+    Path("data/markers/images/index.json").read_text(encoding="utf-8")
+)
+
+
+def _seed_image_id(source_path):
+    return next(row["imageId"] for row in MARKER_IMAGE_SEED
+                if row["display"]["sourcePath"] == source_path)
+
+
+def _source_path(match):
+    return next(row["display"]["sourcePath"] for row in MARKER_IMAGE_SEED
+                if row["imageId"] == match["image_id"])
+
 
 def _stock_explorer_fake_db(records):
     """stock_explorer/stock_explorer_selection now query `db` directly
@@ -63,34 +77,6 @@ def _make_app(monkeypatch):
         app = create_app()
     app.config.update(TESTING=True)
     return app
-
-
-def _write_test_phenotype_image_library(base_dir):
-    root = Path(base_dir)
-    (root / "learning_to_fly" / "wings").mkdir(parents=True, exist_ok=True)
-    (root / "learning_to_fly" / "eye").mkdir(parents=True, exist_ok=True)
-    (root / "learning_to_fly" / "bristles").mkdir(parents=True, exist_ok=True)
-    (root / "learning_to_fly" / "shoulder").mkdir(parents=True, exist_ok=True)
-    (root / "holtzman_and_kaufman" / "wing").mkdir(parents=True, exist_ok=True)
-    (root / "holtzman_and_kaufman" / "eye").mkdir(parents=True, exist_ok=True)
-    (root / "learning_to_fly" / "wings" / "cy.png").write_bytes(b"cy-image")
-    (root / "learning_to_fly" / "eye" / "w-.png").write_bytes(b"w-image")
-    (root / "learning_to_fly" / "eye" / "w+.png").write_bytes(b"mini-white-image")
-    (root / "learning_to_fly" / "bristles" / "sb.png").write_bytes(b"sb-image")
-    (root / "learning_to_fly" / "shoulder" / "sp.png").write_bytes(b"sp-image")
-    (root / "holtzman_and_kaufman" / "wing" / "CyO.png").write_bytes(b"cyo-image")
-    (root / "holtzman_and_kaufman" / "eye" / "DrMio.png").write_bytes(b"drmio-image")
-    (root / "manifest.json").write_text(
-        '{"images":['
-        '{"image_path":"learning_to_fly/wings/cy.png","phenotype_key":"Cy","display_label":"Cy","body_part":"wing","source_collection":"learning_to_fly","source_name":"Learning to Fly","provenance":"Local phenotype image library","credit":"Test fixture: Learning to Fly collection","priority":10},'
-        '{"image_path":"learning_to_fly/eye/w-.png","phenotype_key":"w_loss","display_label":"w","body_part":"eye","source_collection":"learning_to_fly","source_name":"Learning to Fly","provenance":"Local phenotype image library","credit":"Test fixture: Learning to Fly collection","priority":10},'
-        '{"image_path":"learning_to_fly/eye/w+.png","phenotype_key":"mini_white","display_label":"mini-white","body_part":"eye","source_collection":"learning_to_fly","source_name":"Learning to Fly","provenance":"Local phenotype image library","credit":"Test fixture: Learning to Fly collection","priority":10},'
-        '{"image_path":"learning_to_fly/bristles/sb.png","phenotype_key":"Sb","display_label":"Sb","body_part":"bristle","source_collection":"learning_to_fly","source_name":"Learning to Fly","provenance":"Local phenotype image library","credit":"Test fixture: Learning to Fly collection","priority":10},'
-        '{"image_path":"learning_to_fly/shoulder/sp.png","display_label":"Sternopleural","aliases":["sternopleural"],"body_part":"thorax","source_collection":"learning_to_fly","source_name":"Learning to Fly","provenance":"Local phenotype image library","credit":"Test fixture: Learning to Fly collection","priority":10},'
-        '{"image_path":"holtzman_and_kaufman/wing/CyO.png","phenotype_key":"Cy","display_label":"CyO","body_part":"wing","source_collection":"holtzman_and_kaufman","source_name":"Holtzman and Kaufman","provenance":"Local phenotype image library","credit":"Test fixture: Holtzman and Kaufman collection","priority":12},'
-        '{"image_path":"holtzman_and_kaufman/eye/DrMio.png","phenotype_key":"Dr_Mio","display_label":"Mio","allele_token":"Dr[Mio]","body_part":"eye","source_collection":"holtzman_and_kaufman","source_name":"Holtzman and Kaufman","provenance":"Local phenotype image library","credit":"Test fixture: Holtzman and Kaufman collection","priority":12}'
-        ']}'
-    )
 
 
 def _stock_metadata_lookup(metadata_type, _db):
@@ -276,8 +262,6 @@ def _get_authenticated_csrf_token(client):
 
 
 def test_stock_view_route_renders_phenotype_preview(monkeypatch, tmp_path):
-    _write_test_phenotype_image_library(tmp_path)
-    monkeypatch.setenv("FLYMANAGER_PHENOTYPE_IMAGE_LIBRARY_PATH", str(tmp_path))
     app = _make_app(monkeypatch)
     stock_record = {
         "UniqueID": "UID1",
@@ -369,8 +353,8 @@ def test_stock_view_route_renders_phenotype_preview(monkeypatch, tmp_path):
     assert "w, Cy" in body
     assert "Reference image for w" in body
     assert "Reference image for Cy" in body
-    assert "/stock/phenotype_image/learning_to_fly/eye/w-.png" in body
-    assert "/stock/phenotype_image/learning_to_fly/wings/cy.png" in body
+    assert f"/markers/images/{_seed_image_id('learning_to_fly/eye/w-.png')}" in body
+    assert f"/markers/images/{_seed_image_id('learning_to_fly/wings/cy.png')}" in body
     assert "Learning to Fly" in body
     assert "Local phenotype image library" in body
     assert "Construct annotations: GFP reporter" in body
@@ -388,9 +372,7 @@ def test_stock_view_route_renders_phenotype_preview(monkeypatch, tmp_path):
     assert "initializeTagify(true);" not in body
 
 
-def test_stock_phenotype_image_route_serves_local_library_files(monkeypatch, tmp_path):
-    _write_test_phenotype_image_library(tmp_path)
-    monkeypatch.setenv("FLYMANAGER_PHENOTYPE_IMAGE_LIBRARY_PATH", str(tmp_path))
+def test_old_stock_phenotype_image_route_is_retired(monkeypatch):
     app = _make_app(monkeypatch)
 
     with app.test_client() as client:
@@ -399,26 +381,22 @@ def test_stock_phenotype_image_route_serves_local_library_files(monkeypatch, tmp
 
         response = client.get("/stock/phenotype_image/learning_to_fly/wings/cy.png")
 
-    assert response.status_code == 200
-    assert response.data == b"cy-image"
+    assert response.status_code == 404
 
 
-def test_manifest_entries_override_filename_fallback_and_expose_attribution(tmp_path):
-    _write_test_phenotype_image_library(tmp_path)
-
+def test_manifest_entries_override_filename_fallback_and_expose_attribution(monkeypatch):
+    _make_app(monkeypatch)
     matches = select_phenotype_reference_images(
         [{"display_label": "Mio", "phenotype_key": "Dr_Mio", "allele_token": "Dr[Mio]", "body_part": "eye", "effect": "rough eyes"}],
-        base_dir=tmp_path,
     )
 
-    assert matches[0]["relative_path"] == "holtzman_and_kaufman/eye/DrMio.png"
+    assert _source_path(matches[0]) == "holtzman_and_kaufman/eye/DrMio.png"
     assert matches[0]["source_name"] == "Holtzman and Kaufman"
-    assert matches[0]["credit"] == "Test fixture: Holtzman and Kaufman collection"
+    assert matches[0]["credit"]
 
 
-def test_manifest_entries_do_not_cross_match_wrong_body_part_or_stem(tmp_path):
-    _write_test_phenotype_image_library(tmp_path)
-
+def test_manifest_entries_do_not_cross_match_wrong_body_part_or_stem(monkeypatch):
+    _make_app(monkeypatch)
     matches = select_phenotype_reference_images(
         [{
             "display_label": "Sp",
@@ -426,7 +404,6 @@ def test_manifest_entries_do_not_cross_match_wrong_body_part_or_stem(tmp_path):
             "body_part": "wing",
             "effect": "spade-shaped notched wings",
         }],
-        base_dir=tmp_path,
     )
 
     assert matches == []
@@ -437,73 +414,52 @@ def test_manifest_entries_do_not_cross_match_wrong_body_part_or_stem(tmp_path):
             "phenotype_key": "wg_Sp",
             "effect": "spade-shaped notched wings",
         }],
-        base_dir=tmp_path,
     )
 
     assert matches == []
 
 
 def test_repo_phenotype_image_manifest_accounts_for_every_library_image():
-    root = Path("data/phenotype_images")
-    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-    manifest_paths = [entry["image_path"] for entry in manifest["images"]]
-    actual_paths = sorted(
-        path.relative_to(root).as_posix()
-        for path in root.rglob("*")
-        if path.is_file()
-        and path.name not in {".DS_Store", "manifest.json"}
-        and path.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".webp"}
-    )
-
-    assert sorted(manifest_paths) == actual_paths
-    assert len(manifest_paths) == len(set(manifest_paths))
+    assert len(MARKER_IMAGE_SEED) == 254
+    assert len({row["file"] for row in MARKER_IMAGE_SEED}) == 254
 
 
-def test_repo_learning_to_fly_body_color_images_are_reachable():
-    root = Path("data/phenotype_images")
-
+def test_repo_learning_to_fly_body_color_images_are_reachable(monkeypatch):
+    _make_app(monkeypatch)
     ebony_matches = select_phenotype_reference_images(
         [{"display_label": "e", "phenotype_key": "e", "body_part": "body", "effect": "ebony body color"}],
-        base_dir=root,
     )
     yellow_matches = select_phenotype_reference_images(
         [{"display_label": "y", "phenotype_key": "y", "body_part": "body", "effect": "yellow body color"}],
-        base_dir=root,
     )
 
-    assert ebony_matches[0]["relative_path"] == "learning_to_fly/bristles/e.png"
-    assert yellow_matches[0]["relative_path"] == "learning_to_fly/bristles/y.png"
+    assert _source_path(ebony_matches[0]) == "learning_to_fly/bristles/e.png"
+    assert _source_path(yellow_matches[0]) == "learning_to_fly/bristles/y.png"
 
 
-def test_repo_curated_learning_to_fly_alleles_are_reachable():
-    root = Path("data/phenotype_images")
-
+def test_repo_curated_learning_to_fly_alleles_are_reachable(monkeypatch):
+    _make_app(monkeypatch)
     roi_matches = select_phenotype_reference_images(
         [{"display_label": "Roi", "phenotype_key": "amos_Roi", "allele_token": "amos[Roi-1]", "body_part": "eye", "effect": "roughoid eye morphology"}],
-        base_dir=root,
     )
     bc_matches = select_phenotype_reference_images(
         [{"display_label": "Bc", "phenotype_key": "PPO1_Bc", "allele_token": "PPO1[Bc]", "body_part": "body", "effect": "black-cells larval body phenotype"}],
-        base_dir=root,
     )
     me_matches = select_phenotype_reference_images(
         [{"display_label": "me", "phenotype_key": "l2me_1", "allele_token": "l(2)me[1]", "body_part": "eye", "effect": "eye morphology phenotype"}],
-        base_dir=root,
     )
     wa_matches = select_phenotype_reference_images(
         [{"display_label": "wa", "phenotype_key": "wa", "body_part": "eye", "effect": "white-apricot eye color"}],
-        base_dir=root,
     )
 
-    assert roi_matches[0]["relative_path"] == "learning_to_fly/eye/roi.png"
-    assert bc_matches[0]["relative_path"] == "learning_to_fly/larva/bc.png"
-    assert me_matches[0]["relative_path"] == "learning_to_fly/eye/me.png"
-    assert wa_matches[0]["relative_path"] == "learning_to_fly/eye/wa.png"
+    assert _source_path(roi_matches[0]) == "learning_to_fly/eye/roi.png"
+    assert _source_path(bc_matches[0]) == "learning_to_fly/larva/bc.png"
+    assert _source_path(me_matches[0]) == "learning_to_fly/eye/me.png"
+    assert _source_path(wa_matches[0]) == "learning_to_fly/eye/wa.png"
 
 
-def test_repo_non_eye_mini_white_control_panels_are_not_curated_matches():
-    root = Path("data/phenotype_images")
-    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+def test_repo_non_eye_mini_white_control_panels_are_not_curated_matches(monkeypatch):
+    _make_app(monkeypatch)
     control_panel_paths = {
         "learning_to_fly/bristles/w+.png",
         "learning_to_fly/haltere/w+.png",
@@ -515,21 +471,18 @@ def test_repo_non_eye_mini_white_control_panels_are_not_curated_matches():
         "learning_to_fly/wings/w+_2.png",
     }
 
-    indexed = {entry["image_path"]: entry for entry in manifest["images"]}
-    for path in control_panel_paths:
-        assert indexed[path].get("phenotype_key") is None
+    indexed = {entry["display"]["sourcePath"]: entry for entry in MARKER_IMAGE_SEED}
+    assert control_panel_paths <= indexed.keys()
 
     matches = select_phenotype_reference_images(
         [{"display_label": "mini-white", "phenotype_key": "mini_white", "body_part": "eye", "effect": "pigmented eyes from construct marker"}],
-        base_dir=root,
     )
 
-    assert matches[0]["relative_path"] == "learning_to_fly/eye/w+.png"
+    assert _source_path(matches[0]) == "learning_to_fly/eye/w+.png"
 
 
-def test_composite_mini_white_rescue_marker_uses_eye_reference_image(tmp_path):
-    _write_test_phenotype_image_library(tmp_path)
-
+def test_composite_mini_white_rescue_marker_uses_eye_reference_image(monkeypatch):
+    _make_app(monkeypatch)
     matches = select_phenotype_reference_images(
         [{
             "display_label": "mini-white pale orange",
@@ -537,10 +490,9 @@ def test_composite_mini_white_rescue_marker_uses_eye_reference_image(tmp_path):
             "body_part": "eye",
             "effect": "pale orange eye pigmentation from mini-white rescue in a white-eye background",
         }],
-        base_dir=tmp_path,
     )
 
-    assert matches[0]["relative_path"] == "learning_to_fly/eye/w+.png"
+    assert _source_path(matches[0]) == "learning_to_fly/eye/w+.png"
 
 
 def test_stock_explorer_route_shows_best_guess_phenotype(monkeypatch):
@@ -885,8 +837,6 @@ def test_standardization_reviewer_paginates_second_page(monkeypatch):
 
 
 def test_cross_view_route_renders_parent_and_offspring_phenotypes(monkeypatch, tmp_path):
-    _write_test_phenotype_image_library(tmp_path)
-    monkeypatch.setenv("FLYMANAGER_PHENOTYPE_IMAGE_LIBRARY_PATH", str(tmp_path))
     app = _make_app(monkeypatch)
     cross_record = {
         "UniqueID": "CROSS1",
@@ -1261,8 +1211,6 @@ def test_cross_refresh_route_skips_duplicate_refresh(monkeypatch):
 
 
 def test_standalone_phenotype_preview_route_renders_prediction(monkeypatch, tmp_path):
-    _write_test_phenotype_image_library(tmp_path)
-    monkeypatch.setenv("FLYMANAGER_PHENOTYPE_IMAGE_LIBRARY_PATH", str(tmp_path))
     app = _make_app(monkeypatch)
 
     with app.test_client() as client:
@@ -1286,8 +1234,6 @@ def test_standalone_phenotype_preview_route_renders_prediction(monkeypatch, tmp_
 
 
 def test_standalone_phenotype_preview_route_accepts_tagify_form(monkeypatch, tmp_path):
-    _write_test_phenotype_image_library(tmp_path)
-    monkeypatch.setenv("FLYMANAGER_PHENOTYPE_IMAGE_LIBRARY_PATH", str(tmp_path))
     app = _make_app(monkeypatch)
 
     with app.test_client() as client:
@@ -1313,8 +1259,6 @@ def test_standalone_phenotype_preview_route_accepts_tagify_form(monkeypatch, tmp
 
 
 def test_standalone_phenotype_preview_route_returns_json(monkeypatch, tmp_path):
-    _write_test_phenotype_image_library(tmp_path)
-    monkeypatch.setenv("FLYMANAGER_PHENOTYPE_IMAGE_LIBRARY_PATH", str(tmp_path))
     app = _make_app(monkeypatch)
 
     with app.test_client() as client:

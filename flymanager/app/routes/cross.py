@@ -94,7 +94,6 @@ def _get_cross_phenotype_for_view(cross):
                 "sterile_alleles": parent_phenotypes.get("male", {}).get("sterile_alleles", []),
                 "reference_images": select_prediction_reference_images(
                     parent_phenotypes.get("male", {}),
-                    base_dir=current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH"),
                     limit=3,
                 ),
             },
@@ -109,7 +108,6 @@ def _get_cross_phenotype_for_view(cross):
                 "sterile_alleles": parent_phenotypes.get("female", {}).get("sterile_alleles", []),
                 "reference_images": select_prediction_reference_images(
                     parent_phenotypes.get("female", {}),
-                    base_dir=current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH"),
                     limit=3,
                 ),
             },
@@ -140,7 +138,6 @@ def _get_cross_phenotype_for_view(cross):
                         "stage_specific_effects": phenotype.get("stage_specific_effects", []),
                         "reference_images": select_prediction_reference_images(
                             phenotype,
-                            base_dir=current_app.config.get("PHENOTYPE_IMAGE_LIBRARY_PATH"),
                             limit=3,
                         ),
                     },
@@ -996,4 +993,3 @@ def refresh_cross_phenotype(unique_id):
     except OperationLockConflict as exc:
         flash(str(exc), "warning")
     return redirect(url_for("cross.view_cross", unique_id=unique_id))
-
