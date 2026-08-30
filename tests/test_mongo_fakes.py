@@ -112,3 +112,41 @@ def test_find_supports_or_query():
         {"User": "dave", "TrayID": "T3"},
     ]}))
     assert sorted(t["UniqueID"] for t in result) == ["t1", "t3"]
+
+
+def test_find_supports_dotted_paths_and_array_containment():
+    """_apply_set understood dotted paths but _matches did not.
+
+    A query like {"match.markerKeys": "Sb"} silently matched nothing rather
+    than raising -- the same silent-failure class as a dropped update
+    operator. marker_images is indexed on exactly that path.
+    """
+    db = FakeDatabase({"marker_images": [
+        {"imageId": "a", "match": {"markerKeys": ["Sb", "CyO"], "bodyPart": "wing"}},
+        {"imageId": "b", "match": {"markerKeys": ["Dr"], "bodyPart": "eye"}},
+    ]})
+    assert [d["imageId"] for d in db["marker_images"].find({"match.markerKeys": "Sb"})] == ["a"]
+    assert [d["imageId"] for d in db["marker_images"].find({"match.bodyPart": "eye"})] == ["b"]
+    assert list(db["marker_images"].find({"match.markerKeys": "nope"})) == []
+    assert list(db["marker_images"].find({"match.missing": "x"})) == []
+
+
+def test_update_one_applies_add_to_set_and_pull():
+    db = FakeDatabase({"marker_images": [
+        {"imageId": "a", "match": {"markerKeys": ["Sb"]}},
+    ]})
+    db["marker_images"].update_one({"imageId": "a"}, {"$addToSet": {"match.markerKeys": "CyO"}})
+    db["marker_images"].update_one({"imageId": "a"}, {"$addToSet": {"match.markerKeys": "Sb"}})
+    assert db["marker_images"].find_one({"imageId": "a"})["match"]["markerKeys"] == ["Sb", "CyO"]
+
+    db["marker_images"].update_one({"imageId": "a"}, {"$pull": {"match.markerKeys": "Sb"}})
+    assert db["marker_images"].find_one({"imageId": "a"})["match"]["markerKeys"] == ["CyO"]
+
+
+def test_update_one_refuses_an_operator_it_cannot_model():
+    """Silently dropping a write makes a broken production path look green."""
+    import pytest
+
+    db = FakeDatabase({"stocks": [{"UniqueID": "s1", "Note": "x"}]})
+    with pytest.raises(NotImplementedError):
+        db["stocks"].update_one({"UniqueID": "s1"}, {"$unset": {"Note": ""}})

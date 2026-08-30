@@ -32,9 +32,43 @@ def _matches_operator_clause(actual, clause, *, field_present=True):
                 return False
         elif operator == "$options":
             continue  # consumed by the $regex branch above
+        elif operator in ("$lt", "$lte", "$gt", "$gte"):
+            if actual is None:
+                return False
+            try:
+                if operator == "$lt" and not actual < operand:
+                    return False
+                if operator == "$lte" and not actual <= operand:
+                    return False
+                if operator == "$gt" and not actual > operand:
+                    return False
+                if operator == "$gte" and not actual >= operand:
+                    return False
+            except TypeError:
+                return False
         else:
             raise NotImplementedError(f"Unsupported query operator: {operator}")
     return True
+
+
+_MISSING = object()
+
+
+def _resolve_path(record, path):
+    """Resolve a dotted query path, returning (value, present).
+
+    _apply_set has always understood dotted paths, but _matches did not, so
+    a query like {"match.markerKeys": "Sb"} silently matched nothing instead
+    of raising -- the same silent-failure class as an update operator being
+    dropped. Real Mongo also matches a scalar against an array element, so
+    that is modelled here too.
+    """
+    current = record
+    for part in path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return _MISSING, False
+        current = current[part]
+    return current, True
 
 
 def _matches(record, query):
@@ -46,12 +80,17 @@ def _matches(record, query):
     for key, value in query.items():
         if key in ("$or", "$and"):
             continue
+        actual, present = _resolve_path(record, key)
+        if actual is _MISSING:
+            actual = None
         if isinstance(value, dict) and any(k.startswith("$") for k in value):
-            if not _matches_operator_clause(
-                record.get(key), value, field_present=key in record
-            ):
+            if not _matches_operator_clause(actual, value, field_present=present):
                 return False
-        elif record.get(key) != value:
+        elif isinstance(actual, list) and not isinstance(value, list):
+            # Mongo matches a scalar against any element of an array field.
+            if value not in actual:
+                return False
+        elif actual != value:
             return False
     return True
 
