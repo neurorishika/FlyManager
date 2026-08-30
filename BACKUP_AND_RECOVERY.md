@@ -88,6 +88,11 @@ Typical protected data includes:
 - activity logs
 - scheduler-related records stored in MongoDB
 - imported workbook data after it has been swapped into place
+- marker-image metadata and GridFS image bytes
+
+Marker images now add roughly 4.5 MB to each Mongo archive. The shipped
+library is stored in the same database consistency domain as uploaded images,
+so restoring Mongo cannot leave image metadata and bytes out of sync.
 
 ### Deployment-state archive scope
 
@@ -101,6 +106,13 @@ Protected items include:
 - `compose.production.yaml`
 - `deploy/Caddyfile`
 - optional Caddy `/data` and `/config` volume snapshots when `BACKUP_INCLUDE_CADDY` allows it and the selected Compose stack defines the `proxy` service
+
+The former 120 MB PNG phenotype library is no longer part of deployment
+state. Its normalized WebP seed is about 4.5 MB and remains committed under
+`data/markers/images`, so a fresh deployment self-populates Mongo even without
+a restore. The tradeoff is that an existing deployment's shipped images now
+depend on the Mongo archive rather than being reproduced solely from its
+Docker image.
 
 ### What is intentionally not included
 
