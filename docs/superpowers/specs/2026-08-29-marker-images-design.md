@@ -132,8 +132,11 @@ index on `match.markerKeys` and on `sha256`.
 
   match: {
     markerKeys: [],                 # exact binding to marker_definitions.Key
-    aliases:    [],                 # fuzzy tokens (how shipped entries match)
-    bodyPart:   "wing"              # gated by BODY_PART_ALIASES
+    aliases:    [],                 # declared fuzzy tokens (normalized)
+    stem:       "cu3",              # normalized filename stem, own tier
+    bodyPart:   "wing",             # gated by BODY_PART_ALIASES
+    manifestEntry: true,            # scoring flag, preserved from today
+    sourceCollection: "holtzman_and_kaufman"
   },
   display: {
     label, caption, credit, provenance,
@@ -179,13 +182,20 @@ on the content hash makes it idempotent, safe to re-run, and safe on a fresh
 deploy or an existing one alike. This mirrors how `catalog.json` seeds
 `marker_definitions` in slice A.
 
-**The alias conversion is the substantive migration.** Today a scanned entry
-can match through its *filename stem* at runtime (`image_library.py:190`,
-`allow_stem_fallback`). The seed builder resolves those stems into explicit
-`match.aliases` at build time, so the runtime has one rule --- score against
-declared aliases --- with no stem-fallback branch. This is the highest-risk
-part of the slice: it is where a marker could silently lose the image it shows
-today. Part 8 covers how it is pinned down.
+**The migration preserves the scoring tiers rather than collapsing them.** An
+earlier draft of this design had the seed builder resolve filename stems into
+`match.aliases`, leaving one fuzzy rule at runtime. That is wrong.
+`_score_entry` (`image_library.py:181-211`) scores a stem-exact hit at **100**,
+a declared-alias hit at **98**, and stem prefix/substring hits at **88**/**72**.
+Folding stems into aliases collapses four tiers into one and inverts the
+relative order of entries that differ only in how they matched.
+
+The seed therefore carries `match.stem` as its own field alongside
+`match.aliases`, plus the `manifestEntry` and `sourceCollection` flags the
+scorer's bonuses read. What migrates is the entry *source* --- filesystem scan
+to database --- not the scoring algorithm, which is ported unchanged. This
+makes shipped-image behavior identical by construction rather than by
+after-the-fact testing.
 
 ### Part 4 --- Compilation and freshness
 
@@ -215,19 +225,23 @@ stays entirely in-process.
 and their callers (`cross.py:95,110,141` and `stock.py:60,69`). The `base_dir`
 parameter is dropped --- there is no directory any more.
 
-One scorer over catalog entries:
+One scorer over catalog entries, built by adding a single tier on top of
+today's algorithm:
 
 1. **Exact key match** --- the marker's `Key` is in `entry.match.markerKeys`.
-   Scores above any alias match.
-2. **Alias match** --- scored as today, using the marker aliases
-   `_marker_aliases` already derives (which include `get_catalog()`'s
-   `image_aliases`, plus `EPISTASIS_IMAGE_ALIASES`).
+   Scores **1000**, above the fuzzy ceiling of 121 (stem-exact 100, plus body
+   part 8, `learning_to_fly` 4, manifest 6, priority up to 3).
+2. **Fuzzy match** --- `_score_entry` ported verbatim, reading `match.stem`,
+   `match.aliases`, `match.manifestEntry` and `match.sourceCollection` off the
+   catalog entry instead of a filesystem dict. Marker-side aliases still come
+   from `_marker_aliases`, which already folds in `get_catalog()`'s
+   `image_aliases` and `EPISTASIS_IMAGE_ALIASES`.
 3. **Body-part gate** --- unchanged, still `BODY_PART_ALIASES`.
-4. Ties broken by `(display.priority, display.sortOrder, imageId)` --- a total
-   order, never dependent on set or dict iteration.
+4. Ties broken by `(-score, display.sortOrder, imageId)` --- a total order,
+   never dependent on set or dict iteration.
 
-"An upload beats a fuzzy library match" is therefore a consequence of rule 1
-outranking rule 2, not a special case in the code.
+"An upload beats a fuzzy library match" is a consequence of tier 1 outranking
+tier 2 numerically, not a special case in the code.
 
 Each returned match carries a URL built from `imageId`, replacing today's
 relative path.
@@ -339,9 +353,11 @@ TDD against `FakeDatabase` plus `MemoryImageStore`. Load-bearing cases:
 - **Port the existing shipped-library assertions** ---
   `tests/test_phenotype_routes.py:446-530` currently pins ebony, yellow, roi,
   bc, me and wa matches against the real library. These must resolve to the
-  same images through the new path. This is the primary guard on the Part 3
-  alias conversion.
-- Exact `markerKeys` outranks a higher-scoring alias match.
+  same images through the new path.
+- **Scoring parity harness:** for all 254 shipped entries, the ported scorer's
+  output equals the pre-migration scorer's output for a fixed marker set. This
+  is the primary guard on Part 3 and is worth writing before the seed lands.
+- Exact `markerKeys` outranks a stem-exact fuzzy match (1000 > 121).
 - The body-part gate still excludes cross-body-part matches.
 - `EPISTASIS_IMAGE_ALIASES` still resolves the mini-white rescue key.
 - Ordering is stable under `PYTHONHASHSEED=random` across repeated runs.
