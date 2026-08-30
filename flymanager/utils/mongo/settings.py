@@ -37,7 +37,10 @@ def get_settings(db: Database) -> dict:
         if key not in settings
     }
     if missing:
-        db['settings'].update_one({'_id': settings['_id']}, {'$set': missing})
+        # Addressed by {} like every other write to this singleton, rather
+        # than by _id: the collection holds exactly one document, and this
+        # does not assume the caller's copy carries an _id.
+        db['settings'].update_one({}, {'$set': missing})
         settings.update(missing)
     return settings
 
