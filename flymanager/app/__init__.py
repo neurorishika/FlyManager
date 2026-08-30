@@ -11,7 +11,8 @@ import secrets
 from datetime import timedelta
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, render_template, session, url_for
+from flask import (Flask, flash, jsonify, redirect, render_template, request,
+                   session, url_for)
 from flask_apscheduler import APScheduler
 from flask_cors import CORS
 from flask_mail import Mail
@@ -164,10 +165,6 @@ def create_app():
     )
     app.config["SESSION_COOKIE_SECURE"] = secure_cookie_enabled
     app.config["UPLOAD_FOLDER"] = os.getenv("UPLOAD_FOLDER", "data/uploads")
-    app.config["PHENOTYPE_IMAGE_LIBRARY_PATH"] = os.getenv(
-        "FLYMANAGER_PHENOTYPE_IMAGE_LIBRARY_PATH",
-        os.path.abspath(os.path.join(app.root_path, "..", "..", "data", "phenotype_images")),
-    )
     app.config["MAX_CONTENT_LENGTH"] = int(
         os.getenv("MAX_UPLOAD_SIZE_BYTES", str(8 * 1024 * 1024))
     )
@@ -275,6 +272,26 @@ def create_app():
             maybe_refresh_catalog(db)
         except Exception as exc:
             app.logger.warning("Unable to refresh the marker catalog: %s", exc)
+        try:
+            from flymanager.utils.phenotypes.image_catalog import \
+                maybe_refresh_image_catalog
+            maybe_refresh_image_catalog(db)
+        except Exception as exc:
+            app.logger.warning("Unable to refresh the marker image catalog: %s", exc)
+
+    @app.errorhandler(413)
+    def handle_payload_too_large(error):
+        """Turn an oversized upload into a flash, but only where that fits.
+
+        MAX_CONTENT_LENGTH is 8MB app-wide, so this fires for data imports
+        and API calls too. Redirecting those -- and telling them about a 2MB
+        image limit they never hit -- would be wrong, so anything outside the
+        markers blueprint keeps the plain 413.
+        """
+        if request.blueprint != "markers":
+            return error
+        flash("That image is too large. Images must be 2 MB or smaller.", "danger")
+        return redirect(request.referrer or url_for("main.home"))
 
     with app.app_context():
         # Fail fast: a malformed shipped catalog must not become a 500 on a
@@ -282,6 +299,23 @@ def create_app():
         from flymanager.utils.phenotypes.marker_catalog import get_catalog
 
         get_catalog()
+
+        # Seed bytes and metadata share Mongo's backup domain. A corrupt or
+        # unreadable committed seed is a startup failure, just like catalog.json.
+        from flymanager.utils.phenotypes.image_catalog import refresh_image_catalog
+        from flymanager.utils.phenotypes.image_seed import load_image_seed
+        from flymanager.utils.phenotypes.image_store import GridFSImageStore
+
+        # Bootstrap the settings singleton before anything $inc-upserts a
+        # revision counter into it. get_settings backfills missing keys now,
+        # but creating the document from its owner keeps the ordering
+        # obvious rather than relying on the repair path on every boot.
+        from flymanager.utils.mongo.settings import get_settings
+
+        get_settings(db)
+
+        load_image_seed(db, GridFSImageStore(db))
+        refresh_image_catalog(db, force=True)
 
         # --- Import and Register Blueprints ---
         from flymanager.app.routes import (auth, cross, data, flip, jobs,

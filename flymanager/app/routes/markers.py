@@ -7,8 +7,8 @@ rebuild for everyone else's stored predictions.
 """
 import json
 
-from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
-                   request, session, url_for)
+from flask import (Blueprint, abort, current_app, flash, jsonify, redirect,
+                   render_template, request, send_file, session, url_for)
 
 from flymanager.app import db
 from flymanager.app.jobs import enqueue_job
@@ -16,6 +16,7 @@ from flymanager.app.jobs import tasks as job_tasks
 from flymanager.app.routes.auth import login_required
 from flymanager.app.security import get_json_payload, limiter
 from flymanager.utils.mongo import OperationLockConflict
+from flymanager.utils.mongo.activity import write_activity
 from flymanager.utils.mongo.marker_definitions import (
     MarkerDefinitionError, can_edit_marker_definition, create_marker_definition,
     delete_marker_definition, get_marker_definition, list_marker_definitions,
@@ -23,6 +24,12 @@ from flymanager.utils.mongo.marker_definitions import (
 from flymanager.utils.phenotypes.marker_catalog import (MARKER_KINDS,
                                                          get_catalog,
                                                          refresh_catalog)
+from flymanager.utils.phenotypes.image_catalog import (
+    bump_image_revision, get_image_catalog, refresh_image_catalog)
+from flymanager.utils.phenotypes.image_normalize import (
+    ImageRejected, MAX_UPLOAD_BYTES, normalize_image)
+from flymanager.utils.phenotypes.image_seed import upsert_image_entry
+from flymanager.utils.phenotypes.image_store import GridFSImageStore, ImageNotFound
 
 bp = Blueprint("markers", __name__)
 
@@ -164,10 +171,120 @@ def marker_detail(key):
     return render_template(
         "markers/detail.html", page_title=f"Marker: {key}",
         definition=definition, kinds=MARKER_KINDS,
+        images=get_image_catalog()["by_marker_key"].get(key, []),
         can_edit=can_edit_marker_definition(definition, username),
         can_promote=(username == "admin" and definition.get("origin") == "user"),
         is_shipped=(definition.get("origin") == "shipped"),
     )
+
+
+@bp.post("/markers/<path:key>/images")
+@login_required
+@limiter.limit("20 per minute")
+def upload_marker_image(key):
+    # The in-process catalog can be up to one probe interval behind, so a
+    # marker created seconds ago by another worker would 404 here. Fall back
+    # to the overlay collection before refusing.
+    if key not in get_catalog()["definitions"] and get_marker_definition(db, key) is None:
+        abort(404)
+    uploaded = request.files.get("image")
+    if uploaded is None:
+        flash("No image was submitted.", "danger")
+        return redirect(url_for("markers.marker_detail", key=key))
+    raw = uploaded.read(MAX_UPLOAD_BYTES + 1)
+    if len(raw) > MAX_UPLOAD_BYTES:
+        flash("Images must be 2 MB or smaller.", "danger")
+        return redirect(url_for("markers.marker_detail", key=key))
+    try:
+        normalized = normalize_image(raw)
+    except ImageRejected as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("markers.marker_detail", key=key))
+    entry, created, bound = upsert_image_entry(
+        db, GridFSImageStore(db), normalized, marker_key=key,
+        uploaded_by=session.get("username", ""),
+        display={"caption": request.form.get("caption", "").strip()},
+    )
+    refresh_image_catalog(db, force=True)
+    if created:
+        action = f"Uploaded image {entry['imageId']} for marker {key}"
+        message = "Image uploaded."
+    elif bound:
+        # Identical bytes already existed; this binds them to another marker
+        # rather than storing a second copy.
+        action = f"Linked existing image {entry['imageId']} to marker {key}"
+        message = "That image was already stored, so it was linked to this marker."
+    else:
+        action = f"Re-uploaded image {entry['imageId']} already on marker {key}"
+        message = "That image is already on this marker."
+    write_activity(session.get("username", ""), action, db)
+    flash(message, "success" if created or bound else "info")
+    return redirect(url_for("markers.marker_detail", key=key))
+
+
+@bp.get("/markers/images/<image_id>")
+@login_required
+@limiter.limit("60 per minute")
+def serve_marker_image(image_id):
+    entry = db["marker_images"].find_one({"imageId": image_id})
+    if entry is None:
+        abort(404)
+    try:
+        stream = GridFSImageStore(db).open(entry["storageId"])
+    except (ImageNotFound, KeyError):
+        current_app.logger.warning("Marker image %s has missing bytes", image_id)
+        abort(404)
+    response = send_file(stream, mimetype=entry.get("contentType", "image/webp"),
+                         conditional=True)
+    response.set_etag(entry["sha256"])
+    response.headers["Cache-Control"] = "private, max-age=31536000, immutable"
+    return response.make_conditional(request)
+
+
+@bp.post("/markers/images/<image_id>/delete")
+@login_required
+def delete_marker_image(image_id):
+    entry = db["marker_images"].find_one({"imageId": image_id})
+    if entry is None:
+        abort(404)
+    username = session.get("username", "")
+    is_admin = username == "admin"
+    if entry.get("origin") == "shipped" and not is_admin:
+        abort(403)
+    if not is_admin and entry.get("UploadedBy") != username:
+        abort(403)
+    marker_keys = list((entry.get("match") or {}).get("markerKeys") or [])
+    unbind_key = request.form.get("marker_key", "").strip()
+    if unbind_key and unbind_key not in marker_keys:
+        # A stale form (the image was already unbound elsewhere) must not
+        # fall through to destroying the image for every other marker.
+        abort(409)
+
+    if unbind_key and len(marker_keys) > 1:
+        # $pull rather than writing back a list computed before a concurrent
+        # bind, which would resurrect or drop keys under 12 threads.
+        db["marker_images"].update_one(
+            {"imageId": image_id}, {"$pull": {"match.markerKeys": unbind_key}})
+        action = f"Unlinked image {image_id} from marker {unbind_key}"
+        message = "Image removed from this marker."
+    else:
+        # Delete the metadata first: an orphaned blob is inert, whereas a
+        # document pointing at bytes that are already gone renders broken.
+        db["marker_images"].delete_one({"imageId": image_id})
+        try:
+            GridFSImageStore(db).delete(entry["storageId"])
+        except Exception as exc:
+            current_app.logger.warning(
+                "Orphaned GridFS bytes %s for deleted image %s: %s",
+                entry.get("storageId"), image_id, exc)
+        action = f"Deleted marker image {image_id}"
+        message = "Image deleted."
+
+    bump_image_revision(db)
+    refresh_image_catalog(db, force=True)
+    write_activity(username, action, db)
+    flash(message, "success")
+    return redirect(request.referrer or url_for("markers.marker_catalog"))
 
 
 @bp.post("/markers")

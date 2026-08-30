@@ -23,6 +23,7 @@ def _run(key, work):
     app = get_worker_app()
     with app.app_context():
         from flymanager.app import db
+        from flymanager.utils.phenotypes.image_catalog import refresh_image_catalog
         from flymanager.utils.phenotypes.marker_catalog import refresh_catalog
 
         # The worker has no before_request hook, so its marker catalog would
@@ -31,6 +32,7 @@ def _run(key, work):
         # against a stale marker set.
         try:
             refresh_catalog(db)
+            refresh_image_catalog(db)
         except Exception:
             app.logger.exception("Unable to refresh the marker catalog before job %s", key)
 

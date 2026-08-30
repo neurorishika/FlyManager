@@ -427,6 +427,8 @@ def refresh_flybase_reference_data(
                         refresh_catalog
 
                     refresh_catalog(db)
+                    from flymanager.utils.phenotypes.image_catalog import refresh_image_catalog
+                    refresh_image_catalog(db)
                 except Exception:
                     app.logger.exception(
                         "Unable to refresh the marker catalog before rebuilding phenotype caches"

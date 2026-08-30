@@ -49,6 +49,51 @@
             </div>
         </div>
 
+        <div class="app-panel mt-3 marker-images">
+            <div class="app-form-section">
+                <div>
+                    <h2 class="app-form-section-title">Images</h2>
+                    <p class="app-form-section-copy">Reference images attached to this marker are visible to everyone.</p>
+                </div>
+                <div class="row">
+                    {% for image in images %}
+                    <figure class="col-md-6">
+                        <img class="img-fluid rounded" src="{{ url_for('markers.serve_marker_image', image_id=image.imageId) }}"
+                             alt="{{ image.display.label or definition.Key }}" loading="lazy">
+                        <figcaption class="mt-1 small">
+                            {% if image.display.caption %}<div>{{ image.display.caption }}</div>{% endif %}
+                            {% if image.display.credit %}<div class="text-muted">{{ image.display.credit }}</div>{% endif %}
+                            {% if image.display.provenance %}<div class="text-muted">{{ image.display.provenance }}</div>{% endif %}
+                            <div class="text-muted">Uploaded by {{ image.UploadedBy or "FlyManager" }}</div>
+                            {% if image.origin == 'user' or session.get('username') == 'admin' %}
+                            <form method="post" action="{{ url_for('markers.delete_marker_image', image_id=image.imageId) }}" class="mt-1">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="marker_key" value="{{ definition.Key }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                            {% endif %}
+                        </figcaption>
+                    </figure>
+                    {% else %}
+                    <p class="col-12 text-muted">No images yet.</p>
+                    {% endfor %}
+                </div>
+                <form method="post" action="{{ url_for('markers.upload_marker_image', key=definition.Key) }}" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="form-group">
+                        <label for="markerImage">Upload image</label>
+                        <input id="markerImage" class="form-control-file" type="file" name="image" accept="image/png,image/jpeg,image/gif,image/webp" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="markerImageCaption">Caption (optional)</label>
+                        <input id="markerImageCaption" class="form-control" type="text" name="caption" maxlength="500">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Upload image</button>
+                    <small class="form-text text-muted">PNG, JPEG, GIF or WebP, up to 2 MB. Stored as WebP.</small>
+                </form>
+            </div>
+        </div>
+
         <div class="app-panel mt-3">
             <div class="app-form-section">
                 <div>
@@ -98,8 +143,8 @@
                 <div class="form-group mb-2">
                     <label>imaging</label>
                     <pre class="app-inline-note mb-0">{{ definition.get("imaging", {}) | tojson(indent=2) }}</pre>
-                    <small class="text-muted">Image aliases live here; <code>imaging.images</code> is intentionally
-                        empty in this release &mdash; a later slice (marker images) fills it in.</small>
+                    <small class="text-muted">Image aliases live here; <code>imaging.images</code> remains empty
+                        because image metadata is stored separately and does not affect prediction signatures.</small>
                 </div>
                 <div class="form-group mb-2">
                     <label>expression</label>

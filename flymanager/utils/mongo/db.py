@@ -75,6 +75,9 @@ def ensure_mongo_indexes(db):
     db["operation_locks"].create_index("expires_at", expireAfterSeconds=0, name="operation_locks_expires_at")
 
     db["marker_definitions"].create_index("Key", unique=True, name="marker_definitions_key")
+    db["marker_images"].create_index("imageId", unique=True, name="marker_images_image_id")
+    db["marker_images"].create_index("match.markerKeys", name="marker_images_marker_keys")
+    db["marker_images"].create_index("sha256", name="marker_images_sha256")
 
 
 def ping_database(db):
