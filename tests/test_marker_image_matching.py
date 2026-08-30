@@ -29,10 +29,18 @@ def test_exact_binding_beats_fuzzy_and_returns_content_url():
 
 
 def test_body_part_gate_excludes_mismatch():
+    """The marker still gets a row; it just gets no image.
+
+    The selector now emits one row per marker so nothing vanishes from a
+    phenotype view, so "excluded" means has_image is False rather than an
+    empty result.
+    """
     image_catalog.set_image_catalog_for_testing(image_catalog.compile_image_catalog([
         _entry("img_eye", stem="sb", body="eye")]))
-    assert select_phenotype_reference_images([
-        {"key": "Sb[1]", "display_label": "Sb", "body_part": "wing"}]) == []
+    rows = select_phenotype_reference_images([
+        {"key": "Sb[1]", "display_label": "Sb", "body_part": "wing"}])
+    assert [r["has_image"] for r in rows] == [False]
+    assert rows[0]["image_id"] is None
 
 
 def test_upload_binds_to_a_real_resolver_marker_not_a_hand_made_stub():

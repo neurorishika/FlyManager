@@ -145,9 +145,37 @@ def _select_reference_markers_from_prediction(prediction):
     return []
 
 
-def select_phenotype_reference_images(markers, *, limit=6):
+def _definition_key_for(marker):
+    """The catalog Key this marker is filed under, or None.
+
+    Used to link an imageless marker straight to the page where its image
+    can be uploaded. _marker_definition_keys returns candidates in priority
+    order (allele_token before gene_stem, and so on); the first that names a
+    real definition wins. A marker with no definition -- a bare label parsed
+    out of a summary string, say -- yields None, and the UI must then send
+    the user to the catalog rather than to a 404.
+    """
+    catalog = get_catalog()
+    sections = ("definitions", "gene_markers", "allele_markers", "aliases",
+                "balancers")
+    for candidate in _marker_definition_keys(marker):
+        for section in sections:
+            if candidate in (catalog.get(section) or {}):
+                return candidate
+    return None
+
+
+def select_phenotype_reference_images(markers, *, limit=None):
+    """One row per marker, whether or not an image was found.
+
+    Rows for unmatched markers carry has_image=False with image_id and
+    image_url set to None, so a caller can render a placeholder instead of
+    silently omitting the marker. `limit` defaults to no cap: capping this
+    list drops whole markers from a phenotype view, which is what made
+    predicted markers disappear without explanation.
+    """
     entries = get_image_catalog()["entries"]
-    matches, seen_images, seen_markers = [], set(), set()
+    rows, seen_markers = [], set()
     for marker in markers or []:
         identity = (marker.get("phenotype_key"), marker.get("display_label"), marker.get("allele_token"))
         if identity in seen_markers:
@@ -156,31 +184,35 @@ def select_phenotype_reference_images(markers, *, limit=6):
         aliases = _marker_aliases(marker)
         if not aliases and not _marker_definition_keys(marker):
             continue
+
         best_entry, best_score = None, 0
         for entry in entries:
             score = _score_entry(marker, aliases, entry)
             if score > best_score:
                 best_entry, best_score = entry, score
-        if best_entry is None:
-            continue
-        image_id = best_entry["imageId"]
-        if image_id in seen_images:
-            continue
-        seen_images.add(image_id)
-        display = best_entry.get("display") or {}
-        matches.append({
-            "image_id": image_id, "image_url": f"/markers/images/{image_id}",
+
+        # Deliberately no de-duplication across markers: when two markers
+        # share a best image (both carried on TM6B, for instance), showing
+        # it twice is honest, whereas dropping the second marker loses it
+        # from the view entirely.
+        display = (best_entry or {}).get("display") or {}
+        image_id = best_entry["imageId"] if best_entry else None
+        rows.append({
+            "image_id": image_id,
+            "image_url": f"/markers/images/{image_id}" if image_id else None,
+            "has_image": best_entry is not None,
+            "marker_key": _definition_key_for(marker),
             "display_label": marker.get("display_label", marker.get("gene_stem", "?")),
             "body_part": marker.get("body_part", ""), "effect": marker.get("effect", ""),
-            "source_collection": _entry_field(best_entry, "sourceCollection"),
+            "source_collection": _entry_field(best_entry, "sourceCollection") if best_entry else "",
             "source_name": display.get("sourceName", ""), "provenance": display.get("provenance", ""),
             "credit": display.get("credit", ""), "source_url": display.get("sourceUrl", ""),
             "notes": display.get("caption", ""), "match_score": best_score,
         })
-        if len(matches) >= limit:
+        if limit is not None and len(rows) >= limit:
             break
-    return matches
+    return rows
 
 
-def select_prediction_reference_images(prediction, *, limit=6):
+def select_prediction_reference_images(prediction, *, limit=None):
     return select_phenotype_reference_images(_select_reference_markers_from_prediction(prediction or {}), limit=limit)

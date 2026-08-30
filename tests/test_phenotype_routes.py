@@ -416,7 +416,9 @@ def test_manifest_entries_do_not_cross_match_wrong_body_part_or_stem(monkeypatch
         }],
     )
 
-    assert matches == []
+    # The selector now emits a row per marker so nothing vanishes from a
+    # phenotype view; "no cross-match" means the row carries no image.
+    assert [m["has_image"] for m in matches] == [False]
 
     matches = select_phenotype_reference_images(
         [{
@@ -426,7 +428,7 @@ def test_manifest_entries_do_not_cross_match_wrong_body_part_or_stem(monkeypatch
         }],
     )
 
-    assert matches == []
+    assert [m["has_image"] for m in matches] == [False]
 
 
 def test_repo_phenotype_image_manifest_accounts_for_every_library_image():

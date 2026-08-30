@@ -275,7 +275,7 @@ def phenotype_preview():
 
         prediction = _decorate_prediction_for_view(
             predict_individual_phenotype(genotype, sex),
-            image_limit=4,
+            image_limit=None,
         )
         return jsonify(
             {
@@ -301,7 +301,7 @@ def phenotype_preview():
     if genotype:
         prediction = _decorate_prediction_for_view(
             predict_individual_phenotype(genotype, sex),
-            image_limit=4,
+            image_limit=None,
         )
 
     preview_metadata = _get_phenotype_preview_metadata()

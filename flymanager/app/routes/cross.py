@@ -94,7 +94,6 @@ def _get_cross_phenotype_for_view(cross):
                 "sterile_alleles": parent_phenotypes.get("male", {}).get("sterile_alleles", []),
                 "reference_images": select_prediction_reference_images(
                     parent_phenotypes.get("male", {}),
-                    limit=3,
                 ),
             },
             "female": {
@@ -108,7 +107,6 @@ def _get_cross_phenotype_for_view(cross):
                 "sterile_alleles": parent_phenotypes.get("female", {}).get("sterile_alleles", []),
                 "reference_images": select_prediction_reference_images(
                     parent_phenotypes.get("female", {}),
-                    limit=3,
                 ),
             },
         }
@@ -138,7 +136,6 @@ def _get_cross_phenotype_for_view(cross):
                         "stage_specific_effects": phenotype.get("stage_specific_effects", []),
                         "reference_images": select_prediction_reference_images(
                             phenotype,
-                            limit=3,
                         ),
                     },
                     "identifiability": {

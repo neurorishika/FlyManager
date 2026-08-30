@@ -37,7 +37,11 @@ def test_image_matching_reproduces_captured_filesystem_baseline():
     baseline = json.loads(Path("tests/fixtures/image_scoring_baseline.json").read_text())
     mismatches = []
     for record in baseline:
-        actual = select_phenotype_reference_images([record["marker"]])
+        # The selector now returns a row per marker, including markers with
+        # no image. Parity is still about which IMAGES get selected, so
+        # compare only the rows that carry one.
+        actual = [r for r in select_phenotype_reference_images([record["marker"]])
+                  if r["has_image"]]
         got = [paths[match["image_id"]] for match in actual]
         expected = [match["relative_path"] for match in record["matches"]]
         if got != expected:
