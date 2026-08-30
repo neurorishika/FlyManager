@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% import "_phenotype_images_macro.html" as phenotype_images %}
 
 {% block head %}
 <link href="{{ url_for('static', filename='vendor/tagify/tagify.css') }}" rel="stylesheet" type="text/css" />
@@ -6,6 +7,7 @@
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/view_cross.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/phenotype_images.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -140,24 +142,7 @@
                     {% if parent_phenotypes.male.split_system_labels %}
                     <div class="small text-muted mt-1">Split systems: {{ parent_phenotypes.male.split_system_labels|join(' · ') }}</div>
                     {% endif %}
-                    {% if parent_phenotypes.male.reference_images %}
-                    <div class="form-row mt-2">
-                        {% for image in parent_phenotypes.male.reference_images %}
-                        <div class="col-md-4 mb-2">
-                            <div class="card h-100">
-                                <img class="card-img-top parent-reference-image" src="{{ image.image_url }}" alt="Reference image for {{ image.display_label }}">
-                                <div class="card-body p-2">
-                                    <div><strong>{{ image.display_label }}</strong></div>
-                                    <div class="small text-muted">{{ image.source_name or image.source_collection|replace('_', ' ') }}</div>
-                                    {% if image.provenance %}
-                                    <div class="small text-muted">{{ image.provenance }}</div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
+                    {{ phenotype_images.render_phenotype_images(parent_phenotypes.male.reference_images) }}
                 </div>
                 <div class="form-group col-md-6">
                     <label>Female phenotype preview</label>
@@ -170,24 +155,7 @@
                     {% if parent_phenotypes.female.split_system_labels %}
                     <div class="small text-muted mt-1">Split systems: {{ parent_phenotypes.female.split_system_labels|join(' · ') }}</div>
                     {% endif %}
-                    {% if parent_phenotypes.female.reference_images %}
-                    <div class="form-row mt-2">
-                        {% for image in parent_phenotypes.female.reference_images %}
-                        <div class="col-md-4 mb-2">
-                            <div class="card h-100">
-                                <img class="card-img-top parent-reference-image" src="{{ image.image_url }}" alt="Reference image for {{ image.display_label }}">
-                                <div class="card-body p-2">
-                                    <div><strong>{{ image.display_label }}</strong></div>
-                                    <div class="small text-muted">{{ image.source_name or image.source_collection|replace('_', ' ') }}</div>
-                                    {% if image.provenance %}
-                                    <div class="small text-muted">{{ image.provenance }}</div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
+                    {{ phenotype_images.render_phenotype_images(parent_phenotypes.female.reference_images) }}
                 </div>
             </div>
             <div class="form-row mb-3">
@@ -455,16 +423,29 @@
                                 {% if offspring.yield_estimate.expected_targets_per_vial %}
                                 <div class="small text-muted mt-1">Estimated targets per vial: {{ offspring.yield_estimate.expected_targets_per_vial }} · {{ offspring.yield_estimate.yield_label|title }} yield · {{ offspring.yield_estimate.recommended_parallel_vials }} parallel vials</div>
                                 {% endif %}
-                                {% if offspring.phenotype.reference_images %}
+                                {# Offspring rows stay compact: this grid sits inside a
+                                   table cell across many rows, so it shows only markers
+                                   that actually have an image. The parent previews above
+                                   carry the placeholders and upload links. #}
+                                {% set offspring_images = offspring.phenotype.reference_images | selectattr('has_image') | list %}
+                                {% if offspring_images %}
                                 <div class="offspring-phenotype-images">
-                                    {% for image in offspring.phenotype.reference_images %}
-                                    <div class="offspring-phenotype-image-card">
-                                        <img src="{{ image.image_url }}" alt="Reference image for {{ image.display_label }}">
+                                    {% for image in offspring_images %}
+                                    <button type="button" class="offspring-phenotype-image-card js-phenotype-image-zoom"
+                                            data-zoom-src="{{ image.image_url }}"
+                                            data-zoom-label="{{ image.display_label }}"
+                                            data-zoom-body-part="{{ image.body_part or 'phenotype' }}"
+                                            data-zoom-effect="{{ image.effect or '' }}"
+                                            data-zoom-source="{{ image.source_name or image.source_collection|replace('_', ' ') }}"
+                                            data-zoom-provenance="{{ image.provenance or '' }}"
+                                            data-zoom-credit="{{ image.credit or '' }}"
+                                            aria-label="Enlarge reference image for {{ image.display_label }}">
+                                        <img src="{{ image.image_url }}" alt="Reference image for {{ image.display_label }}" loading="lazy">
                                         <div class="offspring-phenotype-image-card-body">
                                             <span class="offspring-phenotype-image-title">{{ image.display_label }}</span>
                                             <span class="offspring-phenotype-image-source">{{ image.source_name or image.source_collection|replace('_', ' ') }}</span>
                                         </div>
-                                    </div>
+                                    </button>
                                     {% endfor %}
                                 </div>
                                 {% endif %}
@@ -490,6 +471,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/marker_image_zoom.js') }}"></script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.min.js') }}"></script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.polyfills.min.js') }}"></script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/field_edit.js') }}"></script>

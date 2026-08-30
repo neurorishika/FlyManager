@@ -1,0 +1,162 @@
+/* Phenotype reference-image cards: shared by the stock viewer, the cross
+ * viewer and the standalone preview, which each used to carry their own
+ * copy of this markup. Card and grid rules live in the per-page sheets;
+ * this file adds only what the shared macro introduces -- the empty state,
+ * the hover affordance and the zoom overlay. */
+
+/* --- clickable media -------------------------------------------------- */
+
+button.stock-phenotype-image-media {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: zoom-in;
+    overflow: hidden;
+}
+
+button.stock-phenotype-image-media img {
+    transition: transform 160ms ease-out;
+}
+
+/* Hover is a preview affordance only; the click-through overlay is the
+ * accessible path, so nothing here is required to inspect an image. */
+button.stock-phenotype-image-media:hover img,
+button.stock-phenotype-image-media:focus-visible img {
+    transform: scale(1.08);
+}
+
+button.stock-phenotype-image-media:focus-visible {
+    outline: 2px solid var(--primary-color, #7c4dff);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    button.stock-phenotype-image-media img {
+        transition: none;
+    }
+    button.stock-phenotype-image-media:hover img,
+    button.stock-phenotype-image-media:focus-visible img {
+        transform: none;
+    }
+}
+
+/* --- the "no image yet" card ----------------------------------------- */
+
+.stock-phenotype-image-card-empty {
+    border-style: dashed;
+}
+
+.stock-phenotype-image-media-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs, 0.35rem);
+    aspect-ratio: 4 / 3;
+    color: var(--text-muted, #8a8a99);
+    background: color-mix(in srgb, var(--bg-color) 94%, var(--card-bg) 6%);
+}
+
+.stock-phenotype-image-empty-mark {
+    font-size: 1.6rem;
+    opacity: 0.5;
+}
+
+.stock-phenotype-image-empty-text {
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+}
+
+.stock-phenotype-image-add-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+}
+
+/* --- zoom overlay ----------------------------------------------------- */
+
+body.phenotype-zoom-open {
+    overflow: hidden;
+}
+
+.phenotype-zoom-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000; /* above the sticky header (1030) and Bootstrap modals */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-lg, 1.5rem);
+}
+
+.phenotype-zoom-overlay[hidden] {
+    display: none;
+}
+
+.phenotype-zoom-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.78);
+}
+
+.phenotype-zoom-panel {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm, 0.75rem);
+    max-width: min(96vw, 1100px);
+    max-height: 92vh;
+    margin: 0;
+    padding: var(--space-md, 1rem);
+    border-radius: var(--radius-lg, 12px);
+    background: var(--card-bg, #1e1e24);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+.phenotype-zoom-image {
+    max-width: 100%;
+    /* Leave room for the caption so a tall image cannot push it off-screen. */
+    max-height: calc(92vh - 9rem);
+    object-fit: contain;
+    border-radius: var(--radius-sm, 6px);
+    background: #000;
+}
+
+.phenotype-zoom-caption {
+    display: grid;
+    gap: 0.15rem;
+}
+
+.phenotype-zoom-title {
+    font-weight: 600;
+    font-size: 1.05rem;
+}
+
+.phenotype-zoom-effect,
+.phenotype-zoom-meta,
+.phenotype-zoom-credit {
+    font-size: 0.85rem;
+    color: var(--text-muted, #9a9aa8);
+}
+
+.phenotype-zoom-close {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    cursor: pointer;
+}
+
+.phenotype-zoom-close:focus-visible {
+    outline: 2px solid var(--primary-color, #7c4dff);
+    outline-offset: 2px;
+}

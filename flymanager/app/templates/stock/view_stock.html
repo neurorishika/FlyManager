@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_phenotype_images_macro.html" as phenotype_images %}
 
 {% block title %}Stock Viewer{% endblock %}
 
@@ -8,6 +9,7 @@
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/view_stock.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/phenotype_images.css') }}">
 {% endblock %}
 
 
@@ -331,28 +333,7 @@
                         <span class="stock-phenotype-pill">Manual refresh required</span>
                         {% endif %}
                     </div>
-                    {% if stock_phenotype.reference_images %}
-                    <div class="stock-phenotype-image-grid">
-                        {% for image in stock_phenotype.reference_images %}
-                        <div class="stock-phenotype-image-card">
-                            <div class="stock-phenotype-image-media">
-                                <img src="{{ image.image_url }}" alt="Reference image for {{ image.display_label }}">
-                            </div>
-                            <div class="stock-phenotype-image-card-body">
-                                <div class="stock-phenotype-image-card-title">{{ image.display_label }}</div>
-                                <div class="stock-phenotype-image-card-copy">{{ image.effect or 'Reference example from the local phenotype image library.' }}</div>
-                                <div class="stock-phenotype-image-card-meta">{{ image.body_part or 'phenotype' }}{% if image.source_name or image.source_collection %} · {{ image.source_name or image.source_collection|replace('_', ' ') }}{% endif %}</div>
-                                {% if image.provenance %}
-                                <div class="stock-phenotype-image-card-copy mt-1">{{ image.provenance }}</div>
-                                {% endif %}
-                                {% if image.credit %}
-                                <div class="stock-phenotype-image-card-copy mt-1">{{ image.credit }}</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
+                    {{ phenotype_images.render_phenotype_images(stock_phenotype.reference_images) }}
                 </div>
                 <div class="span-4 app-view-field">
                     <label>Female Projection</label>
@@ -523,6 +504,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/marker_image_zoom.js') }}"></script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.min.js') }}"></script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.polyfills.min.js') }}"></script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/field_edit.js') }}"></script>

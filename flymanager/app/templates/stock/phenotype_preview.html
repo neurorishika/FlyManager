@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 
+{% import "_phenotype_images_macro.html" as phenotype_images %}
 {% block title %}Phenotype Sandbox{% endblock %}
 
 {% block head %}
@@ -8,6 +9,7 @@
 
 {% block page_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/phenotype_preview.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/phenotype_images.css') }}">
 {% endblock %}
 
 
@@ -140,24 +142,9 @@
                 <div class="app-view-value multiline">{{ preview_prediction.stage_specific_effects|join(' · ') }}</div>
             </div>
             {% endif %}
-            {% if preview_prediction.reference_images %}
             <div class="span-12">
-                <div class="stock-phenotype-image-grid">
-                    {% for image in preview_prediction.reference_images %}
-                    <div class="stock-phenotype-image-card">
-                        <div class="stock-phenotype-image-media">
-                            <img src="{{ image.image_url }}" alt="Reference image for {{ image.display_label }}">
-                        </div>
-                        <div class="stock-phenotype-image-card-body">
-                            <div class="stock-phenotype-image-card-title">{{ image.display_label }}</div>
-                            <div class="stock-phenotype-image-card-copy">{{ image.effect or 'Reference example from the local phenotype image library.' }}</div>
-                            <div class="stock-phenotype-image-card-meta">{{ image.body_part or 'phenotype' }}{% if image.source_name or image.source_collection %} · {{ image.source_name or image.source_collection|replace('_', ' ') }}{% endif %}</div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
+                {{ phenotype_images.render_phenotype_images(preview_prediction.reference_images) }}
             </div>
-            {% endif %}
             {% if preview_prediction.warnings %}
             <div class="span-12 stock-phenotype-warning-list">
                 {% for warning in preview_prediction.warnings %}
@@ -172,6 +159,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/marker_image_zoom.js') }}"></script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.min.js') }}"></script>
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.polyfills.min.js') }}"></script>
 <script nonce="{{ csp_nonce }}">

@@ -1,0 +1,73 @@
+{# Reference-image grid for a predicted phenotype.
+
+   One card per predicted marker. A marker with no image still gets a card,
+   so nothing disappears from a phenotype view without explanation, and the
+   card offers the route to fix it: an upload link when the marker has a
+   catalog definition, otherwise a link into the catalog.
+
+   Every image is clickable and opens the zoom overlay, which base.html
+   renders once as a direct child of body. It lives there rather than in a
+   page's content block because a fixed-position overlay nested inside the
+   page shell is trapped in an ancestor stacking context and draws beneath
+   the sticky header. Pages using this macro need only load
+   css/phenotype_images.css and js/marker_image_zoom.js. #}
+{% macro render_phenotype_images(images) %}
+{% if images %}
+<div class="stock-phenotype-image-grid">
+    {% for image in images %}
+    <div class="stock-phenotype-image-card{% if not image.has_image %} stock-phenotype-image-card-empty{% endif %}">
+        {% if image.has_image %}
+        <button type="button" class="stock-phenotype-image-media js-phenotype-image-zoom"
+                data-zoom-src="{{ image.image_url }}"
+                data-zoom-label="{{ image.display_label }}"
+                data-zoom-body-part="{{ image.body_part or 'phenotype' }}"
+                data-zoom-effect="{{ image.effect or '' }}"
+                data-zoom-source="{{ image.source_name or image.source_collection|replace('_', ' ') }}"
+                data-zoom-provenance="{{ image.provenance or '' }}"
+                data-zoom-credit="{{ image.credit or '' }}"
+                aria-label="Enlarge reference image for {{ image.display_label }}">
+            <img src="{{ image.image_url }}" alt="Reference image for {{ image.display_label }}" loading="lazy">
+        </button>
+        {% else %}
+        <div class="stock-phenotype-image-media stock-phenotype-image-media-empty" aria-hidden="true">
+            <span class="stock-phenotype-image-empty-mark"><i class="fas fa-image"></i></span>
+            <span class="stock-phenotype-image-empty-text">No image yet</span>
+        </div>
+        {% endif %}
+        <div class="stock-phenotype-image-card-body">
+            <div class="stock-phenotype-image-card-title">{{ image.display_label }}</div>
+            {% if image.effect %}
+            <div class="stock-phenotype-image-card-copy">{{ image.effect }}</div>
+            {% endif %}
+            <div class="stock-phenotype-image-card-meta">
+                {{ image.body_part or 'phenotype' }}
+                {%- if image.has_image and (image.source_name or image.source_collection) %} · {{ image.source_name or image.source_collection|replace('_', ' ') }}{% endif %}
+            </div>
+            {% if image.has_image %}
+                {% if image.provenance %}
+                <div class="stock-phenotype-image-card-copy mt-1">{{ image.provenance }}</div>
+                {% endif %}
+                {% if image.credit %}
+                <div class="stock-phenotype-image-card-copy mt-1">{{ image.credit }}</div>
+                {% endif %}
+            {% else %}
+                <div class="stock-phenotype-image-card-copy mt-1">
+                    {% if image.marker_key %}
+                    <a href="{{ url_for('markers.marker_detail', key=image.marker_key) }}"
+                       class="stock-phenotype-image-add-link">
+                        <i class="fas fa-plus"></i> Add an image for {{ image.display_label }}
+                    </a>
+                    {% else %}
+                    <a href="{{ url_for('markers.marker_catalog') }}"
+                       class="stock-phenotype-image-add-link">
+                        <i class="fas fa-search"></i> Define {{ image.display_label }} in the catalog
+                    </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}

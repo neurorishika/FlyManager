@@ -1,0 +1,22 @@
+{# Zoom overlay for phenotype reference images.
+
+   Include once on any page that renders render_phenotype_images(). The
+   overlay starts hidden and is driven by marker_image_zoom.js, which
+   reads the data-zoom-* attributes off the clicked card. #}
+<div class="phenotype-zoom-overlay" id="phenotypeZoomOverlay" hidden
+     role="dialog" aria-modal="true" aria-labelledby="phenotypeZoomTitle">
+    <div class="phenotype-zoom-backdrop" data-phenotype-zoom-close></div>
+    <figure class="phenotype-zoom-panel" role="document">
+        <button type="button" class="phenotype-zoom-close" data-phenotype-zoom-close
+                aria-label="Close enlarged image">
+            <i class="fas fa-times"></i>
+        </button>
+        <img class="phenotype-zoom-image" id="phenotypeZoomImage" src="" alt="">
+        <figcaption class="phenotype-zoom-caption">
+            <div class="phenotype-zoom-title" id="phenotypeZoomTitle"></div>
+            <div class="phenotype-zoom-effect" id="phenotypeZoomEffect"></div>
+            <div class="phenotype-zoom-meta" id="phenotypeZoomMeta"></div>
+            <div class="phenotype-zoom-credit" id="phenotypeZoomCredit"></div>
+        </figcaption>
+    </figure>
+</div>
