@@ -59,7 +59,10 @@ if ! compose_service_running mongodb; then
 fi
 
 trap 'rm -f "$TMP_ARCHIVE_PATH"' INT TERM EXIT
-docker compose $COMPOSE_ARGS exec -T mongodb sh -c 'mongodump --archive --gzip' > "$TMP_ARCHIVE_PATH"
+# --oplog to match container-mongo-backup.sh. Without it this archive has no
+# consistency point at all, so a pre-deploy backup -- exactly when you most
+# need one -- restores collections at their individual scan times.
+docker compose $COMPOSE_ARGS exec -T mongodb sh -c 'mongodump --archive --gzip --oplog' > "$TMP_ARCHIVE_PATH"
 mv "$TMP_ARCHIVE_PATH" "$ARCHIVE_PATH"
 trap - INT TERM EXIT
 

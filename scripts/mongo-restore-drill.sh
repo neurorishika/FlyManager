@@ -48,7 +48,9 @@ echo "Copying archive into scratch container..."
 docker cp "$ARCHIVE_PATH" "$DRILL_CONTAINER:/tmp/drill.archive.gz"
 
 echo "Restoring archive..."
-docker exec "$DRILL_CONTAINER" sh -c 'mongorestore --archive=/tmp/drill.archive.gz --gzip'
+# --oplogReplay to match mongo-restore.sh: a drill that restores differently
+# from production proves the archive is readable, not that the procedure works.
+docker exec "$DRILL_CONTAINER" sh -c 'mongorestore --archive=/tmp/drill.archive.gz --gzip --oplogReplay'
 
 echo "--- Post-restore sanity counts ---"
 docker exec "$DRILL_CONTAINER" mongosh --quiet --eval '

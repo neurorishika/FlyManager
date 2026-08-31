@@ -112,7 +112,10 @@ services:
       mongo-init:
         condition: service_completed_successfully
     volumes:
-      - mongo_backups:/backups
+      # A bind mount, not a named volume: backups in a Docker volume live in
+      # the same storage as mongo_data, so "remove stack and volumes" or a
+      # volume prune destroys the database and every backup of it together.
+      - /volume1/docker/flymanager/backups:/backups
       - /volume1/docker/flymanager/scripts/container-mongo-backup.sh:/usr/local/bin/container-mongo-backup.sh:ro
       - ${RCLONE_CONFIG_PATH:-/volume1/docker/flymanager/scripts/rclone.conf}:/config/rclone/rclone.conf:ro
     environment:
@@ -130,7 +133,21 @@ services:
         /usr/local/bin/container-mongo-backup.sh &&
         while true; do sleep "${MONGO_BACKUP_INTERVAL_SECONDS:-21600}"; /usr/local/bin/container-mongo-backup.sh; done
     healthcheck:
-      disable: true
+      # Freshness, not liveness. The loop keeps running and restarting whatever
+      # happens to a dump -- disk full, an auth change, mongodump missing -- so
+      # a container that is merely "up" said nothing about whether a backup has
+      # been taken this century. Unhealthy once the newest archive is older
+      # than twice the interval.
+      test:
+        - CMD-SHELL
+        - >
+          find /backups -maxdepth 1 -name 'flymanager_mongodb_*.archive.gz'
+          -newermt "-$(( ${MONGO_BACKUP_INTERVAL_SECONDS:-21600} * 2 )) seconds"
+          | grep -q . || exit 1
+      interval: 30m
+      timeout: 30s
+      retries: 2
+      start_period: 10m
 
   redis:
     image: redis:7-alpine
@@ -229,5 +246,4 @@ services:
 volumes:
   mongo_data:
   mongo_data2:
-  mongo_backups:
   redis_data:

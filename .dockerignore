@@ -19,3 +19,6 @@ backups
 data/uploads
 data/backup
 flymanager/app/static/generated_labels
+scripts/rclone.conf
+data/backup
+data/job_exports
