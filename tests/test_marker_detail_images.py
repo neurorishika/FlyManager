@@ -123,6 +123,15 @@ def test_a_marker_with_no_images_shows_the_placeholder_card(app, fake_db):
     assert "No image yet" in body
 
 
+def test_an_admin_gets_a_delete_control_for_an_attached_shipped_image(app, fake_db):
+    """This is the one destructive render path: an admin can delete a shipped
+    document (and its GridFS bytes) for the whole lab, not just unbind it."""
+    _install(_entry("img_ship", keys=["Cy"], stem="cy", origin="shipped"))
+    with patch("flymanager.app.routes.markers.db", fake_db):
+        body = _client(app, fake_db, "admin").get("/markers/Cy").data.decode()
+    assert "img_ship/delete" in body
+
+
 def test_a_balancer_page_shows_its_carried_markers(app, fake_db):
     _install(_entry("img_cy", aliases=["cy"], stem="cy"))
     with patch("flymanager.app.routes.markers.db", fake_db):
