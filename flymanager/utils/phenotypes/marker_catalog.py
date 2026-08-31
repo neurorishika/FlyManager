@@ -100,6 +100,45 @@ def _sorting_errors(sorting):
     return errors
 
 
+def _string_list_errors(value, label):
+    """A list-of-strings field, checked for both wrong type and the silent variant.
+
+    A bare string is the dangerous case: it is iterable, so compilation accepts
+    it and indexes it CHARACTER BY CHARACTER. `aliases: "CyO2"` used to register
+    C, y, O and 2 as balancer symbols the genotype parser matches, producing
+    wrong predictions under a perfectly valid catalog signature.
+    """
+    if value is None:
+        return []
+    if isinstance(value, str) or not isinstance(value, list):
+        return [f"{label} must be a list of strings"]
+    if any(not isinstance(item, str) for item in value):
+        return [f"{label} must contain only strings"]
+    return []
+
+
+def _section_errors(document):
+    """Type checks for every envelope section compile_catalog dereferences."""
+    errors = []
+    for name in ("imaging", "audit", "provenance", "expression"):
+        if not isinstance(document.get(name, {}), dict):
+            errors.append(f"{name} must be an object")
+
+    imaging = document.get("imaging", {})
+    if isinstance(imaging, dict):
+        errors.extend(_string_list_errors(imaging.get("aliases"), "imaging.aliases"))
+
+    match = document.get("match", {})
+    if isinstance(match, dict):
+        errors.extend(_string_list_errors(match.get("aliases"), "match.aliases"))
+
+    payload = document.get("payload", {})
+    if isinstance(payload, dict):
+        errors.extend(_string_list_errors(
+            payload.get("default_markers"), "payload.default_markers"))
+    return errors
+
+
 def validate_definition(document):
     """Return a list of human-readable problems; empty means valid."""
     if not isinstance(document, dict):
@@ -122,12 +161,11 @@ def validate_definition(document):
 
     if kind == "alias" and not str(payload.get("value") or "").strip():
         errors.append("alias payload.value is required")
-    if kind == "balancer" and not isinstance(payload.get("default_markers", []), list):
-        errors.append("balancer payload.default_markers must be a list")
     if kind == "construct_marker" and not isinstance(payload.get("overrides", {}), dict):
         errors.append("construct_marker payload.overrides must be an object")
 
     errors.extend(_sorting_errors(document.get("sorting", {})))
+    errors.extend(_section_errors(document))
 
     try:
         json.dumps(document, sort_keys=True)
@@ -198,7 +236,12 @@ def compile_catalog(shipped, overlay_documents=()):
 
     merged = {}
     for document in list((shipped or {}).get("definitions") or []) + list(overlay_documents or []):
-        errors = validate_definition(document)
+        try:
+            errors = validate_definition(document)
+        except Exception as exc:
+            # validate_definition itself reads the document, so a value that
+            # misbehaves on access raises here rather than during indexing.
+            errors = [f"could not be validated: {exc}"]
         if errors:
             snapshot["invalid_definitions"].append(
                 {"Key": (document or {}).get("Key") if isinstance(document, dict) else None,
@@ -208,60 +251,18 @@ def compile_catalog(shipped, overlay_documents=()):
         merged[str(document["Key"]).strip()] = document
     snapshot["definitions"] = merged
 
-    for key, document in merged.items():
-        kind = document["kind"]
-        marker = _marker_payload(document)
-
-        if kind == "gene_marker":
-            snapshot["gene_markers"][key] = marker
-        elif kind == "allele_marker":
-            snapshot["allele_markers"][key] = marker
-        elif kind == "alias":
-            snapshot["aliases"][key] = marker
-            target = str(marker.get("value") or "")
-            snapshot["aliases_by_target"].setdefault(target, set()).add(key)
-        elif kind == "construct_marker":
-            match = document.get("match") or {}
-            snapshot["construct_markers"][str(match.get("geneStem") or "")] = {
-                "key": key,
-                "allele_prefix": str(match.get("allelePrefix") or "+"),
-                "overrides": dict((document.get("payload") or {}).get("overrides") or {}),
-            }
-        elif kind == "balancer":
-            match = document.get("match") or {}
-            symbol = str(match.get("symbol") or key)
-            metadata = {"symbol": symbol}
-            metadata.update(marker)
-            aliases = [str(alias) for alias in (match.get("aliases") or [])]
-            if aliases:
-                metadata["aliases"] = list(aliases)
-            snapshot["balancers"][symbol] = metadata
-            default_markers = list(metadata.get("default_markers") or [])
-            snapshot["balancer_markers"][symbol] = default_markers
-            for alias in aliases:
-                snapshot["balancer_aliases"][alias] = symbol
-            for marker_key in default_markers:
-                snapshot["balancers_referencing"].setdefault(marker_key, set()).add(symbol)
-
-        sorting = document.get("sorting") or {}
-        if sorting.get("stabilityScore") is not None:
-            label = _display_label(document, marker)
-            if label:
-                snapshot["stability"][label] = {
-                    "score": float(sorting["stabilityScore"]),
-                    "notes": list(sorting.get("notes") or []),
-                }
-
-        if (document.get("audit") or {}).get("isProbeMarker"):
-            snapshot["probe_symbols"].append(
-                str((document.get("audit") or {}).get("probeSymbol") or key)
-            )
-
-        image_aliases = list((document.get("imaging") or {}).get("aliases") or [])
-        if image_aliases:
-            lookup_key = _phenotype_key(document, marker)
-            if lookup_key:
-                snapshot["image_aliases"][lookup_key] = image_aliases
+    for key, document in list(merged.items()):
+        try:
+            _index_definition(snapshot, key, document)
+        except Exception as exc:
+            # Belt and braces behind validate_definition. Validation cannot
+            # enumerate every shape a future field might take, and a raise
+            # here is uniquely expensive: the write has already committed, so
+            # every process would serve a frozen catalog and every later save
+            # would 500 in its post-write refresh, with nothing naming the row.
+            snapshot["definitions"].pop(key, None)
+            snapshot["invalid_definitions"].append(
+                {"Key": key, "errors": [f"could not be indexed: {exc}"]})
 
     snapshot["known_balancer_symbols"] = frozenset(
         set(snapshot["balancers"]) | set(snapshot["balancer_aliases"]))
@@ -275,6 +276,62 @@ def compile_catalog(shipped, overlay_documents=()):
     snapshot["signature"] = compute_marker_catalog_signature(snapshot)
     return snapshot
 
+
+def _index_definition(snapshot, key, document):
+    """Fold one validated definition into every index the snapshot carries."""
+    kind = document["kind"]
+    marker = _marker_payload(document)
+
+    if kind == "gene_marker":
+        snapshot["gene_markers"][key] = marker
+    elif kind == "allele_marker":
+        snapshot["allele_markers"][key] = marker
+    elif kind == "alias":
+        snapshot["aliases"][key] = marker
+        target = str(marker.get("value") or "")
+        snapshot["aliases_by_target"].setdefault(target, set()).add(key)
+    elif kind == "construct_marker":
+        match = document.get("match") or {}
+        snapshot["construct_markers"][str(match.get("geneStem") or "")] = {
+            "key": key,
+            "allele_prefix": str(match.get("allelePrefix") or "+"),
+            "overrides": dict((document.get("payload") or {}).get("overrides") or {}),
+        }
+    elif kind == "balancer":
+        match = document.get("match") or {}
+        symbol = str(match.get("symbol") or key)
+        metadata = {"symbol": symbol}
+        metadata.update(marker)
+        aliases = [str(alias) for alias in (match.get("aliases") or [])]
+        if aliases:
+            metadata["aliases"] = list(aliases)
+        snapshot["balancers"][symbol] = metadata
+        default_markers = list(metadata.get("default_markers") or [])
+        snapshot["balancer_markers"][symbol] = default_markers
+        for alias in aliases:
+            snapshot["balancer_aliases"][alias] = symbol
+        for marker_key in default_markers:
+            snapshot["balancers_referencing"].setdefault(marker_key, set()).add(symbol)
+
+    sorting = document.get("sorting") or {}
+    if sorting.get("stabilityScore") is not None:
+        label = _display_label(document, marker)
+        if label:
+            snapshot["stability"][label] = {
+                "score": float(sorting["stabilityScore"]),
+                "notes": list(sorting.get("notes") or []),
+            }
+
+    if (document.get("audit") or {}).get("isProbeMarker"):
+        snapshot["probe_symbols"].append(
+            str((document.get("audit") or {}).get("probeSymbol") or key)
+        )
+
+    image_aliases = list((document.get("imaging") or {}).get("aliases") or [])
+    if image_aliases:
+        lookup_key = _phenotype_key(document, marker)
+        if lookup_key:
+            snapshot["image_aliases"][lookup_key] = image_aliases
 
 def _canonical_definition(document):
     return {
