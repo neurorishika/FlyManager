@@ -130,3 +130,16 @@ def test_field_value_reads_nested_paths_for_prefilling():
 def test_field_value_renders_lists_as_comma_separated_text():
     document = {"payload": {"default_markers": ["Sb", "Ser"]}}
     assert field_value(document, "payload.default_markers") == "Sb, Ser"
+
+
+def test_a_note_containing_a_comma_stays_one_note():
+    """Balancer notes are free text; splitting them on commas would quietly
+    turn 'breaks down at 25C, use fresh' into two notes on the next save."""
+    document = form_to_document("balancer", MultiDict({
+        "match.symbol": "TM3",
+        "payload.notes": "breaks down at 25C, use fresh\nkeep at 18C",
+    }))
+    assert document["payload"]["notes"] == ["breaks down at 25C, use fresh",
+                                            "keep at 18C"]
+    assert field_value(document, "payload.notes", "\n") == (
+        "breaks down at 25C, use fresh\nkeep at 18C")

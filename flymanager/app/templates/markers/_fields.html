@@ -6,7 +6,8 @@
 
 {% macro render_field(field, definition, field_value, kind) %}
 {% set id = "f-" ~ kind ~ "-" ~ field.name %}
-{% set value = field_value(definition or {}, field.path) %}
+{% set value = field_value(definition or {}, field.path,
+                          "\n" if field.separator == "\n" else ", ") %}
 <div class="form-group mb-3">
     <label for="{{ id }}">{{ field.label }}</label>
     {% if field.type == "select" %}

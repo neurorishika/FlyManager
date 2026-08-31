@@ -18,9 +18,14 @@ _DOMINANCE = ("dominant", "recessive")
 _ALIAS_TYPES = ("allele_token", "construct_token")
 
 
-def _field(path, label, type_="text", help_="", options=(), placeholder=""):
+def _field(path, label, type_="text", help_="", options=(), placeholder="",
+           separator=","):
+    # `separator` only matters for list fields. Free text (a balancer's notes)
+    # is split on newlines alone, because a note like "breaks down at 25C, use
+    # fresh" would otherwise silently become two notes on the next save.
     return {"path": path, "name": path, "label": label, "type": type_,
-            "help": help_, "options": tuple(options), "placeholder": placeholder}
+            "help": help_, "options": tuple(options), "placeholder": placeholder,
+            "separator": separator}
 
 
 _APPEARANCE = (
@@ -114,7 +119,7 @@ MARKER_FIELD_SPECS = {
                 _field("payload.chromosome", "Chromosome", "int"),
                 _field("payload.default_markers", "Markers it carries", "list",
                        help_="Comma separated, e.g. Sb, Ser."),
-                _field("payload.notes", "Notes", "list",
+                _field("payload.notes", "Notes", "list", separator="\n",
                        help_="One note per line."),
             )),
             ("Reference images", _IMAGING),
@@ -182,7 +187,7 @@ def _drop(document, parts):
     node.pop(parts[-1], None)
 
 
-def field_value(document, path):
+def field_value(document, path, separator=", "):
     """The current value of a field, rendered for an HTML input."""
     value = _get(document or {}, _split(path))
     if value is None:
@@ -190,13 +195,15 @@ def field_value(document, path):
     if isinstance(value, bool):
         return value
     if isinstance(value, (list, tuple)):
-        return ", ".join(str(item) for item in value)
+        return separator.join(str(item) for item in value)
     return str(value)
 
 
-def _parse_list(raw):
+def _parse_list(raw, separator=","):
     items = []
-    for chunk in raw.replace("\n", ",").split(","):
+    if separator != "\n":
+        raw = raw.replace("\n", separator)
+    for chunk in raw.split(separator):
         chunk = chunk.strip()
         if chunk:
             items.append(chunk)
@@ -216,7 +223,7 @@ def _coerce(field, form):
         return False, None
     raw = (form.get(name) or "").strip()
     if field["type"] == "list":
-        return True, _parse_list(raw)
+        return True, _parse_list(raw, field.get("separator", ","))
     if not raw:
         return False, None
     if field["type"] == "int":

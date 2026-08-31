@@ -82,7 +82,6 @@
                     <p class="app-form-section-copy">What FlyManager uses when it predicts a phenotype from a genotype.</p>
                 </div>
                 {% for title, group in spec.groups %}
-                {% set filled = group | selectattr("path", "in", []) | list %}
                 {% set rows = [] %}
                 {% for field in group %}{% if field_value(definition, field.path) not in ("", False, None) %}
                 {% set _ = rows.append(field) %}{% endif %}{% endfor %}
