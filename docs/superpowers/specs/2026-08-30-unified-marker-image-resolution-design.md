@@ -6,8 +6,8 @@ Status: approved design, ready for implementation planning
 ## Goal
 
 Make every surface that shows a marker's reference photos resolve them the
-same way, through one function, over one binding shape, rendered by one
-template macro.
+same way, through one function, ranked by one deterministic rule, rendered
+by one template macro.
 
 This is a correctness fix, not a feature. The marker catalog page shows no
 photos at all for markers that visibly have photos elsewhere in the app,
@@ -20,7 +20,7 @@ still hardcoded in Python that the catalog is designed to hold. It is
 separate because it changes the catalog schema and therefore the prediction
 signature; this spec changes neither.
 
-## Background (verified against current code at df4b8c2)
+## Background (verified against current code at de69c19)
 
 Slice B (`docs/superpowers/specs/2026-08-29-marker-images-design.md`, merged)
 moved the 254 shipped phenotype images into Mongo + GridFS and added a user
@@ -78,9 +78,12 @@ here too, not a fallback.
 
 ## Non-goals
 
-- Changing `_score_entry`'s scoring rules or their tuning. The scoring-parity
-  test (`tests/test_marker_image_scoring_parity.py`) pins current behaviour
-  and must stay green throughout.
+- Changing `_score_entry`'s alias, stem and substring tiers or their tuning.
+  The scoring-parity test (`tests/test_marker_image_scoring_parity.py`) pins
+  current behaviour and must stay green throughout. Part 2 makes one narrow,
+  argued exception for the exact-key tier, which is unranked today.
+- Migrating the stored image documents. An earlier draft proposed this; see
+  Part 2 for why it was dropped.
 - Changing the catalog schema, the prediction signature, or anything that
   triggers a phenotype cache rebuild.
 - The marker catalog's form usability work (typo-proofing, tag inputs,
@@ -95,10 +98,11 @@ def select_marker_images(definition_key, *, min_score=ALIAS_TIER_SCORE):
     """Every reference image for a catalog definition, best match first."""
 ```
 
-`ALIAS_TIER_SCORE` is a new named constant (88) sitting beside the existing
-`EXACT_KEY_SCORE`; the alias and stem tiers currently use bare literals
-(98, 100, 88, 72) inside `_score_entry`, and naming the floor is the only
-change made to that function.
+The tiers inside `_score_entry` are bare literals today: 100 exact stem, 98
+alias, 88 stem *prefix*, 72 substring, plus bonuses of up to +18. They are
+given names (`EXACT_STEM_SCORE`, `ALIAS_SCORE`, `STEM_PREFIX_SCORE`,
+`SUBSTRING_SCORE`) so the floor can be stated in terms of a tier rather than
+a magic number.
 
 It resolves the Key to the canonical resolved-marker dict — the same shape
 the predictor produces and the viewers already pass in — then scores every
@@ -111,9 +115,17 @@ Key-to-marker resolution, by kind:
 |---|---|
 | `gene_marker` | `get_visual_marker(key)` |
 | `allele_marker` | `get_visual_marker(gene_stem, allele_spec, token=key)` |
-| `construct_marker` | catalog `construct_markers[stem]`, overrides applied |
-| `alias` | follow `payload.value` to its target and resolve that |
+| `construct_marker` | the definition's `match.geneStem` indexes `construct_markers`; its `overrides` are merged over the base marker |
+| `alias` | the compiled alias is a flat `{alias_type, value}` dict; resolve `value` as a Key |
 | `balancer` | one group per carried marker in `default_markers` |
+
+Resolution failures are explicit rather than silent: an alias whose `value`
+names no definition, an alias chain (an alias pointing at another alias,
+which is followed at most once and then abandoned), a construct with no
+matching stem, and a balancer listing a `default_markers` entry that has no
+definition all yield an empty group carrying the unresolved key, so the page
+can say "no images, and this marker does not resolve" instead of rendering
+nothing.
 
 A balancer returns groups rather than a flat list, so the page can say which
 carried marker each photo belongs to. To keep one return shape, the function
@@ -122,8 +134,11 @@ a non-balancer returns exactly one group.
 
 Each image row carries the fields the shared macro already consumes
 (`image_id`, `image_url`, `has_image`, `display_label`, `body_part`,
-`credit`, `provenance`, `notes`, `source_collection`, `match_score`) plus one
-new field, `attached`, defined in Part 3.
+`effect`, `credit`, `provenance`, `notes`, `source_name`,
+`source_collection`, `marker_key`, `match_score`) plus one new field,
+`attached`, defined in Part 3. `marker_key` is required, not optional: the
+placeholder card's "add an image" link is built from it, and a card without
+it degrades to a bare catalog-search link.
 
 `select_phenotype_reference_images` is refactored to share the resolution and
 scoring helpers but keeps its exact current signature, return shape and
@@ -133,14 +148,21 @@ best-match-only behaviour. Its callers do not change.
 
 The viewers keep only the single best image per marker, so the fuzzy tiers
 rarely surface anything wrong. A detail page listing *every* match above zero
-would surface the substring tier (score 72: the marker's alias appears
-anywhere inside an image's filename stem), which is noisy.
+would surface the substring tier (72: the marker's alias appears anywhere
+inside an image's filename stem) and the prefix tier (88: for the marker `B`,
+any stem *starting* with the letter b), both of which are noisy in a list.
 
-The page therefore shows matches at the exact-key and alias tiers (>= 88) as
-"Reference photos", and puts anything scoring 1..87 behind a collapsed
-"Possibly related" disclosure. Nothing is silently dropped; the distinction
-is presentation, and it is the one place where "same mechanism" deliberately
-does not mean "same output".
+The floor is therefore `ALIAS_SCORE` (98), not 88: "Reference photos" shows
+the exact-key, exact-stem and alias tiers, and everything scoring 1..97 goes
+behind a collapsed "Possibly related" disclosure. Nothing is silently
+dropped; the distinction is presentation, and it is the one place where "same
+mechanism" deliberately does not mean "same output".
+
+Note the floor filters post-bonus scores, so a substring match can in
+principle reach 94 through bonuses and a prefix match can clear 98. On
+current data no entry does — the manifest bonus never coexists with the stem
+tiers, because all 32 manifest entries carry aliases — but the floor is a
+presentation heuristic, not a guarantee, and should be described as one.
 
 ### Deleting the divergent index
 
@@ -149,48 +171,54 @@ does not mean "same output".
 bug by reaching for the obvious-looking index. Callers to update:
 
 - `flymanager/app/routes/markers.py:220` — the fix itself.
-- `flymanager/utils/phenotypes/image_catalog.py:24-28` — index construction.
+- `flymanager/utils/phenotypes/image_catalog.py:24-28` — index construction,
+  and the `_SNAPSHOT` default at line 10, which contains the key literally.
 - `tests/test_marker_image_catalog.py:14` — the only assertion pinning it;
   rewritten to assert the same ordering through `select_marker_images`.
 - Four test files construct empty snapshots containing the key literally;
   those literals are updated.
 
-## Part 2 — One binding shape
+## Part 2 — A deterministic exact tier
 
-Backfill `match.markerKeys` on the shipped seed entries so both writers
-produce the same shape and `_score_entry`'s exact tier does the work for
-every image, seeded or uploaded.
+An earlier draft of this spec proposed backfilling `match.markerKeys` onto
+the 254 seeded images so both writers produced one binding shape. That is
+dropped. Simulating it showed it changes which photo wins for nine markers
+— `B`, `Bar`, `Cy`, `Sb`, `Ser`, `wa`, `Dr[Mio]`, `sna[Sco]`, `wg[Gla-1]` —
+which are among the most-viewed in the app, and it would have done so for no
+reader-visible benefit, since `_score_entry` already reads both shapes.
 
-The backfill is derived, not hand-written: for each seed entry, resolve its
-`aliases` and `stem` against the compiled catalog and record the definition
-Keys that currently match at the alias tier or above. This is the same
-relation the scorer computes at read time, materialised at seed time.
+The simulation is worth keeping, because it exposed a latent defect that is
+the actual mess here:
 
-Constraints this must respect:
+**`_score_entry` returns a flat `EXACT_KEY_SCORE` (1000) with none of the
+bonuses the alias tiers receive, and `select_phenotype_reference_images`
+picks a winner with a strict `score > best_score`.** Two images that both
+match a marker by key therefore tie at 1000, and the winner is whichever the
+snapshot happens to sort first. Today's ranked 120-vs-115 alias pairs are
+decided on merit; two exact matches are decided by accident.
 
-- **The seed is content-addressed.** `load_image_seed` verifies each file's
-  byte count and SHA-256 against `data/markers/images/index.json` and raises
-  on mismatch. Changing `index.json` entries means regenerating it through
-  the existing tooling, not editing it by hand; the image bytes themselves do
-  not change, so the hashes do not change.
-- **Idempotence.** `load_image_seed` skips any record whose `sha256` is
-  already present, so a backfill that only adds `markerKeys` to `index.json`
-  will not reach an already-seeded database. The migration therefore needs an
-  explicit one-shot update over `marker_images` for existing installs, run
-  from the same job path as other marker maintenance, followed by
-  `bump_image_revision`.
-- **Image metadata must stay out of the prediction signature.** This is a
-  standing catalog invariant: changing an image binding must not invalidate
-  materialised phenotype caches. `SIGNATURE_EXCLUDED_FIELDS` and the fact
-  that `marker_images` is a separate collection from `marker_definitions`
-  already guarantee this; the migration adds no definition-side write, and a
-  test asserts the catalog signature is unchanged across it.
-- **Scoring parity.** `tests/test_marker_image_scoring_parity.py` pins the
-  best-match choice for a set of real markers. Populating `markerKeys`
-  promotes some entries from the alias tier (98) to the exact tier (1000),
-  which can change which entry wins where two previously tied. The migration
-  is only correct if that test still passes; if a case legitimately changes,
-  the expectation is updated in the same commit with the reason recorded.
+This is already reachable without any migration: upload two photos for the
+same marker and which one every stock and cross view shows is unspecified.
+The backfill did not create this — it detonated it 34 times at once.
+
+The fix is to make the exact tier ranked rather than flat:
+
+- The exact-key tier keeps its 1000 base, and then receives the same bonuses
+  the alias tiers already get (body part +8, `learning_to_fly` +4, manifest
+  +6, `display.priority`), so an exact match that also agrees on body part
+  outranks one that does not.
+- Winner selection gets an explicit, documented tie-break — `(-score,
+  display.sortOrder, imageId)` — so equal scores resolve the same way on
+  every process and every deploy, rather than by snapshot iteration order.
+
+This is a deliberate, narrow exception to the "do not change `_score_entry`"
+non-goal, and it changes no current behaviour: no marker has two exact-key
+matches in the shipped data today, which is why the parity test does not move.
+That must be asserted, not assumed.
+
+With this in place the two binding shapes are no longer a hazard, and
+unifying them becomes an optional cleanup with no user-visible effect — worth
+revisiting only if a future feature needs it.
 
 ## Part 3 — One image renderer
 
@@ -205,14 +233,22 @@ page is the first surface where both kinds appear side by side:
 - **Attached** — the image's `match.markerKeys` contains this marker's Key.
   Someone deliberately bound it here. It is deletable (subject to the
   existing `origin == 'user'` / admin gate) and sorts first.
-- **Matched** — the image scored above the floor by description. There is no
-  binding to this marker to remove, so no Delete control is rendered, and
-  after Part 2 this category contains only images whose alias match was too
-  weak to be materialised.
+- **Matched** — the image scored above the floor by description. Nobody bound
+  it here and there is nothing to unbind, so no Delete control is rendered.
+  With the migration dropped, this is where all 254 shipped images land, and
+  they stay undeletable from this page.
 
 The row field `attached` carries this; the macro renders Delete only when
-`attached` and the caller passed a delete endpoint. For the three existing
-callers, `attached` is absent and nothing changes.
+`attached` is true and the caller passed a delete endpoint. For the three
+existing callers, `attached` is absent and nothing changes.
+
+This gate is load-bearing rather than cosmetic. `delete_marker_image`
+(`flymanager/app/routes/markers.py:293`) only unbinds when the image has more
+than one marker key and otherwise deletes the document and its bytes
+outright, and an admin may delete a `shipped` entry. Rendering Delete for a
+merely-matched image would therefore put "remove this shipped photo from the
+whole app" one click away on a page where the user believes they are editing
+one marker.
 
 Balancer pages render one macro call per carried-marker group under a
 subheading naming the marker.
@@ -231,28 +267,38 @@ Written before the fix, red for the right reason first.
   today for the parity fixture set after the refactor.
 
 **Part 2**
-- Every seed entry's derived `markerKeys` resolve to real catalog Keys.
-- The catalog signature is identical before and after the migration.
-- The migration is idempotent: running it twice changes nothing the second
-  time and bumps the image revision only when it actually wrote.
-- Scoring parity holds.
+- No marker in the shipped data has two exact-key matches. This is the
+  precondition that makes re-ranking the exact tier a no-op today; when it
+  stops holding, this assertion fails rather than the behaviour drifting.
+- Two images both bound to one marker resolve in a documented order, and that
+  order is stable across a recompiled snapshot with the entries reversed.
+- An exact match that agrees on body part outranks one that does not.
+- Scoring parity holds unchanged.
 
 **Part 3**
 - The marker detail page emits the shared macro's markup, including the zoom
   trigger and a placeholder card when a marker has no images.
 - Delete renders for an attached user upload and does not render for a
-  matched library image.
+  matched library image. Asserted at the rendered-HTML level, not just on the
+  row data, because this is the gate that stands between an admin and
+  destroying a shipped image for every view in the app.
 
 Full-suite check against the documented pre-existing baseline
 (`memory/running-tests-locally.md`) before declaring done.
 
 ## Risks
 
-- **Parity drift in Part 2** is the main one; it is why parity is a gate
-  rather than an afterthought.
-- **The migration touches production data.** It is additive (`$addToSet` on
-  `match.markerKeys`), reversible by unsetting the field, and does not touch
-  image bytes or definitions.
-- **Removing `by_marker_key`** is a breaking change to the snapshot shape.
-  It is process-internal, not persisted, so the blast radius is the four test
-  files and the one route listed in Part 1.
+- **Changing the exact tier's scoring** (Part 2) is a deliberate exception to
+  this spec's own non-goal. It is safe only because no marker currently has
+  two exact-key matches; that fact is asserted by a test, so the day it stops
+  being true the assertion fails rather than the behaviour drifting.
+- **Removing `by_marker_key`** is a breaking change to the snapshot shape. It
+  is process-internal, not persisted, and each process compiles its own
+  snapshot, so a rolling deploy is safe; the blast radius is the one route
+  and the five test literals listed in Part 1.
+- **Part 3 surfaces images on a page that has a Delete control.**
+  `delete_marker_image` only unbinds when `len(markerKeys) > 1` and otherwise
+  destroys the image and its bytes. Rendering Delete for anything not
+  key-bound to this marker would therefore let one click remove a shipped
+  image from the stock and cross viewers. This is why "attached" gates the
+  control, and it is the single most important thing to get right in Part 3.
