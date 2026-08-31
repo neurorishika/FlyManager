@@ -2,6 +2,7 @@ import re
 
 from flymanager.utils.phenotypes.image_catalog import get_image_catalog
 from flymanager.utils.phenotypes.marker_catalog import get_catalog
+from flymanager.utils.phenotypes.marker_resolution import resolve_definition_markers
 
 # Scoring tiers, highest first. Named so a caller can state a floor in terms
 # of a tier instead of a magic number -- 88 in particular is the stem-PREFIX
@@ -192,6 +193,33 @@ def _definition_key_for(marker):
     return None
 
 
+def _image_row(marker, marker_key, entry, score, *, attached=False):
+    display = (entry or {}).get("display") or {}
+    image_id = entry["imageId"] if entry else None
+    return {
+        "image_id": image_id,
+        "image_url": f"/markers/images/{image_id}" if image_id else None,
+        "has_image": entry is not None,
+        "marker_key": marker_key,
+        "display_label": marker.get("display_label", marker.get("gene_stem", "?")),
+        "body_part": marker.get("body_part", ""),
+        "effect": marker.get("effect", ""),
+        "source_collection": _entry_field(entry, "sourceCollection") if entry else "",
+        "source_name": display.get("sourceName", ""),
+        "provenance": display.get("provenance", ""),
+        "credit": display.get("credit", ""),
+        "source_url": display.get("sourceUrl", ""),
+        "notes": display.get("caption", ""),
+        "match_score": score,
+        "attached": attached,
+        # The delete gate needs these: delete_marker_image 403s a non-admin
+        # for a shipped entry or someone else's upload, so a Remove button
+        # rendered without them is a button that only produces a 403.
+        "origin": (entry or {}).get("origin", ""),
+        "uploaded_by": (entry or {}).get("UploadedBy", ""),
+    }
+
+
 def select_phenotype_reference_images(markers, *, limit=None):
     """One row per marker, whether or not an image was found.
 
@@ -221,20 +249,7 @@ def select_phenotype_reference_images(markers, *, limit=None):
         # share a best image (both carried on TM6B, for instance), showing
         # it twice is honest, whereas dropping the second marker loses it
         # from the view entirely.
-        display = (best_entry or {}).get("display") or {}
-        image_id = best_entry["imageId"] if best_entry else None
-        rows.append({
-            "image_id": image_id,
-            "image_url": f"/markers/images/{image_id}" if image_id else None,
-            "has_image": best_entry is not None,
-            "marker_key": _definition_key_for(marker),
-            "display_label": marker.get("display_label", marker.get("gene_stem", "?")),
-            "body_part": marker.get("body_part", ""), "effect": marker.get("effect", ""),
-            "source_collection": _entry_field(best_entry, "sourceCollection") if best_entry else "",
-            "source_name": display.get("sourceName", ""), "provenance": display.get("provenance", ""),
-            "credit": display.get("credit", ""), "source_url": display.get("sourceUrl", ""),
-            "notes": display.get("caption", ""), "match_score": best_score,
-        })
+        rows.append(_image_row(marker, _definition_key_for(marker), best_entry, best_score))
         if limit is not None and len(rows) >= limit:
             break
     return rows
@@ -242,3 +257,46 @@ def select_phenotype_reference_images(markers, *, limit=None):
 
 def select_prediction_reference_images(prediction, *, limit=None):
     return select_phenotype_reference_images(_select_reference_markers_from_prediction(prediction or {}), limit=limit)
+
+
+def select_marker_images(definition_key, *, min_score=ALIAS_SCORE):
+    """Every reference image for a catalog definition, grouped and ranked.
+
+    Unlike select_phenotype_reference_images -- which keeps only the single
+    best image per marker, because a phenotype view shows one card per
+    predicted marker -- this returns everything that matched, because the
+    marker's own page is where you go to see all of them.
+
+    Matches below `min_score` are split into `related` rather than dropped.
+    The fuzzy tiers (stem-prefix 88, substring 72) are fine for picking a
+    single best image and noisy as a list, but hiding them entirely would
+    make an image the app clearly associates with a marker unfindable.
+    """
+    entries = get_image_catalog()["entries"]
+    groups = []
+    for resolved in resolve_definition_markers(definition_key):
+        marker, marker_key = resolved["marker"], resolved["marker_key"]
+        if marker is None:
+            groups.append({**{k: resolved[k] for k in ("marker_key", "display_label")},
+                           "images": [], "related": []})
+            continue
+
+        aliases = _marker_aliases(marker)
+        scored = [(entry, _score_entry(marker, aliases, entry)) for entry in entries]
+        scored = [pair for pair in scored if pair[1] > 0]
+        scored.sort(key=lambda pair: entry_sort_key(pair[0], pair[1]))
+
+        images, related = [], []
+        for entry, score in scored:
+            attached = marker_key in (_entry_field(entry, "markerKeys", []) or [])
+            row = _image_row(marker, marker_key, entry, score, attached=attached)
+            (images if score >= min_score else related).append(row)
+        if not images:
+            # One placeholder row so the shared macro still renders a card
+            # carrying the upload link, rather than showing the marker nothing.
+            images = [_image_row(marker, marker_key, None, 0)]
+
+        groups.append({"marker_key": marker_key,
+                       "display_label": resolved["display_label"],
+                       "images": images, "related": related})
+    return groups
