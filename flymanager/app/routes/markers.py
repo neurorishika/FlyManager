@@ -46,6 +46,16 @@ bp = Blueprint("markers", __name__)
 ENVELOPE_FIELDS = ("match", "payload", "sorting", "audit", "imaging",
                    "expression", "provenance")
 
+# Envelope sections only an admin may set. Deliberately NOT the whole envelope:
+# `match`, `payload`, `imaging` and `provenance` are the marker's own content,
+# every one of them is reachable through the structured form's dotted fields,
+# and the JSON API must keep accepting them or an ordinary user cannot create a
+# marker at all. What is gated is the three sections the form deliberately does
+# not expose, because they confer behaviour rather than describe the marker:
+# `sorting` feeds stability into the crossing constraint solver, `audit` marks
+# FlyBase probe symbols, and `expression` is reserved for a later slice.
+RAW_ONLY_FIELDS = ("sorting", "audit", "expression")
+
 # The stored vocabulary is internal; these are what the pages say instead.
 KIND_LABELS = {
     "gene_marker": "Gene",
@@ -66,6 +76,28 @@ def _serializable(document):
     stripped = dict(document or {})
     stripped.pop("_id", None)
     return stripped
+
+
+def _is_admin():
+    return session.get("username") == "admin"
+
+
+def _reject_unprivileged_envelope(document):
+    """Raise unless the caller may set raw envelope sections directly.
+
+    The raw per-section JSON editor is rendered for an admin only, but that is
+    a UI affordance rather than authority: both the form parser and the JSON
+    API took whole sections from anyone who could edit the row. Only the
+    sections in RAW_ONLY_FIELDS are gated -- see the note there for why the
+    marker's own content is not.
+    """
+    if _is_admin():
+        return
+    raw = sorted(field for field in RAW_ONLY_FIELDS if field in (document or {}))
+    if raw:
+        raise PermissionError(
+            "Only an admin can set " + ", ".join(raw) + " directly. "
+            "Use the marker form fields instead.")
 
 
 def _parse_form_document(form, existing=None):
@@ -355,12 +387,21 @@ def create_marker():
         # request before the document is assembled.
         if request.is_json:
             payload = get_json_payload()
+            _reject_unprivileged_envelope(payload)
             previous = get_marker_definition(db, (payload or {}).get("Key"))
         else:
+            _reject_unprivileged_envelope(request.form)
             previous = get_marker_definition(db, (request.form.get("Key") or "").strip())
             payload = _parse_form_document(request.form, existing=previous)
         payload = _merge_with_existing(payload, previous)
         created = create_marker_definition(db, payload, username=session.get("username"))
+    except PermissionError as exc:
+        # 403, not 400: this is an authority failure, and a JSON caller should
+        # be able to tell "you may not" from "your payload was malformed".
+        if request.is_json:
+            return jsonify({"status": "error", "message": str(exc)}), 403
+        flash(str(exc), "danger")
+        return redirect(url_for("markers.marker_catalog"))
     except ValueError as exc:
         if request.is_json:
             return jsonify({"status": "error", "message": str(exc)}), 400
@@ -388,10 +429,21 @@ def update_marker(key):
     # rebuild scope has to sweep genotypes that used the old spelling.
     previous = get_marker_definition(db, key)
     try:
-        payload = (get_json_payload() if request.is_json
-                   else _parse_form_document(request.form, existing=previous))
+        if request.is_json:
+            payload = get_json_payload()
+            _reject_unprivileged_envelope(payload)
+        else:
+            _reject_unprivileged_envelope(request.form)
+            payload = _parse_form_document(request.form, existing=previous)
         payload = _merge_with_existing(payload, previous)
         update_marker_definition(db, key, payload, username=session.get("username"))
+    except PermissionError as exc:
+        # 403, not 400: this is an authority failure, and a JSON caller should
+        # be able to tell "you may not" from "your payload was malformed".
+        if request.is_json:
+            return jsonify({"status": "error", "message": str(exc)}), 403
+        flash(str(exc), "danger")
+        return redirect(url_for("markers.marker_detail", key=key))
     except ValueError as exc:
         if request.is_json:
             return jsonify({"status": "error", "message": str(exc)}), 400
