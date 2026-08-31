@@ -1,7 +1,7 @@
 # Unified Marker Image Resolution Design
 
 Date: 2026-08-30
-Status: revised after adversarial review — awaiting re-approval
+Status: implemented (commits cf49858..fa93b36 on branch bugfixes)
 Supersedes: the 2026-08-30 draft approved before review, whose Part 2 (a
   markerKeys backfill) was dropped. See Part 2 for why.
 
