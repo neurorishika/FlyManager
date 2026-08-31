@@ -4,12 +4,13 @@
    (`payload.effect`), which is what lets the route rebuild the document from
    the form without the page knowing anything about the envelope. #}
 
-{% macro render_field(field, definition, field_value) %}
+{% macro render_field(field, definition, field_value, kind) %}
+{% set id = "f-" ~ kind ~ "-" ~ field.name %}
 {% set value = field_value(definition or {}, field.path) %}
 <div class="form-group mb-3">
-    <label for="f-{{ field.name }}">{{ field.label }}</label>
+    <label for="{{ id }}">{{ field.label }}</label>
     {% if field.type == "select" %}
-    <select class="form-control" id="f-{{ field.name }}" name="{{ field.name }}">
+    <select class="form-control" id="{{ id }}" name="{{ field.name }}">
         <option value="">—</option>
         {% for option in field.options %}
         <option value="{{ option }}" {% if value == option %}selected{% endif %}>{{ option|replace("_", " ")|capitalize }}</option>
@@ -18,15 +19,15 @@
     {% elif field.type == "bool" %}
     <input type="hidden" name="{{ field.name }}__present" value="1">
     <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="f-{{ field.name }}"
+        <input class="form-check-input" type="checkbox" id="{{ id }}"
                name="{{ field.name }}" {% if value is sameas true %}checked{% endif %}>
-        <label class="form-check-label" for="f-{{ field.name }}">Yes</label>
+        <label class="form-check-label" for="{{ id }}">Yes</label>
     </div>
     {% elif field.type == "list" %}
-    <textarea class="form-control" id="f-{{ field.name }}" name="{{ field.name }}"
+    <textarea class="form-control" id="{{ id }}" name="{{ field.name }}"
               rows="2" placeholder="{{ field.placeholder }}">{{ value }}</textarea>
     {% else %}
-    <input class="form-control" id="f-{{ field.name }}" name="{{ field.name }}"
+    <input class="form-control" id="{{ id }}" name="{{ field.name }}"
            type="{{ 'number' if field.type in ('int', 'float') else ('url' if field.type == 'url' else 'text') }}"
            {% if field.type == 'float' %}step="0.01" min="0" max="1"{% endif %}
            {% if field.type == 'int' %}step="1"{% endif %}
@@ -36,13 +37,13 @@
 </div>
 {% endmacro %}
 
-{% macro render_kind_fields(kind, spec, definition, field_value, hidden=false) %}
+{% macro render_kind_fields(kind, spec, definition, field_value, hidden=false, blurb=true) %}
 <div class="marker-kind-fields" data-marker-kind="{{ kind }}" {% if hidden %}hidden{% endif %}>
-    <p class="text-muted">{{ spec.blurb }}</p>
+    {% if blurb %}<p class="text-muted">{{ spec.blurb }}</p>{% endif %}
     {% for title, fields in spec.groups %}
     <fieldset class="mb-3" {% if hidden %}disabled{% endif %}>
         <legend class="app-form-section-title h6">{{ title }}</legend>
-        {% for field in fields %}{{ render_field(field, definition, field_value) }}{% endfor %}
+        {% for field in fields %}{{ render_field(field, definition, field_value, kind) }}{% endfor %}
     </fieldset>
     {% endfor %}
 </div>

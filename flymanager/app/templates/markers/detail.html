@@ -198,7 +198,7 @@
                     <form method="POST" action="{{ url_for('markers.update_marker', key=definition.Key) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="kind" value="{{ definition.kind }}">
-                        {{ marker_fields.render_kind_fields(definition.kind, spec, definition, field_value) }}
+                        {{ marker_fields.render_kind_fields(definition.kind, spec, definition, field_value, blurb=false) }}
                         <div class="app-button-row justify-content-end">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save changes</button>
                         </div>
@@ -242,7 +242,7 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="Key" value="{{ definition.Key }}">
                         <input type="hidden" name="kind" value="{{ definition.kind }}">
-                        {{ marker_fields.render_kind_fields(definition.kind, spec, definition, field_value) }}
+                        {{ marker_fields.render_kind_fields(definition.kind, spec, definition, field_value, blurb=false) }}
                         <div class="app-button-row justify-content-end">
                             <button type="submit" class="btn btn-warning"><i class="fas fa-pen"></i> Save lab version</button>
                         </div>
