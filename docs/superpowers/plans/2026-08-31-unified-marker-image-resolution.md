@@ -588,7 +588,7 @@ git commit -m "feat: resolve a marker catalog key into the scorer's marker dicts
 
 **Interfaces:**
 - Consumes: `entry_sort_key`, `ALIAS_SCORE` (Task 1); `resolve_definition_markers` (Task 2).
-- Produces: `select_marker_images(definition_key, *, min_score=ALIAS_SCORE)` returning a list of groups `{"marker_key", "display_label", "images": [row], "related": [row]}`. Rows carry `image_id`, `image_url`, `has_image`, `display_label`, `body_part`, `effect`, `credit`, `provenance`, `notes`, `source_name`, `source_url`, `source_collection`, `marker_key`, `match_score`, `attached`. `attached` is True when the entry's `match.markerKeys` contains this group's `marker_key`.
+- Produces: `select_marker_images(definition_key, *, min_score=ALIAS_SCORE)` returning a list of groups `{"marker_key", "display_label", "images": [row], "related": [row]}`. Rows carry `image_id`, `image_url`, `has_image`, `display_label`, `body_part`, `effect`, `credit`, `provenance`, `notes`, `source_name`, `source_url`, `source_collection`, `marker_key`, `match_score`, `attached`, `origin`, `uploaded_by`. `attached` is True when the entry's `match.markerKeys` contains this group's `marker_key`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -692,7 +692,8 @@ def test_rows_carry_every_field_the_shared_macro_reads():
     for field in ("image_id", "image_url", "has_image", "display_label",
                   "body_part", "effect", "credit", "provenance", "notes",
                   "source_name", "source_url", "source_collection",
-                  "marker_key", "match_score", "attached"):
+                  "marker_key", "match_score", "attached", "origin",
+                  "uploaded_by"):
         assert field in row, field
     assert row["image_url"] == "/markers/images/img_seed"
     assert row["marker_key"] == "Sb"
@@ -756,6 +757,11 @@ def _image_row(marker, marker_key, entry, score, *, attached=False):
         "notes": display.get("caption", ""),
         "match_score": score,
         "attached": attached,
+        # The delete gate needs these: delete_marker_image 403s a non-admin
+        # for a shipped entry or someone else's upload, so a Remove button
+        # rendered without them is a button that only produces a 403.
+        "origin": (entry or {}).get("origin", ""),
+        "uploaded_by": (entry or {}).get("UploadedBy", ""),
     }
 ```
 
@@ -846,7 +852,14 @@ git commit -m "feat: add select_marker_images over the shared image scorer"
 - Consumes: `select_marker_images` (Task 3).
 - Produces: `marker_detail` passes `image_groups` (the Task 3 return value) to the template instead of `images`.
 
-**The Delete gate is the highest-risk part of this plan.** `delete_marker_image` (`flymanager/app/routes/markers.py:293`) only *unbinds* when `len(markerKeys) > 1`; otherwise it deletes the document and its bytes, and an admin may do this to a `shipped` entry. Rendering Delete for an image that merely *matched* would put "destroy this shipped photo for every view in the app" one click away on a page where the user believes they are editing one marker. Delete renders only when `attached` is true.
+**The Delete gate is the highest-risk part of this plan.** It must mirror
+`delete_marker_image`'s own rules or it renders buttons that only produce a
+403: that route rejects a non-admin for a `shipped` entry or for someone
+else's upload. And note what "Remove" does when the image has exactly one
+marker key — it does not unbind, it deletes the document and its GridFS
+bytes. That is unchanged from today's page, but today's page could not show a
+shipped image at all, so the button now needs a confirm and honest wording.
+ `delete_marker_image` (`flymanager/app/routes/markers.py:293`) only *unbinds* when `len(markerKeys) > 1`; otherwise it deletes the document and its bytes, and an admin may do this to a `shipped` entry. Rendering Delete for an image that merely *matched* would put "destroy this shipped photo for every view in the app" one click away on a page where the user believes they are editing one marker. Delete renders only when `attached` is true.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -869,7 +882,21 @@ from flymanager.utils.phenotypes import image_catalog
 
 
 @pytest.fixture(autouse=True)
-def _restore_images():
+def _freeze_images(monkeypatch):
+    """Pin the installed snapshot for the duration of a request.
+
+    `create_app`'s before_request hook calls `maybe_refresh_image_catalog(db)`
+    on every request against the real module-global db. The test database has
+    254 images at revision 13, so the first client.get() after installing a
+    revision-0 test snapshot would recompile from Mongo and throw it away --
+    intermittently, since the probe is throttled to 30s. `_reset_catalog` in
+    test_marker_routes already does exactly this for the marker catalog.
+
+    Patching the module attribute works because the hook imports the name
+    inside the function body, so it resolves at call time.
+    """
+    monkeypatch.setattr(image_catalog, "maybe_refresh_image_catalog",
+                        lambda db, **kwargs: None)
     yield
     image_catalog.set_image_catalog_for_testing(
         {"entries": [], "by_marker_key": {}, "revision": -1})
@@ -916,12 +943,44 @@ def test_an_attached_upload_does_get_a_delete_control(app, fake_db):
     assert "img_mine/delete" in body
 
 
+def test_a_non_admin_gets_no_delete_control_for_someone_elses_upload(app, fake_db):
+    """The gate must mirror delete_marker_image, which 403s here. A button
+    that can only produce a 403 is worse than no button."""
+    _install(_entry("img_theirs", keys=["Cy"], stem="cy", origin="user"))
+    with patch("flymanager.app.routes.markers.db", fake_db):
+        body = _client(app, fake_db, "bob").get("/markers/Cy").data.decode()
+    assert "/markers/images/img_theirs" in body
+    assert "img_theirs/delete" not in body
+
+
+def test_a_non_admin_gets_no_delete_control_for_an_attached_shipped_image(app, fake_db):
+    """upsert_image_entry binds by content hash, so a user uploading bytes
+    identical to a shipped photo attaches their key to the shipped document.
+    Attached does not imply deletable."""
+    _install(_entry("img_ship", keys=["Cy"], stem="cy", origin="shipped"))
+    with patch("flymanager.app.routes.markers.db", fake_db):
+        body = _client(app, fake_db, "alice").get("/markers/Cy").data.decode()
+    assert "img_ship/delete" not in body
+
+
 def test_the_page_renders_the_shared_macro_not_a_bespoke_grid(app, fake_db):
     _install(_entry("img_seed", aliases=["cy"], stem="cy"))
     with patch("flymanager.app.routes.markers.db", fake_db):
         body = _client(app, fake_db).get("/markers/Cy").data.decode()
     assert "stock-phenotype-image-grid" in body
     assert "js-phenotype-image-zoom" in body
+
+
+def test_a_user_caption_survives_the_move_to_the_shared_macro(app, fake_db):
+    """The caption is the only metadata the upload form collects; the old
+    bespoke grid rendered it and the shared macro did not."""
+    entry = _entry("img_mine", keys=["Cy"], stem="cy", origin="user")
+    entry["display"]["caption"] = "scored under the scope at 20x"
+    _install(entry)
+    with patch("flymanager.app.routes.markers.db", fake_db):
+        body = _client(app, fake_db, "alice").get("/markers/Cy").data.decode()
+    assert "scored under the scope at 20x" in body
+    assert "Uploaded by alice" in body
 
 
 def test_a_marker_with_no_images_shows_the_placeholder_card(app, fake_db):
@@ -955,17 +1014,25 @@ Expected: FAIL — `/markers/images/img_seed` not in body.
 In `flymanager/app/templates/_phenotype_images_macro.html`, change the macro signature and add the control. Replace line 14:
 
 ```jinja
-{% macro render_phenotype_images(images, delete_action=None, csrf_token_value=None, unbind_key=None) %}
+{% macro render_phenotype_images(images, delete_action=None, csrf_token_value=None, unbind_key=None, viewer=None, viewer_is_admin=false) %}
 ```
 
 Then inside `stock-phenotype-image-card-body`, immediately before its closing `</div>`, add:
 
 ```jinja
-            {% if image.attached and delete_action and image.image_id %}
+            {% if image.notes %}
+            <div class="stock-phenotype-image-card-copy mt-1">{{ image.notes }}</div>
+            {% endif %}
+            {% if image.has_image and image.uploaded_by and image.origin == 'user' %}
+            <div class="stock-phenotype-image-card-meta">Uploaded by {{ image.uploaded_by }}</div>
+            {% endif %}
+            {% set may_delete = viewer_is_admin or (image.origin == 'user' and image.uploaded_by == viewer) %}
+            {% if image.attached and delete_action and image.image_id and may_delete %}
             <form method="post" action="{{ url_for(delete_action, image_id=image.image_id) }}" class="mt-2">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}">
                 <input type="hidden" name="marker_key" value="{{ unbind_key }}">
-                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                <button type="submit" class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('Remove this image? If it is not attached to any other marker it is deleted for the whole lab.')">Remove</button>
             </form>
             {% endif %}
 ```
@@ -1000,7 +1067,12 @@ In `flymanager/app/templates/markers/detail.html`, add the macro import beside t
 {% import "_phenotype_images_macro.html" as phenotype_images %}
 ```
 
-Replace the whole `<div class="row">…</div>` figure loop inside the "What it looks like" panel (everything from `<div class="row">` through the `{% endfor %}`/`{% else %}` block, leaving the upload form beneath it intact) with:
+Replace `detail.html` **lines 38-60 inclusive** — from `<div class="row">`
+through the `</div>` that closes it, which is the line *after* `{% endfor %}`.
+Stopping at `{% endfor %}` leaves a stray `</div>` that closes
+`.app-form-section` early and throws the upload form out of the panel; no test
+catches that, so check the boundary by eye. Leave the upload form beneath it
+untouched. Replacement:
 
 ```jinja
                 {% for group in image_groups %}
@@ -1012,7 +1084,9 @@ Replace the whole `<div class="row">…</div>` figure loop inside the "What it l
                         group.images,
                         delete_action='markers.delete_marker_image',
                         csrf_token_value=csrf_token(),
-                        unbind_key=group.marker_key) }}
+                        unbind_key=group.marker_key,
+                        viewer=session.get('username'),
+                        viewer_is_admin=is_admin) }}
                     {% if group.related %}
                     <details class="mt-2">
                         <summary class="small text-muted">Possibly related ({{ group.related|length }})</summary>
@@ -1103,6 +1177,12 @@ grep -rn "by_marker_key" flymanager/ | grep -v pycache
 
 Expected: only `image_catalog.py` itself. If `routes/markers.py` still appears, Task 4 is incomplete — stop.
 
+Line 220 was the only use of `get_image_catalog` in that file, so also drop it
+from the import at `flymanager/app/routes/markers.py:31`, leaving
+`bump_image_revision` and `refresh_image_catalog`. Confirm with
+`grep -n "get_image_catalog" flymanager/app/routes/markers.py` returning
+nothing.
+
 - [ ] **Step 2: Rewrite the one test that pins the index**
 
 In `tests/test_marker_image_catalog.py`, replace `test_compile_indexes_and_totally_orders_entries` with:
@@ -1175,8 +1255,9 @@ python -m pytest tests/ -q -p no:cacheprovider --ignore=tests/new_feature_explor
     --ignore=tests/test_jobs_queue.py
 ```
 
-Compare the failure list to the pre-existing baseline in
-`memory/running-tests-locally.md`. Any new failure is yours.
+Compare the failure list to the pre-existing baseline listed under Global
+Constraints at the top of this plan (there is no baseline file in the repo).
+Any failure not on that list is yours.
 
 - [ ] **Step 2: Mark the spec implemented**
 
