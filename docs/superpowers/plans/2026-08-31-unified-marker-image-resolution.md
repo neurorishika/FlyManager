@@ -175,7 +175,20 @@ def _with_bonuses(score, marker, entry):
     return score + int((entry.get("display") or {}).get("priority", 0) or 0)
 ```
 
-and end `_score_entry`'s fuzzy path with `return _with_bonuses(score, marker, entry)`.
+and end `_score_entry`'s fuzzy path with:
+
+```python
+    if score <= 0:
+        return 0
+    return _with_bonuses(score, marker, entry)
+```
+
+**Keep that `if score <= 0: return 0` guard exactly where it is.** Only the
+four bonus lines move into `_with_bonuses`. Fold the guard into the helper and
+every zero-scoring entry picks up a +8 body-part bonus and starts winning:
+`test_marker_image_scoring_parity` and
+`test_marker_image_placeholders::test_unmatched_marker_still_gets_a_row` both
+go red.
 
 Add the sort key beside it:
 
@@ -245,6 +258,9 @@ def test_no_shipped_marker_has_two_exact_key_matches():
     for record in seed:
         for key in (record.get("match") or {}).get("markerKeys") or []:
             counts[key] = counts.get(key, 0) + 1
+    # Vacuous today -- every shipped entry has an empty markerKeys, so
+    # `counts` is empty. That is the point: it stays a canary for the day
+    # somebody starts binding seed images by key.
     assert {k: v for k, v in counts.items() if v > 1} == {}
     assert set(counts) <= set(catalog["definitions"])
 ```
@@ -396,11 +412,33 @@ def test_an_alias_chain_is_followed_once_and_then_abandoned():
               "payload": {"value": "a1"}})
     group = resolve_definition_markers("a1")[0]
     assert group["marker"] is None
+    # The key must be the chain's second hop, not the page's own key, or the
+    # detail page's unbind form would post this marker against itself.
+    assert group["marker_key"] == "a1"
 
 
 def test_an_unknown_key_resolves_to_nothing():
     _install(GENE)
     assert resolve_definition_markers("ghost") == []
+
+
+def test_every_shipped_alias_either_resolves_or_is_a_known_exception():
+    """Against the real catalog, not a fixture.
+
+    Four of the seven shipped aliases point at a definition Key; `w- -> w[*]`
+    resolves only through the gene-stem fallback; the two Orco-LexA spellings
+    name a transgene with no marker at all and are expected to stay empty. A
+    new alias that silently resolves to nothing should fail here.
+    """
+    from flymanager.utils.phenotypes.marker_catalog import load_shipped_catalog
+    marker_catalog.set_catalog(
+        marker_catalog.compile_catalog(load_shipped_catalog()))
+    unresolved = set()
+    for key, alias in marker_catalog.get_catalog()["aliases"].items():
+        groups = resolve_definition_markers(key)
+        if not groups or groups[0]["marker"] is None:
+            unresolved.add(key)
+    assert unresolved == {"OrCo-LexA", "Orco-LexA"}
 ```
 
 - [ ] **Step 2: Run the test and verify it fails**
@@ -429,8 +467,14 @@ balancer directly returns nothing, because its metadata holds none of the
 fields the scorer reads, which is why it resolves to one group per carried
 marker instead.
 """
+import re
+
 from flymanager.utils.phenotypes.marker_catalog import get_catalog
 from flymanager.utils.phenotypes.visual_markers import get_visual_marker
+
+# `Orco-LexA -> P{Orco-LexA-VP16}unspecified` has no gene stem to fall back
+# to; `w- -> w[*]` does. This is the shape of an allele-ish token.
+_STEM_RE = re.compile(r"^([A-Za-z0-9_]+)\[")
 
 
 def _group(marker_key, marker, fallback_label=None):
@@ -475,7 +519,18 @@ def _resolve_one(key, catalog, _following_alias=False):
             # risk a cycle.
             return _group(target or key, None, fallback_label=target or key)
         resolved = _resolve_one(target, catalog, _following_alias=True)
-        return resolved or _group(target or key, None, fallback_label=target or key)
+        if resolved is not None:
+            return resolved
+        # Three shipped aliases point at something that is not a definition
+        # Key: `w- -> w[*]` and two Orco-LexA spellings. Fall back to the
+        # target's gene stem, which rescues `w[*] -> w` (a real gene marker
+        # with white-eye photos) and honestly finds nothing for the transgene.
+        stem_match = _STEM_RE.match(target)
+        if stem_match:
+            marker = get_visual_marker(stem_match.group(1))
+            if marker is not None:
+                return _group(stem_match.group(1), marker)
+        return _group(target or key, None, fallback_label=target or key)
 
     return _group(key, None, fallback_label=key)
 
@@ -514,7 +569,7 @@ def resolve_definition_markers(definition_key):
 python -m pytest tests/test_marker_resolution.py -q -p no:cacheprovider
 ```
 
-Expected: PASS (10 tests).
+Expected: PASS (11 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -533,7 +588,7 @@ git commit -m "feat: resolve a marker catalog key into the scorer's marker dicts
 
 **Interfaces:**
 - Consumes: `entry_sort_key`, `ALIAS_SCORE` (Task 1); `resolve_definition_markers` (Task 2).
-- Produces: `select_marker_images(definition_key, *, min_score=ALIAS_SCORE)` returning a list of groups `{"marker_key", "display_label", "images": [row], "related": [row]}`. Rows carry `image_id`, `image_url`, `has_image`, `display_label`, `body_part`, `effect`, `credit`, `provenance`, `notes`, `source_name`, `source_collection`, `marker_key`, `match_score`, `attached`. `attached` is True when the entry's `match.markerKeys` contains this group's `marker_key`.
+- Produces: `select_marker_images(definition_key, *, min_score=ALIAS_SCORE)` returning a list of groups `{"marker_key", "display_label", "images": [row], "related": [row]}`. Rows carry `image_id`, `image_url`, `has_image`, `display_label`, `body_part`, `effect`, `credit`, `provenance`, `notes`, `source_name`, `source_url`, `source_collection`, `marker_key`, `match_score`, `attached`. `attached` is True when the entry's `match.markerKeys` contains this group's `marker_key`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -616,11 +671,16 @@ def test_every_match_is_returned_not_only_the_best():
 
 
 def test_matches_below_the_floor_land_in_related_not_images():
-    """A stem-prefix hit (88) for 'Sb' is any stem starting with 'sb'."""
+    """A stem-prefix hit (88) for 'Sb' is any stem starting with 'sb'.
+
+    The marker still has no reference photo worth showing, so `images` holds
+    the placeholder card (carrying the upload link) rather than being empty:
+    a weak match must not silently satisfy "this marker has an image".
+    """
     _install_catalog(GENE)
     _install_images(_entry("img_weak", stem="sbsomethingelse"))
     group = select_marker_images("Sb")[0]
-    assert group["images"] == []
+    assert [i["has_image"] for i in group["images"]] == [False]
     assert [i["image_id"] for i in group["related"]] == ["img_weak"]
     assert group["related"][0]["match_score"] < ALIAS_SCORE
 
@@ -631,8 +691,8 @@ def test_rows_carry_every_field_the_shared_macro_reads():
     row = select_marker_images("Sb")[0]["images"][0]
     for field in ("image_id", "image_url", "has_image", "display_label",
                   "body_part", "effect", "credit", "provenance", "notes",
-                  "source_name", "source_collection", "marker_key",
-                  "match_score", "attached"):
+                  "source_name", "source_url", "source_collection",
+                  "marker_key", "match_score", "attached"):
         assert field in row, field
     assert row["image_url"] == "/markers/images/img_seed"
     assert row["marker_key"] == "Sb"
@@ -692,6 +752,7 @@ def _image_row(marker, marker_key, entry, score, *, attached=False):
         "source_name": display.get("sourceName", ""),
         "provenance": display.get("provenance", ""),
         "credit": display.get("credit", ""),
+        "source_url": display.get("sourceUrl", ""),
         "notes": display.get("caption", ""),
         "match_score": score,
         "attached": attached,
@@ -700,8 +761,10 @@ def _image_row(marker, marker_key, entry, score, *, attached=False):
 
 Rewrite `select_phenotype_reference_images`'s row append as
 `rows.append(_image_row(marker, _definition_key_for(marker), best_entry, best_score))`
-and delete the inline dict. Its behaviour and field set are unchanged apart
-from the new `attached` key, which is always False there.
+and delete the inline dict. Its behaviour and field set are unchanged apart from
+the new `attached` key, which is always False there. Note `source_url` in the
+list above — `tests/test_marker_image_placeholders.py:118` asserts the exact
+field set, so dropping it fails immediately.
 
 - [ ] **Step 4: Add the selector**
 
@@ -719,9 +782,6 @@ def select_marker_images(definition_key, *, min_score=ALIAS_SCORE):
     single best image and noisy as a list, but hiding them entirely would
     make an image the app clearly associates with a marker unfindable.
     """
-    from flymanager.utils.phenotypes.marker_resolution import \
-        resolve_definition_markers
-
     entries = get_image_catalog()["entries"]
     groups = []
     for resolved in resolve_definition_markers(definition_key):
@@ -752,7 +812,10 @@ def select_marker_images(definition_key, *, min_score=ALIAS_SCORE):
     return groups
 ```
 
-Note the deferred import: `marker_resolution` imports `visual_markers`, which imports `marker_catalog`, and a module-level import here creates a cycle.
+Import `resolve_definition_markers` at module level, beside the existing
+`marker_catalog` import at the top of the file. There is no import cycle:
+`marker_resolution` imports only `marker_catalog` and `visual_markers`, and
+neither imports `image_library`.
 
 - [ ] **Step 5: Run the tests**
 
