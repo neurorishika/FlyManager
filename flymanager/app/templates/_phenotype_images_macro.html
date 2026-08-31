@@ -11,7 +11,7 @@
    page shell is trapped in an ancestor stacking context and draws beneath
    the sticky header. Pages using this macro need only load
    css/phenotype_images.css and js/marker_image_zoom.js. #}
-{% macro render_phenotype_images(images) %}
+{% macro render_phenotype_images(images, delete_action=None, csrf_token_value=None, unbind_key=None, viewer=None, viewer_is_admin=false) %}
 {% if images %}
 <div class="stock-phenotype-image-grid">
     {% for image in images %}
@@ -64,6 +64,21 @@
                     </a>
                     {% endif %}
                 </div>
+            {% endif %}
+            {% if image.notes %}
+            <div class="stock-phenotype-image-card-copy mt-1">{{ image.notes }}</div>
+            {% endif %}
+            {% if image.has_image and image.uploaded_by and image.origin == 'user' %}
+            <div class="stock-phenotype-image-card-meta">Uploaded by {{ image.uploaded_by }}</div>
+            {% endif %}
+            {% set may_delete = viewer_is_admin or (image.origin == 'user' and image.uploaded_by == viewer) %}
+            {% if image.attached and delete_action and image.image_id and may_delete %}
+            <form method="post" action="{{ url_for(delete_action, image_id=image.image_id) }}" class="mt-2">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}">
+                <input type="hidden" name="marker_key" value="{{ unbind_key }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('Remove this image? If it is not attached to any other marker it is deleted for the whole lab.')">Remove</button>
+            </form>
             {% endif %}
         </div>
     </div>

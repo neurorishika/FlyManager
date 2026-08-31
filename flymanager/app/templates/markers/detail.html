@@ -1,11 +1,16 @@
 {% extends "base.html" %}
 {% import "markers/_fields.html" as marker_fields %}
+{% import "_phenotype_images_macro.html" as phenotype_images %}
 
 {% set spec = field_specs.get(definition.kind) %}
 {% set fields = definition.get("payload", {}) %}
 {% set label = fields.get("display_label") or fields.get("overrides", {}).get("display_label") or definition.Key %}
 
 {% block title %}Marker: {{ definition.Key }}{% endblock %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/phenotype_images.css') }}">
+{% endblock %}
 
 {% block content %}
 <div class="app-panel app-page-header">
@@ -35,29 +40,29 @@
                     <p class="app-form-section-copy">Reference photos for scoring this marker under the scope.
                         Anything you upload here is visible to the whole lab.</p>
                 </div>
-                <div class="row">
-                    {% for image in images %}
-                    <figure class="col-md-6">
-                        <img class="img-fluid rounded" src="{{ url_for('markers.serve_marker_image', image_id=image.imageId) }}"
-                             alt="{{ image.display.label or definition.Key }}" loading="lazy">
-                        <figcaption class="mt-1 small">
-                            {% if image.display.caption %}<div>{{ image.display.caption }}</div>{% endif %}
-                            {% if image.display.credit %}<div class="text-muted">{{ image.display.credit }}</div>{% endif %}
-                            {% if image.display.provenance %}<div class="text-muted">{{ image.display.provenance }}</div>{% endif %}
-                            <div class="text-muted">Uploaded by {{ image.UploadedBy or "FlyManager" }}</div>
-                            {% if image.origin == 'user' or is_admin %}
-                            <form method="post" action="{{ url_for('markers.delete_marker_image', image_id=image.imageId) }}" class="mt-1">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="marker_key" value="{{ definition.Key }}">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                            </form>
-                            {% endif %}
-                        </figcaption>
-                    </figure>
-                    {% else %}
-                    <p class="col-12 text-muted">No photos yet &mdash; if you have a good one, add it below.</p>
-                    {% endfor %}
+                {% for group in image_groups %}
+                <div class="marker-image-group mb-3" data-marker-group="{{ group.marker_key }}">
+                    {% if image_groups|length > 1 %}
+                    <h3 class="h6 text-muted">{{ group.display_label }}</h3>
+                    {% endif %}
+                    {{ phenotype_images.render_phenotype_images(
+                        group.images,
+                        delete_action='markers.delete_marker_image',
+                        csrf_token_value=csrf_token(),
+                        unbind_key=group.marker_key,
+                        viewer=session.get('username'),
+                        viewer_is_admin=is_admin) }}
+                    {% if group.related %}
+                    <details class="mt-2">
+                        <summary class="small text-muted">Possibly related ({{ group.related|length }})</summary>
+                        {{ phenotype_images.render_phenotype_images(group.related) }}
+                    </details>
+                    {% endif %}
                 </div>
+                {% else %}
+                <p class="text-muted">This marker does not resolve to anything the
+                    image library knows about.</p>
+                {% endfor %}
                 <form method="post" action="{{ url_for('markers.upload_marker_image', key=definition.Key) }}" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group">
@@ -255,6 +260,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/marker_image_zoom.js') }}"></script>
 <script nonce="{{ csp_nonce }}">
     // Delete/Promote always return a JSON body (so a bare API POST gets a
     // clean 200 instead of a redirect that only makes sense to a browser),

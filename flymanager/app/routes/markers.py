@@ -29,6 +29,7 @@ from flymanager.utils.phenotypes.marker_fields import (MARKER_FIELD_SPECS,
                                                        form_to_document)
 from flymanager.utils.phenotypes.image_catalog import (
     bump_image_revision, get_image_catalog, refresh_image_catalog)
+from flymanager.utils.phenotypes.image_library import select_marker_images
 from flymanager.utils.phenotypes.image_normalize import (
     ImageRejected, MAX_UPLOAD_BYTES, normalize_image)
 from flymanager.utils.phenotypes.image_seed import upsert_image_entry
@@ -217,7 +218,7 @@ def marker_detail(key):
     return render_template(
         "markers/detail.html", page_title=f"Marker: {key}",
         definition=definition, kinds=MARKER_KINDS,
-        images=get_image_catalog()["by_marker_key"].get(key, []),
+        image_groups=select_marker_images(key),
         can_edit=can_edit_marker_definition(definition, username),
         can_promote=(username == "admin" and definition.get("origin") == "user"),
         is_shipped=(definition.get("origin") == "shipped"),
