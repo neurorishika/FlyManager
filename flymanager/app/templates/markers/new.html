@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% import "markers/_fields.html" as marker_fields %}
+
+{% block title %}Add a Marker{% endblock %}
+
+{% block content %}
+<div class="app-panel app-page-header">
+    <div>
+        <p class="app-kicker">Marker Catalog</p>
+        <h1 class="app-page-title">Add a marker</h1>
+        <p class="app-page-subtitle">Teach FlyManager to recognise something new in a genotype. Pick what
+            kind of thing it is, then fill in what you would tell a new student about it. Everyone in the lab
+            sees the marker as soon as you save.</p>
+    </div>
+    <div class="app-chip-row">
+        <a href="{{ url_for('markers.marker_catalog') }}" class="app-chip"><i class="fas fa-arrow-left"></i> Back to catalog</a>
+    </div>
+</div>
+
+<div class="app-panel">
+    <form method="POST" action="{{ url_for('markers.create_marker') }}" class="app-form-shell">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group mb-3">
+            <label for="newMarkerKey">Name</label>
+            <input type="text" class="form-control" id="newMarkerKey" name="Key" required
+                   placeholder="Sb, TM3, w+ …">
+            <small class="form-text text-muted">How you would write it in a genotype. This has to be unique.</small>
+        </div>
+        <div class="form-group mb-3">
+            <label for="newMarkerKind">What kind of marker is it?</label>
+            <select class="form-control" id="newMarkerKind" name="kind" data-marker-kind-select required>
+                {% for kind in kinds %}
+                <option value="{{ kind }}" {% if kind == selected_kind %}selected{% endif %}>{{ kind_labels.get(kind, kind) }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        {% for kind in kinds %}
+        {{ marker_fields.render_kind_fields(kind, field_specs[kind], definition, field_value,
+                                            hidden=(kind != selected_kind)) }}
+        {% endfor %}
+
+        <div class="app-button-row justify-content-end">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add marker</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/marker_kind_fields.js') }}"></script>
+{% endblock %}

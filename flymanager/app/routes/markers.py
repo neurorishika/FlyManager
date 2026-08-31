@@ -24,6 +24,9 @@ from flymanager.utils.mongo.marker_definitions import (
 from flymanager.utils.phenotypes.marker_catalog import (MARKER_KINDS,
                                                          get_catalog,
                                                          refresh_catalog)
+from flymanager.utils.phenotypes.marker_fields import (MARKER_FIELD_SPECS,
+                                                       field_value,
+                                                       form_to_document)
 from flymanager.utils.phenotypes.image_catalog import (
     bump_image_revision, get_image_catalog, refresh_image_catalog)
 from flymanager.utils.phenotypes.image_normalize import (
@@ -34,12 +37,27 @@ from flymanager.utils.phenotypes.image_store import GridFSImageStore, ImageNotFo
 bp = Blueprint("markers", __name__)
 
 # The envelope sections a definition document carries besides `Key`/`kind`.
-# The edit and override forms render one JSON textarea per section, prefilled
-# with its current value, so a normal save already carries every section --
-# see _parse_form_document / _merge_with_existing below for why that alone
-# is not trusted as the only guard.
+# The admin-only raw editor renders one JSON textarea per section, prefilled
+# with its current value, so a save through it already carries every section;
+# the structured editor everyone else uses covers only the fields its kind
+# actually has -- see _parse_form_document / _merge_with_existing below for
+# why neither is trusted as the only guard.
 ENVELOPE_FIELDS = ("match", "payload", "sorting", "audit", "imaging",
                    "expression", "provenance")
+
+# The stored vocabulary is internal; these are what the pages say instead.
+KIND_LABELS = {
+    "gene_marker": "Gene",
+    "allele_marker": "Allele",
+    "alias": "Nickname",
+    "balancer": "Balancer",
+    "construct_marker": "Construct",
+}
+ORIGIN_LABELS = {
+    "shipped": "Built in",
+    "user": "Added by the lab",
+    "curated": "Reviewed",
+}
 
 
 def _serializable(document):
@@ -49,30 +67,38 @@ def _serializable(document):
     return stripped
 
 
-def _parse_form_document(form):
+def _parse_form_document(form, existing=None):
     """Reassemble a full definition document from a plain HTML form POST.
 
-    The edit/override forms render one JSON textarea per envelope section
-    (match/payload/sorting/audit/imaging/expression/provenance), prefilled
-    with that section's current value, precisely so a save carries the whole
-    document rather than a partial diff -- see the module docstring on
-    _merge_with_existing for why a partial diff is dangerous here. A section
-    left blank is simply omitted; `_merge_with_existing` (for updates) or the
-    store's own defaulting (for creates) fills it in.
+    Two form shapes reach here. The ordinary one is the structured editor
+    everyone sees: one input per real field, named for its dotted location
+    (`payload.effect`), rebuilt into envelope sections by `form_to_document`.
+    The other is the admin-only raw editor, which still renders one JSON
+    textarea per envelope section, prefilled with that section's current
+    value, precisely so a save carries the whole document rather than a
+    partial diff -- see _merge_with_existing for why a partial diff is
+    dangerous here. Whichever shape arrives, sections it does not mention are
+    filled from the stored document by `_merge_with_existing`.
     """
     document = {}
     if "Key" in form:
         document["Key"] = (form.get("Key") or "").strip()
+    kind = (form.get("kind") or "").strip() or (existing or {}).get("kind")
     if "kind" in form:
         document["kind"] = (form.get("kind") or "").strip()
-    for field in ENVELOPE_FIELDS:
-        raw = (form.get(field) or "").strip()
-        if not raw:
-            continue
-        try:
-            document[field] = json.loads(raw)
-        except ValueError as exc:
-            raise ValueError(f"{field} must be valid JSON ({exc})") from exc
+
+    if any(field in form for field in ENVELOPE_FIELDS):
+        for field in ENVELOPE_FIELDS:
+            raw = (form.get(field) or "").strip()
+            if not raw:
+                continue
+            try:
+                document[field] = json.loads(raw)
+            except ValueError as exc:
+                raise ValueError(f"{field} must be valid JSON ({exc})") from exc
+        return document
+
+    document.update(form_to_document(kind, form, existing=existing))
     return document
 
 
@@ -156,7 +182,27 @@ def marker_catalog():
                            invalid_definitions=invalid_definitions,
                            selected_kind=request.args.get("kind", ""),
                            selected_origin=request.args.get("origin", ""),
-                           search_query=request.args.get("q", ""))
+                           search_query=request.args.get("q", ""),
+                           kind_labels=KIND_LABELS, origin_labels=ORIGIN_LABELS)
+
+
+@bp.get("/markers/new")
+@login_required
+def new_marker():
+    """The create form, on its own page.
+
+    Creating used to be a JSON-textarea card wedged under the catalog table.
+    The structured editor renders a different set of fields per kind, which
+    needs the room and the kind chosen up front.
+    """
+    kind = (request.args.get("kind") or "").strip()
+    if kind not in MARKER_KINDS:
+        kind = MARKER_KINDS[0]
+    return render_template("markers/new.html", page_title="Add a Marker",
+                           kinds=MARKER_KINDS, selected_kind=kind,
+                           field_specs=MARKER_FIELD_SPECS,
+                           kind_labels=KIND_LABELS, definition={},
+                           field_value=field_value)
 
 
 @bp.get("/markers/<path:key>")
@@ -175,6 +221,9 @@ def marker_detail(key):
         can_edit=can_edit_marker_definition(definition, username),
         can_promote=(username == "admin" and definition.get("origin") == "user"),
         is_shipped=(definition.get("origin") == "shipped"),
+        is_admin=(username == "admin"),
+        field_specs=MARKER_FIELD_SPECS, field_value=field_value,
+        kind_labels=KIND_LABELS, origin_labels=ORIGIN_LABELS,
     )
 
 
@@ -292,7 +341,6 @@ def delete_marker_image(image_id):
 @limiter.limit("60 per hour")
 def create_marker():
     try:
-        payload = get_json_payload() if request.is_json else _parse_form_document(request.form)
         # Captured before the write: when this Key is a shipped key,
         # create_marker_definition is the OVERRIDE path (_require_editable
         # 409s any other attempt to edit a shipped row in place), and the
@@ -301,7 +349,15 @@ def create_marker():
         # it in the same way update_marker does also stops a partial JSON
         # override from silently blanking the shipped row's
         # sorting/audit/imaging sections.
-        previous = get_marker_definition(db, (payload or {}).get("Key"))
+        # The structured form needs `previous` to parse against (it carries
+        # over the keys it does not render), so the key is read from the raw
+        # request before the document is assembled.
+        if request.is_json:
+            payload = get_json_payload()
+            previous = get_marker_definition(db, (payload or {}).get("Key"))
+        else:
+            previous = get_marker_definition(db, (request.form.get("Key") or "").strip())
+            payload = _parse_form_document(request.form, existing=previous)
         payload = _merge_with_existing(payload, previous)
         created = create_marker_definition(db, payload, username=session.get("username"))
     except ValueError as exc:
@@ -331,7 +387,8 @@ def update_marker(key):
     # rebuild scope has to sweep genotypes that used the old spelling.
     previous = get_marker_definition(db, key)
     try:
-        payload = get_json_payload() if request.is_json else _parse_form_document(request.form)
+        payload = (get_json_payload() if request.is_json
+                   else _parse_form_document(request.form, existing=previous))
         payload = _merge_with_existing(payload, previous)
         update_marker_definition(db, key, payload, username=session.get("username"))
     except ValueError as exc:

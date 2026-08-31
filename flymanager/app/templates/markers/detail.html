@@ -1,18 +1,26 @@
 {% extends "base.html" %}
+{% import "markers/_fields.html" as marker_fields %}
+
+{% set spec = field_specs.get(definition.kind) %}
+{% set fields = definition.get("payload", {}) %}
+{% set label = fields.get("display_label") or fields.get("overrides", {}).get("display_label") or definition.Key %}
 
 {% block title %}Marker: {{ definition.Key }}{% endblock %}
 
 {% block content %}
 <div class="app-panel app-page-header">
     <div>
-        <p class="app-kicker">Phenotype Markers</p>
-        <h1 class="app-page-title"><code>{{ definition.Key }}</code></h1>
-        <p class="app-page-subtitle">{{ definition.get("payload", {}).get("display_label", definition.Key) }} &mdash;
-            {{ definition.kind }}</p>
+        <p class="app-kicker">Marker Catalog</p>
+        <h1 class="app-page-title">{{ label }}</h1>
+        <p class="app-page-subtitle">
+            {{ kind_labels.get(definition.kind, definition.kind) }}
+            {%- if label != definition.Key %} &mdash; written as {{ definition.Key }} in a genotype{% endif %}.
+            {% if spec %}{{ spec.blurb }}{% endif %}
+        </p>
     </div>
     <div class="app-chip-row">
         <span class="app-chip badge badge-{{ 'secondary' if definition.origin == 'shipped' else 'success' if definition.origin == 'curated' else 'info' }}">
-            {{ definition.origin }}
+            {{ origin_labels.get(definition.origin, definition.origin) }}
         </span>
         <a href="{{ url_for('markers.marker_catalog') }}" class="app-chip"><i class="fas fa-arrow-left"></i> Back to catalog</a>
     </div>
@@ -20,40 +28,12 @@
 
 <div class="app-settings-grid">
     <div>
-        <div class="app-panel">
+        <div class="app-panel marker-images">
             <div class="app-form-section">
                 <div>
-                    <h2 class="app-form-section-title">Overview</h2>
-                    <p class="app-form-section-copy">The fields the phenotype predictor reads directly.</p>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-sm mb-0">
-                        <tbody>
-                            <tr><th scope="row">Key</th><td><code>{{ definition.Key }}</code></td></tr>
-                            <tr><th scope="row">Kind</th><td>{{ definition.kind }}</td></tr>
-                            <tr><th scope="row">Display label</th><td>{{ definition.get("payload", {}).get("display_label", "") or "—" }}</td></tr>
-                            <tr><th scope="row">Body part</th><td>{{ definition.get("payload", {}).get("body_part", "") or "—" }}</td></tr>
-                            <tr><th scope="row">Chromosome</th><td>{{ definition.get("payload", {}).get("chromosome", "") or "—" }}</td></tr>
-                            <tr>
-                                <th scope="row">Origin</th>
-                                <td>
-                                    <span class="badge badge-{{ 'secondary' if definition.origin == 'shipped' else 'success' if definition.origin == 'curated' else 'info' }}">
-                                        {{ definition.origin }}
-                                    </span>
-                                </td>
-                            </tr>
-                            <tr><th scope="row">Defined by</th><td>{{ definition.CreatedBy or "FlyManager" }}</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div class="app-panel mt-3 marker-images">
-            <div class="app-form-section">
-                <div>
-                    <h2 class="app-form-section-title">Images</h2>
-                    <p class="app-form-section-copy">Reference images attached to this marker are visible to everyone.</p>
+                    <h2 class="app-form-section-title">What it looks like</h2>
+                    <p class="app-form-section-copy">Reference photos for scoring this marker under the scope.
+                        Anything you upload here is visible to the whole lab.</p>
                 </div>
                 <div class="row">
                     {% for image in images %}
@@ -65,7 +45,7 @@
                             {% if image.display.credit %}<div class="text-muted">{{ image.display.credit }}</div>{% endif %}
                             {% if image.display.provenance %}<div class="text-muted">{{ image.display.provenance }}</div>{% endif %}
                             <div class="text-muted">Uploaded by {{ image.UploadedBy or "FlyManager" }}</div>
-                            {% if image.origin == 'user' or session.get('username') == 'admin' %}
+                            {% if image.origin == 'user' or is_admin %}
                             <form method="post" action="{{ url_for('markers.delete_marker_image', image_id=image.imageId) }}" class="mt-1">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="marker_key" value="{{ definition.Key }}">
@@ -75,90 +55,117 @@
                         </figcaption>
                     </figure>
                     {% else %}
-                    <p class="col-12 text-muted">No images yet.</p>
+                    <p class="col-12 text-muted">No photos yet &mdash; if you have a good one, add it below.</p>
                     {% endfor %}
                 </div>
                 <form method="post" action="{{ url_for('markers.upload_marker_image', key=definition.Key) }}" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group">
-                        <label for="markerImage">Upload image</label>
+                        <label for="markerImage">Add a photo</label>
                         <input id="markerImage" class="form-control-file" type="file" name="image" accept="image/png,image/jpeg,image/gif,image/webp" required>
                     </div>
                     <div class="form-group">
                         <label for="markerImageCaption">Caption (optional)</label>
                         <input id="markerImageCaption" class="form-control" type="text" name="caption" maxlength="500">
                     </div>
-                    <button type="submit" class="btn btn-primary">Upload image</button>
-                    <small class="form-text text-muted">PNG, JPEG, GIF or WebP, up to 2 MB. Stored as WebP.</small>
+                    <button type="submit" class="btn btn-primary">Upload photo</button>
+                    <small class="form-text text-muted">PNG, JPEG, GIF or WebP, up to 2 MB.</small>
                 </form>
             </div>
         </div>
 
+        {% if spec %}
         <div class="app-panel mt-3">
             <div class="app-form-section">
                 <div>
-                    <h2 class="app-form-section-title">Audit Trail</h2>
-                    <p class="app-form-section-copy">Attribution is the safety mechanism for global-immediate
-                        visibility: any user's edit is live for every user right away, so who-did-what-when is not
-                        decoration.</p>
+                    <h2 class="app-form-section-title">Details</h2>
+                    <p class="app-form-section-copy">What FlyManager uses when it predicts a phenotype from a genotype.</p>
                 </div>
+                {% for title, group in spec.groups %}
+                {% set filled = group | selectattr("path", "in", []) | list %}
+                {% set rows = [] %}
+                {% for field in group %}{% if field_value(definition, field.path) not in ("", False, None) %}
+                {% set _ = rows.append(field) %}{% endif %}{% endfor %}
+                {% if rows %}
+                <h3 class="h6 text-muted mt-3">{{ title }}</h3>
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
                         <tbody>
-                            <tr><th scope="row">Created by</th><td>{{ definition.CreatedBy or "—" }}</td></tr>
-                            <tr><th scope="row">Created at</th><td>{{ definition.CreatedAt or "—" }}</td></tr>
-                            <tr><th scope="row">Updated by</th><td>{{ definition.UpdatedBy or "—" }}</td></tr>
-                            <tr><th scope="row">Updated at</th><td>{{ definition.UpdatedAt or "—" }}</td></tr>
-                            <tr><th scope="row">Curated by</th><td>{{ definition.CuratedBy or "—" }}</td></tr>
-                            <tr><th scope="row">Curated at</th><td>{{ definition.CuratedAt or "—" }}</td></tr>
+                            {% for field in rows %}
+                            <tr>
+                                <th scope="row" style="width: 40%">{{ field.label }}</th>
+                                <td>
+                                    {% set value = field_value(definition, field.path) %}
+                                    {% if field.type == "bool" %}Yes
+                                    {% elif field.type == "url" %}<a href="{{ value }}" rel="noopener noreferrer" target="_blank">{{ value }}</a>
+                                    {% else %}{{ value }}{% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
+                {% endif %}
+                {% endfor %}
             </div>
         </div>
+        {% endif %}
 
         <div class="app-panel mt-3">
             <div class="app-form-section">
                 <div>
-                    <h2 class="app-form-section-title">Envelope</h2>
-                    <p class="app-form-section-copy">The full stored document, section by section.</p>
+                    <h2 class="app-form-section-title">History</h2>
+                    <p class="app-form-section-copy">Anyone's edit here changes predictions for everyone, so the
+                        catalog records who changed what.</p>
                 </div>
-
-                <div class="form-group mb-2">
-                    <label>match</label>
-                    <pre class="app-inline-note mb-0">{{ definition.get("match", {}) | tojson(indent=2) }}</pre>
-                </div>
-                <div class="form-group mb-2">
-                    <label>payload</label>
-                    <pre class="app-inline-note mb-0">{{ definition.get("payload", {}) | tojson(indent=2) }}</pre>
-                </div>
-                <div class="form-group mb-2">
-                    <label>sorting</label>
-                    <pre class="app-inline-note mb-0">{{ definition.get("sorting", {}) | tojson(indent=2) }}</pre>
-                </div>
-                <div class="form-group mb-2">
-                    <label>audit</label>
-                    <pre class="app-inline-note mb-0">{{ definition.get("audit", {}) | tojson(indent=2) }}</pre>
-                </div>
-                <div class="form-group mb-2">
-                    <label>imaging</label>
-                    <pre class="app-inline-note mb-0">{{ definition.get("imaging", {}) | tojson(indent=2) }}</pre>
-                    <small class="text-muted">Image aliases live here; <code>imaging.images</code> remains empty
-                        because image metadata is stored separately and does not affect prediction signatures.</small>
-                </div>
-                <div class="form-group mb-2">
-                    <label>expression</label>
-                    <pre class="app-inline-note mb-0">{{ definition.get("expression", {}) | tojson(indent=2) }}</pre>
-                    <small class="text-muted">Expression-system pairing (Gal4/UAS, LexA/LexAop, QF/QUAS) is
-                        intentionally empty in this release &mdash; a later slice (expression systems) fills it
-                        in.</small>
-                </div>
-                <div class="form-group mb-0">
-                    <label>provenance</label>
-                    <pre class="app-inline-note mb-0">{{ definition.get("provenance", {}) | tojson(indent=2) }}</pre>
-                </div>
+                <p class="mb-1">Added by <strong>{{ definition.CreatedBy or "FlyManager" }}</strong>{% if definition.CreatedAt %} on {{ definition.CreatedAt }}{% endif %}.</p>
+                {% if definition.UpdatedBy %}
+                <p class="mb-1">Last changed by <strong>{{ definition.UpdatedBy }}</strong>{% if definition.UpdatedAt %} on {{ definition.UpdatedAt }}{% endif %}.</p>
+                {% endif %}
+                {% if definition.CuratedBy %}
+                <p class="mb-0">Reviewed by <strong>{{ definition.CuratedBy }}</strong>{% if definition.CuratedAt %} on {{ definition.CuratedAt }}{% endif %}.</p>
+                {% endif %}
             </div>
         </div>
+
+        {% if is_admin %}
+        <div class="app-panel mt-3">
+            <details>
+                <summary class="app-form-section-title">Raw definition (admin)</summary>
+                <p class="app-form-section-copy mt-2">The stored document, section by section. Editing here is the
+                    escape hatch for anything the form above does not cover; <code>imaging.images</code> stays
+                    empty because image metadata is stored separately and does not affect prediction signatures.</p>
+                {% for section in ("match", "payload", "sorting", "audit", "imaging", "expression", "provenance") %}
+                <div class="form-group mb-2">
+                    <label>{{ section }}</label>
+                    <pre class="app-inline-note mb-0">{{ definition.get(section, {}) | tojson(indent=2) }}</pre>
+                </div>
+                {% endfor %}
+
+                <form method="POST" action="{{ url_for('markers.update_marker', key=definition.Key) if not is_shipped else url_for('markers.create_marker') }}" class="mt-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% if is_shipped %}<input type="hidden" name="Key" value="{{ definition.Key }}">{% endif %}
+                    <div class="form-group mb-2">
+                        <label for="rawKind">kind</label>
+                        <select class="form-control" id="rawKind" name="kind">
+                            {% for kind in kinds %}
+                            <option value="{{ kind }}" {% if kind == definition.kind %}selected{% endif %}>{{ kind }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% for section in ("match", "payload", "sorting", "audit", "imaging", "expression", "provenance") %}
+                    <div class="form-group mb-2">
+                        <label for="raw-{{ section }}">{{ section }}</label>
+                        <textarea class="form-control" id="raw-{{ section }}" name="{{ section }}" rows="3">{{ definition.get(section, {}) | tojson(indent=2) }}</textarea>
+                    </div>
+                    {% endfor %}
+                    <div class="app-button-row justify-content-end">
+                        <button type="submit" class="btn btn-outline-secondary"><i class="fas fa-code"></i> Save raw definition</button>
+                    </div>
+                </form>
+            </details>
+        </div>
+        {% endif %}
     </div>
 
     <div>
@@ -166,68 +173,34 @@
         <div class="app-panel">
             <div class="app-action-card">
                 <div>
-                    <h6 class="mb-1">Promote to Curated</h6>
-                    <p class="text-muted mb-0">Marks this user-submitted definition as reviewed and endorsed. Curated
-                        rows can no longer be edited by their original creator &mdash; only an admin can change them
-                        after this.</p>
+                    <h6 class="mb-1">Mark as reviewed</h6>
+                    <p class="text-muted mb-0">Records that this lab-added marker has been checked. After this,
+                        only an admin can change it.</p>
                 </div>
                 <form method="POST" action="{{ url_for('markers.promote_marker', key=definition.Key) }}"
                       data-ajax-action data-redirect-url="{{ url_for('markers.marker_detail', key=definition.Key) }}"
-                      data-confirm-message="Promote {{ definition.Key }} to curated? Its creator will no longer be able to edit it directly.">
-                    <button type="submit" class="btn btn-success"><i class="fas fa-check-circle"></i> Promote to Curated</button>
+                      data-confirm-message="Mark {{ definition.Key }} as reviewed? Its creator will no longer be able to edit it directly.">
+                    <button type="submit" class="btn btn-success"><i class="fas fa-check-circle"></i> Mark as reviewed</button>
                 </form>
             </div>
         </div>
         {% endif %}
 
-        {% if can_edit %}
+        {% if can_edit and spec %}
         <div class="app-panel mt-3">
             <div class="app-form-shell">
                 <div class="app-form-section">
                     <div>
-                        <h2 class="app-form-section-title">Edit Definition</h2>
-                        <p class="app-form-section-copy">Every section below is submitted on save, even the ones you
-                            do not touch, so an edit never resets a section to empty.</p>
+                        <h2 class="app-form-section-title">Edit this marker</h2>
+                        <p class="app-form-section-copy">Saving updates predictions for everyone in the lab, and
+                            your name is recorded against the change.</p>
                     </div>
                     <form method="POST" action="{{ url_for('markers.update_marker', key=definition.Key) }}">
-                        <div class="form-group mb-2">
-                            <label for="editKind">kind</label>
-                            <select class="form-control" id="editKind" name="kind">
-                                {% for kind in kinds %}
-                                <option value="{{ kind }}" {% if kind == definition.kind %}selected{% endif %}>{{ kind }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="editMatch">match</label>
-                            <textarea class="form-control" id="editMatch" name="match" rows="2">{{ definition.get("match", {}) | tojson(indent=2) }}</textarea>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="editPayload">payload</label>
-                            <textarea class="form-control" id="editPayload" name="payload" rows="6">{{ definition.get("payload", {}) | tojson(indent=2) }}</textarea>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="editSorting">sorting</label>
-                            <textarea class="form-control" id="editSorting" name="sorting" rows="2">{{ definition.get("sorting", {}) | tojson(indent=2) }}</textarea>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="editAudit">audit</label>
-                            <textarea class="form-control" id="editAudit" name="audit" rows="2">{{ definition.get("audit", {}) | tojson(indent=2) }}</textarea>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="editImaging">imaging <small class="text-muted">(images filled by a later slice)</small></label>
-                            <textarea class="form-control" id="editImaging" name="imaging" rows="2">{{ definition.get("imaging", {}) | tojson(indent=2) }}</textarea>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="editExpression">expression <small class="text-muted">(filled by a later slice)</small></label>
-                            <textarea class="form-control" id="editExpression" name="expression" rows="2">{{ definition.get("expression", {}) | tojson(indent=2) }}</textarea>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="editProvenance">provenance</label>
-                            <textarea class="form-control" id="editProvenance" name="provenance" rows="2">{{ definition.get("provenance", {}) | tojson(indent=2) }}</textarea>
-                        </div>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="kind" value="{{ definition.kind }}">
+                        {{ marker_fields.render_kind_fields(definition.kind, spec, definition, field_value) }}
                         <div class="app-button-row justify-content-end">
-                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save changes</button>
                         </div>
                     </form>
                 </div>
@@ -237,76 +210,41 @@
         <div class="app-panel mt-3">
             <div class="app-action-card">
                 <div>
-                    <h6 class="mb-1 text-danger">Delete Definition</h6>
+                    <h6 class="mb-1 text-danger">Remove this marker</h6>
                     <p class="text-muted mb-0">
                         {% if definition.overridesShipped %}
-                        This removes your override; the shipped definition for <code>{{ definition.Key }}</code>
-                        takes effect again.
+                        This drops the lab's version of {{ definition.Key }}; the built-in one takes over again.
                         {% else %}
-                        This permanently removes <code>{{ definition.Key }}</code> from the catalog.
+                        FlyManager will stop recognising {{ definition.Key }}. This cannot be undone.
                         {% endif %}
                     </p>
                 </div>
                 <form method="POST" action="{{ url_for('markers.delete_marker', key=definition.Key) }}"
                       data-ajax-action data-redirect-url="{{ url_for('markers.marker_catalog') }}"
-                      data-confirm-message="Delete the definition for {{ definition.Key }}? This cannot be undone.">
-                    <button type="submit" class="btn btn-outline-danger"><i class="fas fa-trash"></i> Delete Definition</button>
+                      data-confirm-message="Remove {{ definition.Key }} from the catalog? This cannot be undone.">
+                    <button type="submit" class="btn btn-outline-danger"><i class="fas fa-trash"></i> Remove marker</button>
                 </form>
             </div>
         </div>
         {% endif %}
 
-        {% if is_shipped %}
+        {% if is_shipped and spec %}
         <div class="app-panel mt-3">
             <div class="app-form-shell">
                 <div class="app-form-section">
                     <div>
-                        <h2 class="app-form-section-title">Override This Definition</h2>
-                        <p class="app-form-section-copy">This is a shipped, read-only definition. Saving here creates
-                            a Mongo overlay for <code>{{ definition.Key }}</code> that takes precedence over the
-                            shipped file everywhere the marker is matched. Every section is prefilled with the
-                            shipped values so you only need to change what you actually want different.</p>
+                        <h2 class="app-form-section-title">Correct this marker</h2>
+                        <p class="app-form-section-copy">{{ definition.Key }} is one of FlyManager's built-in
+                            markers. Saving here keeps a lab version that is used instead of the built-in one
+                            everywhere. Everything is prefilled, so change only what is wrong.</p>
                     </div>
                     <form method="POST" action="{{ url_for('markers.create_marker') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="Key" value="{{ definition.Key }}">
-                        <div class="form-group mb-2">
-                            <label for="overrideKind">kind</label>
-                            <select class="form-control" id="overrideKind" name="kind">
-                                {% for kind in kinds %}
-                                <option value="{{ kind }}" {% if kind == definition.kind %}selected{% endif %}>{{ kind }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="overrideMatch">match</label>
-                            <textarea class="form-control" id="overrideMatch" name="match" rows="2">{{ definition.get("match", {}) | tojson(indent=2) }}</textarea>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="overridePayload">payload</label>
-                            <textarea class="form-control" id="overridePayload" name="payload" rows="6">{{ definition.get("payload", {}) | tojson(indent=2) }}</textarea>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="overrideSorting">sorting</label>
-                            <textarea class="form-control" id="overrideSorting" name="sorting" rows="2">{{ definition.get("sorting", {}) | tojson(indent=2) }}</textarea>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="overrideAudit">audit</label>
-                            <textarea class="form-control" id="overrideAudit" name="audit" rows="2">{{ definition.get("audit", {}) | tojson(indent=2) }}</textarea>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="overrideImaging">imaging <small class="text-muted">(images filled by a later slice)</small></label>
-                            <textarea class="form-control" id="overrideImaging" name="imaging" rows="2">{{ definition.get("imaging", {}) | tojson(indent=2) }}</textarea>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="overrideExpression">expression <small class="text-muted">(filled by a later slice)</small></label>
-                            <textarea class="form-control" id="overrideExpression" name="expression" rows="2">{{ definition.get("expression", {}) | tojson(indent=2) }}</textarea>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label for="overrideProvenance">provenance</label>
-                            <textarea class="form-control" id="overrideProvenance" name="provenance" rows="2">{{ definition.get("provenance", {}) | tojson(indent=2) }}</textarea>
-                        </div>
+                        <input type="hidden" name="kind" value="{{ definition.kind }}">
+                        {{ marker_fields.render_kind_fields(definition.kind, spec, definition, field_value) }}
                         <div class="app-button-row justify-content-end">
-                            <button type="submit" class="btn btn-warning"><i class="fas fa-code-branch"></i> Override</button>
+                            <button type="submit" class="btn btn-warning"><i class="fas fa-pen"></i> Save lab version</button>
                         </div>
                     </form>
                 </div>

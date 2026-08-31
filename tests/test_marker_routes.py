@@ -93,9 +93,11 @@ def test_detail_renders_a_shipped_definition_read_only(app, fake_db):
         response = _client(app, fake_db).get("/markers/Cy")
     body = response.data.decode()
     assert response.status_code == 200
-    assert "Override" in body
-    assert "curly wings" in body  # payload.effect actually rendered, not dumped
-    assert "shipped" in body
+    # A built-in marker offers a lab correction (an overlay) rather than an
+    # in-place edit; the page says so in plain words now.
+    assert "Save lab version" in body
+    assert "curly wings" in body  # the effect actually rendered, not dumped
+    assert "Built in" in body
     assert "{{" not in body
     assert "Undefined" not in body
 
