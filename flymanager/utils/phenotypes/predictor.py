@@ -450,6 +450,11 @@ def get_cached_stock_phenotype(record, strict=True):
     if strict:
         if cache.get("version") != PHENOTYPE_CACHE_VERSION:
             return None
+        # The truthiness guard is deliberate: caches written before signatures
+        # existed carry none, and are tolerated rather than mass-invalidated.
+        # See test_a_cache_written_before_this_change_has_no_signature_and_is_tolerated.
+        # Every cache this version writes stamps both, so the tolerance only
+        # ever applies to genuinely pre-signature documents.
         if cache.get("pipelineSignature") and str(cache.get("pipelineSignature", "")) != compute_flybase_pipeline_signature():
             return None
         if cache.get("markerCatalogSignature") and str(cache.get("markerCatalogSignature", "")) != get_catalog()["signature"]:
@@ -557,6 +562,11 @@ def get_cached_cross_phenotype(record, strict=True):
     if strict:
         if cache.get("version") != PHENOTYPE_CACHE_VERSION:
             return None
+        # The truthiness guard is deliberate: caches written before signatures
+        # existed carry none, and are tolerated rather than mass-invalidated.
+        # See test_a_cache_written_before_this_change_has_no_signature_and_is_tolerated.
+        # Every cache this version writes stamps both, so the tolerance only
+        # ever applies to genuinely pre-signature documents.
         if cache.get("pipelineSignature") and str(cache.get("pipelineSignature", "")) != compute_flybase_pipeline_signature():
             return None
         if cache.get("markerCatalogSignature") and str(cache.get("markerCatalogSignature", "")) != get_catalog()["signature"]:

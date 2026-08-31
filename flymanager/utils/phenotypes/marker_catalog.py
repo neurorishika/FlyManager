@@ -219,6 +219,7 @@ def _empty_snapshot():
         "construct_markers": {},
         "stability": {},
         "image_aliases": {},
+        "unresolved_balancer_markers": {},
         "probe_symbols": [],
         "signature": "",
     }
@@ -264,6 +265,15 @@ def compile_catalog(shipped, overlay_documents=()):
             snapshot["invalid_definitions"].append(
                 {"Key": key, "errors": [f"could not be indexed: {exc}"]})
 
+    # Recorded after the whole merge, so forward references to a definition
+    # later in the file are not mistaken for typos. A carried marker that names
+    # nothing was previously dropped at resolve time with no warning anywhere,
+    # so a user was simply told the balancer does not carry it.
+    for symbol, carried in snapshot["balancer_markers"].items():
+        missing = [key for key in carried if key not in snapshot["definitions"]]
+        if missing:
+            snapshot["unresolved_balancer_markers"][symbol] = missing
+
     snapshot["known_balancer_symbols"] = frozenset(
         set(snapshot["balancers"]) | set(snapshot["balancer_aliases"]))
     # Precomputed and immutable: these are read per token on the parsing hot
@@ -306,7 +316,12 @@ def _index_definition(snapshot, key, document):
         if aliases:
             metadata["aliases"] = list(aliases)
         snapshot["balancers"][symbol] = metadata
-        default_markers = list(metadata.get("default_markers") or [])
+        # Stripped here, once, rather than at each read site: the form path
+        # strips but the JSON API does not, and a padded " Sb" matches no
+        # definition, so the marker silently vanished from the balancer.
+        default_markers = [str(m).strip() for m in (metadata.get("default_markers") or [])]
+        default_markers = [m for m in default_markers if m]
+        metadata["default_markers"] = list(default_markers)
         snapshot["balancer_markers"][symbol] = default_markers
         for alias in aliases:
             snapshot["balancer_aliases"][alias] = symbol
