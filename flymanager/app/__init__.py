@@ -126,6 +126,11 @@ def run_locked_scheduled_job(app, *, key, label, ttl_seconds, func):
 
 
 # --- Application Factory ---
+# The literal in .env.example. Anything that boots with this is running on a
+# secret anyone can read out of the repository.
+PLACEHOLDER_SECRET_KEY = "replace-with-a-long-random-string"
+
+
 def create_app():
     """Create and configure the Flask application."""
 
@@ -140,6 +145,12 @@ def create_app():
     # --- Configuration ---
     session_lifetime_seconds = int(os.getenv("SESSION_LIFETIME_SECONDS", "3600"))
     provided_secret_key = (os.getenv("SECRET_KEY") or "").strip()
+    if provided_secret_key == PLACEHOLDER_SECRET_KEY:
+        # .env.example ships this value and scripts/install-production.sh used
+        # to copy it verbatim, so a documented production install ran with a
+        # secret published in this repository -- every session cookie, admin
+        # included, was forgeable. Treated as no key at all.
+        provided_secret_key = ""
     secure_cookie_enabled = env_flag("SESSION_COOKIE_SECURE", False)
     production_domain = (os.getenv("FLYMANAGER_DOMAIN") or "").strip()
     if not provided_secret_key and (secure_cookie_enabled or production_domain):

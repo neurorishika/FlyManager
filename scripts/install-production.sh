@@ -56,9 +56,17 @@ mkdir -p "$ROOT_DIR/backups/mongodb"
 mkdir -p "$ROOT_DIR/backups/state"
 mkdir -p "$ROOT_DIR/backups/logs"
 
+# shellcheck source=lib/generate-secret-key.sh
+. "$(dirname "$0")/lib/generate-secret-key.sh"
+
 if [ ! -f "$ENV_FILE" ]; then
     cp "$EXAMPLE_ENV_FILE" "$ENV_FILE"
 fi
+
+# Unconditional rather than only on first copy: an .env written by an earlier
+# version of this script still holds the published placeholder, and the app now
+# refuses to start on it for a public-domain deployment.
+ensure_secret_key "$ENV_FILE" || exit 1
 
 if [ -n "$DOMAIN_ARG" ]; then
     upsert_env_var "FLYMANAGER_DOMAIN" "$DOMAIN_ARG"

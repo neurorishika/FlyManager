@@ -24,33 +24,15 @@ mkdir -p "$ROOT_DIR/backups/mongodb"
 mkdir -p "$ROOT_DIR/backups/state"
 mkdir -p "$ROOT_DIR/backups/logs"
 
+# shellcheck source=lib/generate-secret-key.sh
+. "$(dirname "$0")/lib/generate-secret-key.sh"
+
 if [ ! -f "$ENV_FILE" ]; then
     cp "$EXAMPLE_ENV_FILE" "$ENV_FILE"
-    if command -v python3 >/dev/null 2>&1; then
-        GENERATED_SECRET=$(python3 - <<'PY'
-import secrets
-print(secrets.token_hex(32))
-PY
-)
-        python3 - <<PY
-from pathlib import Path
-
-env_file = Path(r"$ENV_FILE")
-env_file.write_text(
-    env_file.read_text().replace("replace-with-a-long-random-string", "$GENERATED_SECRET"),
-    encoding="utf-8",
-)
-PY
-    elif command -v openssl >/dev/null 2>&1; then
-        GENERATED_SECRET=$(openssl rand -hex 32)
-        sed -i.bak "s/replace-with-a-long-random-string/$GENERATED_SECRET/" "$ENV_FILE"
-        rm -f "$ENV_FILE.bak"
-    else
-        echo "Unable to generate SECRET_KEY automatically because neither python3 nor openssl is available."
-        exit 1
-    fi
-    echo "Created .env from .env.example with a generated SECRET_KEY."
+    echo "Created .env from .env.example."
 fi
+
+ensure_secret_key "$ENV_FILE" || exit 1
 
 cd "$ROOT_DIR"
 docker compose up -d --build
