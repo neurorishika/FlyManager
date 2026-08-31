@@ -115,6 +115,19 @@ def test_a_user_caption_survives_the_move_to_the_shared_macro(app, fake_db):
     assert "Uploaded by alice" in body
 
 
+def test_an_unresolvable_marker_page_shows_a_does_not_resolve_message(app, fake_db):
+    """Orco-LexA is a real shipped alias whose target isn't a definition Key
+    and has no gene stem to fall back to, so it resolves to one group with
+    marker=None (images=[]). The template used a for-loop {% else %}, which
+    only fires when image_groups is empty overall -- never for an unresolved
+    group inside a one-item list -- so this panel used to render blank."""
+    _install()
+    with patch("flymanager.app.routes.markers.db", fake_db):
+        body = _client(app, fake_db).get("/markers/Orco-LexA").data.decode()
+    assert "does not resolve to" in body
+    assert "the image library knows about" in body
+
+
 def test_a_marker_with_no_images_shows_the_placeholder_card(app, fake_db):
     _install()
     with patch("flymanager.app.routes.markers.db", fake_db):
@@ -130,6 +143,20 @@ def test_an_admin_gets_a_delete_control_for_an_attached_shipped_image(app, fake_
     with patch("flymanager.app.routes.markers.db", fake_db):
         body = _client(app, fake_db, "admin").get("/markers/Cy").data.decode()
     assert "img_ship/delete" in body
+
+
+def test_an_upload_made_on_a_balancer_page_gets_a_working_remove_control(app, fake_db):
+    """upload_marker_image binds to the page's own Key ('CyO'), not to any of
+    the carried markers ('Cy', 'pr', 'cn') the balancer resolves to. This was
+    the fully-broken case: the upload was invisible on the page it was made
+    from, and even once visible, posting the resolved group key against
+    delete_marker_image 409s because that key was never in markerKeys."""
+    _install(_entry("img_mine", keys=["CyO"], stem="cy", origin="user"))
+    with patch("flymanager.app.routes.markers.db", fake_db):
+        body = _client(app, fake_db, "alice").get("/markers/CyO").data.decode()
+    assert "/markers/images/img_mine" in body
+    assert "img_mine/delete" in body
+    assert 'name="marker_key" value="CyO"' in body
 
 
 def test_a_balancer_page_shows_its_carried_markers(app, fake_db):

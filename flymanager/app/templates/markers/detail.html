@@ -45,6 +45,13 @@
                     {% if image_groups|length > 1 %}
                     <h3 class="h6 text-muted">{{ group.display_label }}</h3>
                     {% endif %}
+                    {% if not group.images %}
+                    {# An empty images list -- as opposed to the placeholder row a
+                       resolved-but-unmatched group always gets -- is the unambiguous
+                       signal that this group's Key never resolved to a marker at all. #}
+                    <p class="text-muted">{{ group.display_label }} does not resolve to
+                        anything the image library knows about.</p>
+                    {% else %}
                     {{ phenotype_images.render_phenotype_images(
                         group.images,
                         delete_action='markers.delete_marker_image',
@@ -57,6 +64,7 @@
                         <summary class="small text-muted">Possibly related ({{ group.related|length }})</summary>
                         {{ phenotype_images.render_phenotype_images(group.related) }}
                     </details>
+                    {% endif %}
                     {% endif %}
                 </div>
                 {% else %}

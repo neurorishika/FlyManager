@@ -58,9 +58,11 @@ def _resolve_one(key, catalog, _following_alias=False):
     if kind == "alias":
         target = str((document.get("payload") or {}).get("value") or "")
         if _following_alias:
-            # An alias chain is a data error, not a feature. Follow one hop so
-            # the common `Gla -> wg[Gla-1]` case works, then stop rather than
-            # risk a cycle.
+            # An alias chain is a data error, not a feature. This is only
+            # reached on the second hop (target-of-a-target), so it fires for
+            # alias-to-alias chains, not the single-hop `Gla -> wg[Gla-1]`
+            # case, which the non-chain branch below already handles. Stop
+            # here rather than follow further and risk a cycle.
             return _group(target or key, None, fallback_label=target or key)
         resolved = _resolve_one(target, catalog, _following_alias=True)
         if resolved is not None:

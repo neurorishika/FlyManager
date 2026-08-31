@@ -193,7 +193,7 @@ def _definition_key_for(marker):
     return None
 
 
-def _image_row(marker, marker_key, entry, score, *, attached=False):
+def _image_row(marker, marker_key, entry, score, *, attached=False, bound_key=""):
     display = (entry or {}).get("display") or {}
     image_id = entry["imageId"] if entry else None
     return {
@@ -201,6 +201,11 @@ def _image_row(marker, marker_key, entry, score, *, attached=False):
         "image_url": f"/markers/images/{image_id}" if image_id else None,
         "has_image": entry is not None,
         "marker_key": marker_key,
+        # The key this row is actually bound by, distinct from marker_key
+        # (the resolved group's key). The unbind form must post this one --
+        # posting the resolved key 409s when the entry was bound to the
+        # page's own (pre-resolution) Key instead, e.g. an alias page.
+        "bound_key": bound_key,
         "display_label": marker.get("display_label", marker.get("gene_stem", "?")),
         "body_part": marker.get("body_part", ""),
         "effect": marker.get("effect", ""),
@@ -273,6 +278,12 @@ def select_marker_images(definition_key, *, min_score=ALIAS_SCORE):
     make an image the app clearly associates with a marker unfindable.
     """
     entries = get_image_catalog()["entries"]
+    # The page's own (pre-resolution) Key. An upload made on this page binds
+    # to it (see upload_marker_image), but resolution rewrites marker_key to
+    # whatever the group resolved to -- an alias target, a balancer's carried
+    # marker -- so a bound-here entry must be recognized under EITHER key or
+    # it is invisible on the very page it was uploaded from.
+    page_key = str(definition_key or "").strip()
     groups = []
     for resolved in resolve_definition_markers(definition_key):
         marker, marker_key = resolved["marker"], resolved["marker_key"]
@@ -282,15 +293,39 @@ def select_marker_images(definition_key, *, min_score=ALIAS_SCORE):
             continue
 
         aliases = _marker_aliases(marker)
-        scored = [(entry, _score_entry(marker, aliases, entry)) for entry in entries]
-        scored = [pair for pair in scored if pair[1] > 0]
-        scored.sort(key=lambda pair: entry_sort_key(pair[0], pair[1]))
+        scored = []
+        for entry in entries:
+            score = _score_entry(marker, aliases, entry)
+            entry_keys = _entry_field(entry, "markerKeys", []) or []
+            # Prefer the page key as the bound key: it is what the unbind
+            # form must post, and an entry bound to both would otherwise
+            # post the group key and 409 (that key isn't in markerKeys as
+            # posted, or removes the wrong binding).
+            if page_key in entry_keys:
+                bound_key = page_key
+            elif marker_key in entry_keys:
+                bound_key = marker_key
+            else:
+                bound_key = ""
+            attached = bool(bound_key)
+            if score <= 0 and not attached:
+                # Neither scored a match nor bound here: irrelevant to this
+                # group.
+                continue
+            scored.append((entry, score, attached, bound_key))
+        # Attached entries first (regardless of score), then by the shared
+        # entry_sort_key within each group.
+        scored.sort(key=lambda t: (0 if t[2] else 1,) + entry_sort_key(t[0], t[1]))
 
         images, related = [], []
-        for entry, score in scored:
-            attached = marker_key in (_entry_field(entry, "markerKeys", []) or [])
-            row = _image_row(marker, marker_key, entry, score, attached=attached)
-            (images if score >= min_score else related).append(row)
+        for entry, score, attached, bound_key in scored:
+            row = _image_row(marker, marker_key, entry, score,
+                             attached=attached, bound_key=bound_key)
+            # An attached entry must show up here even if it scores 0 --
+            # otherwise an upload that doesn't happen to match the scorer's
+            # aliases/stem is bound but invisible, and there is no way to
+            # find it again to delete it.
+            (images if attached or score >= min_score else related).append(row)
         if not images:
             # One placeholder row so the shared macro still renders a card
             # carrying the upload link, rather than showing the marker nothing.

@@ -111,8 +111,9 @@ def test_an_alias_chain_is_followed_once_and_then_abandoned():
               "payload": {"value": "a1"}})
     group = resolve_definition_markers("a1")[0]
     assert group["marker"] is None
-    # The key must be the chain's second hop, not the page's own key, or the
-    # detail page's unbind form would post this marker against itself.
+    # Following exactly one hop from "a1" lands on "a2"'s target, which is
+    # "a1" again in this two-cycle -- coincidentally the page's own key, but
+    # only because the cycle has length two, not because that's the rule.
     assert group["marker_key"] == "a1"
 
 

@@ -24,6 +24,8 @@ GENE = {"Key": "Sb", "kind": "gene_marker", "match": {"symbol": "Sb"},
                     "effect": "short bristles", "phenotype_key": "Sb"}}
 BALANCER = {"Key": "CyO", "kind": "balancer", "match": {"symbol": "CyO"},
             "payload": {"default_markers": ["Sb"], "chromosome": 2}}
+ALIAS = {"Key": "Gla", "kind": "alias", "match": {"token": "Gla"},
+         "payload": {"value": "Sb"}}
 
 
 def _install_catalog(*definitions):
@@ -126,3 +128,42 @@ def test_an_unknown_key_returns_no_groups():
     _install_catalog(GENE)
     _install_images()
     assert select_marker_images("ghost") == []
+
+
+def test_an_upload_bound_to_the_alias_page_key_is_visible_and_attached():
+    """upload_marker_image binds to the page's OWN Key ('Gla'), but the
+    resolved group's marker_key is the alias target ('Sb'). Without the
+    page-key fallback the entry never matches and the upload is invisible
+    on the page it was made from."""
+    _install_catalog(GENE, ALIAS)
+    _install_images(_entry("img_upload", keys=["Gla"]))
+    group = select_marker_images("Gla")[0]
+    assert group["marker_key"] == "Sb"
+    assert [i["image_id"] for i in group["images"]] == ["img_upload"]
+    assert group["images"][0]["attached"] is True
+    assert group["images"][0]["bound_key"] == "Gla"
+
+
+def test_an_upload_bound_to_the_balancer_page_key_is_visible_and_attached():
+    _install_catalog(GENE, BALANCER)
+    _install_images(_entry("img_upload", keys=["CyO"]))
+    group = select_marker_images("CyO")[0]
+    assert group["marker_key"] == "Sb"
+    assert [i["image_id"] for i in group["images"]] == ["img_upload"]
+    assert group["images"][0]["attached"] is True
+    assert group["images"][0]["bound_key"] == "CyO"
+
+
+def test_a_zero_scoring_attached_entry_is_still_included_and_sorts_first():
+    """An upload bound to the page's own (pre-resolution) Key scores 0 --
+    the resolved marker's exact-key tier and alias/stem tiers all key off
+    the resolved marker, not the page's alias Key. It must still show up as
+    attached rather than be silently dropped by the score > 0 filter, or a
+    bound-but-unmatched upload becomes invisible and undeletable."""
+    _install_catalog(GENE, ALIAS)
+    _install_images(_entry("img_seed", aliases=["sb"], stem="sb"),
+                    _entry("img_upload", keys=["Gla"]))
+    images = select_marker_images("Gla")[0]["images"]
+    assert [i["image_id"] for i in images] == ["img_upload", "img_seed"]
+    assert images[0]["match_score"] == 0
+    assert images[0]["attached"] is True
