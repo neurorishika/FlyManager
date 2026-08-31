@@ -73,6 +73,33 @@ def load_shipped_catalog(path=None):
     }
 
 
+def _sorting_errors(sorting):
+    """Problems with a definition's `sorting` section.
+
+    compile_catalog calls float() on stabilityScore, and compilation has no
+    per-row recovery: a non-numeric score there raises out of the compile and
+    takes down every catalog read for every user. Definitions arrive from the
+    marker API, so that row is reachable by any logged-in user -- validating
+    here is what routes it to invalid_definitions instead.
+    """
+    if not isinstance(sorting, dict):
+        return ["sorting must be an object"]
+
+    errors = []
+    score = sorting.get("stabilityScore")
+    if score is not None:
+        # bool is an int subclass, so it would otherwise pass as 1.0.
+        if isinstance(score, bool) or not isinstance(score, (int, float)):
+            errors.append("sorting.stabilityScore must be a number")
+        elif not 0 <= score <= 1:
+            errors.append("sorting.stabilityScore must be between 0 and 1")
+
+    notes = sorting.get("notes")
+    if notes is not None and not isinstance(notes, list):
+        errors.append("sorting.notes must be a list")
+    return errors
+
+
 def validate_definition(document):
     """Return a list of human-readable problems; empty means valid."""
     if not isinstance(document, dict):
@@ -99,6 +126,8 @@ def validate_definition(document):
         errors.append("balancer payload.default_markers must be a list")
     if kind == "construct_marker" and not isinstance(payload.get("overrides", {}), dict):
         errors.append("construct_marker payload.overrides must be an object")
+
+    errors.extend(_sorting_errors(document.get("sorting", {})))
 
     try:
         json.dumps(document, sort_keys=True)
