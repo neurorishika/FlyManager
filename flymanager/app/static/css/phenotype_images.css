@@ -17,7 +17,9 @@
      * identically sized cards. */
     grid-template-columns: repeat(auto-fill, minmax(160px, 160px));
     justify-content: start;
-    align-items: start;
+    /* stretch, not start: cards in a row otherwise take their own height
+       from their caption length and the grid reads ragged. */
+    align-items: stretch;
     gap: var(--space-lg);
     margin-top: var(--space-lg);
 }
