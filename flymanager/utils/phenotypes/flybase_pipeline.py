@@ -1179,9 +1179,28 @@ def get_flybase_phenotype_cache(data_dir=None, cache_path=None, db=None):
     cache_path = resolve_flybase_phenotype_cache_path(data_dir, cache_path)
     cache_key = str(cache_path)
 
+    # The MEMO is dropped when the sources move; the on-disk index is still
+    # served as-is if it is behind them. Those are different problems.
+    #
+    # Web and worker share the data directory. After an admin refresh the
+    # worker rewrites both the sources and this index, but a long-lived
+    # gunicorn process held its memo forever -- so it kept computing from
+    # pre-refresh evidence while build_stock_phenotype_cache stamped the
+    # post-refresh signature onto the result: stale output labelled current,
+    # which strict readers then trust forever. Only a restart cleared it.
+    # Dropping the memo makes that process pick up the file the worker wrote.
+    #
+    # Serving a stale FILE is a separate, deliberate behaviour: a lookup must
+    # never trigger a multi-minute parse, so an index behind its sources
+    # degrades gracefully rather than emptying out. See
+    # test_flybase_evidence_cache_never_rebuilds_on_lookup.
+    current_signature = compute_flybase_pipeline_signature(data_dir)
+
     cached_payload = _IN_MEMORY_CACHE.get(cache_key)
     if cached_payload:
-        return cached_payload
+        if cached_payload.get("source_signature") == current_signature:
+            return cached_payload
+        _IN_MEMORY_CACHE.pop(cache_key, None)
 
     if cache_path.exists():
         try:
