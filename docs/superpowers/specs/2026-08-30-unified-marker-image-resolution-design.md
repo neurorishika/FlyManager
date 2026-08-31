@@ -1,7 +1,9 @@
 # Unified Marker Image Resolution Design
 
 Date: 2026-08-30
-Status: approved design, ready for implementation planning
+Status: revised after adversarial review — awaiting re-approval
+Supersedes: the 2026-08-30 draft approved before review, whose Part 2 (a
+  markerKeys backfill) was dropped. See Part 2 for why.
 
 ## Goal
 
@@ -94,7 +96,7 @@ here too, not a fallback.
 Add to `flymanager/utils/phenotypes/image_library.py`:
 
 ```python
-def select_marker_images(definition_key, *, min_score=ALIAS_TIER_SCORE):
+def select_marker_images(definition_key, *, min_score=ALIAS_SCORE):
     """Every reference image for a catalog definition, best match first."""
 ```
 
@@ -107,7 +109,9 @@ a magic number.
 It resolves the Key to the canonical resolved-marker dict — the same shape
 the predictor produces and the viewers already pass in — then scores every
 catalog entry with the existing `_score_entry` and returns all matches at or
-above `min_score`, sorted by score descending then `imageId` for stability.
+above `min_score`, ordered by the tie-break Part 2 defines
+(`-score`, `display.sortOrder`, `imageId`) so the order is identical in every
+process and across deploys.
 
 Key-to-marker resolution, by kind:
 

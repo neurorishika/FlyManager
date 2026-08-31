@@ -1,7 +1,9 @@
 # Marker Knowledge Into The Catalog Design
 
 Date: 2026-08-30
-Status: approved design, ready for implementation planning
+Status: revised after adversarial review — awaiting re-approval
+Supersedes: the 2026-08-30 draft approved before review. K3 lost its
+  epistasis half and K1 was rebuilt after its motivation proved wrong.
 
 ## Goal
 
