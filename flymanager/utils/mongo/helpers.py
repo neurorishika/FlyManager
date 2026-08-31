@@ -2,6 +2,7 @@ import datetime
 from threading import RLock
 
 from flask import url_for
+from markupsafe import escape
 
 from flymanager.utils.utils import day_str_to_num
 
@@ -232,16 +233,22 @@ def get_flip_schedule(user, db):
             closest_flip_day = find_closest_flip_day(next_flip_date, flip_days)
             if closest_flip_day:
                 flip_date_str = closest_flip_day.strftime("%Y-%m-%d")
-                tray_info = f"{stock['TrayID']} - {stock['TrayPosition']}"
-                owner_note = f", owner: {stock['User']}" if stock.get("User") != user else ""
+                # Escaped, not raw: these entries are rendered with `| safe`
+                # in home.html and flip_schedule.html, and a maintainer's
+                # schedule lists records owned by other users -- so another
+                # user's record name reaches this page as live markup.
+                tray_info = f"{escape(stock['TrayID'])} - {escape(stock['TrayPosition'])}"
+                owner_note = (f", owner: {escape(stock['User'])}"
+                              if stock.get("User") != user else "")
                 try:
                     # Try to generate URL - this will fail outside of request context
-                    link = f"<a href='{url_for('stock.view_stock', unique_id=stock['UniqueID'])}'>{stock['Name']}</a>"
+                    stock_url = url_for("stock.view_stock", unique_id=stock["UniqueID"])
+                    link = f"<a href='{escape(stock_url)}'>{escape(stock['Name'])}</a>"
                 except RuntimeError:
                     # Fallback for scheduled tasks - just show the name without link
-                    link = stock["Name"]
+                    link = escape(stock["Name"])
                 schedule.setdefault(flip_date_str, []).append(
-                    f"Stock: {link} (ID: {stock['UniqueID']}, {tray_info}{owner_note})"
+                    f"Stock: {link} (ID: {escape(stock['UniqueID'])}, {tray_info}{owner_note})"
                 )
             else:
                 print(
@@ -255,17 +262,22 @@ def get_flip_schedule(user, db):
             closest_flip_day = find_closest_flip_day(next_flip_date, flip_days)
             if closest_flip_day:
                 flip_date_str = closest_flip_day.strftime("%Y-%m-%d")
-                tray_info = f"{cross['TrayID']} - {cross['TrayPosition']}"
-                owner_note = f", owner: {cross['User']}" if cross.get("User") != user else ""
+                # Escaped, not raw: these entries are rendered with `| safe`
+                # in home.html and flip_schedule.html, and a maintainer's
+                # schedule lists records owned by other users -- so another
+                # user's record name reaches this page as live markup.
+                tray_info = f"{escape(cross['TrayID'])} - {escape(cross['TrayPosition'])}"
+                owner_note = (f", owner: {escape(cross['User'])}"
+                              if cross.get("User") != user else "")
                 try:
                     # Try to generate URL - this will fail outside of request context
                     uid_url = url_for("cross.view_cross", unique_id=cross["UniqueID"])
-                    link = f"<a href='{uid_url}'>{cross['Name']}</a>"
+                    link = f"<a href='{escape(uid_url)}'>{escape(cross['Name'])}</a>"
                 except RuntimeError:
                     # Fallback for scheduled tasks - just show the name without link
-                    link = cross["Name"]
+                    link = escape(cross["Name"])
                 schedule.setdefault(flip_date_str, []).append(
-                    f"Cross: {link} (ID: {cross['UniqueID']}, {tray_info}{owner_note})"
+                    f"Cross: {link} (ID: {escape(cross['UniqueID'])}, {tray_info}{owner_note})"
                 )
 
     # Sort the schedule by date

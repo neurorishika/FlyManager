@@ -979,21 +979,24 @@
             `${item.type.charAt(0).toUpperCase() + item.type.slice(1)} at Position ${position}`;
         
         // Set modal content
+        // escapeHtml on every interpolation, matching buildCellDetailMarkup
+        // above: these strings are record fields owned by whoever owns the
+        // tray, and a supervisor views their reports' trays.
         let detailContent = `
-            <p><strong>Name:</strong> ${item.display_name}</p>
+            <p><strong>Name:</strong> ${escapeHtml(item.display_name)}</p>
         `;
         
         if (item.type === 'stock') {
             detailContent += `
-                <p><strong>Genotype:</strong> ${item.genotype}</p>
+                <p><strong>Genotype:</strong> ${escapeHtml(item.genotype)}</p>
             `;
             
             // Set view link
             document.getElementById('viewItemLink').href = `{{ url_for('stock.view_stock', unique_id='PLACEHOLDER') }}`.replace('PLACEHOLDER', item.id);
         } else {
             detailContent += `
-                <p><strong>Male Genotype:</strong> ${item.male_genotype}</p>
-                <p><strong>Female Genotype:</strong> ${item.female_genotype}</p>
+                <p><strong>Male Genotype:</strong> ${escapeHtml(item.male_genotype)}</p>
+                <p><strong>Female Genotype:</strong> ${escapeHtml(item.female_genotype)}</p>
             `;
             
             // Set view link
@@ -1001,8 +1004,8 @@
         }
         
         detailContent += `
-            <p><strong>Status:</strong> ${item.status}</p>
-            <p><strong>Position:</strong> ${position}</p>
+            <p><strong>Status:</strong> ${escapeHtml(item.status)}</p>
+            <p><strong>Position:</strong> ${escapeHtml(position)}</p>
         `;
         
         document.getElementById('itemDetailBody').innerHTML = detailContent;
