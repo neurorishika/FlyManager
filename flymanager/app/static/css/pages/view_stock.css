@@ -311,66 +311,6 @@
         gap: var(--space-sm);
     }
 
-    .stock-phenotype-image-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 420px));
-        justify-content: start;
-        align-items: start;
-        gap: var(--space-lg);
-        margin-top: var(--space-lg);
-    }
-
-    .stock-phenotype-image-card {
-        display: grid;
-        grid-template-rows: auto 1fr;
-        width: min(100%, 420px);
-        max-width: 420px;
-        justify-self: start;
-        border: 1px solid var(--border-color);
-        border-radius: 16px;
-        overflow: hidden;
-        background: color-mix(in srgb, var(--card-bg) 94%, white 6%);
-    }
-
-    .stock-phenotype-image-media {
-        aspect-ratio: 4 / 3;
-        overflow: hidden;
-        background: color-mix(in srgb, var(--bg-color) 88%, var(--card-bg) 12%);
-    }
-
-    .stock-phenotype-image-card img {
-        display: block;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .stock-phenotype-image-card-body {
-        display: grid;
-        gap: var(--space-xs);
-        padding: var(--space-lg);
-        border-top: 1px solid var(--border-color);
-    }
-
-    .stock-phenotype-image-card-title {
-        margin: 0;
-        font-weight: 600;
-    }
-
-    .stock-phenotype-image-card-copy {
-        margin: 0;
-        color: var(--muted-text);
-        font-size: var(--font-size-sm);
-        line-height: var(--line-height-140);
-    }
-
-    .stock-phenotype-image-card-meta {
-        margin: var(--space-2xs) 0 0;
-        color: var(--muted-text);
-        font-size: var(--font-size-sm);
-        text-transform: capitalize;
-    }
-
     .stock-phenotype-warning {
         padding: var(--space-lg);
         border-radius: 12px;
@@ -400,15 +340,6 @@
 
         .stock-source-grid {
             grid-template-columns: 1fr;
-        }
-
-        .stock-phenotype-image-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .stock-phenotype-image-card {
-            width: 100%;
-            max-width: none;
         }
 
         .stock-match-item {
