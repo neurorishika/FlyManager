@@ -28,7 +28,7 @@ from flymanager.utils.phenotypes.marker_fields import (MARKER_FIELD_SPECS,
                                                        field_value,
                                                        form_to_document)
 from flymanager.utils.phenotypes.image_catalog import (
-    bump_image_revision, get_image_catalog, refresh_image_catalog)
+    bump_image_revision, refresh_image_catalog)
 from flymanager.utils.phenotypes.image_library import select_marker_images
 from flymanager.utils.phenotypes.image_normalize import (
     ImageRejected, MAX_UPLOAD_BYTES, normalize_image)

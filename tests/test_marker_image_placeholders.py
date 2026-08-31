@@ -34,7 +34,7 @@ def _install(entries):
 def _restore_snapshot():
     yield
     image_catalog.set_image_catalog_for_testing(
-        {"entries": [], "by_marker_key": {}, "revision": -1})
+        {"entries": [], "revision": -1})
 
 
 def test_unmatched_marker_still_gets_a_row():

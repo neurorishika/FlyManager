@@ -31,7 +31,7 @@ def _freeze_images(monkeypatch):
                         lambda db, **kwargs: None)
     yield
     image_catalog.set_image_catalog_for_testing(
-        {"entries": [], "by_marker_key": {}, "revision": -1})
+        {"entries": [], "revision": -1})
 
 
 def _entry(image_id, *, keys=(), aliases=(), stem="", body="wing",

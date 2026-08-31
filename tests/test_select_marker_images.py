@@ -15,7 +15,7 @@ from flymanager.utils.phenotypes.image_library import (ALIAS_SCORE,
 def _restore():
     yield
     image_catalog.set_image_catalog_for_testing(
-        {"entries": [], "by_marker_key": {}, "revision": -1})
+        {"entries": [], "revision": -1})
     marker_catalog.reset_catalog()
 
 

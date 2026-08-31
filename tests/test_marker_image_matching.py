@@ -9,7 +9,7 @@ def _restore_snapshot():
     """The snapshot is process-global; without this it leaks between modules."""
     yield
     image_catalog.set_image_catalog_for_testing(
-        {"entries": [], "by_marker_key": {}, "revision": -1})
+        {"entries": [], "revision": -1})
 
 
 def _entry(image_id, *, keys=(), stem="", body="wing"):

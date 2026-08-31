@@ -8,10 +8,15 @@ def _entry(image_id, keys=(), order=0):
             "match": {"markerKeys": list(keys)}, "display": {"sortOrder": order}}
 
 
-def test_compile_indexes_and_totally_orders_entries():
+def test_compile_totally_orders_entries_and_drops_incomplete_ones():
+    """Ordering is still a compile-time guarantee; the by_marker_key index it
+    used to feed is gone, because the only consumer that ever read it was
+    the marker detail page, and every shipped image has an empty markerKeys
+    so that page showed nothing. Images resolve through the scorer now."""
     snapshot = compile_image_catalog([_entry("z", ["Sb"], 0), _entry("a", ["Sb"], 0),
                                       _entry("m", ["Sb"], -1), {"imageId": "broken"}])
-    assert [e["imageId"] for e in snapshot["by_marker_key"]["Sb"]] == ["m", "a", "z"]
+    assert [e["imageId"] for e in snapshot["entries"]] == ["m", "a", "z"]
+    assert "by_marker_key" not in snapshot
 
 
 def test_revision_controls_refresh():
@@ -53,4 +58,4 @@ def test_image_matching_runs_without_any_database():
         assert [m["image_id"] for m in matches] == ["img_a"]
     finally:
         image_catalog.set_image_catalog_for_testing(
-            {"entries": [], "by_marker_key": {}, "revision": -1})
+            {"entries": [], "revision": -1})

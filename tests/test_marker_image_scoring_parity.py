@@ -11,7 +11,7 @@ from flymanager.utils.phenotypes.image_library import select_phenotype_reference
 def _restore_snapshot():
     yield
     image_catalog.set_image_catalog_for_testing(
-        {"entries": [], "by_marker_key": {}, "revision": -1})
+        {"entries": [], "revision": -1})
 
 
 def test_baseline_fixture_is_not_vacuous():

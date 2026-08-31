@@ -18,7 +18,7 @@ from flymanager.utils.phenotypes.image_library import (
 def _restore_snapshot():
     yield
     image_catalog.set_image_catalog_for_testing(
-        {"entries": [], "by_marker_key": {}, "revision": -1})
+        {"entries": [], "revision": -1})
 
 
 def _entry(image_id, *, keys=(), stem="", body="wing", order=0, priority=0):
@@ -68,7 +68,7 @@ def test_the_winner_does_not_depend_on_snapshot_order():
     winners = set()
     for ordering in (entries, list(reversed(entries))):
         image_catalog.set_image_catalog_for_testing(
-            {"entries": ordering, "by_marker_key": {}, "revision": 1})
+            {"entries": ordering, "revision": 1})
         winners.add(select_phenotype_reference_images([_marker()])[0]["image_id"])
     assert winners == {"img_a"}
 

@@ -7,7 +7,7 @@ from pymongo import ReturnDocument
 logger = logging.getLogger(__name__)
 _LOCK = threading.Lock()
 _REFRESH_LOCK = threading.Lock()
-_SNAPSHOT = {"entries": [], "by_marker_key": {}, "revision": -1}
+_SNAPSHOT = {"entries": [], "revision": -1}
 _LAST_PROBE = 0.0
 _PROBE_LOCK = threading.Lock()
 SETTINGS_FIELD = "markerImageRevision"
@@ -21,12 +21,7 @@ def _entry_sort_key(entry):
 def compile_image_catalog(documents, revision=0):
     entries = [d for d in documents or [] if d.get("imageId") and d.get("storageId")]
     entries.sort(key=_entry_sort_key)
-    by_marker_key = {}
-    for entry in entries:
-        for key in (entry.get("match") or {}).get("markerKeys") or []:
-            by_marker_key.setdefault(str(key), []).append(entry)
-    return {"entries": entries, "by_marker_key": by_marker_key,
-            "revision": int(revision or 0)}
+    return {"entries": entries, "revision": int(revision or 0)}
 
 
 def get_image_catalog():
