@@ -3,7 +3,14 @@ import re
 from flymanager.utils.phenotypes.image_catalog import get_image_catalog
 from flymanager.utils.phenotypes.marker_catalog import get_catalog
 
+# Scoring tiers, highest first. Named so a caller can state a floor in terms
+# of a tier instead of a magic number -- 88 in particular is the stem-PREFIX
+# tier, which reads like an alias tier and is not one.
 EXACT_KEY_SCORE = 1000
+EXACT_STEM_SCORE = 100
+ALIAS_SCORE = 98
+STEM_PREFIX_SCORE = 88
+SUBSTRING_SCORE = 72
 EPISTASIS_IMAGE_ALIASES = {"epistasis:w_mini_white_rescue": ["miniwhite", "mini-white", "wplus", "w+"]}
 BODY_PART_ALIASES = {
     "wing": {"wing", "wings"}, "eye": {"eye", "eyes"},
@@ -80,10 +87,36 @@ def _marker_definition_keys(marker):
     return keys
 
 
+def _with_bonuses(score, marker, entry):
+    if _body_part_matches(marker, entry):
+        score += 8
+    if _entry_field(entry, "sourceCollection") == "learning_to_fly":
+        score += 4
+    if _entry_field(entry, "manifestEntry", False):
+        score += 6
+    return score + int((entry.get("display") or {}).get("priority", 0) or 0)
+
+
+def entry_sort_key(entry, score):
+    """Total order over scored entries: best first, ties broken explicitly.
+
+    Without the second and third components, equal scores resolve by whatever
+    order the snapshot happened to compile in, which differs between processes
+    and across deploys.
+    """
+    display = entry.get("display") or {}
+    return (-score, int(display.get("sortOrder") or 0), str(entry.get("imageId") or ""))
+
+
 def _score_entry(marker, aliases, entry):
     entry_keys = _entry_field(entry, "markerKeys", []) or []
     if entry_keys and any(key in entry_keys for key in _marker_definition_keys(marker)):
-        return EXACT_KEY_SCORE
+        # An exact binding outranks every fuzzy tier by construction (1000 vs
+        # at most 100 + 18 of bonuses), but two exact bindings used to tie at
+        # a flat 1000 and resolve by snapshot order. Giving this tier the same
+        # bonuses every other tier gets makes "exact AND agrees on body part"
+        # beat "exact but does not", which is the honest ranking.
+        return _with_bonuses(EXACT_KEY_SCORE, marker, entry)
     stem = str(_entry_field(entry, "stem"))
     if not stem:
         return 0
@@ -97,22 +130,16 @@ def _score_entry(marker, aliases, entry):
     score = 0
     for alias in aliases:
         if alias and alias in entry_aliases:
-            score = max(score, 98)
+            score = max(score, ALIAS_SCORE)
         elif allow_stem and stem == alias:
-            score = max(score, 100)
+            score = max(score, EXACT_STEM_SCORE)
         elif allow_stem and alias and stem.startswith(alias):
-            score = max(score, 88)
+            score = max(score, STEM_PREFIX_SCORE)
         elif allow_stem and alias and alias in stem:
-            score = max(score, 72)
+            score = max(score, SUBSTRING_SCORE)
     if score <= 0:
         return 0
-    if _body_part_matches(marker, entry):
-        score += 8
-    if _entry_field(entry, "sourceCollection") == "learning_to_fly":
-        score += 4
-    if manifest:
-        score += 6
-    return score + int((entry.get("display") or {}).get("priority", 0) or 0)
+    return _with_bonuses(score, marker, entry)
 
 
 def _labels_to_marker_stubs(labels):
@@ -185,11 +212,10 @@ def select_phenotype_reference_images(markers, *, limit=None):
         if not aliases and not _marker_definition_keys(marker):
             continue
 
-        best_entry, best_score = None, 0
-        for entry in entries:
-            score = _score_entry(marker, aliases, entry)
-            if score > best_score:
-                best_entry, best_score = entry, score
+        scored = [(entry, _score_entry(marker, aliases, entry)) for entry in entries]
+        scored = [pair for pair in scored if pair[1] > 0]
+        scored.sort(key=lambda pair: entry_sort_key(pair[0], pair[1]))
+        best_entry, best_score = scored[0] if scored else (None, 0)
 
         # Deliberately no de-duplication across markers: when two markers
         # share a best image (both carried on TM6B, for instance), showing
