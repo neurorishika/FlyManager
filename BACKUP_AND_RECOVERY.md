@@ -723,3 +723,77 @@ BACKUP_DRY_RUN=1 ./scripts/mongo-backup.sh
 BACKUP_DRY_RUN=1 ./scripts/state-backup.sh
 BACKUP_DRY_RUN=1 ./scripts/state-restore.sh backups/state/flymanager_state_YYYYMMDDTHHMMSSZ.tar.gz
 ```
+
+
+## State backup on the Portainer deployment (uploads + stack environment)
+
+`mongodump` covers every collection and GridFS blob, so marker images and all
+records are inside the Mongo backup. It does not cover two things, and the
+Portainer deployment has no git checkout, so `scripts/state-backup.sh` cannot
+run there at all. `scripts/nas-state-backup.sh` is self-contained for that
+reason: it is copied onto the NAS and scheduled from DSM.
+
+It captures:
+
+- `data/uploads`, `generated_labels` and `data/bloomington.csv` — user files
+  that exist nowhere else.
+- The app container's environment, read straight from `docker inspect` so no
+  Portainer API key has to live on the NAS. This is the only place
+  `SECRET_KEY`, the admin credentials and the SMTP credentials exist. Losing
+  `SECRET_KEY` invalidates every session; losing the admin password locks you
+  out of your own instance.
+
+### Why the environment is encrypted to a public key
+
+The NAS holds only the **public** half, so it can encrypt and cannot decrypt.
+A compromised NAS, or a leaked off-site copy, does not expose the secrets. A
+passphrase stored beside the backup would protect neither.
+
+- Private key: keep it off the NAS, in a password manager or an encrypted
+  volume. **If it is lost, the environment backups are unreadable.** The file
+  backups are unaffected — they are plain `tar.gz`.
+- Public key on the NAS: `/volume1/docker/flymanager/scripts/state-backup-public.pem`
+
+Generate a pair with:
+
+```bash
+openssl req -x509 -nodes -newkey rsa:4096 -days 3650 \
+  -keyout state-backup-private.pem -out state-backup-public.pem \
+  -subj "/CN=FlyManager state backup"
+```
+
+### Restoring
+
+```bash
+# Files
+tar xzf flymanager_state_<stamp>.tar.gz -C /volume1/docker/flymanager
+
+# Environment (needs the private key)
+openssl smime -decrypt -binary -inform DEM \
+  -in flymanager_env_<stamp>.env.enc \
+  -inkey state-backup-private.pem
+```
+
+Paste the recovered values back into the Portainer stack's environment
+variables. Verify a restore end to end at least once — an unverified backup is
+a hypothesis.
+
+### Scheduling it (DSM Task Scheduler)
+
+DSM has no crontab and the deploy account has no passwordless sudo, so the
+schedule is created through the UI:
+
+**Control Panel → Task Scheduler → Create → Scheduled Task → User-defined
+script**
+
+- General: name `FlyManager state backup`, user `root` (needs to read the
+  Docker socket).
+- Schedule: daily, an hour after the Mongo backup window.
+- Task Settings → Run command:
+  `/volume1/docker/flymanager/scripts/nas-state-backup.sh`
+- Tick "Send run details by email" for failures, so a silent failure is not
+  the way you find out.
+
+Retention defaults to 30 days but never prunes below 3 archives, for the same
+reason the Mongo backup does not: retention that can empty the directory turns
+a silent failure into total loss.
