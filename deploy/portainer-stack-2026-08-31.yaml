@@ -1,54 +1,3 @@
-# Portainer stack file for Synology NAS deployment
-#
-# Heavy admin actions (Excel export, phenotype/provider cache backfills,
-# FlyBase/Bloomington data refreshes) run in a separate "worker" container
-# via Redis-backed RQ, so they never block the web app. The worker uses the
-# same image as the app, just with a different entrypoint/command - no
-# separate build/push step needed for it.
-#
-# Prerequisites:
-#   1. Build and push the image from your dev machine:
-#        docker build -t YOUR_DOCKERHUB_USER/flymanager:latest .
-#        docker push YOUR_DOCKERHUB_USER/flymanager:latest
-#
-#   2. On your Synology, create the data directories:
-#        /volume1/docker/flymanager/data/uploads
-#        /volume1/docker/flymanager/data/backup
-#        /volume1/docker/flymanager/data/job_exports
-#        /volume1/docker/flymanager/data/flybase
-#      and the file /volume1/docker/flymanager/data/bloomington.csv must exist
-#      (an empty file is fine) -- Docker creates a DIRECTORY in its place if it
-#      does not, and the app then fails to read it.
-#        /volume1/docker/flymanager/flask_session
-#        /volume1/docker/flymanager/generated_labels
-#        /volume1/docker/flymanager/backups
-#        /volume1/docker/flymanager/scripts
-#
-#   3. Upload these two repo files into /volume1/docker/flymanager/scripts/
-#      on the NAS (e.g. via File Station or scp) - there is no git checkout
-#      on the NAS in the Portainer deployment model, so these must be
-#      copied in manually and re-copied whenever they change:
-#        scripts/container-mongo-backup.sh
-#        scripts/rclone.conf (copy from scripts/rclone.conf.example and
-#          fill in real rclone remote credentials once you're ready to
-#          enable off-site backup push - leave it as the unmodified
-#          example content, renamed to rclone.conf, until then)
-#
-#   4. In Portainer → Stacks → Add Stack, paste this file and
-#      fill in the environment variables listed below.
-#
-# After deploying, set up a Reverse Proxy rule in Synology DSM:
-#   Control Panel → Application Portal → Reverse Proxy
-#   Source: https  your-nas-domain.com  443
-#   Destination: http  localhost  12754
-#
-# Required environment variables to set in Portainer:
-#   SECRET_KEY          — long random string, e.g. from: openssl rand -hex 32
-#   FLYMANAGER_ADMIN_USERNAME
-#   FLYMANAGER_ADMIN_PASSWORD
-#   FLYMANAGER_ADMIN_INITIALS
-#   APP_IMAGE           — e.g. YOUR_DOCKERHUB_USER/flymanager:latest
-
 services:
   mongodb:
     image: mongo:7.0
@@ -137,11 +86,10 @@ services:
         /usr/local/bin/container-mongo-backup.sh &&
         while true; do sleep "${MONGO_BACKUP_INTERVAL_SECONDS:-21600}"; /usr/local/bin/container-mongo-backup.sh; done
     healthcheck:
-      # Freshness, not liveness. The loop keeps running and restarting whatever
-      # happens to a dump -- disk full, an auth change, mongodump missing -- so
-      # a container that is merely "up" said nothing about whether a backup has
-      # been taken this century. Unhealthy once the newest archive is older
-      # than twice the interval.
+      # Freshness, not liveness. The loop keeps running whatever happens to a
+      # dump -- disk full, an auth change, mongodump missing -- so a container
+      # that is merely "up" said nothing about whether a backup was taken.
+      # Unhealthy once the newest archive is older than twice the interval.
       test:
         - CMD-SHELL
         - >
@@ -262,4 +210,5 @@ services:
 volumes:
   mongo_data:
   mongo_data2:
+  mongo_backups:
   redis_data:
