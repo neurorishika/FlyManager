@@ -37,7 +37,9 @@
 
         {% for kind in kinds %}
         {{ marker_fields.render_kind_fields(kind, field_specs[kind], definition, field_value,
-                                            hidden=(kind != selected_kind)) }}
+                                            hidden=(kind != selected_kind),
+                                            repeating_rows=repeating_rows,
+                                            repeating_input_name=repeating_input_name) }}
         {% endfor %}
 
         <div class="app-button-row justify-content-end">

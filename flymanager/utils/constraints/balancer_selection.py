@@ -1,5 +1,4 @@
-from flymanager.utils.constraints._shared import (DEFAULT_BALANCER_PRIORITY,
-                                                  extract_cytology_tokens,
+from flymanager.utils.constraints._shared import (extract_cytology_tokens,
                                                   is_distal_to_gene,
                                                   lookup_gene_map_record,
                                                   normalize_chromosome_label,
@@ -8,7 +7,8 @@ from flymanager.utils.constraints._shared import (DEFAULT_BALANCER_PRIORITY,
 from flymanager.utils.constraints.interchromosomal import \
     evaluate_interchromosomal_risk
 from flymanager.utils.constraints.marker_stability import score_sorting_markers
-from flymanager.utils.phenotypes.visual_markers import get_balancer_metadata_map
+from flymanager.utils.phenotypes.visual_markers import (
+    get_balancer_metadata_map, get_balancer_preference_map)
 
 
 def _candidate_documents(chromosome, db):
@@ -27,14 +27,20 @@ def _candidate_documents(chromosome, db):
     return list(candidates.values())
 
 
-def _fallback_priority_score(symbol, chromosome):
-    ordered = DEFAULT_BALANCER_PRIORITY.get(chromosome, [])
-    if not ordered:
-        return 0.0
-    if symbol not in ordered:
-        return 0.04
-    index = ordered.index(symbol)
-    return round(max(0.06, 0.24 - index * 0.04), 2)
+UNSTATED_PREFERENCE_BONUS = 0.04
+
+
+def _preference_bonus(symbol):
+    """How much a lab's stated preference adds to this balancer's score.
+
+    This was DEFAULT_BALANCER_PRIORITY, a per-chromosome list of symbols that
+    a user-added balancer could never appear in -- so it carried a permanent
+    ~0.2 handicap it could not shed, and a lab could not say "we prefer this
+    one" at all. The bonus now comes from the balancer's own definition, and
+    a balancer that states none gets what an unlisted balancer got.
+    """
+    bonus = get_balancer_preference_map().get(symbol)
+    return UNSTATED_PREFERENCE_BONUS if bonus is None else round(float(bonus), 2)
 
 
 def _marker_labels(candidate):
@@ -139,7 +145,7 @@ def select_optimal_balancer(
 
         stability = score_sorting_markers(_marker_labels(candidate))
         breakpoint_assessment = _breakpoint_assessment(candidate, gene_position)
-        fallback_score = _fallback_priority_score(symbol, normalized_chromosome)
+        fallback_score = _preference_bonus(symbol)
         interchromosomal = evaluate_interchromosomal_risk(
             balancers=list(existing_balancers or []) + [symbol]
         )

@@ -84,12 +84,15 @@ def test_a_missing_file_fails_loudly(tmp_path):
 def test_the_catalog_signature_is_untouched_by_this_slice():
     """K3 moves no definition, so every cached prediction stays valid.
 
-    The literal is the shipped catalog's signature before the body-part table
-    moved out of Python. K1 and K2 are expected to change it; K3 is not, and
-    this test is what makes that claim checkable rather than asserted.
+    The literal is the shipped catalog's signature. K3 did not change it
+    (it was 37fec1358889aecc13f86e7f97bae4ea before and after); K1 and K2
+    then did, by seeding sorting.preferenceBonus on every balancer and
+    sorting.contextualStability on Tb, which is exactly what the field
+    changes are supposed to do. Updating this literal is how that change
+    gets noticed rather than absorbed.
     """
     snapshot = marker_catalog.compile_catalog(
         marker_catalog.load_shipped_catalog(), [])
     assert marker_catalog.compute_marker_catalog_signature(snapshot) == \
-        "37fec1358889aecc13f86e7f97bae4ea"
+        "2b7897af5078d7477857c81d07943635"
     assert "bodyParts" not in snapshot

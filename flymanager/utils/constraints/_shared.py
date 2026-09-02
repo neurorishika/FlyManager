@@ -7,14 +7,6 @@ from flymanager.utils.phenotypes.parser import parse_gene_package
 CYTOLOGY_TOKEN_RE = re.compile(r"\b\d{1,3}[A-F](?:\d{1,2})?\b", re.IGNORECASE)
 CYTOLOGY_POINT_RE = re.compile(r"^(?P<band>\d{1,3})(?P<letter>[A-F])(?P<subband>\d{0,2})$", re.IGNORECASE)
 
-DEFAULT_BALANCER_PRIORITY = {
-    1: ["FM7c", "FM7a", "FM7", "FM3"],
-    2: ["CyO", "SM6a", "SM5", "SM1"],
-    3: ["TM3", "TM6B", "TM6", "TM2", "TM1"],
-    4: [],
-}
-
-
 def normalize_chromosome_label(value):
     text = str(value or "").strip().upper()
     if text == "X":

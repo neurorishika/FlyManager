@@ -19,13 +19,42 @@ _ALIAS_TYPES = ("allele_token", "construct_token")
 
 
 def _field(path, label, type_="text", help_="", options=(), placeholder="",
-           separator=","):
+           separator=",", minimum=0, maximum=1):
     # `separator` only matters for list fields. Free text (a balancer's notes)
     # is split on newlines alone, because a note like "breaks down at 25C, use
     # fresh" would otherwise silently become two notes on the next save.
     return {"path": path, "name": path, "label": label, "type": type_,
             "help": help_, "options": tuple(options), "placeholder": placeholder,
-            "separator": separator}
+            "separator": separator, "minimum": minimum, "maximum": maximum,
+            "repeating": False}
+
+
+def _repeating(path, label, fields, help_="", blank_rows=2):
+    """A group of fields that repeats: a list of objects inside the envelope.
+
+    The form is otherwise flat -- one input per dotted path -- so a repeating
+    group is described separately and rendered as numbered rows, with the
+    inputs named `sorting.contextualStability.0.maxScore`. Rows arrive back in
+    index order; a row whose fields are all blank is dropped, which is how a
+    rule gets deleted and how the trailing blank rows stay harmless.
+    """
+    return {"path": path, "name": path, "label": label, "type": "repeating",
+            "help": help_, "options": (), "placeholder": "", "separator": ",",
+            "minimum": 0, "maximum": 1, "repeating": True,
+            "fields": tuple(fields), "blank_rows": blank_rows}
+
+
+_CONTEXTUAL_STABILITY = _repeating(
+    "sorting.contextualStability", "Only on certain balancers", (
+        _field("whenBalancer", "Balancers", "list",
+               help_="Comma separated, exactly as written, e.g. TM6B, TM6."),
+        _field("maxScore", "Cap the stability at", "float",
+               help_="Between 0 and 1. The score is never raised, only capped."),
+        _field("note", "Why",
+               help_="Shown alongside the prediction, e.g. why the marker reverts."),
+    ),
+    help_="Use this when a marker is less trustworthy on one balancer than on "
+          "others. Leave a row blank to remove it.")
 
 
 _APPEARANCE = (
@@ -72,6 +101,7 @@ MARKER_FIELD_SPECS = {
                 _field("payload.homozygous_lethal", "Homozygous lethal", "bool",
                        help_="Two copies of this are not viable."),
             )),
+            ("Stability", (_CONTEXTUAL_STABILITY,)),
             ("Reference images", _IMAGING),
             ("Where this came from", _PROVENANCE),
         ),
@@ -86,6 +116,7 @@ MARKER_FIELD_SPECS = {
                 _field("match.alleleSpec", "Allele", help_="The part in brackets, e.g. 1."),
             )),
             ("Appearance", (_field("payload.gene_stem", "Gene stem"),) + _APPEARANCE),
+            ("Stability", (_CONTEXTUAL_STABILITY,)),
             ("Reference images", _IMAGING),
             ("Where this came from", _PROVENANCE),
         ),
@@ -121,6 +152,11 @@ MARKER_FIELD_SPECS = {
                        help_="Comma separated, e.g. Sb, Ser."),
                 _field("payload.notes", "Notes", "list", separator="\n",
                        help_="One note per line."),
+                _field("sorting.preferenceBonus", "Preference", "float",
+                       maximum=0.25,
+                       help_="How strongly to prefer this balancer when the "
+                             "solver picks one, from 0 to 0.25. Leave blank "
+                             "for no preference."),
             )),
             ("Reference images", _IMAGING),
             ("Where this came from", _PROVENANCE),
@@ -239,6 +275,53 @@ def _coerce(field, form):
     return True, raw
 
 
+def repeating_rows(document, field):
+    """The rows to render for a repeating group: what is stored, plus blanks.
+
+    The blank rows are how a rule gets added without any JavaScript. They post
+    empty and are dropped by the parser, so rendering them costs nothing.
+    """
+    stored = _get(document or {}, _split(field["path"]))
+    rows = [row for row in (stored or []) if isinstance(row, dict)]
+    return rows + [{}] * field["blank_rows"]
+
+
+def repeating_input_name(field, index, subfield):
+    """The form name for one input inside a repeating group's row."""
+    return f"{field['name']}.{index}.{subfield['name']}"
+
+
+def _coerce_repeating(field, form):
+    """Rebuild a repeating group's list from the submitted rows.
+
+    Indices come from the submitted names rather than a count, so a row the
+    browser omitted entirely cannot shift every later row up by one. A row
+    with nothing filled in is dropped: that is both how a rule is deleted and
+    why the trailing blank rows are harmless.
+    """
+    prefix = f"{field['name']}."
+    indices = set()
+    for name in form:
+        if not name.startswith(prefix):
+            continue
+        remainder = name[len(prefix):].split(".", 1)
+        if len(remainder) == 2 and remainder[0].isdigit():
+            indices.add(int(remainder[0]))
+
+    rows = []
+    for index in sorted(indices):
+        row = {}
+        for subfield in field["fields"]:
+            scoped = dict(subfield)
+            scoped["name"] = repeating_input_name(field, index, subfield)
+            present, value = _coerce(scoped, form)
+            if present and value not in ("", [], None):
+                row[subfield["path"]] = value
+        if row:
+            rows.append(row)
+    return rows
+
+
 def form_to_document(kind, form, existing=None):
     """Rebuild the envelope sections a kind's form covers.
 
@@ -256,8 +339,15 @@ def form_to_document(kind, form, existing=None):
 
     for field in fields:
         parts = _split(field["path"])
-        present, value = _coerce(field, form)
         target = sections[parts[0]]
+        if field["repeating"]:
+            rows = _coerce_repeating(field, form)
+            if rows:
+                _set(target, parts[1:], rows)
+            else:
+                _drop(target, parts[1:])
+            continue
+        present, value = _coerce(field, form)
         if present:
             _set(target, parts[1:], value)
         else:
