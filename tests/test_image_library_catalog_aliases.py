@@ -31,8 +31,11 @@ def test_the_epistasis_key_stays_hardcoded():
     assert "miniwhite" in aliases
 
 
-def test_body_part_aliases_are_still_hardcoded():
-    assert image_library.BODY_PART_ALIASES["wing"] == {"wing", "wings"}
+def test_body_part_aliases_come_from_the_data_file():
+    """The synonym table left Python for data/markers/body_parts.json; the
+    behaviour it drives is locked down in tests/test_body_part_synonyms.py."""
+    assert not hasattr(image_library, "BODY_PART_ALIASES")
+    assert marker_catalog.get_body_parts()["wing"] == {"wing", "wings"}
 
 
 def test_a_user_marker_contributes_its_image_aliases():

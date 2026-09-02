@@ -1,0 +1,13 @@
+{
+  "comment": "Body-part synonyms, consulted symmetrically when scoring reference images against a marker. Not marker knowledge and not part of any definition, so editing this file does NOT change the marker catalog signature and does NOT invalidate cached predictions. Note the asymmetric entries: 'antenna' lists 'head' but 'head' does not list 'antenna', and 'thorax' lists 'shoulder' but there is no 'shoulder' entry -- the matcher falls back to the other side's list, so those pairs still match both ways.",
+  "bodyParts": {
+    "wing": ["wing", "wings"],
+    "eye": ["eye", "eyes"],
+    "bristle": ["bristle", "bristles"],
+    "body": ["body"],
+    "haltere": ["haltere", "halteres"],
+    "thorax": ["thorax", "shoulder"],
+    "head": ["head"],
+    "antenna": ["antenna", "head"]
+  }
+}
