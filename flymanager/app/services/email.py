@@ -6,7 +6,51 @@ from flask_mail import Message
 
 # Import app context variables and mongo utils
 from flymanager.app import db, mail
+from flymanager.app.services.labels import build_label_pdf
 from flymanager.utils.mongo import get_flip_schedule, get_user_email
+
+# Labels for a large overdue backlog can grow past what an SMTP relay will
+# accept. Past this, send the reminder without the PDF rather than have the
+# whole message bounce.
+MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+
+
+def mail_config_status():
+    """Report each mail setting as set or missing, for the admin readout.
+
+    In 2026-09 a redeploy dropped MAIL_SUPPRESS_SEND=0 and SMTP_SENDER from
+    the production stack. Sending stopped for days because the only signal
+    was an INFO log below the configured level. This turns that state into
+    something an admin can read off a page.
+
+    Never includes the password value -- only whether one is set.
+    """
+    config = current_app.config
+    suppressed = bool(config.get("MAIL_SUPPRESS_SEND"))
+    server = config.get("MAIL_SERVER")
+    sender = config.get("MAIL_DEFAULT_SENDER")
+
+    problems = []
+    if suppressed:
+        problems.append(
+            "MAIL_SUPPRESS_SEND is on, so no mail is sent. Set MAIL_SUPPRESS_SEND=0."
+        )
+    if not server:
+        problems.append("SMTP_SERVER is not set.")
+    if not sender:
+        problems.append("SMTP_SENDER is not set.")
+
+    return {
+        "suppressed": suppressed,
+        "server": server or "",
+        "port": config.get("MAIL_PORT"),
+        "sender": sender or "",
+        "username": config.get("MAIL_USERNAME") or "",
+        "password_set": bool(config.get("MAIL_PASSWORD")),
+        "use_tls": bool(config.get("MAIL_USE_TLS")),
+        "problems": problems,
+        "ready": not problems,
+    }
 
 
 def mail_is_configured():
@@ -19,6 +63,66 @@ def mail_is_configured():
         current_app.config.get("MAIL_DEFAULT_SENDER"),
     )
     return all(required_values)
+
+
+def send_test_email(recipient):
+    """Send a short test message to one address.
+
+    Deliberately lets SMTP exceptions propagate: the caller shows the error
+    to the admin. A test that swallows its own failure is the bug this
+    feature exists to prevent.
+    """
+    msg = Message(
+        subject="✅ D. manager test email",
+        recipients=[recipient],
+        html=(
+            "<html><body style=\"font-family: Arial, sans-serif; color: #1f2933;\">"
+            "<h2>Mail is working</h2>"
+            "<p>This is a test message from <strong><em>D. manager</em></strong>. "
+            "If you are reading it, outbound email is configured correctly and "
+            "flip reminders can be delivered.</p>"
+            f"<p style=\"font-size: 0.9rem; color: #52606d;\">Sent {escape(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))}</p>"
+            "</body></html>"
+        ),
+    )
+    mail.send(msg)
+
+
+def _attach_flip_labels(msg, username, today, schedule):
+    """Attach print-ready labels for everything due today or overdue.
+
+    Every failure here is swallowed on purpose: a label problem must never
+    cost the user the reminder itself, which is the part that tells them
+    what to flip.
+    """
+    try:
+        dates = sorted(date for date in schedule if date <= today)
+        if not dates:
+            return
+
+        pdf_bytes, count = build_label_pdf(username, dates, db)
+        if not pdf_bytes:
+            return
+
+        if len(pdf_bytes) > MAX_ATTACHMENT_BYTES:
+            current_app.logger.warning(
+                "Flip label PDF for %s is %d bytes, over the %d limit. Sending "
+                "the reminder without it.",
+                username, len(pdf_bytes), MAX_ATTACHMENT_BYTES,
+            )
+            return
+
+        msg.attach(
+            f"flip_labels_{today}.pdf", "application/pdf", pdf_bytes
+        )
+        current_app.logger.info(
+            "Attached %d flip labels to the reminder for %s", count, username
+        )
+    except Exception as e:
+        current_app.logger.exception(
+            "Could not attach flip labels for %s, sending reminder without them: %s",
+            username, e,
+        )
 
 
 def send_flip_reminder_email(username):
@@ -266,6 +370,7 @@ def send_flip_reminder_email(username):
 
         # Send the email using the 'mail' object from the app context
         msg = Message(subject=email_subject, recipients=[user_email], html=email_body)
+        _attach_flip_labels(msg, username, today, schedule)
         mail.send(msg)
         current_app.logger.info("Flip reminder email sent to %s at %s", username, user_email)
 
