@@ -18,6 +18,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_CATALOG_PATH = REPO_ROOT / "data" / "markers" / "catalog.json"
+DEFAULT_BODY_PARTS_PATH = REPO_ROOT / "data" / "markers" / "body_parts.json"
 
 MARKER_KINDS = (
     "gene_marker",
@@ -71,6 +72,48 @@ def load_shipped_catalog(path=None):
         "catalogVersion": int(payload.get("catalogVersion") or 0),
         "definitions": definitions,
     }
+
+
+def load_body_parts(path=None):
+    """Read and validate the shipped body-part synonym table.
+
+    Synonyms sit outside every definition -- they are a vocabulary over body
+    parts, not marker knowledge -- so this file is deliberately separate from
+    catalog.json and is NOT part of the catalog signature. Like the catalog it
+    fails hard rather than degrading: a half-read table would silently stop
+    reference images matching their markers, which looks like missing data
+    rather than a broken file.
+    """
+    parts_path = Path(path) if path is not None else DEFAULT_BODY_PARTS_PATH
+    try:
+        payload = json.loads(parts_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ValueError(f"Unable to read body parts at {parts_path}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Body parts at {parts_path} is not valid JSON: {exc}") from exc
+
+    if not isinstance(payload, dict):
+        raise ValueError(f"Body parts at {parts_path} must be a JSON object")
+    body_parts = payload.get("bodyParts")
+    if not isinstance(body_parts, dict) or not body_parts:
+        raise ValueError(
+            f"Body parts at {parts_path} must contain a non-empty 'bodyParts' object")
+
+    table = {}
+    for part, synonyms in body_parts.items():
+        if not isinstance(part, str) or not part.strip():
+            raise ValueError(f"Body parts at {parts_path} has a blank body part name")
+        if not isinstance(synonyms, list) or not synonyms:
+            raise ValueError(
+                f"Body part '{part}' at {parts_path} must map to a non-empty list of synonyms")
+        values = set()
+        for synonym in synonyms:
+            if not isinstance(synonym, str) or not synonym.strip():
+                raise ValueError(
+                    f"Body part '{part}' at {parts_path} has a synonym that is not a non-empty string")
+            values.add(synonym.strip().lower())
+        table[part.strip().lower()] = values
+    return table
 
 
 def _sorting_errors(sorting):
@@ -376,6 +419,7 @@ def compute_marker_catalog_signature(snapshot):
 
 _LOCK = threading.Lock()
 _SNAPSHOT = None
+_BODY_PARTS = None
 # Serializes the whole read-compile-install sequence in refresh_catalog, so
 # only one thread compiles at a time. Distinct from _LOCK (which only
 # guards the snapshot pointer itself) because threading.Lock is not
@@ -413,6 +457,29 @@ def reset_catalog():
     with _LOCK:
         _SNAPSHOT = None
         _SNAPSHOT_REVISION = None
+
+
+def get_body_parts():
+    """Return the body-part synonym table, loading it on first use.
+
+    Lazy like get_catalog(): the catalog is itself only compiled on first read
+    (create_app installs no snapshot eagerly), so loading here keeps the two
+    files failing at the same point rather than inventing a startup hook that
+    the catalog does not have.
+    """
+    global _BODY_PARTS
+    if _BODY_PARTS is None:
+        with _LOCK:
+            if _BODY_PARTS is None:
+                _BODY_PARTS = load_body_parts()
+    return _BODY_PARTS
+
+
+def reset_body_parts():
+    """Drop the cached table so the next get_body_parts() re-reads the file."""
+    global _BODY_PARTS
+    with _LOCK:
+        _BODY_PARTS = None
 
 
 MARKER_CATALOG_REVISION_KEY = "markerCatalogRevision"

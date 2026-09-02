@@ -1,7 +1,7 @@
 import re
 
 from flymanager.utils.phenotypes.image_catalog import get_image_catalog
-from flymanager.utils.phenotypes.marker_catalog import get_catalog
+from flymanager.utils.phenotypes.marker_catalog import get_body_parts, get_catalog
 from flymanager.utils.phenotypes.marker_resolution import resolve_definition_markers
 
 # Scoring tiers, highest first. Named so a caller can state a floor in terms
@@ -12,13 +12,14 @@ EXACT_STEM_SCORE = 100
 ALIAS_SCORE = 98
 STEM_PREFIX_SCORE = 88
 SUBSTRING_SCORE = 72
+# Stays hardcoded, unlike the body-part table below. This is keyed by
+# "epistasis:w_mini_white_rescue", which is not a catalog definition and never
+# was: that marker is synthesized at runtime in phenotypes/epistasis.py, and
+# compile_catalog keys image_aliases by a definition's phenotype key, so there
+# is nothing in the catalog to hang the alias on. Moving it would mean
+# inventing a definition for a synthetic marker -- new parser-visible surface,
+# a signature change, and a real chance of the alias silently ceasing to match.
 EPISTASIS_IMAGE_ALIASES = {"epistasis:w_mini_white_rescue": ["miniwhite", "mini-white", "wplus", "w+"]}
-BODY_PART_ALIASES = {
-    "wing": {"wing", "wings"}, "eye": {"eye", "eyes"},
-    "bristle": {"bristle", "bristles"}, "body": {"body"},
-    "haltere": {"haltere", "halteres"}, "thorax": {"thorax", "shoulder"},
-    "head": {"head"}, "antenna": {"antenna", "head"},
-}
 
 
 def _phenotype_image_aliases():
@@ -56,10 +57,11 @@ def _body_part_matches(marker, entry):
     entry_part = str(_entry_field(entry, "bodyPart")).strip().lower()
     if not marker_part or not entry_part:
         return False
-    aliases = BODY_PART_ALIASES.get(marker_part)
+    table = get_body_parts()
+    aliases = table.get(marker_part)
     if aliases:
         return entry_part in aliases
-    aliases = BODY_PART_ALIASES.get(entry_part)
+    aliases = table.get(entry_part)
     return marker_part in aliases if aliases else marker_part == entry_part
 
 

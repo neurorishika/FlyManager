@@ -1,7 +1,13 @@
 # Marker Knowledge Into The Catalog Design
 
 Date: 2026-08-30
-Status: revised after adversarial review — awaiting re-approval
+Status: K3 implemented; K1 and K2 still awaiting re-approval
+  K3 (body-part synonyms to `data/markers/body_parts.json`) was approved and
+  landed on its own because the marker-form usability work depends on the
+  vocabulary it exposes. Its precondition was verified before implementation:
+  `_body_part_matches` is used only inside `image_library.py` (the bonus in
+  `_with_bonuses` and the gate in `_score_entry`), so body parts do gate image
+  matching only and the move changes no definition and no signature.
 Supersedes: the 2026-08-30 draft approved before review. K3 lost its
   epistasis half and K1 was rebuilt after its motivation proved wrong.
 
