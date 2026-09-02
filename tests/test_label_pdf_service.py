@@ -179,3 +179,89 @@ def test_build_label_pdf_leaves_no_temp_file_behind(monkeypatch, tmp_path):
             build_label_pdf("alice", ["2026-09-02"], db)
 
     assert list(scratch.iterdir()) == []
+
+
+# --- the route that was refactored onto the helper ----------------------
+
+def test_generate_labels_for_day_route_returns_a_real_pdf(monkeypatch):
+    """The /flip route was rewritten to call build_label_pdf and write the
+    bytes itself, so its redirect target must still be a fetchable PDF."""
+    import os
+
+    app = _make_app(monkeypatch)
+    db = _db()
+
+    labels_dir = os.path.join(app.static_folder, "generated_labels")
+    generated_before = set(os.listdir(labels_dir)) if os.path.isdir(labels_dir) else set()
+
+    try:
+        with app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess["username"] = "alice"
+
+            with patch("flymanager.app.routes.flip.db", db), patch(
+                "flymanager.app.routes.flip.get_flip_schedule", return_value=_schedule()
+            ), patch(
+                "flymanager.app.services.labels.db", db
+            ), patch(
+                "flymanager.app.services.labels.get_flip_schedule",
+                return_value=_schedule(),
+            ):
+                response = client.post(
+                    "/flip/generate_labels_for_day",
+                    data={"date": "2026-09-02", "blank_spaces": "0"},
+                )
+
+            assert response.status_code == 302
+            redirect_target = response.headers["Location"]
+            assert "generated_labels" in redirect_target
+
+            with app.test_client() as client:
+                follow_up = client.get(redirect_target)
+
+            assert follow_up.status_code == 200
+            assert follow_up.data.startswith(b"%PDF")
+    finally:
+        if os.path.isdir(labels_dir):
+            for name in set(os.listdir(labels_dir)) - generated_before:
+                os.remove(os.path.join(labels_dir, name))
+
+
+def test_generate_labels_for_day_route_reports_an_empty_day(monkeypatch):
+    app = _make_app(monkeypatch)
+    db = _db()
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "alice"
+
+        with patch("flymanager.app.routes.flip.db", db), patch(
+            "flymanager.app.routes.flip.get_flip_schedule", return_value=_schedule()
+        ):
+            response = client.post(
+                "/flip/generate_labels_for_day",
+                data={"date": "2026-12-25", "blank_spaces": "0"},
+                follow_redirects=True,
+            )
+
+    assert response.status_code == 200
+    assert "No items scheduled for 2026-12-25" in response.get_data(as_text=True)
+
+
+def test_generate_labels_for_day_route_rejects_a_bad_date(monkeypatch):
+    app = _make_app(monkeypatch)
+    db = _db()
+
+    with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess["username"] = "alice"
+
+        with patch("flymanager.app.routes.flip.db", db):
+            response = client.post(
+                "/flip/generate_labels_for_day",
+                data={"date": "not-a-date", "blank_spaces": "0"},
+                follow_redirects=True,
+            )
+
+    assert response.status_code == 200
+    assert "Invalid date format" in response.get_data(as_text=True)
