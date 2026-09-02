@@ -38,6 +38,114 @@ if is_truthy "$BACKUP_DRY_RUN"; then
     exit 0
 fi
 
+# --- BEGIN EMBEDDED gfs-select.awk (canonical: scripts/lib/gfs-select.awk;
+#     tests/test_gfs_retention.py fails if these drift apart) ---
+gfs_select_awk() {
+    cat <<'GFSAWK'
+# Grandfather-father-son selection over timestamped backup names.
+#
+# Reads candidate filenames on stdin, writes the ones to DELETE on stdout.
+# Keeps: every archive inside KEEP_ALL_DAYS, then one per day to KEEP_DAILY,
+# one per 7-day bucket to KEEP_WEEKLY, one per month to KEEP_MONTHLY, and
+# nothing older. Within each bucket the NEWEST survives.
+#
+# Flat "delete older than N days" retention cannot bound storage and can empty
+# the directory outright when backups start failing silently; this bounds total
+# archives forever (~110) regardless of how far back you keep them.
+#
+# Portable on purpose: busybox awk on the backup container has no mktime(), so
+# ages come from Julian day numbers computed here.
+#
+# Required: -v TODAY=YYYYMMDD  -v MIN_KEEP=N
+# Optional: KEEP_ALL_DAYS, KEEP_DAILY, KEEP_WEEKLY, KEEP_MONTHLY
+
+function jdn(y, m, d,    a, yy, mm) {
+    a = int((14 - m) / 12); yy = y + 4800 - a; mm = m + 12 * a - 3
+    return d + int((153 * mm + 2) / 5) + 365 * yy + int(yy / 4) \
+             - int(yy / 100) + int(yy / 400) - 32045
+}
+
+BEGIN {
+    if (KEEP_ALL_DAYS  == "") KEEP_ALL_DAYS  = 7
+    if (KEEP_DAILY     == "") KEEP_DAILY     = 30
+    if (KEEP_WEEKLY    == "") KEEP_WEEKLY    = 180
+    if (KEEP_MONTHLY   == "") KEEP_MONTHLY   = 730
+    today = jdn(substr(TODAY,1,4) + 0, substr(TODAY,5,2) + 0, substr(TODAY,7,2) + 0)
+    n = 0
+}
+
+{
+    # Pull the first YYYYMMDD out of the name; anything without one is left
+    # strictly alone rather than guessed at.
+    if (match($0, /[0-9]{8}T[0-9]{6}Z/) == 0) next
+    stamp = substr($0, RSTART, RLENGTH)
+    names[++n] = $0
+    stamps[n] = stamp
+}
+
+END {
+    # Newest first, so the survivor of each bucket is the most recent.
+    for (i = 1; i <= n; i++)
+        for (j = i + 1; j <= n; j++)
+            if (stamps[j] > stamps[i]) {
+                t = stamps[i]; stamps[i] = stamps[j]; stamps[j] = t
+                t = names[i];  names[i]  = names[j];  names[j]  = t
+            }
+
+    kept = 0
+    for (i = 1; i <= n; i++) {
+        s = stamps[i]
+        age = today - jdn(substr(s,1,4) + 0, substr(s,5,2) + 0, substr(s,7,2) + 0)
+        keep = 0
+        if (age <= KEEP_ALL_DAYS) {
+            keep = 1                                   # everything, recent
+        } else if (age <= KEEP_DAILY) {
+            bucket = "d" substr(s,1,8)
+        } else if (age <= KEEP_WEEKLY) {
+            bucket = "w" int(jdn(substr(s,1,4)+0, substr(s,5,2)+0, substr(s,7,2)+0) / 7)
+        } else if (age <= KEEP_MONTHLY) {
+            bucket = "m" substr(s,1,6)
+        } else {
+            bucket = ""                                # past the horizon
+        }
+
+        if (!keep && bucket != "" && !(bucket in seen)) { seen[bucket] = 1; keep = 1 }
+
+        # The floor: never prune below MIN_KEEP, however old. Retention that
+        # can empty the directory turns a silent failure into total loss.
+        if (!keep && kept < MIN_KEEP) keep = 1
+        if (keep) kept++; else print names[i]
+    }
+}
+GFSAWK
+}
+
+# Delete the archives GFS did not select, taking each one's .sha256 with
+# it. Never deletes a file whose name carries no timestamp.
+gfs_prune_local() {
+    _dir=$1; _glob=$2; _min_keep=$3
+    _awk=$(mktemp); gfs_select_awk > "$_awk"
+    find "$_dir" -maxdepth 1 -type f -name "$_glob" \
+        | awk -f "$_awk" -v TODAY="$(date -u +%Y%m%d)" -v MIN_KEEP="$_min_keep" \
+        | while read -r _victim; do rm -f "$_victim" "${_victim}.sha256"; done
+    rm -f "$_awk"
+}
+
+# Same selection against an rclone remote.
+gfs_prune_remote() {
+    _remote=$1; _glob=$2; _min_keep=$3
+    [ -n "$_remote" ] || return 0
+    _awk=$(mktemp); gfs_select_awk > "$_awk"
+    rclone lsf "$_remote" --include "$_glob" 2>/dev/null \
+        | awk -f "$_awk" -v TODAY="$(date -u +%Y%m%d)" -v MIN_KEEP="$_min_keep" \
+        | while read -r _victim; do
+            rclone deletefile "${_remote}/${_victim}" 2>/dev/null || true
+            rclone deletefile "${_remote}/${_victim}.sha256" 2>/dev/null || true
+          done
+    rm -f "$_awk"
+}
+# --- END EMBEDDED gfs-select.awk ---
+
 mkdir -p "$BACKUP_DIR"
 
 # Dump to .tmp and rename: a container killed mid-dump otherwise leaves a
@@ -59,17 +167,35 @@ sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
 # the last archives standing. Backups failing silently -- disk full, auth
 # change, mongodump missing -- used to be followed by retention quietly
 # deleting everything that ever existed once it aged past the window.
-SURVIVING=$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'flymanager_mongodb_*.archive.gz' | wc -l)
-if [ "$SURVIVING" -gt "$BACKUP_MIN_KEEP" ]; then
-    find "$BACKUP_DIR" -maxdepth 1 -type f -name 'flymanager_mongodb_*.archive.gz*' \
-        -mtime +"$BACKUP_KEEP_DAYS" -delete
-else
-    echo "Retention skipped: only $SURVIVING archive(s) present (minimum $BACKUP_MIN_KEEP)."
-fi
+gfs_prune_local "$BACKUP_DIR" 'flymanager_mongodb_*.archive.gz' "$BACKUP_MIN_KEEP"
 
 if [ -n "$RCLONE_REMOTE" ]; then
-    rclone copy "$ARCHIVE" "${RCLONE_REMOTE}/"
-    rclone copy "${ARCHIVE}.sha256" "${RCLONE_REMOTE}/"
+    SLIM="$BACKUP_DIR/flymanager_labdata_${STAMP}.archive.gz"
+    TMP_SLIM="${SLIM}.tmp"
+    trap 'rm -f "$TMP_SLIM"' INT TERM EXIT
+    mongodump \
+        --host "${MONGO_HOST}:${MONGO_PORT}" \
+        --oplog \
+        --archive="$TMP_SLIM" \
+        --gzip \
+        --excludeCollection=flybase_phenotypes \
+        --excludeCollection=flybase_allele_genes \
+        --excludeCollection=genes2nd \
+        --excludeCollection=genes3rd \
+        --excludeCollection=genesX \
+        --excludeCollection=genes4th
+    mv "$TMP_SLIM" "$SLIM"
+    trap - INT TERM EXIT
+    sha256sum "$SLIM" > "${SLIM}.sha256"
+
+    rclone copy "$SLIM" "${RCLONE_REMOTE}/mongo/"
+    rclone copy "${SLIM}.sha256" "${RCLONE_REMOTE}/mongo/"
+    gfs_prune_remote "${RCLONE_REMOTE}/mongo" 'flymanager_labdata_*.archive.gz' "$BACKUP_MIN_KEEP"
+
+    # The slim copy exists to be uploaded; keeping it would just be a second
+    # local retention problem, so it goes once it is off the machine.
+    rm -f "$SLIM" "${SLIM}.sha256"
+    echo "Off-site (lab data only): ${RCLONE_REMOTE}/mongo/flymanager_labdata_${STAMP}.archive.gz"
 fi
 
 if [ -n "$HEALTHCHECK_UUID" ]; then
