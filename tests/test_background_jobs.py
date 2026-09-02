@@ -7,6 +7,7 @@ for testing pure status-tracking logic that has zero flymanager imports of
 its own.
 """
 import importlib.util
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -110,3 +111,13 @@ def test_list_recent_jobs_filters_by_actor_and_sorts_newest_first(db):
 
     all_jobs = ol.list_recent_jobs(db)
     assert {job["key"] for job in all_jobs} == {"job:a", "job:b"}
+
+
+def test_status_poll_ignores_expired_jobs_without_running_a_delete_sweep(db):
+    key = ol.start_background_job(db, key="job:expired", actor="alice", label="Old")
+    collection = db["operation_locks"]
+    collection._documents[0]["expires_at"] = ol._utcnow() - timedelta(seconds=1)
+
+    assert ol.get_job_status(db, key) is None
+    assert ol.list_recent_jobs(db, actor="alice") == []
+    assert len(collection._documents) == 1  # Mongo's TTL index owns deletion.

@@ -13,8 +13,8 @@ from flymanager.utils.mongo import (add_user, consume_password_reset_token,
                                     create_password_reset_token,
                                     get_reset_token_username, get_user_crosses,
                                     get_user_email, get_user_stocks,
-                                    update_cross_vials, update_stock_vials,
                                     verify_user_password, write_activity)
+from flymanager.utils.mongo.bulk_operations import refresh_vial_timelines_bulk
 from flymanager.utils.phenotypes.flybase_pipeline import \
     flybase_phenotype_cache_status
 from flymanager.utils.phenotypes.predictor import (get_cached_cross_phenotype,
@@ -133,11 +133,8 @@ def login():
                 stocks, crosses = [], []
                 try:
                     stocks = get_user_stocks(username, db)
-                    for stock in stocks:
-                        update_stock_vials(stock, username, db)
                     crosses = get_user_crosses(username, db)
-                    for cross in crosses:
-                        update_cross_vials(cross, username, db)
+                    refresh_vial_timelines_bulk(username, stocks, crosses, db)
                     write_activity(username, "Logged in", db)
                     if migrated:
                         write_activity(username, "Password hash upgraded", db)

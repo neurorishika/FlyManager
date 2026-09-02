@@ -8,11 +8,12 @@ import functools
 import os
 import re
 import secrets
+import time
 from datetime import timedelta
 
 from dotenv import load_dotenv
 from flask import (Flask, flash, jsonify, redirect, render_template, request,
-                   session, url_for)
+                   g, session, url_for)
 from flask_apscheduler import APScheduler
 from flask_cors import CORS
 from flask_mail import Mail
@@ -20,6 +21,7 @@ from flask_socketio import SocketIO
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from flask_session import Session as FlaskSession
+from redis import Redis
 # internal imports
 from flymanager.app.security import (add_security_headers, csrf,
                                      generate_csp_nonce, limiter,
@@ -159,7 +161,8 @@ def create_app():
         )
 
     app.config["SECRET_KEY"] = provided_secret_key or secrets.token_hex(32)
-    app.config["SESSION_TYPE"] = "filesystem"
+    session_type = os.getenv("SESSION_TYPE", "filesystem").strip().lower()
+    app.config["SESSION_TYPE"] = session_type
     app.config["SESSION_PERMANENT"] = True
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
         seconds=session_lifetime_seconds
@@ -169,6 +172,13 @@ def create_app():
     )
     app.config["SESSION_FILE_THRESHOLD"] = 500
     app.config["SESSION_FILE_MODE"] = 0o600  # Use octal literal
+    if session_type == "redis":
+        app.config["SESSION_REDIS"] = Redis.from_url(
+            os.getenv("SESSION_REDIS_URL", "redis://redis:6379/1")
+        )
+    app.config["SESSION_REFRESH_EACH_REQUEST"] = env_flag(
+        "SESSION_REFRESH_EACH_REQUEST", True
+    )
     app.config["SESSION_USE_SIGNER"] = True
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = os.getenv(
@@ -194,10 +204,20 @@ def create_app():
     app.config["ENABLE_CAMERA_SCANNER"] = env_flag(
         "ENABLE_CAMERA_SCANNER", True
     )
+    app_version = (os.getenv("APP_VERSION") or "dev").strip()
+    app.config["APP_VERSION"] = app_version
+    app.config["SLOW_REQUEST_THRESHOLD_MS"] = int(
+        os.getenv("SLOW_REQUEST_THRESHOLD_MS", "500")
+    )
+    # Cache policy is applied after the static response is built so only URLs
+    # carrying the matching release token become immutable. This keeps direct
+    # or CSS-relative unversioned asset URLs safe across deployments.
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
     # Ensure upload and session directories exist
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-    os.makedirs(app.config["SESSION_FILE_DIR"], exist_ok=True)
+    if session_type == "filesystem":
+        os.makedirs(app.config["SESSION_FILE_DIR"], exist_ok=True)
 
     if env_flag("TRUST_PROXY_HEADERS", bool(production_domain)):
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
@@ -225,6 +245,40 @@ def create_app():
     scheduler.init_app(app)
     app.after_request(add_security_headers)
 
+    @app.url_defaults
+    def add_static_asset_version(endpoint, values):
+        if endpoint == "static":
+            values.setdefault("v", app.config["APP_VERSION"])
+
+    @app.before_request
+    def start_request_timer():
+        g.request_started_at = time.perf_counter()
+
+    @app.after_request
+    def add_performance_headers(response):
+        started_at = getattr(g, "request_started_at", None)
+        if started_at is not None:
+            duration_ms = (time.perf_counter() - started_at) * 1000
+            response.headers["Server-Timing"] = f"app;dur={duration_ms:.1f}"
+            slow_threshold_ms = app.config["SLOW_REQUEST_THRESHOLD_MS"]
+            if duration_ms >= slow_threshold_ms:
+                app.logger.warning(
+                    "Slow request method=%s path=%s status=%s duration_ms=%.1f",
+                    request.method,
+                    request.path,
+                    response.status_code,
+                    duration_ms,
+                )
+        if request.endpoint == "static" and app.config["APP_VERSION"] != "dev":
+            response.cache_control.no_cache = None
+            response.cache_control.public = True
+            if request.args.get("v") == app.config["APP_VERSION"]:
+                response.cache_control.max_age = 31536000
+                response.cache_control.immutable = True
+            else:
+                response.cache_control.max_age = 3600
+        return response
+
     if not provided_secret_key:
         app.logger.warning(
             "SECRET_KEY was not provided; using an ephemeral key for local-only runtime."
@@ -234,7 +288,6 @@ def create_app():
     @app.context_processor
     def inject_settings():
         flybase_sync_indicator = None
-        has_active_background_jobs = False
         username = session.get("username")
         if username:
             if username == "admin":
@@ -247,24 +300,10 @@ def create_app():
                         "Unable to load FlyBase sync indicator for template context: %s",
                         exc,
                     )
-            try:
-                from flymanager.utils.mongo import list_recent_jobs
-
-                actor = None if username == "admin" else username
-                has_active_background_jobs = any(
-                    job.get("status") in ("queued", "running")
-                    for job in list_recent_jobs(db, actor=actor, limit=20)
-                )
-            except Exception as exc:
-                app.logger.warning(
-                    "Unable to check for active background jobs: %s", exc
-                )
-
         return dict(
             settings=get_settings(db),
             csp_nonce=generate_csp_nonce(),
             flybase_sync_indicator=flybase_sync_indicator,
-            has_active_background_jobs=has_active_background_jobs,
         )
 
     @app.before_request

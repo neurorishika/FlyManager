@@ -86,6 +86,8 @@ class _InMemoryOperationLockCollection:
             if isinstance(value, dict):
                 if "$lte" in value and not (document_value <= value["$lte"]):
                     return False
+                if "$gt" in value and not (document_value > value["$gt"]):
+                    return False
                 if "$ne" in value and document_value == value["$ne"]:
                     return False
                 if "$in" in value and document_value not in value["$in"]:
@@ -318,8 +320,7 @@ def mark_job_failed(db, key, *, error):
 
 def get_job_status(db, key):
     collection = _get_operation_lock_collection(db)
-    _cleanup_expired_locks(collection)
-    document = collection.find_one({"key": key})
+    document = collection.find_one({"key": key, "expires_at": {"$gt": _utcnow()}})
     if not document or "status" not in document:
         return None
     return document
@@ -327,10 +328,19 @@ def get_job_status(db, key):
 
 def list_recent_jobs(db, *, actor=None, limit=50):
     collection = _get_operation_lock_collection(db)
-    _cleanup_expired_locks(collection)
-    query = {"status": {"$in": list(_ACTIVE_JOB_STATUSES + (JOB_STATUS_SUCCEEDED, JOB_STATUS_FAILED))}}
+    query = {
+        "status": {
+            "$in": list(_ACTIVE_JOB_STATUSES + (JOB_STATUS_SUCCEEDED, JOB_STATUS_FAILED))
+        },
+        "expires_at": {"$gt": _utcnow()},
+    }
     if actor:
         query["actor"] = actor
-    documents = [doc for doc in collection.find(query) if "status" in doc]
-    documents.sort(key=lambda doc: doc.get("created_at") or _utcnow(), reverse=True)
-    return documents[:limit]
+    # This endpoint is polled by every signed-in browser. Let Mongo use its
+    # TTL index for expiry and do ordering/limiting server-side; polling must
+    # remain read-only rather than issuing a delete sweep every few seconds.
+    cursor = collection.find(query)
+    if isinstance(cursor, list):
+        cursor.sort(key=lambda doc: doc.get("created_at") or _utcnow(), reverse=True)
+        return cursor[:limit]
+    return list(cursor.sort("created_at", -1).limit(limit))

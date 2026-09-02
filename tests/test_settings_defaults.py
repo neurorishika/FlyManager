@@ -13,7 +13,7 @@ create_app, before any request had bootstrapped settings.
 """
 import flymanager.app  # noqa: F401  (imported first: avoids a circular import)
 
-from flymanager.utils.mongo.settings import DEFAULT_SETTINGS, get_settings
+from flymanager.utils.mongo.settings import DEFAULT_SETTINGS, get_settings, update_settings
 from tests.mongo_fakes import FakeDatabase
 
 
@@ -69,3 +69,17 @@ def test_repeated_calls_are_stable():
 
     assert first["lab_info"] == second["lab_info"]
     assert db["settings"].count_documents({}) == 1
+
+
+def test_update_invalidates_short_lived_settings_cache():
+    db = FakeDatabase({"settings": [{
+        "lab_info": {"lab_name": "Original Lab"},
+        "theme": DEFAULT_SETTINGS["theme"],
+    }]})
+    assert get_settings(db)["lab_info"]["lab_name"] == "Original Lab"
+
+    assert update_settings(
+        {"lab_info": {"lab_name": "Updated Lab"}}, db
+    ) is True
+
+    assert get_settings(db)["lab_info"]["lab_name"] == "Updated Lab"

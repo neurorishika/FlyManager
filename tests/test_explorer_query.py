@@ -79,6 +79,38 @@ def test_projection_limits_returned_fields():
     assert set(items[0].keys()) == {"UniqueID", "Name"}
 
 
+def test_nested_projection_is_applied_by_aggregation_and_keeps_nested_shape():
+    db = FakeDatabase({
+        "stocks": [_stock(
+            "s1",
+            PhenotypeCache={
+                "genotype": "w[1118]",
+                "prediction": {"best_guess_summary": "white eyes", "large": [1, 2, 3]},
+            },
+            Comments="must not cross the DB boundary",
+        )]
+    })
+
+    items, _ = get_accessible_documents_page(
+        "stocks",
+        "alice",
+        db,
+        projection={
+            "UniqueID": 1,
+            "PhenotypeCache.genotype": 1,
+            "PhenotypeCache.prediction.best_guess_summary": 1,
+        },
+    )
+
+    assert items == [{
+        "UniqueID": "s1",
+        "PhenotypeCache": {
+            "genotype": "w[1118]",
+            "prediction": {"best_guess_summary": "white eyes"},
+        },
+    }]
+
+
 # --- Step 6: stock deterministic-filter translator ----------------------
 
 def test_build_stock_mongo_filter_excludes_no_longer_maintained_by_default():

@@ -22,8 +22,8 @@ from flymanager.utils.mongo import (OperationLockConflict,
                                     get_accessible_crosses,
                                     get_accessible_stocks, get_flip_in,
                                     get_flip_schedule, get_settings,
-                                    get_tray_occupancy, get_user_activities,
-                                    get_user_initials, get_user_trays,
+                                    get_tray_occupancies_bulk,
+                                    get_user_activities, get_user_initials, get_user_trays,
                                     hold_operation_lock, write_activity)
 from flymanager.utils.mongo_records import delete_owned_documents_if_status
 from flymanager.utils.utils import get_datetime_from_str
@@ -42,6 +42,22 @@ ATTENTION_FILTER_OPTIONS = (
     {'value': 'today', 'label': 'Due Today'},
     {'value': 'watch', 'label': 'Review'},
 )
+
+# The dashboard needs vial timing and tray-display fields, but none of the
+# large phenotype/standardization caches or modification history embedded in
+# stock and cross documents.
+_DASHBOARD_RECORD_PROJECTION = {
+    '_id': 0,
+    'UniqueID': 1,
+    'User': 1,
+    'AssignedTo': 1,
+    'Name': 1,
+    'Status': 1,
+    'TrayID': 1,
+    'TrayPosition': 1,
+    'CurrentlyAliveVials': 1,
+    'NextFlipDates': 1,
+}
 
 
 def _count_alive_vials(item):
@@ -361,12 +377,22 @@ def home():
             else None
         )
 
-        # Get all user data
-        stocks = get_accessible_stocks(username, db, annotate=True)
-        crosses = get_accessible_crosses(username, db, annotate=True)
+        today = datetime.now()
+
+        # Load only the fields this page renders. Activity is bounded to the
+        # 30-day analysis window instead of replaying the user's full history.
+        stocks = get_accessible_stocks(
+            username, db, annotate=True, projection=_DASHBOARD_RECORD_PROJECTION
+        )
+        crosses = get_accessible_crosses(
+            username, db, annotate=True, projection=_DASHBOARD_RECORD_PROJECTION
+        )
         trays = get_user_trays(username, db)
-        activities = get_user_activities(username, db)
-        settings = get_settings(db)
+        activities = get_user_activities(
+            username,
+            db,
+            since=(today - timedelta(days=30)).strftime('%Y-%m-%d %H:%M'),
+        )
 
         # Filter out items that are no longer maintained
         active_stocks = [s for s in stocks if s.get('Status') != 'No longer maintained']
@@ -549,6 +575,7 @@ def home():
         active_trays = 0
         tray_heatmaps = []
         
+        tray_occupancies = get_tray_occupancies_bulk(trays, db)
         for tray in trays:
             tray_id = tray.get('TrayID')
             if tray_id:
@@ -558,7 +585,7 @@ def home():
                 
                 # Get tray occupancy which accounts for blocking
                 try:
-                    tray_occupancy = get_tray_occupancy(username, tray_id, db)
+                    tray_occupancy = tray_occupancies.get(tray.get('UniqueID'), {})
                     tray_usage_count = len(tray_occupancy)
                     used_positions += tray_usage_count
                     if tray_usage_count:
@@ -577,8 +604,9 @@ def home():
         tray_usage = round((used_positions / total_positions * 100) if total_positions > 0 else 0)
 
         # Get schedule for today and upcoming week
-        schedule_data = get_flip_schedule(username, db)
-        today = datetime.now()
+        schedule_data = get_flip_schedule(
+            username, db, stocks=stocks, crosses=crosses
+        )
         
         # Format today's schedule
         today_str = today.strftime('%Y-%m-%d')
@@ -984,7 +1012,6 @@ def home():
             is_admin=is_admin,
             flybase_reference_status=flybase_reference_status,
             stats=stats,
-            settings=settings,
             today_date=today.strftime('%B %d, %Y')
         )
 
@@ -1065,7 +1092,6 @@ def home():
                 'weekly_flips': 0,
                 'flips_by_day': {}
             },
-            settings=get_settings(db),
             today_date=datetime.now().strftime('%B %d, %Y')
         )
 

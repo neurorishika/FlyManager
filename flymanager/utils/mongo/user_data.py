@@ -96,7 +96,7 @@ def get_user_crosses(user, db):
     return list(filtered_crosses)
 
 
-def get_user_activities(user, db):
+def get_user_activities(user, db, *, since=None, limit=None):
     """
     Retrieve the user's activities from the MongoDB database.
 
@@ -112,8 +112,16 @@ def get_user_activities(user, db):
     """
     activities_collection = db["activity"]
 
-    # Find all activities where the 'username' field matches the given user
-    user_activities = list(activities_collection.find({"user": user}))
+    query = {"user": user}
+    if since is not None:
+        query["timestamp"] = {"$gte": since}
+
+    cursor = activities_collection.find(
+        query, {"_id": 0, "timestamp": 1, "activity": 1}
+    ).sort("timestamp", -1)
+    if limit is not None:
+        cursor = cursor.limit(limit)
+    user_activities = list(cursor)
 
     return user_activities
 

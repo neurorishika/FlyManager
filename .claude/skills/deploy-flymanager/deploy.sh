@@ -61,6 +61,7 @@ build() {
   echo "==> Building ${NEW_IMAGE} (+ :latest) for ${PLATFORM}"
   docker buildx build \
     --platform "$PLATFORM" \
+    --build-arg "APP_VERSION=${TAG}" \
     --load \
     -t "$NEW_IMAGE" \
     -t "${IMAGE}:latest" \

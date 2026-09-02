@@ -188,6 +188,8 @@ services:
       MONGO_URI: mongodb://mongodb:27017,mongodb2:27017/?replicaSet=rs0
       MONGO_DB_NAME: flymanager
       REDIS_URL: redis://redis:6379/0
+      SESSION_TYPE: redis
+      SESSION_REDIS_URL: redis://redis:6379/1
       APP_HOST: 0.0.0.0
       APP_PORT: "5234"
       FLASK_DEBUG: "0"
@@ -196,7 +198,6 @@ services:
       ENABLE_SCHEDULER: "1"
       SOCKETIO_ASYNC_MODE: threading
       UPLOAD_FOLDER: data/uploads
-      SESSION_FILE_DIR: /tmp/flymanager/flask_session
       MAX_UPLOAD_SIZE_BYTES: "8388608"
       TRUST_PROXY_HEADERS: "1"
       SESSION_COOKIE_SECURE: "0"

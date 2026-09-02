@@ -87,6 +87,68 @@ def _compute_flip_set(document, normalized_timestamp, new_status, comment,
     return {**flip_fields, **default_updates, **vial_properties}
 
 
+def _changed_fields(document, updates):
+    """Return only values that would materially change ``document``."""
+    return {
+        key: value
+        for key, value in updates.items()
+        if key not in document or document.get(key) != value
+    }
+
+
+def refresh_vial_timelines_bulk(user, stocks, crosses, db):
+    """Refresh all login-time vial timelines with at most two writes.
+
+    The previous login path called ``update_*_vials`` once per record. Each
+    call read the document again and then wrote it, even when the computed
+    timeline was unchanged. Here we reuse the documents already fetched for
+    the login warning, perform the same calculations in memory, and batch only
+    records whose persisted fields actually need changing.
+    """
+    collection_specs = (
+        (
+            "stocks",
+            stocks,
+            compute_stock_vial_properties,
+            REQUIRED_STOCK_PROPERTIES,
+            DEFAULT_STOCK_PROPERTY_VALUES,
+        ),
+        (
+            "crosses",
+            crosses,
+            compute_cross_vial_properties,
+            REQUIRED_CROSS_PROPERTIES,
+            DEFAULT_CROSS_PROPERTY_VALUES,
+        ),
+    )
+    refreshed = {"stocks": 0, "crosses": 0}
+
+    for collection_name, documents, compute_vials, required, defaults in collection_specs:
+        operations = []
+        for document in documents:
+            default_updates = get_missing_required_updates(
+                document, required, defaults
+            )
+            working = {**document, **default_updates}
+            vial_properties, _refresh_vials = compute_vials(working)
+            updates = _changed_fields(
+                document, {**default_updates, **vial_properties}
+            )
+            if updates:
+                operations.append(
+                    UpdateOne(
+                        {"UniqueID": document["UniqueID"], "User": user},
+                        {"$set": updates},
+                    )
+                )
+
+        if operations:
+            db[collection_name].bulk_write(operations, ordered=False)
+        refreshed[collection_name] = len(operations)
+
+    return refreshed
+
+
 def bulk_flip_records(user, uids, db, flip_time, *, new_status=None, comment="",
                       progress_cb=None):
     """Flip many stocks/crosses in a batched, timeout-resistant way.

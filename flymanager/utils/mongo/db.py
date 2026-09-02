@@ -73,6 +73,13 @@ def ensure_mongo_indexes(db):
 
     db["operation_locks"].create_index("key", unique=True, name="operation_locks_key")
     db["operation_locks"].create_index("expires_at", expireAfterSeconds=0, name="operation_locks_expires_at")
+    db["operation_locks"].create_index(
+        [("status", 1), ("created_at", -1)], name="operation_locks_status_created"
+    )
+    db["operation_locks"].create_index(
+        [("actor", 1), ("status", 1), ("created_at", -1)],
+        name="operation_locks_actor_status_created",
+    )
 
     db["marker_definitions"].create_index("Key", unique=True, name="marker_definitions_key")
     db["marker_images"].create_index("imageId", unique=True, name="marker_images_image_id")

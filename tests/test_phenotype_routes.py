@@ -568,7 +568,7 @@ def test_stock_explorer_route_shows_best_guess_phenotype(monkeypatch):
     assert ">Reviewer<" in body
 
 
-def test_stock_explorer_route_recomputes_stale_cache_summary(monkeypatch):
+def test_stock_explorer_route_serves_stored_cache_summary_without_live_recompute(monkeypatch):
     app = _make_app(monkeypatch)
     stock_record = {
         "UniqueID": "UID1",
@@ -620,7 +620,7 @@ def test_stock_explorer_route_recomputes_stale_cache_summary(monkeypatch):
 
     body = response.get_data(as_text=True)
     assert response.status_code == 200
-    assert "mini-white pale orange" in body
+    assert "w, mini-white" in body
     assert "Refresh in record" not in body
 
 

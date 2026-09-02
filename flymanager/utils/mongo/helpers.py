@@ -180,7 +180,7 @@ def edit_metadata(metadata_type, old_value, new_value, db):
 # Flip Schedule Utilities
 
 
-def get_flip_schedule(user, db):
+def get_flip_schedule(user, db, *, stocks=None, crosses=None, flip_days=None):
     """
     Get a date-by-date schedule for which stocks and crosses need to be flipped, including tray info and links.
 
@@ -192,13 +192,20 @@ def get_flip_schedule(user, db):
     dict: A dictionary where the keys are dates and the values are lists of stocks/crosses to flip on those dates.
     """
     # Import locally to avoid circular imports
-    from flymanager.utils.mongo.access import (get_maintainable_crosses,
+    from flymanager.utils.mongo.access import (get_effective_maintainer,
+                                               get_maintainable_crosses,
                                                get_maintainable_stocks)
     from flymanager.utils.mongo.user_data import get_user_flip_days
 
     # Retrieve user's stocks and crosses
-    stocks = get_maintainable_stocks(user, db)
-    crosses = get_maintainable_crosses(user, db)
+    if stocks is None:
+        stocks = get_maintainable_stocks(user, db)
+    else:
+        stocks = [item for item in stocks if get_effective_maintainer(item) == user]
+    if crosses is None:
+        crosses = get_maintainable_crosses(user, db)
+    else:
+        crosses = [item for item in crosses if get_effective_maintainer(item) == user]
 
     # Remove ones with Status = "No longer maintained"
     stocks = [stock for stock in stocks if stock["Status"] != "No longer maintained"]
@@ -221,7 +228,8 @@ def get_flip_schedule(user, db):
     )
 
     # Get user's preferred flip days
-    flip_days = get_user_flip_days(user, db)
+    if flip_days is None:
+        flip_days = get_user_flip_days(user, db)
 
     # Initialize a schedule dictionary where each key is a date and value is a list of stocks/crosses
     schedule = {}

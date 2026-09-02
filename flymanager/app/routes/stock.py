@@ -145,18 +145,41 @@ def _get_stock_phenotype_for_view(stock):
 
 
 def _get_stock_phenotype_summary(stock):
-    phenotype_cache = get_cached_stock_phenotype(stock, strict=False)
-    if not phenotype_cache:
+    phenotype_cache = stock.get("PhenotypeCache")
+    prediction = (
+        phenotype_cache.get("prediction")
+        if isinstance(phenotype_cache, dict)
+        and str(phenotype_cache.get("genotype", "")) == str(stock.get("Genotype", ""))
+        else None
+    )
+    if not isinstance(prediction, dict):
         return {
             "guess": "Refresh in record",
             "confidence": "refresh required",
         }
 
-    prediction = phenotype_cache["prediction"]
     return {
         "guess": prediction.get("best_guess_summary", "Phenotype unavailable"),
         "confidence": prediction.get("confidence_label", "low"),
     }
+
+
+_STOCK_EXPLORER_PROJECTION = {
+    "_id": 0,
+    "UniqueID": 1, "User": 1, "AssignedTo": 1, "Name": 1,
+    "OwnerUser": 1, "MaintainerUser": 1, "AssignmentScope": 1,
+    "AssignmentScopeLabel": 1, "AssignmentScopeDetail": 1,
+    "SourceID": 1, "StockSource": 1, "SourceCollection": 1,
+    "FlyBaseStockID": 1, "ExternalRawGenotype": 1, "Genotype": 1,
+    "AltReference": 1, "SeriesID": 1, "ReplicateID": 1, "Type": 1,
+    "Status": 1, "FoodType": 1, "Provenance": 1, "Species": 1,
+    "TrayID": 1, "TrayPosition": 1, "Comments": 1, "CreationDate": 1,
+    "DataModifiedDate": 1, "LastFlipDate": 1, "NextFlipDates": 1,
+    "NextEclosionDates": 1, PROVIDER_MATCH_CACHE_FIELD: 1,
+    "PhenotypeCache.genotype": 1,
+    "PhenotypeCache.prediction.best_guess_summary": 1,
+    "PhenotypeCache.prediction.confidence_label": 1,
+}
 
 
 def _stock_sort_key(stock):
@@ -635,6 +658,7 @@ def stock_explorer():
             # the original route did, just over a far smaller candidate set.
             candidates, _ = get_accessible_documents_page(
                 "stocks", username, db, mongo_filter=mongo_filter, limit=None,
+                projection=_STOCK_EXPLORER_PROJECTION,
             )
             filtered_stocks = _apply_stock_search(candidates, search_query)
             filtered_stocks = sorted(filtered_stocks, key=_stock_sort_key)
@@ -649,7 +673,7 @@ def stock_explorer():
             skip = (pagination_state["page"] - 1) * per_page if per_page else 0
             page_items, total_count = get_accessible_documents_page(
                 "stocks", username, db, mongo_filter=mongo_filter,
-                skip=skip, limit=per_page,
+                skip=skip, limit=per_page, projection=_STOCK_EXPLORER_PROJECTION,
             )
             pagination = build_pagination_from_db_page(
                 page_items, total_count, pagination_state,

@@ -274,7 +274,7 @@ def test_home_page_renders_dashboard_command_sections(monkeypatch):
             "NextFlipDates": tomorrow,
         }
     ]
-    trays = [{"TrayID": "T1", "Rows": 2, "Columns": 3, "Name": "Incubator A"}]
+    trays = [{"UniqueID": "tray-1", "TrayID": "T1", "Rows": 2, "Columns": 3, "Name": "Incubator A"}]
     activities = [
         {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -321,7 +321,8 @@ def test_home_page_renders_dashboard_command_sections(monkeypatch):
         ), patch("flymanager.app.routes.main.get_user_trays", return_value=trays), patch(
             "flymanager.app.routes.main.get_user_activities", return_value=activities
         ), patch("flymanager.app.routes.main.get_flip_schedule", return_value=schedule), patch(
-            "flymanager.app.routes.main.get_tray_occupancy", return_value=occupancy
+            "flymanager.app.routes.main.get_tray_occupancies_bulk",
+            return_value={"tray-1": occupancy},
         ), patch(
             "flymanager.app.routes.main.flybase_service.get_flybase_reference_status",
             return_value={
@@ -580,6 +581,20 @@ def test_login_page_uses_local_vendor_assets(monkeypatch):
     assert "https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" not in page
     assert "https://fonts.googleapis.com" not in page
     assert "https://cdnjs.cloudflare.com/ajax/libs/font-awesome" not in page
+
+
+def test_release_static_assets_are_versioned_and_immutable(monkeypatch):
+    monkeypatch.setenv("APP_VERSION", "abc1234")
+    app = _make_app(monkeypatch)
+
+    with app.test_client() as client:
+        page_response = client.get("/auth/login")
+        asset_response = client.get("/static/css/base.css?v=abc1234")
+
+    assert "/static/css/base.css?v=abc1234" in page_response.get_data(as_text=True)
+    assert "immutable" in asset_response.headers["Cache-Control"]
+    assert "max-age=31536000" in asset_response.headers["Cache-Control"]
+    assert page_response.headers["Server-Timing"].startswith("app;dur=")
 
 
 def test_permissions_policy_blocks_camera_when_feature_disabled(monkeypatch):

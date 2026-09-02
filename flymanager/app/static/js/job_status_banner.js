@@ -1,8 +1,11 @@
 (function () {
     'use strict';
 
-    const POLL_INTERVAL_MS = 3000;
+    const ACTIVE_POLL_INTERVAL_MS = 3000;
+    const IDLE_POLL_INTERVAL_MS = 30000;
     const SEEN_STORAGE_KEY = 'flymanager_seen_job_states';
+    let pollTimer = null;
+    let activeBanner = null;
 
     function loadSeenStates() {
         try {
@@ -64,7 +67,19 @@
         return row;
     }
 
+    function schedulePoll(banner, delay) {
+        if (pollTimer !== null) {
+            window.clearTimeout(pollTimer);
+        }
+        pollTimer = window.setTimeout(() => poll(banner), delay);
+    }
+
     function poll(banner) {
+        if (document.hidden) {
+            schedulePoll(banner, IDLE_POLL_INTERVAL_MS);
+            return;
+        }
+
         fetch('/jobs/status.json', { headers: { Accept: 'application/json' } })
             .then((response) => (response.ok ? response.json() : { jobs: [] }))
             .then((data) => {
@@ -94,12 +109,17 @@
                 const rowsToShow = active.concat(justFinished);
                 if (rowsToShow.length === 0) {
                     banner.classList.remove('job-status-banner--visible');
+                    schedulePoll(banner, IDLE_POLL_INTERVAL_MS);
                     return;
                 }
                 banner.classList.add('job-status-banner--visible');
                 rowsToShow.forEach((job) => banner.appendChild(renderJobRow(job)));
+                schedulePoll(
+                    banner,
+                    active.length ? ACTIVE_POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS
+                );
             })
-            .catch(() => { /* transient network hiccup - just try again next tick */ });
+            .catch(() => schedulePoll(banner, IDLE_POLL_INTERVAL_MS));
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -108,7 +128,13 @@
             return;
         }
         const banner = createBanner(container);
+        activeBanner = banner;
         poll(banner);
-        setInterval(() => poll(banner), POLL_INTERVAL_MS);
+    });
+
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && activeBanner) {
+            schedulePoll(activeBanner, 0);
+        }
     });
 })();

@@ -380,6 +380,21 @@ class FakeCollection:
                 records = records[stage["$skip"]:]
             elif "$limit" in stage:
                 records = records[: stage["$limit"]]
+            elif "$project" in stage:
+                projection = stage["$project"]
+                included_paths = [
+                    field for field, included in projection.items()
+                    if included and field != "_id"
+                ]
+                projected_records = []
+                for record in records:
+                    projected = {}
+                    for field in included_paths:
+                        value, present = _resolve_path(record, field)
+                        if present:
+                            _apply_set(projected, {field: copy.deepcopy(value)})
+                    projected_records.append(projected)
+                records = projected_records
             else:
                 raise NotImplementedError(f"Unsupported aggregation stage: {stage}")
         return records

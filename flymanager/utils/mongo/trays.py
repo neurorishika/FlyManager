@@ -409,6 +409,19 @@ def _build_occupancy(stocks, crosses, parent_stock_map):
     return occupancy
 
 
+_TRAY_STOCK_PROJECTION = {
+    "_id": 0, "UniqueID": 1, "User": 1, "TrayID": 1, "TrayPosition": 1,
+    "Name": 1, "Genotype": 1, "Status": 1, "VialLifetime": 1,
+    "FlipFrequency": 1,
+}
+_TRAY_CROSS_PROJECTION = {
+    "_id": 0, "UniqueID": 1, "User": 1, "TrayID": 1, "TrayPosition": 1,
+    "Name": 1, "MaleGenotype": 1, "FemaleGenotype": 1, "MaleUniqueID": 1,
+    "FemaleUniqueID": 1, "Status": 1, "VialLifetime": 1,
+    "FlipFrequency": 1,
+}
+
+
 def get_tray_occupancy(user, tray_id, db):
     """
     Get the current occupancy of a tray.
@@ -429,8 +442,12 @@ def get_tray_occupancy(user, tray_id, db):
     stocks_collection = db["stocks"]
     crosses_collection = db["crosses"]
 
-    stocks = list(stocks_collection.find({"User": user, "TrayID": tray_id}))
-    crosses = list(crosses_collection.find({"User": user, "TrayID": tray_id}))
+    stocks = list(stocks_collection.find(
+        {"User": user, "TrayID": tray_id}, _TRAY_STOCK_PROJECTION
+    ))
+    crosses = list(crosses_collection.find(
+        {"User": user, "TrayID": tray_id}, _TRAY_CROSS_PROJECTION
+    ))
 
     # Batch-resolve male/female parent stocks for all crosses in one query
     parent_ids = {
@@ -444,7 +461,8 @@ def get_tray_occupancy(user, tray_id, db):
         parent_stock_map = {
             stock["UniqueID"]: stock
             for stock in stocks_collection.find(
-                {"User": user, "UniqueID": {"$in": list(parent_ids)}}
+                {"User": user, "UniqueID": {"$in": list(parent_ids)}},
+                {"_id": 0, "UniqueID": 1},
             )
         }
 
@@ -474,8 +492,12 @@ def get_tray_occupancies_bulk(trays, db):
         return {}
 
     or_clauses = [{"User": owner, "TrayID": tray_id} for owner, tray_id in owner_tray_pairs]
-    all_stocks = list(db["stocks"].find({"$or": or_clauses}))
-    all_crosses = list(db["crosses"].find({"$or": or_clauses}))
+    all_stocks = list(db["stocks"].find(
+        {"$or": or_clauses}, _TRAY_STOCK_PROJECTION
+    ))
+    all_crosses = list(db["crosses"].find(
+        {"$or": or_clauses}, _TRAY_CROSS_PROJECTION
+    ))
 
     parent_ids_by_owner = {}
     for cross in all_crosses:
@@ -489,7 +511,8 @@ def get_tray_occupancies_bulk(trays, db):
         parent_stock_map_by_owner[owner] = {
             stock["UniqueID"]: stock
             for stock in db["stocks"].find(
-                {"User": owner, "UniqueID": {"$in": list(parent_ids)}}
+                {"User": owner, "UniqueID": {"$in": list(parent_ids)}},
+                {"_id": 0, "UniqueID": 1},
             )
         }
 

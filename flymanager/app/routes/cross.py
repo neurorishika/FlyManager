@@ -227,10 +227,33 @@ def _get_cross_phenotype_for_view(cross):
 
 
 def _get_cross_phenotype_summary(cross):
-    phenotype_cache = get_cached_cross_phenotype(cross, strict=False)
-    if not phenotype_cache:
+    phenotype_cache = cross.get("PhenotypeCache")
+    parent_phenotypes = (
+        phenotype_cache.get("parentPhenotypes")
+        if isinstance(phenotype_cache, dict)
+        and str(phenotype_cache.get("maleGenotype", "")) == str(cross.get("MaleGenotype", ""))
+        and str(phenotype_cache.get("femaleGenotype", "")) == str(cross.get("FemaleGenotype", ""))
+        else None
+    )
+    if not isinstance(parent_phenotypes, dict):
         return "Refresh in record"
-    return phenotype_cache["parentPhenotypes"].get("summary", "Phenotype unavailable")
+    return parent_phenotypes.get("summary", "Phenotype unavailable")
+
+
+_CROSS_EXPLORER_PROJECTION = {
+    "_id": 0,
+    "UniqueID": 1, "User": 1, "AssignedTo": 1, "Name": 1,
+    "OwnerUser": 1, "MaintainerUser": 1, "AssignmentScope": 1,
+    "AssignmentScopeLabel": 1, "AssignmentScopeDetail": 1,
+    "MaleUniqueID": 1, "FemaleUniqueID": 1, "MaleGenotype": 1,
+    "FemaleGenotype": 1, "MaleSpecies": 1, "FemaleSpecies": 1,
+    "Status": 1, "FoodType": 1, "TrayID": 1, "TrayPosition": 1,
+    "Comments": 1, "CreationDate": 1, "DataModifiedDate": 1,
+    "LastFlipDate": 1, "NextFlipDates": 1, "NextEclosionDates": 1,
+    "PhenotypeCache.maleGenotype": 1,
+    "PhenotypeCache.femaleGenotype": 1,
+    "PhenotypeCache.parentPhenotypes.summary": 1,
+}
 
 
 @bp.route("/cross_explorer", methods=["GET", "POST"])
@@ -271,7 +294,7 @@ def cross_explorer():
             # the original route did, just over a far smaller candidate set.
             candidates, _ = get_accessible_documents_page(
                 "crosses", username, db, mongo_filter=mongo_filter, limit=None,
-                extra_sort_keys=(),
+                projection=_CROSS_EXPLORER_PROJECTION, extra_sort_keys=(),
             )
             filtered_crosses = _apply_cross_search(candidates, search_query)
             filtered_crosses = sorted(filtered_crosses, key=_cross_sort_key)
@@ -286,7 +309,8 @@ def cross_explorer():
             skip = (pagination_state["page"] - 1) * per_page if per_page else 0
             page_items, total_count = get_accessible_documents_page(
                 "crosses", username, db, mongo_filter=mongo_filter,
-                skip=skip, limit=per_page, extra_sort_keys=(),
+                skip=skip, limit=per_page,
+                projection=_CROSS_EXPLORER_PROJECTION, extra_sort_keys=(),
             )
             pagination = build_pagination_from_db_page(
                 page_items, total_count, pagination_state,

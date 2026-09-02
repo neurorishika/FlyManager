@@ -18,7 +18,7 @@ from pymongo import ReturnDocument
 import flymanager.app  # noqa: F401
 
 from flymanager.utils.mongo.bulk_operations import (
-    bulk_change_status_records, bulk_flip_records)
+    bulk_change_status_records, bulk_flip_records, refresh_vial_timelines_bulk)
 from flymanager.utils.mongo.crosses import edit_cross, flip_cross
 from flymanager.utils.mongo.stocks import edit_stock, flip_stock
 
@@ -84,6 +84,9 @@ class FakeCollection:
         return SimpleNamespace(inserted_ids=list(range(len(documents))))
 
     def bulk_write(self, operations, ordered=True):
+        self.database.bulk_write_calls[self.name] = (
+            self.database.bulk_write_calls.get(self.name, 0) + 1
+        )
         modified = 0
         for operation in operations:
             query = operation._filter
@@ -98,6 +101,7 @@ class FakeCollection:
 
 class FakeDatabase:
     def __init__(self, initial_data=None):
+        self.bulk_write_calls = {}
         self.data = {
             name: [dict(item) for item in records]
             for name, records in (initial_data or {}).items()
@@ -197,6 +201,53 @@ def _run_both(initial, uids, **flip_kwargs):
     _sequential_flip(sequential_db, uids, **flip_kwargs)
     results = bulk_flip_records(USER, uids, batched_db, FLIP_TIME, **flip_kwargs)
     return sequential_db, batched_db, results
+
+
+def test_login_vial_refresh_matches_sequential_and_batches_writes():
+    initial = {
+        "stocks": [
+            make_stock("stock-1"),
+            make_stock("stock-2"),
+        ],
+        "crosses": [make_cross("cross-1")],
+    }
+    sequential_db = FakeDatabase(copy.deepcopy(initial))
+    batched_db = FakeDatabase(copy.deepcopy(initial))
+
+    for stock in list(sequential_db.data["stocks"]):
+        from flymanager.utils.mongo.stocks import update_stock_vials
+        update_stock_vials(stock, USER, sequential_db)
+    for cross in list(sequential_db.data["crosses"]):
+        from flymanager.utils.mongo.crosses import update_cross_vials
+        update_cross_vials(cross, USER, sequential_db)
+
+    result = refresh_vial_timelines_bulk(
+        USER,
+        copy.deepcopy(initial["stocks"]),
+        copy.deepcopy(initial["crosses"]),
+        batched_db,
+    )
+
+    assert batched_db.data["stocks"] == sequential_db.data["stocks"]
+    assert batched_db.data["crosses"] == sequential_db.data["crosses"]
+    assert result == {"stocks": 2, "crosses": 1}
+    assert batched_db.bulk_write_calls == {"stocks": 1, "crosses": 1}
+
+
+def test_login_vial_refresh_skips_documents_that_are_already_current():
+    db = FakeDatabase({"stocks": [make_stock("stock-1")], "crosses": []})
+    # Establish the exact computed state first, then refresh it again.
+    refresh_vial_timelines_bulk(
+        USER, copy.deepcopy(db.data["stocks"]), [], db
+    )
+    db.bulk_write_calls.clear()
+
+    result = refresh_vial_timelines_bulk(
+        USER, copy.deepcopy(db.data["stocks"]), [], db
+    )
+
+    assert result == {"stocks": 0, "crosses": 0}
+    assert db.bulk_write_calls == {}
 
 
 def test_bulk_flip_matches_sequential_plain():

@@ -141,6 +141,26 @@ def get_accessible_documents_page(
     if limit is not None:
         pipeline.append({"$limit": limit})
 
+    requested_roots = None
+    if projection:
+        if isinstance(projection, dict):
+            requested_paths = {
+                field for field, included in projection.items()
+                if included and field != "_id"
+            }
+            mongo_projection = dict(projection)
+        else:
+            requested_paths = set(projection)
+            requested_paths.discard("_id")
+            mongo_projection = {field: 1 for field in requested_paths}
+
+        # Access annotation is calculated after aggregation, so retain its
+        # three source fields even when the caller only requests derived
+        # annotation fields. The final result is trimmed back below.
+        mongo_projection.update({"UniqueID": 1, "User": 1, "AssignedTo": 1})
+        pipeline.append({"$project": mongo_projection})
+        requested_roots = {field.split(".", 1)[0] for field in requested_paths}
+
     # The $sort stage sorts on TrayID + a computed field, so it can never
     # use an index; allowDiskUse lets MongoDB spill to disk instead of
     # raising "Sort exceeded memory limit" once the accessible set is large.
@@ -149,9 +169,13 @@ def get_accessible_documents_page(
         document.pop("_sortTrayPosition", None)
     annotated = [annotate_document_access(document, user) for document in items]
 
-    if projection:
+    if requested_roots is not None:
         annotated = [
-            {field: document.get(field) for field in projection if field in document}
+            {
+                field: document.get(field)
+                for field in requested_roots
+                if field in document
+            }
             for document in annotated
         ]
 
