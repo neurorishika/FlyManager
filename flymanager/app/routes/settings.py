@@ -126,6 +126,25 @@ def admin_settings():
     )
 
 
+@bp.get("/settings/scheduler")
+@login_required
+@admin_required
+def scheduler_diagnostics():
+    """What is scheduled in THIS worker, and when the state backup last ran.
+
+    Reported from inside the process because nothing outside it can see an
+    APScheduler job store. Each gunicorn worker keeps its own scheduler, so
+    this describes the worker that served the request -- the jobs hold a
+    distributed lock precisely because there may be several.
+    """
+    from flymanager.app.services import diagnostics
+
+    return jsonify({
+        "scheduler": diagnostics.describe_scheduled_jobs(),
+        "state_backup": diagnostics.describe_last_state_backup(),
+    })
+
+
 @bp.route("/settings/send-test-email", methods=["POST"])
 @login_required
 @admin_required

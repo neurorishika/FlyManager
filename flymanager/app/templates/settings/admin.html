@@ -417,4 +417,79 @@
         </div>
     </div>
 </div>
+
+        <div class="app-panel mt-3">
+            <div class="app-form-section">
+                <div>
+                    <h2 class="app-form-section-title">Scheduled Tasks &amp; Backups</h2>
+                    <p class="app-form-section-copy">What this app process has scheduled, and when the
+                        state backup last produced anything. The state backup runs here rather than on the
+                        NAS's task scheduler, so this page is where you check that it is alive &mdash;
+                        a job that is registered but failing every night looks exactly like a healthy one
+                        until something measures what it produced.</p>
+                </div>
+                <div id="schedulerDiagnostics" data-endpoint="{{ url_for('settings.scheduler_diagnostics') }}">
+                    <p class="text-muted mb-0">Loading&hellip;</p>
+                </div>
+            </div>
+        </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+    // Rendered client-side so the settings page keeps loading even if the
+    // diagnostics call fails -- an operational panel must never be the reason
+    // an admin cannot reach the rest of Settings.
+    (function () {
+        var host = document.getElementById('schedulerDiagnostics');
+        if (!host) { return; }
+
+        function esc(value) {
+            return String(value === null || value === undefined ? '' : value)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        fetch(host.dataset.endpoint, { credentials: 'same-origin' })
+            .then(function (r) { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.json(); })
+            .then(function (data) {
+                var parts = [];
+                var sched = data.scheduler || {};
+                if (!sched.running) {
+                    parts.push('<div class="alert alert-warning mb-2">The scheduler is <strong>not running</strong> in this process. Nothing scheduled here will fire.</div>');
+                } else if (!(sched.jobs || []).length) {
+                    parts.push('<div class="alert alert-warning mb-2">The scheduler is running but has <strong>no jobs registered</strong>.</div>');
+                }
+                if ((sched.jobs || []).length) {
+                    parts.push('<table class="table table-sm mb-3"><thead><tr><th>Task</th><th>Next run (UTC)</th></tr></thead><tbody>');
+                    sched.jobs.forEach(function (job) {
+                        var next = job.next_run_time
+                            ? esc(job.next_run_time)
+                            : '<span class="text-danger">not scheduled</span>';
+                        parts.push('<tr><td>' + esc(job.id) + '</td><td>' + next + '</td></tr>');
+                    });
+                    parts.push('</tbody></table>');
+                }
+
+                var backup = data.state_backup || {};
+                if (!backup.present) {
+                    parts.push('<div class="alert alert-warning mb-0">No state backup has been written yet to <code>' + esc(backup.directory) + '</code>.</div>');
+                } else {
+                    var tone = backup.stale ? 'alert-danger' : 'alert-success';
+                    var age = backup.age_hours === null ? 'unknown' : esc(backup.age_hours) + ' hours ago';
+                    var size = backup.bytes ? (Math.round(backup.bytes / 1024) + ' KB') : '';
+                    parts.push('<div class="alert ' + tone + ' mb-0">Last state backup: <strong>' +
+                        esc(backup.archive) + '</strong> (' + age + ', ' + size + ')' +
+                        (backup.stale ? ' &mdash; <strong>this is stale; backups may have stopped.</strong>' : '') +
+                        '</div>');
+                }
+                host.innerHTML = parts.join('');
+            })
+            .catch(function (err) {
+                host.innerHTML = '<div class="alert alert-warning mb-0">Could not read scheduler diagnostics: ' +
+                    esc(err.message) + '</div>';
+            });
+    })();
+</script>
 {% endblock %}
