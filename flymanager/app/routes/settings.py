@@ -8,8 +8,9 @@ from flymanager.app.routes.auth import admin_required, login_required
 from flymanager.app.security import (get_json_payload, limiter,
                                      normalize_optional_text)
 from flymanager.app.services import flybase as flybase_service
+from flymanager.app.services.email import (mail_config_status, send_test_email)
 from flymanager.utils.mongo import (OperationLockConflict, get_settings,
-                                    get_user_profiles,
+                                    get_user_email, get_user_profiles,
                                     update_settings,
                                     update_user_reporting_manager,
                                     write_activity)
@@ -121,7 +122,51 @@ def admin_settings():
         manager_options=manager_options,
         flybase_reference_status=flybase_reference_status,
         force_recompute_cooldowns=force_recompute_cooldowns,
+        mail_status=mail_config_status(),
     )
+
+
+@bp.route("/settings/send-test-email", methods=["POST"])
+@login_required
+@admin_required
+@limiter.limit("10 per hour")
+def send_test_email_route():
+    """Send a test message to the requesting admin's own address.
+
+    Reports the specific reason for any failure. The predecessor of this
+    route returned success without sending anything whenever mail was
+    misconfigured, which is how a 2026-09 outage went unnoticed for days.
+    """
+    redirect_to = url_for("settings.admin_settings")
+    username = session.get("username")
+
+    status = mail_config_status()
+    if not status["ready"]:
+        flash(
+            "Test email not sent. " + " ".join(status["problems"]),
+            "error",
+        )
+        return redirect(redirect_to)
+
+    recipient = get_user_email(username, db)
+    if not recipient:
+        flash(
+            "Test email not sent: your account has no email address. Add one "
+            "to your profile first.",
+            "error",
+        )
+        return redirect(redirect_to)
+
+    try:
+        send_test_email(recipient)
+    except Exception as exc:
+        current_app.logger.exception("Test email to %s failed: %s", recipient, exc)
+        flash(f"Test email to {recipient} failed: {exc}", "error")
+        return redirect(redirect_to)
+
+    write_activity(username, f"Sent a test email to {recipient}", db)
+    flash(f"Test email sent to {recipient}. Check your inbox.", "success")
+    return redirect(redirect_to)
 
 
 @bp.route("/settings/user-hierarchy", methods=["POST"])

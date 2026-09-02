@@ -380,6 +380,40 @@
                 <strong>Backups:</strong> Stored in data/backup/ and cleaned up after 12 months<br>
                 <strong>Gene collections:</strong> X chromosome, 2nd, 3rd, and 4th chromosome genes
             </div>
+
+            <div>
+                <h2 class="app-form-section-title">Email Delivery</h2>
+                <p class="app-form-section-copy">Flip reminders go out every morning at 8:00. If mail is misconfigured the reminder job still runs and reports success, so check this readout after any redeploy.</p>
+            </div>
+
+            <div class="app-action-card">
+                <div>
+                    <h6 class="mb-1">Current mail configuration</h6>
+                    {% if mail_status.ready %}
+                        <p class="text-muted mb-2"><i class="fas fa-check-circle text-success"></i> Outbound email is configured.</p>
+                    {% else %}
+                        <p class="text-muted mb-2"><i class="fas fa-exclamation-triangle text-danger"></i> <strong>Email is not being sent.</strong></p>
+                        <ul class="text-danger mb-2">
+                            {% for problem in mail_status.problems %}
+                                <li>{{ problem }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    <p class="text-muted mb-0">
+                        <strong>Server:</strong> {{ mail_status.server or 'not set' }}:{{ mail_status.port }}<br>
+                        <strong>Sender:</strong> {{ mail_status.sender or 'not set' }}<br>
+                        <strong>Username:</strong> {{ mail_status.username or 'not set' }}<br>
+                        <strong>Password:</strong> {{ 'set' if mail_status.password_set else 'not set' }}<br>
+                        <strong>Suppress sending:</strong> {{ 'yes' if mail_status.suppressed else 'no' }}
+                    </p>
+                </div>
+                <form method="POST" action="{{ url_for('settings.send_test_email_route') }}" data-confirm-message="This will send a test email to your own address. Continue?" data-progress-form data-progress-message="Sending a test email..." data-progress-duplicate-message="A test email is already being sent." data-progress-label="Sending...">
+                    <button type="submit" class="btn btn-secondary" data-progress-label="Sending...">
+                        <i class="fas fa-envelope"></i> Send Test Email To Myself
+                    </button>
+                </form>
+                <small class="text-muted">Sends only to the address on your own account, and reports the SMTP error if delivery fails.</small>
+            </div>
         </div>
     </div>
 </div>
