@@ -517,6 +517,16 @@
         "stabilityScore": 0.5,
         "notes": [
           "Tubby is down-weighted because TM6B/Tb reversion is a known high-frequency risk."
+        ],
+        "contextualStability": [
+          {
+            "whenBalancer": [
+              "TM6B",
+              "TM6"
+            ],
+            "maxScore": 0.35,
+            "note": "TM6B explicitly keeps Tb because the marker can revert at high frequency."
+          }
         ]
       },
       "audit": {
@@ -2092,7 +2102,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2121,7 +2133,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2151,7 +2165,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2180,7 +2196,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2210,7 +2228,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2239,7 +2259,9 @@
           "Modeled as a third-chromosome dominant marker balancer shorthand."
         ]
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2270,7 +2292,9 @@
           "Uses the cheat-sheet visible-marker set for the common second-chromosome balancer."
         ]
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.24
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2301,7 +2325,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2330,7 +2356,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.12
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2359,7 +2387,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2390,7 +2420,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2419,7 +2451,9 @@
           "Bare FM7 is kept conservative; specific FM7 variants carry the fuller cheat-sheet marker sets."
         ]
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.16
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2448,7 +2482,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.2
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2477,7 +2513,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2509,7 +2547,9 @@
           "Preserves the FM7c-specific sn marker instead of collapsing to generic FM7."
         ]
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.24
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2537,7 +2577,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2565,7 +2607,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2593,7 +2637,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2621,7 +2667,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2651,7 +2699,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2679,7 +2729,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2709,7 +2761,9 @@
           "Treated as the same visible-marker set as MKRS for phenotype summaries."
         ]
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2739,7 +2793,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.12
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2770,7 +2826,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.16
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2800,7 +2858,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.2
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2830,7 +2890,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2857,7 +2919,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.08
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2884,7 +2948,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.12
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2916,7 +2982,9 @@
           "Explicit Sb[1] and Ser[1] in genotype strings are resolved separately rather than implied by TM3."
         ]
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.24
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2945,7 +3013,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.16
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -2974,7 +3044,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.2
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -3003,7 +3075,9 @@
           "Uses the stripped-down TM6C visible core from the cheat sheet rather than the fuller TM6B shorthand."
         ]
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -3032,7 +3106,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -3061,7 +3137,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -3089,7 +3167,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],
@@ -3117,7 +3197,9 @@
         ],
         "notes": []
       },
-      "sorting": {},
+      "sorting": {
+        "preferenceBonus": 0.04
+      },
       "audit": {},
       "imaging": {
         "aliases": [],

@@ -1,10 +1,16 @@
 # Marker Knowledge Into The Catalog Design
 
 Date: 2026-08-30
-Status: K3 implemented; K1 and K2 still awaiting re-approval
-  K3 (body-part synonyms to `data/markers/body_parts.json`) was approved and
-  landed on its own because the marker-form usability work depends on the
-  vocabulary it exposes. Its precondition was verified before implementation:
+Status: implemented (K3 in b84969b; K1 and K2 on branch feature/k1-k2-marker-knowledge-into-catalog)
+  K3 (body-part synonyms to `data/markers/body_parts.json`) landed first, on
+  its own, because the marker-form usability work depends on the vocabulary it
+  exposes; K1 and K2 followed. Two deliberate departures from the text below,
+  both stated at implementation time: chromosome 4's 0.0 becomes the same 0.04
+  default every other unstated balancer gets (no chromosome-4 balancer ships,
+  and the score is only ever compared within a chromosome, so no ranking
+  moves); and `contextualStability` is editable through the admin JSON editor
+  only, not as a repeating form group, which is the first pass the text below
+  sanctions. K3's precondition was verified before implementation:
   `_body_part_matches` is used only inside `image_library.py` (the bonus in
   `_with_bonuses` and the gate in `_score_entry`), so body parts do gate image
   matching only and the move changes no definition and no signature.

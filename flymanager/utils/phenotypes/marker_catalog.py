@@ -140,6 +140,52 @@ def _sorting_errors(sorting):
     notes = sorting.get("notes")
     if notes is not None and not isinstance(notes, list):
         errors.append("sorting.notes must be a list")
+
+    bonus = sorting.get("preferenceBonus")
+    if bonus is not None:
+        if isinstance(bonus, bool) or not isinstance(bonus, (int, float)):
+            errors.append("sorting.preferenceBonus must be a number")
+        elif not 0 <= bonus <= 0.25:
+            errors.append("sorting.preferenceBonus must be between 0 and 0.25")
+
+    errors.extend(_contextual_stability_errors(sorting.get("contextualStability")))
+    return errors
+
+
+def _contextual_stability_errors(contextual):
+    """Problems with a definition's contextual stability caps.
+
+    Same reasoning as stabilityScore: compile_catalog calls float() on
+    maxScore with no per-row recovery, and these rows arrive from the marker
+    API, so an unvalidated entry here would let any logged-in user break every
+    catalog read.
+    """
+    if contextual is None:
+        return []
+    if not isinstance(contextual, list):
+        return ["sorting.contextualStability must be a list"]
+
+    errors = []
+    for index, rule in enumerate(contextual):
+        where = f"sorting.contextualStability[{index}]"
+        if not isinstance(rule, dict):
+            errors.append(f"{where} must be an object")
+            continue
+        balancers = rule.get("whenBalancer")
+        if balancers is not None:
+            if not isinstance(balancers, list) or any(
+                    not isinstance(symbol, str) for symbol in balancers):
+                errors.append(f"{where}.whenBalancer must be a list of strings")
+        max_score = rule.get("maxScore")
+        if max_score is None:
+            errors.append(f"{where}.maxScore is required")
+        elif isinstance(max_score, bool) or not isinstance(max_score, (int, float)):
+            errors.append(f"{where}.maxScore must be a number")
+        elif not 0 <= max_score <= 1:
+            errors.append(f"{where}.maxScore must be between 0 and 1")
+        note = rule.get("note")
+        if note is not None and not isinstance(note, str):
+            errors.append(f"{where}.note must be a string")
     return errors
 
 
@@ -261,6 +307,8 @@ def _empty_snapshot():
         "allele_marker_tokens": frozenset(),
         "construct_markers": {},
         "stability": {},
+        "balancer_preference": {},
+        "contextual_stability": {},
         "image_aliases": {},
         "unresolved_balancer_markers": {},
         "probe_symbols": [],
@@ -370,6 +418,12 @@ def _index_definition(snapshot, key, document):
             snapshot["balancer_aliases"][alias] = symbol
         for marker_key in default_markers:
             snapshot["balancers_referencing"].setdefault(marker_key, set()).add(symbol)
+        # Indexed beside the metadata rather than inside it: the metadata dicts
+        # are handed out by get_balancer_metadata_map and flow into places that
+        # persist them, so this slice does not change their shape.
+        bonus = (document.get("sorting") or {}).get("preferenceBonus")
+        if bonus is not None:
+            snapshot["balancer_preference"][symbol] = float(bonus)
 
     sorting = document.get("sorting") or {}
     if sorting.get("stabilityScore") is not None:
@@ -379,6 +433,23 @@ def _index_definition(snapshot, key, document):
                 "score": float(sorting["stabilityScore"]),
                 "notes": list(sorting.get("notes") or []),
             }
+
+    # Indexed independently of the flat stability table, which is only written
+    # when stabilityScore is set: folding these in there would silently drop a
+    # cap on a definition that has a cap but no base score.
+    contextual = sorting.get("contextualStability")
+    if contextual:
+        label = _display_label(document, marker)
+        if label:
+            snapshot["contextual_stability"][label] = [
+                {
+                    "when_balancer": [str(symbol) for symbol in (rule.get("whenBalancer") or [])],
+                    "max_score": float(rule["maxScore"]),
+                    "note": str(rule.get("note") or ""),
+                }
+                for rule in contextual
+                if rule.get("maxScore") is not None
+            ]
 
     if (document.get("audit") or {}).get("isProbeMarker"):
         snapshot["probe_symbols"].append(

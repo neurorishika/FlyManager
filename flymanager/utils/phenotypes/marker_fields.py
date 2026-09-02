@@ -121,6 +121,10 @@ MARKER_FIELD_SPECS = {
                        help_="Comma separated, e.g. Sb, Ser."),
                 _field("payload.notes", "Notes", "list", separator="\n",
                        help_="One note per line."),
+                _field("sorting.preferenceBonus", "Preference", "float",
+                       help_="How strongly to prefer this balancer when the "
+                             "solver picks one, from 0 to 0.25. Leave blank "
+                             "for no preference."),
             )),
             ("Reference images", _IMAGING),
             ("Where this came from", _PROVENANCE),

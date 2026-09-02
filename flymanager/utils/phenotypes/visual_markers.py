@@ -48,6 +48,11 @@ def get_balancer_metadata_map():
     return deepcopy(get_catalog()["balancers"])
 
 
+def get_balancer_preference_map():
+    """Copy of the balancer symbol -> preference bonus mapping."""
+    return dict(get_catalog()["balancer_preference"])
+
+
 def get_balancer_aliases():
     """Copy of the balancer alias -> canonical symbol mapping."""
     return dict(get_catalog()["balancer_aliases"])

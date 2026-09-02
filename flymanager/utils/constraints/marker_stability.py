@@ -8,6 +8,16 @@ def _stability_entry(label):
     return get_catalog()["stability"].get(label) or {}
 
 
+def _contextual_rules(label):
+    """Caps that apply only when a particular balancer carries the marker.
+
+    Read from their own snapshot index, not from the flat stability table:
+    that table is only written for a definition that sets stabilityScore, so a
+    definition with a cap and no base score would otherwise lose the cap.
+    """
+    return get_catalog()["contextual_stability"].get(label) or []
+
+
 def _marker_label(marker_or_label):
     if isinstance(marker_or_label, dict):
         if marker_or_label.get("mini_white"):
@@ -37,9 +47,17 @@ def assess_marker_stability(marker_or_label, *, balancer_symbol=None):
 
     resolved_balancer = str(balancer_symbol or (marker or {}).get("balancer_symbol") or "").strip()
     notes = list(entry.get("notes") or [])
-    if label == "Tb" and resolved_balancer in {"TM6B", "TM6"}:
-        score = min(score, 0.35)
-        notes.append("TM6B explicitly keeps Tb because the marker can revert at high frequency.")
+    # Applied after the scoring_confidence fallback, in declaration order, so a
+    # cap bounds whatever score the marker actually ended up with. whenBalancer
+    # matches the RAW symbol rather than one canonicalized through
+    # balancer_aliases: that is what the hardcoded Tb/TM6B rule did, and
+    # routing it through the alias map would be a behaviour change smuggled in
+    # under a refactor.
+    for rule in _contextual_rules(label):
+        if resolved_balancer and resolved_balancer in rule["when_balancer"]:
+            score = min(score, rule["max_score"])
+            if rule["note"]:
+                notes.append(rule["note"])
 
     if score >= 0.82:
         label_name = "stable"
