@@ -96,7 +96,9 @@
                 </div>
                 {% for title, group in spec.groups %}
                 {% set rows = [] %}
-                {% for field in group %}{% if field_value(definition, field.path) not in ("", False, None) %}
+                {% for field in group %}{% if field.repeating %}{% if definition.get(field.path.split(".")[0], {}).get(field.path.split(".")[1]) %}
+                {% set _ = rows.append(field) %}{% endif %}
+                {% elif field_value(definition, field.path) not in ("", False, None) %}
                 {% set _ = rows.append(field) %}{% endif %}{% endfor %}
                 {% if rows %}
                 <h3 class="h6 text-muted mt-3">{{ title }}</h3>
@@ -107,10 +109,19 @@
                             <tr>
                                 <th scope="row" style="width: 40%">{{ field.label }}</th>
                                 <td>
+                                    {% if field.repeating %}
+                                    <ul class="mb-0 pl-3">
+                                        {% for row in definition.get(field.path.split(".")[0], {}).get(field.path.split(".")[1], []) %}
+                                        <li>{{ (row.whenBalancer or [])|join(", ") or "any balancer" }}:
+                                            at most {{ row.maxScore }}{% if row.note %} — {{ row.note }}{% endif %}</li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% else %}
                                     {% set value = field_value(definition, field.path) %}
                                     {% if field.type == "bool" %}Yes
                                     {% elif field.type == "url" %}<a href="{{ value }}" rel="noopener noreferrer" target="_blank">{{ value }}</a>
                                     {% else %}{{ value }}{% endif %}
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -210,7 +221,9 @@
                     <form method="POST" action="{{ url_for('markers.update_marker', key=definition.Key) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="kind" value="{{ definition.kind }}">
-                        {{ marker_fields.render_kind_fields(definition.kind, spec, definition, field_value, blurb=false) }}
+                        {{ marker_fields.render_kind_fields(definition.kind, spec, definition, field_value, blurb=false,
+                            repeating_rows=repeating_rows,
+                            repeating_input_name=repeating_input_name) }}
                         <div class="app-button-row justify-content-end">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save changes</button>
                         </div>
@@ -254,7 +267,9 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="Key" value="{{ definition.Key }}">
                         <input type="hidden" name="kind" value="{{ definition.kind }}">
-                        {{ marker_fields.render_kind_fields(definition.kind, spec, definition, field_value, blurb=false) }}
+                        {{ marker_fields.render_kind_fields(definition.kind, spec, definition, field_value, blurb=false,
+                            repeating_rows=repeating_rows,
+                            repeating_input_name=repeating_input_name) }}
                         <div class="app-button-row justify-content-end">
                             <button type="submit" class="btn btn-warning"><i class="fas fa-pen"></i> Save lab version</button>
                         </div>

@@ -102,7 +102,11 @@ def test_keys_the_form_never_rendered_survive_a_save():
     # never shows, because image metadata is stored separately -- must survive.
     assert document["imaging"]["images"] == []
     # Sections no field of this kind touches are left to the route's merge.
-    assert "expression" not in document and "sorting" not in document
+    # `sorting` is no longer one of them: the contextual stability rules are a
+    # rendered field now, so the section is rebuilt -- and, like every other
+    # rebuilt section, it carries over the keys the form never showed.
+    assert "expression" not in document
+    assert document["sorting"] == {}
 
 
 def test_cleared_field_is_removed_even_when_it_exists_today():

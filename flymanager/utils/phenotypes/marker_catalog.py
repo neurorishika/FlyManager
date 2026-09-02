@@ -309,6 +309,7 @@ def _empty_snapshot():
         "stability": {},
         "balancer_preference": {},
         "contextual_stability": {},
+        "duplicate_stability_labels": {},
         "image_aliases": {},
         "unresolved_balancer_markers": {},
         "probe_symbols": [],
@@ -364,6 +365,13 @@ def compile_catalog(shipped, overlay_documents=()):
         missing = [key for key in carried if key not in snapshot["definitions"]]
         if missing:
             snapshot["unresolved_balancer_markers"][symbol] = missing
+
+    # Reported after the whole merge for the same reason as the balancer
+    # markers above: a definition later in the file is not a duplicate of one
+    # earlier until both have actually been indexed.
+    claims = snapshot.pop("_stability_label_claims", {})
+    snapshot["duplicate_stability_labels"] = {
+        label: keys for label, keys in claims.items() if len(keys) > 1}
 
     snapshot["known_balancer_symbols"] = frozenset(
         set(snapshot["balancers"]) | set(snapshot["balancer_aliases"]))
@@ -426,6 +434,17 @@ def _index_definition(snapshot, key, document):
             snapshot["balancer_preference"][symbol] = float(bonus)
 
     sorting = document.get("sorting") or {}
+    # The stability indexes are keyed by display label, not by Key, so two
+    # definitions sharing a label collide and the last one indexed wins by
+    # dict order. That is pre-existing and not fixed here -- changing the key
+    # would change resolution -- but it is no longer silent: the claims are
+    # tallied and a collision is reported on the catalog page.
+    if sorting.get("stabilityScore") is not None or sorting.get("contextualStability"):
+        claimed = _display_label(document, marker)
+        if claimed:
+            snapshot.setdefault("_stability_label_claims", {}).setdefault(
+                claimed, []).append(key)
+
     if sorting.get("stabilityScore") is not None:
         label = _display_label(document, marker)
         if label:

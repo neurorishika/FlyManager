@@ -4,6 +4,39 @@
    (`payload.effect`), which is what lets the route rebuild the document from
    the form without the page knowing anything about the envelope. #}
 
+{% macro render_repeating(field, definition, field_value, kind, repeating_rows, repeating_input_name) %}
+{# Rendered as numbered rows with two spare blanks on the end, so a rule can be
+   added without any JavaScript. A row left entirely blank is dropped by the
+   parser, which is also how an existing rule is removed. #}
+<fieldset class="form-group mb-3">
+    <legend class="h6">{{ field.label }}</legend>
+    {% if field.help %}<small class="form-text text-muted mb-2">{{ field.help }}</small>{% endif %}
+    {% for row in repeating_rows(definition or {}, field) %}
+    {% set index = loop.index0 %}
+    <div class="border rounded p-2 mb-2">
+        {% for subfield in field.fields %}
+        {% set name = repeating_input_name(field, index, subfield) %}
+        {% set id = "f-" ~ kind ~ "-" ~ name %}
+        {% set value = field_value(row, subfield.path,
+                                  "\n" if subfield.separator == "\n" else ", ") %}
+        <div class="form-group mb-2">
+            <label for="{{ id }}">{{ subfield.label }}</label>
+            {% if subfield.type == "list" %}
+            <textarea class="form-control" id="{{ id }}" name="{{ name }}" rows="1">{{ value }}</textarea>
+            {% elif subfield.type == "float" %}
+            <input class="form-control" id="{{ id }}" name="{{ name }}" type="number"
+                   step="0.01" min="{{ subfield.minimum }}" max="{{ subfield.maximum }}" value="{{ value }}">
+            {% else %}
+            <input class="form-control" id="{{ id }}" name="{{ name }}" type="text" value="{{ value }}">
+            {% endif %}
+            {% if subfield.help %}<small class="form-text text-muted">{{ subfield.help }}</small>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</fieldset>
+{% endmacro %}
+
 {% macro render_field(field, definition, field_value, kind) %}
 {% set id = "f-" ~ kind ~ "-" ~ field.name %}
 {% set value = field_value(definition or {}, field.path,
@@ -30,7 +63,7 @@
     {% else %}
     <input class="form-control" id="{{ id }}" name="{{ field.name }}"
            type="{{ 'number' if field.type in ('int', 'float') else ('url' if field.type == 'url' else 'text') }}"
-           {% if field.type == 'float' %}step="0.01" min="0" max="1"{% endif %}
+           {% if field.type == 'float' %}step="0.01" min="{{ field.minimum }}" max="{{ field.maximum }}"{% endif %}
            {% if field.type == 'int' %}step="1"{% endif %}
            value="{{ value }}" placeholder="{{ field.placeholder }}">
     {% endif %}
@@ -38,13 +71,20 @@
 </div>
 {% endmacro %}
 
-{% macro render_kind_fields(kind, spec, definition, field_value, hidden=false, blurb=true) %}
+{% macro render_kind_fields(kind, spec, definition, field_value, hidden=false, blurb=true,
+                            repeating_rows=none, repeating_input_name=none) %}
 <div class="marker-kind-fields" data-marker-kind="{{ kind }}" {% if hidden %}hidden{% endif %}>
     {% if blurb %}<p class="text-muted">{{ spec.blurb }}</p>{% endif %}
     {% for title, fields in spec.groups %}
     <fieldset class="mb-3" {% if hidden %}disabled{% endif %}>
         <legend class="app-form-section-title h6">{{ title }}</legend>
-        {% for field in fields %}{{ render_field(field, definition, field_value, kind) }}{% endfor %}
+        {% for field in fields %}
+        {%- if field.repeating -%}
+        {{ render_repeating(field, definition, field_value, kind, repeating_rows, repeating_input_name) }}
+        {%- else -%}
+        {{ render_field(field, definition, field_value, kind) }}
+        {%- endif -%}
+        {% endfor %}
     </fieldset>
     {% endfor %}
 </div>

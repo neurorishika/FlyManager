@@ -26,7 +26,9 @@ from flymanager.utils.phenotypes.marker_catalog import (MARKER_KINDS,
                                                          refresh_catalog)
 from flymanager.utils.phenotypes.marker_fields import (MARKER_FIELD_SPECS,
                                                        field_value,
-                                                       form_to_document)
+                                                       form_to_document,
+                                                       repeating_input_name,
+                                                       repeating_rows)
 from flymanager.utils.phenotypes.image_catalog import (
     bump_image_revision, refresh_image_catalog)
 from flymanager.utils.phenotypes.image_library import select_marker_images
@@ -210,9 +212,11 @@ def marker_catalog():
     # unclickable table row would just confuse without adding information.
     rows = [row for row in rows if str(row.get("Key") or "").strip()]
     invalid_definitions = get_catalog()["invalid_definitions"]
+    duplicate_labels = get_catalog()["duplicate_stability_labels"]
     return render_template("markers/list.html", page_title="Marker Catalog",
                            definitions=rows, kinds=MARKER_KINDS,
                            invalid_definitions=invalid_definitions,
+                           duplicate_labels=duplicate_labels,
                            selected_kind=request.args.get("kind", ""),
                            selected_origin=request.args.get("origin", ""),
                            search_query=request.args.get("q", ""),
@@ -235,7 +239,8 @@ def new_marker():
                            kinds=MARKER_KINDS, selected_kind=kind,
                            field_specs=MARKER_FIELD_SPECS,
                            kind_labels=KIND_LABELS, definition={},
-                           field_value=field_value)
+                           field_value=field_value, repeating_rows=repeating_rows,
+                           repeating_input_name=repeating_input_name)
 
 
 @bp.get("/markers/<path:key>")
@@ -256,6 +261,7 @@ def marker_detail(key):
         is_shipped=(definition.get("origin") == "shipped"),
         is_admin=(username == "admin"),
         field_specs=MARKER_FIELD_SPECS, field_value=field_value,
+        repeating_rows=repeating_rows, repeating_input_name=repeating_input_name,
         kind_labels=KIND_LABELS, origin_labels=ORIGIN_LABELS,
     )
 

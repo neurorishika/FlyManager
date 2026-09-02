@@ -29,6 +29,20 @@
 </div>
 {% endif %}
 
+{% if duplicate_labels %}
+<div class="alert alert-warning" role="alert">
+    <strong>{{ duplicate_labels|length }} sorting label{{ "" if duplicate_labels|length == 1 else "s" }}
+        {{ "is" if duplicate_labels|length == 1 else "are" }} claimed by more than one marker.</strong>
+    Stability is looked up by the label a marker shows up as, so only one of these takes effect
+    and the others are ignored. Give them distinct labels.
+    <ul class="mb-0 pl-3">
+        {% for label, keys in duplicate_labels.items() %}
+        <li>{{ label }}: {{ keys|join(", ") }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
 <div class="app-panel">
     <form method="get" action="{{ url_for('markers.marker_catalog') }}" class="form-inline app-toolbar flex-wrap">
         <label class="mr-2 mb-0" for="markerSearch">Search</label>
