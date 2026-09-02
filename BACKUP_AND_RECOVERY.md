@@ -778,21 +778,26 @@ Paste the recovered values back into the Portainer stack's environment
 variables. Verify a restore end to end at least once — an unverified backup is
 a hypothesis.
 
-### Scheduling it (DSM Task Scheduler)
+### Scheduling: nothing external
 
-DSM has no crontab and the deploy account has no passwordless sudo, so the
-schedule is created through the UI:
+The state backup runs on the app's own APScheduler at 02:15 daily, under the
+same Mongo-backed distributed lock as the flip reminders
+(`maintenance:state-backup`). There is no DSM Task Scheduler entry and no
+crontab: the schedule travels with the stack, so a migration cannot leave it
+behind, and failures land in the app log and the job-history record.
 
-**Control Panel → Task Scheduler → Create → Scheduled Task → User-defined
-script**
+`scripts/nas-state-backup.sh` remains in the repo as a manual and
+emergency path -- it is the way to take a state backup when the app itself
+is down, which is exactly when the in-app schedule cannot help. Run it with
+`RCLONE_REMOTE=gdrive:FlyManagerBackups /volume1/docker/flymanager/scripts/nas-state-backup.sh`.
 
-- General: name `FlyManager state backup`, user `root` (needs to read the
-  Docker socket).
-- Schedule: daily, an hour after the Mongo backup window.
-- Task Settings → Run command:
-  `/volume1/docker/flymanager/scripts/nas-state-backup.sh`
-- Tick "Send run details by email" for failures, so a silent failure is not
-  the way you find out.
+**The Mongo dump deliberately stays in its own container**, on the
+`mongo-backup` loop, rather than moving into the app scheduler. That is a
+separate failure domain: when the app crash-looped on 2026-08-31 the backup
+container kept working throughout. A backup system must not depend on the
+health of the thing it backs up. The container also owns pruning and the
+off-site push for *both* kinds of backup, so the GFS retention rule has
+exactly one implementation.
 
 Retention defaults to 30 days but never prunes below 3 archives, for the same
 reason the Mongo backup does not: retention that can empty the directory turns

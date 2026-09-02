@@ -208,6 +208,22 @@ if [ -n "$RCLONE_REMOTE" ]; then
     echo "Off-site (lab data only): ${RCLONE_REMOTE}/mongo/flymanager_labdata_${TIMESTAMP}.archive.gz"
 fi
 
+# The app writes its daily state backup into $BACKUP_DIR/state on its own
+# scheduler; this loop is what carries it off-site and applies the same GFS
+# retention, so the app never needs rclone and the deletion rule stays in one
+# place.
+STATE_DIR="$BACKUP_DIR/state"
+if [ -d "$STATE_DIR" ]; then
+    gfs_prune_local "$STATE_DIR" 'flymanager_state_*.tar.gz' "$BACKUP_MIN_KEEP"
+    gfs_prune_local "$STATE_DIR" 'flymanager_env_*.env.enc' "$BACKUP_MIN_KEEP"
+    if [ -n "$RCLONE_REMOTE" ]; then
+        rclone copy "$STATE_DIR" "${RCLONE_REMOTE}/state/" --include '*.tar.gz*' --include '*.env.enc*'
+        gfs_prune_remote "${RCLONE_REMOTE}/state" 'flymanager_state_*.tar.gz' "$BACKUP_MIN_KEEP"
+        gfs_prune_remote "${RCLONE_REMOTE}/state" 'flymanager_env_*.env.enc' "$BACKUP_MIN_KEEP"
+        echo "Off-site (state): ${RCLONE_REMOTE}/state/"
+    fi
+fi
+
 if [ -n "$HEALTHCHECK_UUID" ]; then
     curl -fsS -m 10 --retry 3 "https://hc-ping.com/${HEALTHCHECK_UUID}" > /dev/null || true
 fi

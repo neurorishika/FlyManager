@@ -372,6 +372,7 @@ def create_app():
         from flymanager.app.services import bloomington as bloomington_service
         from flymanager.app.services import email as email_service
         from flymanager.app.services import flybase as flybase_service
+        from flymanager.app.services import state_backup as state_backup_service
         from flymanager.app.services import scanner as scanner_service
         from flymanager.app.services import scheduler as scheduler_service
 
@@ -435,6 +436,37 @@ def create_app():
                 day=1,
                 hour=2,
                 minute=0,
+                args=[app],
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+            # Daily state backup (02:15, after the nightly quiet period).
+            #
+            # This is the half of the backup story mongodump does not cover:
+            # the files on disk and the process environment, which is the only
+            # place SECRET_KEY and the SMTP/admin credentials exist. It lives
+            # here rather than in a DSM Task Scheduler entry so the schedule
+            # travels with the stack instead of sitting outside it, invisible
+            # to the compose file and easy to lose in a migration.
+            #
+            # The MONGO dump deliberately does NOT move here. It runs in the
+            # mongo-backup container on its own loop, in a separate failure
+            # domain: when the app crash-looped on 2026-08-31 that container
+            # kept taking backups throughout. A backup system must not depend
+            # on the health of the thing it is backing up.
+            scheduler.add_job(
+                id="daily_state_backup_job",
+                func=functools.partial(
+                    run_locked_scheduled_job,
+                    key="maintenance:state-backup",
+                    label="Daily state backup",
+                    ttl_seconds=1800,
+                    func=state_backup_service.run_state_backup,
+                ),
+                trigger="cron",
+                hour=2,
+                minute=15,
                 args=[app],
                 replace_existing=True,
                 max_instances=1,
