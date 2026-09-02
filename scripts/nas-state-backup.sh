@@ -36,6 +36,12 @@ KEEP_DAYS=${STATE_BACKUP_KEEP_DAYS:-30}
 # backup script for the same guard and the same reason.
 MIN_KEEP=${STATE_BACKUP_MIN_KEEP:-3}
 RCLONE_REMOTE=${RCLONE_REMOTE:-}
+# Explicit, because DSM Task Scheduler runs this as root and root has no
+# rclone config of its own -- the one created by `rclone config` lives under
+# the interactive user's home. Without this the off-site push silently finds
+# no remote.
+RCLONE_CONFIG=${RCLONE_CONFIG:-$ROOT/scripts/rclone.conf}
+export RCLONE_CONFIG
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 
 if [ "${1:-}" = "--dry-run" ]; then
@@ -166,7 +172,11 @@ tar czf "$TMP_STATE" -C "$ROOT" \
     $( [ -f "$ROOT/data/bloomington.csv" ] && echo data/bloomington.csv )
 mv "$TMP_STATE" "$STATE_ARCHIVE"
 trap - INT TERM EXIT
-sha256sum "$STATE_ARCHIVE" > "${STATE_ARCHIVE}.sha256"
+# Checksummed by BARE FILENAME, not by path: sha256sum records whatever
+# argument it was given, so an absolute path makes the .sha256 verifiable
+# only on a machine where that exact path exists -- never after pulling
+# the pair down from off-site, which is the one time it matters most.
+( cd "$BACKUP_DIR" && sha256sum "$(basename "$STATE_ARCHIVE")" > "$(basename "$STATE_ARCHIVE").sha256" )
 echo "State archive: $STATE_ARCHIVE"
 
 # --- environment -----------------------------------------------------------
@@ -176,7 +186,7 @@ ENV_ARCHIVE="$BACKUP_DIR/flymanager_env_${STAMP}.env.enc"
 "$DOCKER" inspect "$APP_CONTAINER" --format '{{range .Config.Env}}{{println .}}{{end}}' \
     | openssl smime -encrypt -binary -aes-256-cbc -outform DEM -out "$ENV_ARCHIVE" "$PUBLIC_KEY"
 chmod 600 "$ENV_ARCHIVE"
-sha256sum "$ENV_ARCHIVE" > "${ENV_ARCHIVE}.sha256"
+( cd "$BACKUP_DIR" && sha256sum "$(basename "$ENV_ARCHIVE")" > "$(basename "$ENV_ARCHIVE").sha256" )
 echo "Environment archive (encrypted): $ENV_ARCHIVE"
 
 # --- retention -------------------------------------------------------------

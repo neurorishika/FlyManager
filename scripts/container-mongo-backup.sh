@@ -161,7 +161,11 @@ mongodump \
 mv "$TMP_ARCHIVE" "$ARCHIVE"
 trap - INT TERM EXIT
 
-sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
+# Checksummed by BARE FILENAME, not by path: sha256sum records whatever
+# argument it was given, so an absolute path makes the .sha256 verifiable
+# only on a machine where that exact path exists -- never after pulling
+# the pair down from off-site, which is the one time it matters most.
+( cd "$BACKUP_DIR" && sha256sum "$(basename "$ARCHIVE")" > "$(basename "$ARCHIVE").sha256" )
 
 # Retention only ever runs after a dump that just succeeded, and never deletes
 # the last archives standing. Backups failing silently -- disk full, auth
@@ -170,12 +174,18 @@ sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
 gfs_prune_local "$BACKUP_DIR" 'flymanager_mongodb_*.archive.gz' "$BACKUP_MIN_KEEP"
 
 if [ -n "$RCLONE_REMOTE" ]; then
-    SLIM="$BACKUP_DIR/flymanager_labdata_${STAMP}.archive.gz"
+    SLIM="$BACKUP_DIR/flymanager_labdata_${TIMESTAMP}.archive.gz"
     TMP_SLIM="${SLIM}.tmp"
     trap 'rm -f "$TMP_SLIM"' INT TERM EXIT
+    # --db is mandatory alongside --excludeCollection, and --oplog is not
+    # allowed with --db, so the slim archive is a single-database dump without
+    # an oplog. That is acceptable here and only here: the full archive on the
+    # NAS keeps the oplog for consistent local restores, and the off-site copy
+    # is the disaster case, where a few seconds of skew matters far less than
+    # having any copy at all.
     mongodump \
         --host "${MONGO_HOST}:${MONGO_PORT}" \
-        --oplog \
+        --db="${MONGO_DB_NAME:-flymanager}" \
         --archive="$TMP_SLIM" \
         --gzip \
         --excludeCollection=flybase_phenotypes \
@@ -186,7 +196,7 @@ if [ -n "$RCLONE_REMOTE" ]; then
         --excludeCollection=genes4th
     mv "$TMP_SLIM" "$SLIM"
     trap - INT TERM EXIT
-    sha256sum "$SLIM" > "${SLIM}.sha256"
+    ( cd "$BACKUP_DIR" && sha256sum "$(basename "$SLIM")" > "$(basename "$SLIM").sha256" )
 
     rclone copy "$SLIM" "${RCLONE_REMOTE}/mongo/"
     rclone copy "${SLIM}.sha256" "${RCLONE_REMOTE}/mongo/"
@@ -195,7 +205,7 @@ if [ -n "$RCLONE_REMOTE" ]; then
     # The slim copy exists to be uploaded; keeping it would just be a second
     # local retention problem, so it goes once it is off the machine.
     rm -f "$SLIM" "${SLIM}.sha256"
-    echo "Off-site (lab data only): ${RCLONE_REMOTE}/mongo/flymanager_labdata_${STAMP}.archive.gz"
+    echo "Off-site (lab data only): ${RCLONE_REMOTE}/mongo/flymanager_labdata_${TIMESTAMP}.archive.gz"
 fi
 
 if [ -n "$HEALTHCHECK_UUID" ]; then
