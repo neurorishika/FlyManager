@@ -22,6 +22,7 @@
     {% endif %}
 
     <form method="POST" action="{{ url_for('stock.add_stock') }}" class="app-form-shell" id="addStockForm">
+        <input type="hidden" name="submissionKey" value="{{ submission_key }}">
         <div class="app-form-section">
             <div>
                 <h2 class="app-form-section-title">Source</h2>

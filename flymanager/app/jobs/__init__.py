@@ -11,7 +11,7 @@ import redis
 from rq import Queue
 
 from flymanager.utils.mongo.operation_locks import (
-    DEFAULT_JOB_HISTORY_TTL_SECONDS, start_background_job)
+    DEFAULT_JOB_HISTORY_TTL_SECONDS, mark_job_failed, start_background_job)
 
 DEFAULT_QUEUE_NAME = "default"
 DEFAULT_JOB_TIMEOUT_SECONDS = 60 * 60 * 2  # 2 hours; individual jobs can override
@@ -25,7 +25,16 @@ def get_redis_connection():
     global _redis_connection
     if _redis_connection is None:
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-        _redis_connection = redis.from_url(redis_url)
+        # A committed form mutation must not inherit Redis' multi-second
+        # default socket waits.  Cache dispatch is best-effort and records a
+        # visible failed state when the queue is unavailable.
+        _redis_connection = redis.from_url(
+            redis_url,
+            socket_connect_timeout=float(
+                os.getenv("RQ_REDIS_CONNECT_TIMEOUT_SECONDS", "1")
+            ),
+            socket_timeout=float(os.getenv("RQ_REDIS_SOCKET_TIMEOUT_SECONDS", "1")),
+        )
     return _redis_connection
 
 
@@ -88,13 +97,19 @@ def enqueue_job(
         metadata=metadata,
         conflict_message=conflict_message,
     )
-    get_queue().enqueue(
-        func,
-        *args,
-        kwargs=kwargs or {},
-        job_id=job_key,
-        job_timeout=job_timeout,
-        result_ttl=0,
-        failure_ttl=3600,
-    )
+    try:
+        get_queue().enqueue(
+            func,
+            *args,
+            kwargs=kwargs or {},
+            job_id=job_key,
+            job_timeout=job_timeout,
+            result_ttl=0,
+            failure_ttl=3600,
+        )
+    except Exception as exc:
+        # Do not leave a phantom queued status when Redis is unavailable;
+        # callers can immediately retry this deterministic job key.
+        mark_job_failed(db, job_key, error=f"Queue enqueue failed: {exc}")
+        raise
     return job_key

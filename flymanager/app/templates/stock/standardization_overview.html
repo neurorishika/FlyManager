@@ -74,7 +74,10 @@
                         <p class="standardization-genotype">{{ row.genotype or 'Unavailable' }}</p>
                     </td>
                     <td>
-                        {% if row.issueCount %}
+                        {% if row.cachePending %}
+                        <span class="standardization-status-pill">Processing</span>
+                        <p class="standardization-meta-copy">Derived review cache is generating in the background.</p>
+                        {% elif row.issueCount %}
                         <span class="standardization-status-pill is-needs-review">Needs Review</span>
                         <p class="standardization-meta-copy">{{ row.issueCount }} issue{% if row.issueCount != 1 %}s{% endif %}</p>
                         {% else %}

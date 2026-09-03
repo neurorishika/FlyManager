@@ -17,11 +17,7 @@ def test_edit_stock_propagates_genotype_change_to_dependent_crosses():
     db = FakeDatabase({"stocks": [_stock("SID1")]})
 
     with patch(
-        "flymanager.utils.mongo.stocks.build_stock_phenotype_cache",
-        return_value={"phenotype": "new"},
-    ), patch(
-        "flymanager.utils.mongo.stocks.build_stock_standardization_cache",
-        return_value={"standardization": "new"},
+        "flymanager.utils.mongo.stocks.schedule_record_cache_generation",
     ), patch(
         "flymanager.utils.mongo.crosses.propagate_stock_genotype_to_crosses",
         return_value={"crosses_updated": 2, "errors": 0},
@@ -48,11 +44,7 @@ def test_edit_stock_does_not_propagate_when_write_fails():
     db = FakeDatabase({"stocks": [_stock("SID1")]})
 
     with patch(
-        "flymanager.utils.mongo.stocks.build_stock_phenotype_cache",
-        return_value={"phenotype": "new"},
-    ), patch(
-        "flymanager.utils.mongo.stocks.build_stock_standardization_cache",
-        return_value={"standardization": "new"},
+        "flymanager.utils.mongo.stocks.schedule_record_cache_generation",
     ), patch(
         "flymanager.utils.mongo.crosses.propagate_stock_genotype_to_crosses",
     ) as propagate:
@@ -66,11 +58,7 @@ def test_edit_stock_logs_warning_when_propagation_reports_errors(caplog):
     db = FakeDatabase({"stocks": [_stock("SID1")]})
 
     with patch(
-        "flymanager.utils.mongo.stocks.build_stock_phenotype_cache",
-        return_value={"phenotype": "new"},
-    ), patch(
-        "flymanager.utils.mongo.stocks.build_stock_standardization_cache",
-        return_value={"standardization": "new"},
+        "flymanager.utils.mongo.stocks.schedule_record_cache_generation",
     ), patch(
         "flymanager.utils.mongo.crosses.propagate_stock_genotype_to_crosses",
         return_value={"crosses_updated": 1, "errors": 2},
@@ -90,11 +78,7 @@ def test_edit_stock_does_not_log_when_propagation_reports_no_errors(caplog):
     db = FakeDatabase({"stocks": [_stock("SID1")]})
 
     with patch(
-        "flymanager.utils.mongo.stocks.build_stock_phenotype_cache",
-        return_value={"phenotype": "new"},
-    ), patch(
-        "flymanager.utils.mongo.stocks.build_stock_standardization_cache",
-        return_value={"standardization": "new"},
+        "flymanager.utils.mongo.stocks.schedule_record_cache_generation",
     ), patch(
         "flymanager.utils.mongo.crosses.propagate_stock_genotype_to_crosses",
         return_value={"crosses_updated": 3, "errors": 0},

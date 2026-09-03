@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import traceback
 from datetime import datetime
 from urllib.parse import unquote
@@ -21,8 +22,11 @@ from flymanager.app.routes.explorer_utils import (
 from flymanager.app.security import (csrf, get_json_payload, limiter,
                                      normalize_optional_text, parse_int_value,
                                      require_confirmation)
-from flymanager.app.services.stock_standardization import \
-    review_stock_standardization
+from flymanager.app.services.stock_standardization import (
+    get_cached_stock_standardization, review_stock_standardization)
+from flymanager.utils.cache_generation import (
+    pending_cache_generation, schedule_record_cache_generation,
+    stock_cache_signature)
 from flymanager.app.settings import DEFAULT_STOCK_PROPERTY_VALUES
 from flymanager.utils.genetics import qc_genotype
 from flymanager.utils.mongo import (OperationLockConflict, add_metadata,
@@ -40,9 +44,8 @@ from flymanager.utils.phenotypes.image_library import \
     select_prediction_reference_images
 from flymanager.utils.phenotypes.flybase_pipeline import \
     compute_flybase_pipeline_signature
-from flymanager.utils.phenotypes.predictor import (
-    build_stock_phenotype_cache, get_cached_stock_phenotype,
-    predict_individual_phenotype)
+from flymanager.utils.phenotypes.predictor import (get_cached_stock_phenotype,
+                                                   predict_individual_phenotype)
 from flymanager.utils.stock_sources import (
     EXTERNAL_SOURCE_OPTIONS, build_stock_provider_metadata_from_context,
     enrich_stock_source_context, find_external_stock_matches,
@@ -111,10 +114,18 @@ def _get_stock_phenotype_for_view(stock):
             "is_cached": True,
         }
 
+    generation = stock.get("CacheGeneration") or {}
+    cache_state = generation.get("state", "missing")
+    is_pending = cache_state == "pending"
     return {
-        "best_guess_summary": "Phenotype cache not generated",
-        "best_guess_basis": "cache_missing",
-        "female_summary": "Refresh the cache from this record to generate a phenotype preview.",
+        "best_guess_summary": (
+            "Phenotype is processing" if is_pending else "Phenotype cache not generated"
+        ),
+        "best_guess_basis": "cache_pending" if is_pending else "cache_missing",
+        "female_summary": (
+            "Cache generation is running in the background; reload shortly."
+            if is_pending else "Refresh the cache from this record to generate a phenotype preview."
+        ),
         "male_summary": None,
         "female_construct_annotation_labels": [],
         "male_construct_annotation_labels": [],
@@ -136,11 +147,13 @@ def _get_stock_phenotype_for_view(stock):
         "stage_specific_effects": [],
         "epistasis_events": [],
         "warnings": [
-            "The stored phenotype cache is missing or stale for this genotype.",
+            ("Phenotype cache generation is processing in the background."
+             if is_pending else "The stored phenotype cache is missing or stale for this genotype."),
         ],
         "confidence_label": "low",
         "cached_at": "",
         "is_cached": False,
+        "cache_state": cache_state,
     }
 
 
@@ -198,17 +211,9 @@ def _stock_sort_key(stock):
 
 
 def _build_stock_standardization_overview_row(stock):
-    review = review_stock_standardization(stock.get("Genotype", ""), candidate_limit=0)
-    issues = list(review.get("issues") or [])
-    top_tokens = [issue.get("token", "") for issue in issues[:4] if issue.get("token")]
-    recommended_replacements = [
-        {
-            "from": issue.get("token", ""),
-            "to": issue.get("recommended_replacement", ""),
-        }
-        for issue in issues
-        if issue.get("token") and issue.get("recommended_replacement")
-    ]
+    cache = get_cached_stock_standardization(stock, strict=False)
+    summary = cache.get("summary", {}) if cache else {}
+    cache_pending = (stock.get("CacheGeneration") or {}).get("state") == "pending"
 
     return {
         "uniqueID": str(stock.get("UniqueID", "")),
@@ -219,11 +224,12 @@ def _build_stock_standardization_overview_row(stock):
         "assignmentScopeLabel": str(stock.get("AssignmentScopeLabel", "Maintain")),
         "assignmentScopeDetail": str(stock.get("AssignmentScopeDetail", "Owned by you")),
         "reviewable": bool(stock.get("ViewerCanEdit")),
-        "issueCount": int(review.get("issue_count") or 0),
-        "unresolvedCount": int((review.get("summary") or {}).get("unresolved_token", 0)),
-        "unmodeledCount": int((review.get("summary") or {}).get("standard_format_unmodeled", 0)),
-        "topTokens": top_tokens,
-        "recommendedReplacements": recommended_replacements[:3],
+        "issueCount": int(summary.get("issueCount") or 0),
+        "unresolvedCount": int(summary.get("unresolvedCount") or 0),
+        "unmodeledCount": int(summary.get("unmodeledCount") or 0),
+        "topTokens": list(summary.get("topTokens") or []),
+        "recommendedReplacements": list(summary.get("recommendedReplacements") or [])[:3],
+        "cachePending": cache_pending,
     }
 
 
@@ -599,24 +605,20 @@ def refresh_stock_phenotype(unique_id):
         return redirect(url_for("stock.stock_explorer"))
 
     owner_username = stock.get("User", "")
-    try:
-        with hold_operation_lock(
-            db,
-            key=f"record:phenotype-refresh:stock:{unique_id}",
-            actor=username,
-            label=f"Stock phenotype refresh {unique_id}",
-            ttl_seconds=300,
-            metadata={"route": "refresh_stock_phenotype", "uid": unique_id},
-            conflict_message=f"A phenotype refresh for stock {unique_id} is already running. Please wait for it to finish.",
-        ):
-            phenotype_cache = build_stock_phenotype_cache(stock.get("Genotype", ""))
-            db["stocks"].update_one(
-                {"UniqueID": unique_id, "User": owner_username},
-                {"$set": {"PhenotypeCache": phenotype_cache}},
-            )
-            write_activity(username, f"Refreshed phenotype cache for stock {unique_id}", db)
-    except OperationLockConflict as exc:
-        flash(str(exc), "warning")
+    signature = stock_cache_signature(stock.get("Genotype", ""))
+    db["stocks"].update_one(
+        {"UniqueID": unique_id, "User": owner_username},
+        {"$set": {
+            "PhenotypeCache": None,
+            "StandardizationCache": None,
+            "CacheGeneration": pending_cache_generation("stock", unique_id, signature),
+        }},
+    )
+    schedule_record_cache_generation(
+        db, actor=owner_username, record_type="stock", unique_id=unique_id,
+        input_signature=signature,
+    )
+    write_activity(username, f"Queued phenotype cache refresh for stock {unique_id}", db)
     return redirect(url_for("stock.view_stock", unique_id=unique_id))
 
 
@@ -957,6 +959,7 @@ def _build_stock_selection_item(stock):
 @login_required
 def add_stock(source_stock_id=None):
     username = session.get("username")
+    submission_key = secrets.token_urlsafe(24)
     error_message = None
     stock_data = {
         "sourceType": DEFAULT_STOCK_PROPERTY_VALUES["StockSource"],
@@ -1072,6 +1075,7 @@ def add_stock(source_stock_id=None):
 
     if request.method == "POST":
         try:
+            submission_key = str(request.form.get("submissionKey") or submission_key).strip()
             require_confirmation(
                 request.form.get("creationConfirmation"),
                 action_name="stock creation",
@@ -1173,7 +1177,9 @@ def add_stock(source_stock_id=None):
             }
 
             # --- Add to Database ---
-            success, uid_or_message = add_to_stock(username, new_stock_data, db)
+            success, uid_or_message = add_to_stock(
+                username, new_stock_data, db, submission_key=submission_key,
+            )
 
             if success:
                 print(f"Stock {uid_or_message} added successfully for {username}.")
@@ -1226,6 +1232,7 @@ def add_stock(source_stock_id=None):
         species_list=species_list,
         stock_data=stock_data,  # Pre-fill data
         external_source_options=EXTERNAL_SOURCE_OPTIONS,
+        submission_key=submission_key,
         error=error_message,
     )
 
@@ -1661,6 +1668,15 @@ def review_stock_standardization_route(unique_id):
         stock = get_accessible_stock(username, unique_id, db)
         if not stock:
             return jsonify({"error": "Stock not found."}), 404
+
+        cache = get_cached_stock_standardization(stock, strict=False)
+        if cache is None:
+            state = (stock.get("CacheGeneration") or {}).get("state", "missing")
+            return jsonify({
+                "processing": state == "pending",
+                "error": (stock.get("CacheGeneration") or {}).get("error"),
+                "message": "Standardization cache is processing; reload shortly.",
+            }), 202 if state == "pending" else 409
 
         token_search_overrides = {}
         if requested_token and requested_query:

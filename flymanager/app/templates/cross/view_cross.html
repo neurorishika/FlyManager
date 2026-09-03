@@ -35,7 +35,7 @@
     </div>
 
     <div class="app-button-row mb-3 align-items-center">
-        <span class="app-inline-note mb-0">{% if phenotype_cache_meta.is_cached %}Phenotype cache refreshed {{ phenotype_cache_meta.cached_at }}{% else %}Phenotype cache missing or stale{% endif %}</span>
+        <span class="app-inline-note mb-0">{% if phenotype_cache_meta.is_cached %}Phenotype cache refreshed {{ phenotype_cache_meta.cached_at }}{% elif phenotype_cache_meta.cache_state == 'pending' %}Phenotype cache processing{% else %}Phenotype cache missing or stale{% endif %}</span>
         <form method="POST" action="{{ url_for('cross.refresh_cross_phenotype', unique_id=cross_data.uniqueID) }}" class="mb-0" data-progress-form data-progress-message="Refreshing this cross phenotype cache..." data-progress-duplicate-message="This cross phenotype refresh is already in progress." data-progress-label="Refreshing...">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-outline-secondary btn-sm">Refresh Cache</button>

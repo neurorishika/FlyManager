@@ -16,9 +16,12 @@ from flymanager.utils.mongo_records import (apply_updates_to_owned_document,
                                             get_owned_document,
                                             prune_vial_schedule,
                                             require_fields)
-from flymanager.utils.phenotypes.predictor import build_stock_phenotype_cache
+from flymanager.utils.cache_generation import (
+    pending_cache_generation, schedule_record_cache_generation,
+    stock_cache_signature)
 
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +35,7 @@ def build_stock_standardization_cache(genotype):
     return _build(genotype)
 
 
-def add_to_stock(user, properties, db):
+def add_to_stock(user, properties, db, submission_key=None):
     """
     Add a stock to the user's stock collection in MongoDB.
 
@@ -61,6 +64,28 @@ def add_to_stock(user, properties, db):
     if not qc:
         return False, genotype
 
+    # A browser can lose the redirect after the insert commits.  Reusing the
+    # per-form submission key returns that committed stock instead of creating
+    # a second record on retry.
+    submission_key = str(submission_key or "").strip()
+    if submission_key:
+        existing = db["stocks"].find_one({
+            "User": user,
+        })
+        if existing:
+            generation = existing.get("CacheGeneration") or {}
+            if generation.get("state") != "ready":
+                schedule_record_cache_generation(
+                    db,
+                    actor=user,
+                    record_type="stock",
+                    unique_id=existing["UniqueID"],
+                    input_signature=generation.get("inputSignature") or stock_cache_signature(
+                        existing.get("Genotype", ""),
+                    ),
+                )
+            return True, existing["UniqueID"]
+
     # create UniqueID as a hash of the (User + Genotype + SeriesID + ReplicateID)
     uid = generate_unique_id(
         [
@@ -76,6 +101,7 @@ def add_to_stock(user, properties, db):
     # get creation timestamp
     timestamp = current_timestamp()
 
+    input_signature = stock_cache_signature(genotype)
     stock_document = build_owned_document(
         user=user,
         uid=uid,
@@ -84,8 +110,13 @@ def add_to_stock(user, properties, db):
         optional_properties=OPTIONAL_STOCK_PROPERTIES,
         base_document={
             "Genotype": genotype,
-            "PhenotypeCache": build_stock_phenotype_cache(genotype),
-            "StandardizationCache": build_stock_standardization_cache(genotype),
+            # Do not build these inside a user request.  The RQ worker fills
+            # them after this minimal, durable record has committed.
+            "PhenotypeCache": None,
+            "StandardizationCache": None,
+            "CacheGeneration": pending_cache_generation(
+                "stock", uid, input_signature,
+            ),
             "Name": properties["Name"],
             "TrayID": "",
             "TrayPosition": "",
@@ -96,10 +127,39 @@ def add_to_stock(user, properties, db):
             "ModificationLog": f"{timestamp} : Stock created",
         },
     )
+    if submission_key:
+        stock_document["SubmissionKey"] = submission_key
 
     # insert the document into the MongoDB collection
     stocks_collection = db["stocks"]
-    stocks_collection.insert_one(stock_document)
+    insert_started_at = time.perf_counter()
+    try:
+        stocks_collection.insert_one(stock_document)
+    except Exception as exc:
+        # The unique sparse index turns two simultaneous retries of the same
+        # form into one committed stock.  Avoid importing pymongo's exception
+        # class here so in-memory test databases remain lightweight.
+        if submission_key and exc.__class__.__name__ == "DuplicateKeyError":
+            existing = stocks_collection.find_one({
+                "User": user,
+                "SubmissionKey": submission_key,
+            })
+            if existing:
+                return True, existing["UniqueID"]
+        raise
+
+    logger.info(
+        "Stock persisted uid=%s mongo_insert_ms=%.1f cache_state=pending",
+        uid, (time.perf_counter() - insert_started_at) * 1000,
+    )
+
+    schedule_record_cache_generation(
+        db,
+        actor=user,
+        record_type="stock",
+        unique_id=uid,
+        input_signature=input_signature,
+    )
 
     return True, uid
 
@@ -205,11 +265,11 @@ def edit_stock(user, uid, db, updates, log_activity=True, refresh_vials=True):
 
     prepared_updates = dict(updates)
     if "Genotype" in prepared_updates:
-        prepared_updates["PhenotypeCache"] = build_stock_phenotype_cache(
-            prepared_updates["Genotype"]
-        )
-        prepared_updates["StandardizationCache"] = build_stock_standardization_cache(
-            prepared_updates["Genotype"]
+        input_signature = stock_cache_signature(prepared_updates["Genotype"])
+        prepared_updates["PhenotypeCache"] = None
+        prepared_updates["StandardizationCache"] = None
+        prepared_updates["CacheGeneration"] = pending_cache_generation(
+            "stock", uid, input_signature,
         )
 
     success, current_stock = apply_updates_to_owned_document(
@@ -222,6 +282,13 @@ def edit_stock(user, uid, db, updates, log_activity=True, refresh_vials=True):
     )
 
     if success and "Genotype" in prepared_updates:
+        schedule_record_cache_generation(
+            db,
+            actor=user,
+            record_type="stock",
+            unique_id=uid,
+            input_signature=input_signature,
+        )
         from flymanager.utils.mongo.crosses import \
             propagate_stock_genotype_to_crosses
         summary = propagate_stock_genotype_to_crosses(

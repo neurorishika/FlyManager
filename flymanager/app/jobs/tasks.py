@@ -8,12 +8,13 @@ business logic is unchanged from what used to live inline in the route.
 """
 import logging
 import os
+import time
 from datetime import datetime
 
 from flymanager.app.jobs import get_worker_app
-from flymanager.utils.mongo import (mark_job_failed, mark_job_running,
-                                    mark_job_succeeded, update_job_progress,
-                                    write_activity)
+from flymanager.utils.mongo import (get_job_status, mark_job_failed,
+                                    mark_job_running, mark_job_succeeded,
+                                    update_job_progress, write_activity)
 
 EXPORT_SUBDIR = os.path.join("data", "job_exports")
 
@@ -26,18 +27,26 @@ def _run(key, work):
         from flymanager.utils.phenotypes.image_catalog import refresh_image_catalog
         from flymanager.utils.phenotypes.marker_catalog import refresh_catalog
 
-        # The worker has no before_request hook, so its marker catalog would
-        # otherwise stay at whatever create_app compiled -- shipped-only, with
-        # no overlay. Any task that writes a materialized cache must not run
-        # against a stale marker set.
-        try:
-            refresh_catalog(db)
-            refresh_image_catalog(db)
-        except Exception:
-            app.logger.exception("Unable to refresh the marker catalog before job %s", key)
-
+        queued_record = get_job_status(db, key) or {}
+        queued_at = queued_record.get("created_at")
+        queue_delay_ms = None
+        if isinstance(queued_at, datetime):
+            queue_delay_ms = max(
+                0.0,
+                (datetime.now(queued_at.tzinfo) - queued_at).total_seconds() * 1000,
+            )
+        started_at = time.perf_counter()
         mark_job_running(db, key)
         try:
+            # The worker has no before_request hook, so its marker catalog
+            # would otherwise stay at whatever create_app compiled --
+            # shipped-only, with no overlay.  Keep this inside the measured
+            # job duration: it is real queue work and can be costly cold.
+            try:
+                refresh_catalog(db)
+                refresh_image_catalog(db)
+            except Exception:
+                app.logger.exception("Unable to refresh the marker catalog before job %s", key)
             result = work(app, db)
         except Exception as exc:
             app.logger.exception("Background job %s failed", key)
@@ -45,6 +54,12 @@ def _run(key, work):
             raise
         else:
             mark_job_succeeded(db, key, result=result)
+            logging.getLogger(__name__).info(
+                "Background job completed key=%s queue_delay_ms=%s duration_ms=%.1f",
+                key,
+                f"{queue_delay_ms:.1f}" if queue_delay_ms is not None else "unknown",
+                (time.perf_counter() - started_at) * 1000,
+            )
 
 
 def _throttled_progress(db, key, *, every=25):
@@ -263,6 +278,39 @@ def task_update_flybase_gene_metadata(key, username):
 
         flybase_service.manual_update_flybase_gene_metadata_only(app)
         return {"message": "FlyBase gene metadata update completed successfully."}
+
+    _run(key, work)
+
+
+def task_materialize_record_caches(key, record_type, unique_id, username, input_signature):
+    """Build one record's derived caches outside the web request lifecycle."""
+    def work(app, db):
+        from flymanager.utils.cache_generation import (
+            fail_record_cache_generation, materialize_record_caches)
+
+        # A process-local warm flag makes cold worker loads visible in job
+        # logs without reading or parsing the FlyBase data a second time.
+        from flymanager.utils.phenotypes import flybase_pipeline
+        flybase_cache_warm = bool(flybase_pipeline._IN_MEMORY_CACHE)
+        try:
+            result = materialize_record_caches(
+                db,
+                record_type=record_type,
+                unique_id=unique_id,
+                actor=username,
+                input_signature=input_signature,
+            )
+        except Exception as exc:
+            fail_record_cache_generation(
+                db,
+                record_type=record_type,
+                unique_id=unique_id,
+                actor=username,
+                input_signature=input_signature,
+                error=exc,
+            )
+            raise
+        return {**result, "flybaseCacheWarmAtStart": flybase_cache_warm}
 
     _run(key, work)
 

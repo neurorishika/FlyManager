@@ -313,7 +313,7 @@
                 <p class="app-form-section-copy">Cached best-guess visible phenotype derived from the current marker model. Refresh it manually here or let it update automatically when the genotype changes.</p>
             </div>
             <div class="app-toolbar">
-                <span class="stock-phenotype-pill">{% if stock_phenotype.is_cached %}Cached {{ stock_phenotype.cached_at }}{% else %}Cache missing{% endif %}</span>
+                <span class="stock-phenotype-pill">{% if stock_phenotype.is_cached %}Cached {{ stock_phenotype.cached_at }}{% elif stock_phenotype.cache_state == 'pending' %}Processing{% else %}Cache missing{% endif %}</span>
                 <button type="submit" form="refreshStockPhenotypeForm" class="btn btn-outline-secondary btn-sm">Refresh Cache</button>
             </div>
             <div class="app-detail-grid">
@@ -854,6 +854,11 @@ document.addEventListener("DOMContentLoaded", function() {
     function renderStandardizationReview(review) {
         standardizationReviewPanel.innerHTML = '';
         standardizationReviewPanel.classList.remove('is-hidden');
+
+        if (review.processing) {
+            renderStandardizationError(review.message || 'Standardization cache is processing; reload shortly.');
+            return;
+        }
 
         const summary = document.createElement('div');
         summary.className = 'stock-review-summary';

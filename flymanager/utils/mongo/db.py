@@ -52,6 +52,12 @@ def ensure_mongo_indexes(db):
     """Create the indexes used by stock/cross access, tray, and auth query patterns."""
     db["stocks"].create_index([("User", 1), ("UniqueID", 1)], name="stocks_user_uid")
     db["stocks"].create_index([("AssignedTo", 1), ("UniqueID", 1)], name="stocks_assigned_uid")
+    db["stocks"].create_index(
+        [("User", 1), ("SubmissionKey", 1)],
+        unique=True,
+        sparse=True,
+        name="stocks_user_submission_key",
+    )
     db["stocks"].create_index([("User", 1), ("Status", 1), ("TrayID", 1)], name="stocks_user_status_tray")
     db["stocks"].create_index([("AssignedTo", 1), ("Status", 1), ("TrayID", 1)], name="stocks_assigned_status_tray")
 

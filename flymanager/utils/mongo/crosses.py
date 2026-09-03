@@ -16,7 +16,9 @@ from flymanager.utils.mongo_records import (apply_updates_to_owned_document,
                                             get_owned_document,
                                             prune_vial_schedule,
                                             require_fields)
-from flymanager.utils.phenotypes.predictor import build_cross_phenotype_cache
+from flymanager.utils.cache_generation import (
+    cross_cache_signature, pending_cache_generation,
+    schedule_record_cache_generation)
 
 
 def build_cross_standardization_cache(male_genotype, female_genotype):
@@ -68,6 +70,7 @@ def add_to_cross(user, properties, db):
     if not qc:
         return False, female_genotype
 
+    input_signature = cross_cache_signature(male_genotype, female_genotype)
     cross_document = build_owned_document(
         user=user,
         uid=uid,
@@ -79,13 +82,10 @@ def add_to_cross(user, properties, db):
             "FemaleUniqueID": properties["FemaleUniqueID"],
             "MaleGenotype": male_genotype,
             "FemaleGenotype": female_genotype,
-            "PhenotypeCache": build_cross_phenotype_cache(
-                male_genotype,
-                female_genotype,
-            ),
-            "StandardizationCache": build_cross_standardization_cache(
-                male_genotype,
-                female_genotype,
+            "PhenotypeCache": None,
+            "StandardizationCache": None,
+            "CacheGeneration": pending_cache_generation(
+                "cross", uid, input_signature,
             ),
             "Name": properties["Name"],
             "TrayID": "",
@@ -101,6 +101,13 @@ def add_to_cross(user, properties, db):
     # Insert the document into the MongoDB collection
     crosses_collection = db["crosses"]
     crosses_collection.insert_one(cross_document)
+    schedule_record_cache_generation(
+        db,
+        actor=user,
+        record_type="cross",
+        unique_id=uid,
+        input_signature=input_signature,
+    )
 
     return True, uid
 
@@ -216,13 +223,11 @@ def edit_cross(user, uid, db, updates, log_activity=True, refresh_vials=True):
             "FemaleGenotype",
             current_cross.get("FemaleGenotype", ""),
         )
-        prepared_updates["PhenotypeCache"] = build_cross_phenotype_cache(
-            male_genotype,
-            female_genotype,
-        )
-        prepared_updates["StandardizationCache"] = build_cross_standardization_cache(
-            male_genotype,
-            female_genotype,
+        input_signature = cross_cache_signature(male_genotype, female_genotype)
+        prepared_updates["PhenotypeCache"] = None
+        prepared_updates["StandardizationCache"] = None
+        prepared_updates["CacheGeneration"] = pending_cache_generation(
+            "cross", uid, input_signature,
         )
 
     success, current_cross = apply_updates_to_owned_document(
@@ -236,6 +241,15 @@ def edit_cross(user, uid, db, updates, log_activity=True, refresh_vials=True):
 
     if success and refresh_vials and current_cross:
         update_cross_vials(current_cross, user, db)
+
+    if success and ("MaleGenotype" in prepared_updates or "FemaleGenotype" in prepared_updates):
+        schedule_record_cache_generation(
+            db,
+            actor=user,
+            record_type="cross",
+            unique_id=uid,
+            input_signature=input_signature,
+        )
 
     return success
 
@@ -273,14 +287,25 @@ def propagate_stock_genotype_to_crosses(user, stock_unique_id, new_genotype, db)
             if is_female_parent:
                 updates["FemaleGenotype"] = female_genotype
 
-            updates["PhenotypeCache"] = build_cross_phenotype_cache(male_genotype, female_genotype)
-            updates["StandardizationCache"] = build_cross_standardization_cache(male_genotype, female_genotype)
+            input_signature = cross_cache_signature(male_genotype, female_genotype)
+            updates["PhenotypeCache"] = None
+            updates["StandardizationCache"] = None
+            updates["CacheGeneration"] = pending_cache_generation(
+                "cross", cross["UniqueID"], input_signature,
+            )
 
             success, _ = apply_updates_to_owned_document(
                 "crosses", user, cross["UniqueID"], db, updates, log_activity=True,
             )
             if success:
                 summary["crosses_updated"] += 1
+                schedule_record_cache_generation(
+                    db,
+                    actor=user,
+                    record_type="cross",
+                    unique_id=cross["UniqueID"],
+                    input_signature=input_signature,
+                )
         except Exception:
             summary["errors"] += 1
 

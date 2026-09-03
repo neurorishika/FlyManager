@@ -10,6 +10,9 @@ from flymanager.app.routes.explorer_utils import (
     get_explorer_pagination_state, paginate_explorer_records,
     set_flip_display_fields)
 from flymanager.app.security import get_json_payload, limiter, require_confirmation
+from flymanager.utils.cache_generation import (
+    cross_cache_signature, pending_cache_generation,
+    schedule_record_cache_generation)
 from flymanager.app.settings import DEFAULT_CROSS_PROPERTY_VALUES
 from flymanager.utils.genetics import qc_genotype
 from flymanager.utils.mongo import (OperationLockConflict, add_metadata,
@@ -25,8 +28,7 @@ from flymanager.utils.mongo import (OperationLockConflict, add_metadata,
                                     update_document_assignment, write_activity)
 from flymanager.utils.phenotypes.image_library import \
     select_prediction_reference_images
-from flymanager.utils.phenotypes.predictor import (build_cross_phenotype_cache,
-                                                   get_cached_cross_phenotype)
+from flymanager.utils.phenotypes.predictor import get_cached_cross_phenotype
 from flymanager.utils.scanner import get_available_ports
 from flymanager.utils.utils import clean_tagify_data
 
@@ -184,9 +186,16 @@ def _get_cross_phenotype_for_view(cross):
             },
         )
 
+    cache_state = (cross.get("CacheGeneration") or {}).get("state", "missing")
+    processing = cache_state == "pending"
+    missing_summary = "Phenotype cache is processing" if processing else "Phenotype cache not generated"
+    missing_warning = (
+        "Cache generation is running in the background; reload shortly."
+        if processing else "Refresh the cache from this record to generate phenotype previews."
+    )
     parent_phenotypes = {
         "male": {
-            "summary": "Phenotype cache not generated",
+            "summary": missing_summary,
             "confidence_label": "low",
             "construct_annotation_labels": [],
             "split_system_labels": [],
@@ -197,11 +206,11 @@ def _get_cross_phenotype_for_view(cross):
             "sterile_alleles": [],
             "reference_images": [],
             "warnings": [
-                "Refresh the cache from this record to generate phenotype previews.",
+                missing_warning,
             ],
         },
         "female": {
-            "summary": "Phenotype cache not generated",
+            "summary": missing_summary,
             "confidence_label": "low",
             "construct_annotation_labels": [],
             "split_system_labels": [],
@@ -212,15 +221,16 @@ def _get_cross_phenotype_for_view(cross):
             "sterile_alleles": [],
             "reference_images": [],
             "warnings": [
-                "Refresh the cache from this record to generate phenotype previews.",
+                missing_warning,
             ],
         },
-        "summary": "Phenotype cache not generated",
+        "summary": missing_summary,
         "source_counts": {},
     }
     return parent_phenotypes, [], {
         "cached_at": "",
         "is_cached": False,
+        "cache_state": cache_state,
         "simulation_summary": None,
         "direction_evaluation": None,
     }
@@ -994,25 +1004,20 @@ def refresh_cross_phenotype(unique_id):
         return redirect(url_for("cross.cross_explorer"))
 
     owner_username = cross.get("User", "")
-    try:
-        with hold_operation_lock(
-            db,
-            key=f"record:phenotype-refresh:cross:{unique_id}",
-            actor=username,
-            label=f"Cross phenotype refresh {unique_id}",
-            ttl_seconds=300,
-            metadata={"route": "refresh_cross_phenotype", "uid": unique_id},
-            conflict_message=f"A phenotype refresh for cross {unique_id} is already running. Please wait for it to finish.",
-        ):
-            phenotype_cache = build_cross_phenotype_cache(
-                cross.get("MaleGenotype", ""),
-                cross.get("FemaleGenotype", ""),
-            )
-            db["crosses"].update_one(
-                {"UniqueID": unique_id, "User": owner_username},
-                {"$set": {"PhenotypeCache": phenotype_cache}},
-            )
-            write_activity(username, f"Refreshed phenotype cache for cross {unique_id}", db)
-    except OperationLockConflict as exc:
-        flash(str(exc), "warning")
+    signature = cross_cache_signature(
+        cross.get("MaleGenotype", ""), cross.get("FemaleGenotype", ""),
+    )
+    db["crosses"].update_one(
+        {"UniqueID": unique_id, "User": owner_username},
+        {"$set": {
+            "PhenotypeCache": None,
+            "StandardizationCache": None,
+            "CacheGeneration": pending_cache_generation("cross", unique_id, signature),
+        }},
+    )
+    schedule_record_cache_generation(
+        db, actor=owner_username, record_type="cross", unique_id=unique_id,
+        input_signature=signature,
+    )
+    write_activity(username, f"Queued phenotype cache refresh for cross {unique_id}", db)
     return redirect(url_for("cross.view_cross", unique_id=unique_id))

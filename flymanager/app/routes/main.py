@@ -15,8 +15,7 @@ from flymanager.app.security import (get_json_payload, limiter,
 from flymanager.app.services import flybase as flybase_service
 from flymanager.app.services.scheduler import schedule_daily_flip_reminders
 from flymanager.app.services.stock_standardization import (
-    get_cached_cross_standardization, get_cached_stock_standardization,
-    summarize_genotype_standardization)
+    get_cached_cross_standardization, get_cached_stock_standardization)
 from flymanager.utils.labels import generate_label_pdf
 from flymanager.utils.mongo import (OperationLockConflict,
                                     get_accessible_crosses,
@@ -231,6 +230,7 @@ _STOCK_REVIEWER_PROJECTION = {
     'TrayID': 1,
     'TrayPosition': 1,
     'StandardizationCache': 1,
+    'CacheGeneration.state': 1,
 }
 _CROSS_REVIEWER_PROJECTION = {
     '_id': 0,
@@ -243,6 +243,7 @@ _CROSS_REVIEWER_PROJECTION = {
     'TrayID': 1,
     'TrayPosition': 1,
     'StandardizationCache': 1,
+    'CacheGeneration.state': 1,
 }
 
 
@@ -250,7 +251,7 @@ def _build_standardization_reviewer_row(*, summary, record_type, subject_label,
                                         unique_id, name, genotype, tray_id,
                                         tray_position, assignment_scope_label,
                                         assignment_scope_detail, action_href,
-                                        action_label):
+                                        action_label, cache_pending=False):
     summary = summary or {}
     return {
         'recordType': record_type,
@@ -268,6 +269,7 @@ def _build_standardization_reviewer_row(*, summary, record_type, subject_label,
         'unmodeledCount': int(summary.get('unmodeledCount') or 0),
         'topTokens': list(summary.get('topTokens') or []),
         'recommendedReplacements': list(summary.get('recommendedReplacements') or [])[:3],
+        'cachePending': bool(cache_pending),
         'actionHref': action_href,
         'actionLabel': action_label,
     }
@@ -276,15 +278,14 @@ def _build_standardization_reviewer_row(*, summary, record_type, subject_label,
 def _stock_standardization_summary(stock):
     """Compact standardization summary for a stock, preferring the cache.
 
-    Reads the materialized ``StandardizationCache`` (non-strict, so viewing a
-    record never triggers a live recompute even across pipeline drift). Falls
-    back to a live compute only when the cache is missing/incompatible — cheap
-    now that the bulk path never runs the fuzzy candidate scan.
+    Reads the materialized ``StandardizationCache`` only.  A missing cache is
+    pending work, never a reason to load FlyBase data in a dashboard request.
     """
     cache = get_cached_stock_standardization(stock, strict=False)
     if cache is not None:
         return cache.get('summary')
-    return summarize_genotype_standardization(stock.get('Genotype', ''))
+    return {"issueCount": 0, "unresolvedCount": 0, "unmodeledCount": 0,
+            "topTokens": [], "recommendedReplacements": []}
 
 
 def _cross_standardization_summaries(cross):
@@ -292,10 +293,9 @@ def _cross_standardization_summaries(cross):
     cache = get_cached_cross_standardization(cross, strict=False)
     if cache is not None:
         return cache.get('male'), cache.get('female')
-    return (
-        summarize_genotype_standardization(cross.get('MaleGenotype', '')),
-        summarize_genotype_standardization(cross.get('FemaleGenotype', '')),
-    )
+    pending = {"issueCount": 0, "unresolvedCount": 0, "unmodeledCount": 0,
+               "topTokens": [], "recommendedReplacements": []}
+    return pending, pending
 
 
 def _build_standardization_reviewer_rows(stocks, crosses):
@@ -319,6 +319,7 @@ def _build_standardization_reviewer_rows(stocks, crosses):
                 assignment_scope_detail=stock.get('AssignmentScopeDetail'),
                 action_href=url_for('stock.view_stock', unique_id=stock.get('UniqueID')),
                 action_label='Open Stock',
+                cache_pending=(stock.get('CacheGeneration') or {}).get('state') == 'pending',
             )
         )
 
@@ -346,6 +347,7 @@ def _build_standardization_reviewer_rows(stocks, crosses):
                     assignment_scope_detail=cross.get('AssignmentScopeDetail'),
                     action_href=url_for('cross.view_cross', unique_id=cross.get('UniqueID')),
                     action_label='Open Cross',
+                    cache_pending=(cross.get('CacheGeneration') or {}).get('state') == 'pending',
                 )
             )
 
@@ -1124,7 +1126,7 @@ def standardization_reviewer():
             'stockTargets': sum(1 for row in reviewer_rows if row['recordType'] == 'stock'),
             'crossParentTargets': sum(1 for row in reviewer_rows if row['recordType'] == 'cross_parent'),
             'flaggedTargets': sum(1 for row in reviewer_rows if row['issueCount']),
-            'cleanTargets': sum(1 for row in reviewer_rows if not row['issueCount']),
+            'cleanTargets': sum(1 for row in reviewer_rows if not row['issueCount'] and not row['cachePending']),
             'totalIssues': sum(int(row['issueCount'] or 0) for row in reviewer_rows),
             'totalUnresolved': sum(int(row['unresolvedCount'] or 0) for row in reviewer_rows),
             'totalUnmodeled': sum(int(row['unmodeledCount'] or 0) for row in reviewer_rows),
