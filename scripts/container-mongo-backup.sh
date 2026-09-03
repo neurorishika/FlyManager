@@ -167,6 +167,13 @@ trap - INT TERM EXIT
 # the pair down from off-site, which is the one time it matters most.
 ( cd "$BACKUP_DIR" && sha256sum "$(basename "$ARCHIVE")" > "$(basename "$ARCHIVE").sha256" )
 
+# The backup container's healthcheck reads this instead of relying on GNU
+# find's -newermt (not available in the BusyBox find bundled by rclone).
+# Update it only after both the archive and its checksum are durable.
+LAST_SUCCESS="$BACKUP_DIR/.mongo-backup-last-success"
+printf '%s\n' "$(date +%s)" > "${LAST_SUCCESS}.tmp"
+mv "${LAST_SUCCESS}.tmp" "$LAST_SUCCESS"
+
 # Retention only ever runs after a dump that just succeeded, and never deletes
 # the last archives standing. Backups failing silently -- disk full, auth
 # change, mongodump missing -- used to be followed by retention quietly

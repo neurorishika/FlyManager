@@ -76,6 +76,7 @@ services:
       MONGO_PORT: "27017"
       BACKUP_DIR: /backups
       BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      MONGO_BACKUP_INTERVAL_SECONDS: ${MONGO_BACKUP_INTERVAL_SECONDS:-21600}
       RCLONE_REMOTE: ${RCLONE_REMOTE:-}
       HEALTHCHECK_UUID: ${HEALTHCHECK_UUID:-}
     entrypoint: ["/bin/sh", "-c"]
@@ -84,18 +85,23 @@ services:
         apk add --no-cache mongodb-tools bash curl > /dev/null 2>&1 &&
         chmod +x /usr/local/bin/container-mongo-backup.sh || true &&
         /usr/local/bin/container-mongo-backup.sh &&
-        while true; do sleep "${MONGO_BACKUP_INTERVAL_SECONDS:-21600}"; /usr/local/bin/container-mongo-backup.sh; done
+        while true; do sleep "$${MONGO_BACKUP_INTERVAL_SECONDS}"; /usr/local/bin/container-mongo-backup.sh; done
     healthcheck:
       # Freshness, not liveness. The loop keeps running whatever happens to a
       # dump -- disk full, an auth change, mongodump missing -- so a container
       # that is merely "up" said nothing about whether a backup was taken.
       # Unhealthy once the newest archive is older than twice the interval.
+      # BusyBox find in the rclone image lacks GNU find's -newermt, so the
+      # backup script records a completion epoch after writing an archive.
       test:
         - CMD-SHELL
         - >
-          find /backups -maxdepth 1 -name 'flymanager_mongodb_*.archive.gz'
-          -newermt "-$(( ${MONGO_BACKUP_INTERVAL_SECONDS:-21600} * 2 )) seconds"
-          | grep -q . || exit 1
+          last_success="$$(cat /backups/.mongo-backup-last-success 2>/dev/null)" &&
+          case "$$last_success" in ''|*[!0-9]*) exit 1 ;; esac &&
+          now="$$(date +%s)" &&
+          max_age="$$(( $${MONGO_BACKUP_INTERVAL_SECONDS} * 2 ))" &&
+          [ "$$now" -ge "$$last_success" ] &&
+          [ "$$((now - last_success))" -le "$$max_age" ]
       interval: 30m
       timeout: 30s
       retries: 2
