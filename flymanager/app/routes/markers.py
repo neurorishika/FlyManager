@@ -19,14 +19,17 @@ from flymanager.utils.mongo import OperationLockConflict
 from flymanager.utils.mongo.activity import write_activity
 from flymanager.utils.mongo.marker_definitions import (
     MarkerDefinitionError, can_edit_marker_definition, create_marker_definition,
-    delete_marker_definition, get_marker_definition, list_marker_definitions,
-    promote_marker_definition, update_marker_definition)
+    delete_marker_definition, get_marker_definition,
+    get_marker_definition_overlay, get_shipped_definition_keys,
+    list_marker_definitions, promote_marker_definition,
+    update_marker_definition)
 from flymanager.utils.phenotypes.marker_catalog import (MARKER_KINDS,
                                                          get_catalog,
                                                          refresh_catalog)
 from flymanager.utils.phenotypes.marker_fields import (MARKER_FIELD_SPECS,
                                                        field_value,
                                                        form_to_document,
+                                                       marker_vocabularies,
                                                        repeating_input_name,
                                                        repeating_rows)
 from flymanager.utils.phenotypes.image_catalog import (
@@ -240,7 +243,49 @@ def new_marker():
                            field_specs=MARKER_FIELD_SPECS,
                            kind_labels=KIND_LABELS, definition={},
                            field_value=field_value, repeating_rows=repeating_rows,
-                           repeating_input_name=repeating_input_name)
+                           repeating_input_name=repeating_input_name,
+                           vocabularies=marker_vocabularies())
+
+
+@bp.get("/markers/key-check")
+@login_required
+def marker_key_check():
+    """Is this Key free, taken, or a shipped key someone is about to override?
+
+    Three states, not two. Reusing a SHIPPED key is the supported way to keep
+    a lab's own version of a built-in marker -- create_marker is that override
+    path -- so calling it a duplicate would talk someone out of doing the
+    right thing. Only an overlay row is an actual collision, and that is the
+    one create_marker_definition 409s on.
+
+    Registered above `/markers/<path:key>` so the literal wins the route
+    match; a `path` converter would otherwise swallow "key-check".
+    """
+    key = (request.args.get("key") or "").strip()
+    if not key:
+        return jsonify({"status": "empty", "message": ""})
+
+    # The overlay is consulted directly rather than through the compiled
+    # snapshot: that snapshot can be a refresh interval stale, so a marker
+    # another worker created seconds ago would read as free and the person
+    # would fill in the whole form before the 409.
+    if get_marker_definition_overlay(db, key) is not None:
+        return jsonify({
+            "status": "taken",
+            "message": f"{key} is already a marker in this lab's catalog.",
+            "url": url_for("markers.marker_detail", key=key),
+        })
+
+    if key in get_shipped_definition_keys():
+        return jsonify({
+            "status": "shipped",
+            "message": (f"{key} is one of FlyManager's built-in markers. "
+                        "Saving creates a lab override that is used instead of "
+                        "the built-in one everywhere."),
+            "url": url_for("markers.marker_detail", key=key),
+        })
+
+    return jsonify({"status": "free", "message": f"{key} is free."})
 
 
 @bp.get("/markers/<path:key>")
@@ -262,8 +307,50 @@ def marker_detail(key):
         is_admin=(username == "admin"),
         field_specs=MARKER_FIELD_SPECS, field_value=field_value,
         repeating_rows=repeating_rows, repeating_input_name=repeating_input_name,
+        vocabularies=marker_vocabularies(),
         kind_labels=KIND_LABELS, origin_labels=ORIGIN_LABELS,
     )
+
+
+def _attach_image(key, uploaded, caption=""):
+    """Store an uploaded image against a marker. Returns (message, category).
+
+    Split out of the upload route so the create page can attach a photo in
+    the same request that makes the marker, without the two paths drifting.
+    Returns rather than flashes because its two callers report differently:
+    a failure here is the whole story for an upload, and a footnote for a
+    create that otherwise succeeded.
+    """
+    if uploaded is None or not (uploaded.filename or "").strip():
+        return "No image was submitted.", "danger"
+    raw = uploaded.read(MAX_UPLOAD_BYTES + 1)
+    if len(raw) > MAX_UPLOAD_BYTES:
+        return "Images must be 2 MB or smaller.", "danger"
+    try:
+        normalized = normalize_image(raw)
+    except ImageRejected as exc:
+        return str(exc), "danger"
+
+    entry, created, bound = upsert_image_entry(
+        db, GridFSImageStore(db), normalized, marker_key=key,
+        uploaded_by=session.get("username", ""),
+        display={"caption": (caption or "").strip()},
+    )
+    refresh_image_catalog(db, force=True)
+    if created:
+        action = f"Uploaded image {entry['imageId']} for marker {key}"
+        message, category = "Image uploaded.", "success"
+    elif bound:
+        # Identical bytes already existed; this binds them to another marker
+        # rather than storing a second copy.
+        action = f"Linked existing image {entry['imageId']} to marker {key}"
+        message = "That image was already stored, so it was linked to this marker."
+        category = "success"
+    else:
+        action = f"Re-uploaded image {entry['imageId']} already on marker {key}"
+        message, category = "That image is already on this marker.", "info"
+    write_activity(session.get("username", ""), action, db)
+    return message, category
 
 
 @bp.post("/markers/<path:key>/images")
@@ -275,38 +362,10 @@ def upload_marker_image(key):
     # to the overlay collection before refusing.
     if key not in get_catalog()["definitions"] and get_marker_definition(db, key) is None:
         abort(404)
-    uploaded = request.files.get("image")
-    if uploaded is None:
-        flash("No image was submitted.", "danger")
-        return redirect(url_for("markers.marker_detail", key=key))
-    raw = uploaded.read(MAX_UPLOAD_BYTES + 1)
-    if len(raw) > MAX_UPLOAD_BYTES:
-        flash("Images must be 2 MB or smaller.", "danger")
-        return redirect(url_for("markers.marker_detail", key=key))
-    try:
-        normalized = normalize_image(raw)
-    except ImageRejected as exc:
-        flash(str(exc), "danger")
-        return redirect(url_for("markers.marker_detail", key=key))
-    entry, created, bound = upsert_image_entry(
-        db, GridFSImageStore(db), normalized, marker_key=key,
-        uploaded_by=session.get("username", ""),
-        display={"caption": request.form.get("caption", "").strip()},
-    )
-    refresh_image_catalog(db, force=True)
-    if created:
-        action = f"Uploaded image {entry['imageId']} for marker {key}"
-        message = "Image uploaded."
-    elif bound:
-        # Identical bytes already existed; this binds them to another marker
-        # rather than storing a second copy.
-        action = f"Linked existing image {entry['imageId']} to marker {key}"
-        message = "That image was already stored, so it was linked to this marker."
-    else:
-        action = f"Re-uploaded image {entry['imageId']} already on marker {key}"
-        message = "That image is already on this marker."
-    write_activity(session.get("username", ""), action, db)
-    flash(message, "success" if created or bound else "info")
+    message, category = _attach_image(key, request.files.get("image"),
+                                      request.form.get("caption", ""))
+    if message:
+        flash(message, category)
     return redirect(url_for("markers.marker_detail", key=key))
 
 
@@ -423,6 +482,19 @@ def create_marker():
     # Form path returns a plain 302; a 201 with a Location header is not
     # followed by browsers.
     flash(f"Created marker definition {created['Key']}", "success")
+    # The photo is attached after the marker exists, not with it: the upload
+    # endpoint 404s without one, so this cannot be a single request. A photo
+    # the store rejects is a footnote on a create that already succeeded --
+    # the marker stays, and the person is told the picture did not.
+    uploaded = request.files.get("image")
+    if uploaded is not None and (uploaded.filename or "").strip():
+        message, category = _attach_image(created["Key"], uploaded,
+                                          request.form.get("caption", ""))
+        if category == "danger":
+            flash(f"The marker was created, but its photo was not attached: {message}",
+                  "warning")
+        elif message:
+            flash(message, category)
     return redirect(url_for("markers.marker_detail", key=created["Key"]))
 
 

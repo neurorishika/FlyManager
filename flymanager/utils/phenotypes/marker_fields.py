@@ -16,17 +16,26 @@ so a value added through the admin JSON editor survives an ordinary save.
 # inside the definition document; the form input uses the same name.
 _DOMINANCE = ("dominant", "recessive")
 _ALIAS_TYPES = ("allele_token", "construct_token")
+# Stored as an int; only the X needs saying out loud.
+_CHROMOSOMES = (("1", "1 (X)"), ("2", "2"), ("3", "3"), ("4", "4"))
 
 
 def _field(path, label, type_="text", help_="", options=(), placeholder="",
-           separator=",", minimum=0, maximum=1):
+           separator=",", minimum=0, maximum=1, vocabulary="", coerce="",
+           tags=False):
     # `separator` only matters for list fields. Free text (a balancer's notes)
     # is split on newlines alone, because a note like "breaks down at 25C, use
     # fresh" would otherwise silently become two notes on the next save.
+    # Options are (value, label): a chromosome is stored as 1 but has to read
+    # as "1 (X)". A bare string is both, which is what every other select is.
+    normalized = tuple(
+        option if isinstance(option, tuple) else (option, option)
+        for option in options)
     return {"path": path, "name": path, "label": label, "type": type_,
-            "help": help_, "options": tuple(options), "placeholder": placeholder,
+            "help": help_, "options": normalized, "placeholder": placeholder,
             "separator": separator, "minimum": minimum, "maximum": maximum,
-            "repeating": False}
+            "repeating": False, "vocabulary": vocabulary, "coerce": coerce,
+            "tags": tags}
 
 
 def _repeating(path, label, fields, help_="", blank_rows=2):
@@ -40,13 +49,15 @@ def _repeating(path, label, fields, help_="", blank_rows=2):
     """
     return {"path": path, "name": path, "label": label, "type": "repeating",
             "help": help_, "options": (), "placeholder": "", "separator": ",",
-            "minimum": 0, "maximum": 1, "repeating": True,
+            "minimum": 0, "maximum": 1, "repeating": True, "vocabulary": "",
+            "coerce": "", "tags": False,
             "fields": tuple(fields), "blank_rows": blank_rows}
 
 
 _CONTEXTUAL_STABILITY = _repeating(
     "sorting.contextualStability", "Only on certain balancers", (
-        _field("whenBalancer", "Balancers", "list",
+        _field("whenBalancer", "Balancers", "list", vocabulary="balancer_symbols",
+               tags=True,
                help_="Comma separated, exactly as written, e.g. TM6B, TM6."),
         _field("maxScore", "Cap the stability at", "float",
                help_="Between 0 and 1. The score is never raised, only capped."),
@@ -62,9 +73,10 @@ _APPEARANCE = (
            help_="How this marker is written in a predicted phenotype."),
     _field("payload.effect", "What you see",
            help_="Plain description of the visible effect, e.g. 'short stubby bristles'."),
-    _field("payload.body_part", "Where to look",
+    _field("payload.body_part", "Where to look", vocabulary="body_parts",
            placeholder="eye, wing, bristle, body …"),
-    _field("payload.chromosome", "Chromosome", "int",
+    _field("payload.chromosome", "Chromosome", "select", options=_CHROMOSOMES,
+           coerce="int",
            help_="1 (X), 2, 3 or 4. Leave blank if it varies."),
     _field("payload.dominance", "Dominance", "select", options=_DOMINANCE,
            help_="Whether one copy is enough to see the phenotype."),
@@ -79,12 +91,12 @@ _PROVENANCE = (
     _field("provenance.geneName", "Gene name"),
     _field("provenance.flybaseId", "FlyBase ID", placeholder="FBgn…"),
     _field("provenance.referenceUrl", "Reference link", "url"),
-    _field("provenance.source", "Where this came from",
+    _field("provenance.source", "Where this came from", vocabulary="sources",
            help_="A paper, a stock centre sheet, or your own observation."),
 )
 
 _IMAGING = (
-    _field("imaging.aliases", "Image search names", "list",
+    _field("imaging.aliases", "Image search names", "list", tags=True,
            help_="Other spellings that should find the same reference photos, "
                  "comma separated."),
 )
@@ -112,10 +124,12 @@ MARKER_FIELD_SPECS = {
         "groups": (
             ("Recognised as", (
                 _field("match.token", "Full token", help_="How the allele is written, e.g. Bl[1]."),
-                _field("match.geneStem", "Gene stem", help_="The gene part, e.g. Bl."),
+                _field("match.geneStem", "Gene stem", vocabulary="gene_stems",
+                       help_="The gene part, e.g. Bl."),
                 _field("match.alleleSpec", "Allele", help_="The part in brackets, e.g. 1."),
             )),
-            ("Appearance", (_field("payload.gene_stem", "Gene stem"),) + _APPEARANCE),
+            ("Appearance", (_field("payload.gene_stem", "Gene stem",
+                                   vocabulary="gene_stems"),) + _APPEARANCE),
             ("Stability", (_CONTEXTUAL_STABILITY,)),
             ("Reference images", _IMAGING),
             ("Where this came from", _PROVENANCE),
@@ -129,7 +143,7 @@ MARKER_FIELD_SPECS = {
                 _field("match.token", "Written as", help_="The nickname seen in a genotype."),
             )),
             ("Means", (
-                _field("payload.value", "Read it as",
+                _field("payload.value", "Read it as", vocabulary="definition_keys",
                        help_="The canonical token this stands for."),
                 _field("payload.alias_type", "Alias type", "select", options=_ALIAS_TYPES),
             )),
@@ -142,14 +156,17 @@ MARKER_FIELD_SPECS = {
         "groups": (
             ("Recognised as", (
                 _field("match.symbol", "Balancer name", help_="e.g. TM3."),
-                _field("match.aliases", "Other names", "list",
-                       help_="Comma separated alternative spellings."),
+                _field("match.aliases", "Other names", "list", tags=True,
+                       help_="Alternative spellings of this balancer."),
             )),
             ("Details", (
-                _field("payload.family", "Family", help_="e.g. TM3, CyO."),
-                _field("payload.chromosome", "Chromosome", "int"),
+                _field("payload.family", "Family", vocabulary="families",
+                       help_="e.g. TM3, CyO."),
+                _field("payload.chromosome", "Chromosome", "select",
+                       options=_CHROMOSOMES, coerce="int"),
                 _field("payload.default_markers", "Markers it carries", "list",
-                       help_="Comma separated, e.g. Sb, Ser."),
+                       vocabulary="definition_keys", tags=True,
+                       help_="The markers this balancer carries, e.g. Sb, Ser."),
                 _field("payload.notes", "Notes", "list", separator="\n",
                        help_="One note per line."),
                 _field("sorting.preferenceBonus", "Preference", "float",
@@ -168,13 +185,15 @@ MARKER_FIELD_SPECS = {
                  "and allele prefix.",
         "groups": (
             ("Recognised as", (
-                _field("match.geneStem", "Gene stem", help_="e.g. w."),
+                _field("match.geneStem", "Gene stem", vocabulary="gene_stems",
+                       help_="e.g. w."),
                 _field("match.allelePrefix", "Allele prefix", help_="e.g. +."),
             )),
             ("Appearance", (
                 _field("payload.overrides.display_label", "Shows up as"),
                 _field("payload.overrides.effect", "What you see"),
-                _field("payload.overrides.body_part", "Where to look"),
+                _field("payload.overrides.body_part", "Where to look",
+                       vocabulary="body_parts"),
                 _field("payload.overrides.dominance", "Dominance", "select",
                        options=_DOMINANCE),
                 _field("payload.overrides.phenotype_key", "Internal key"),
@@ -184,6 +203,49 @@ MARKER_FIELD_SPECS = {
         ),
     },
 }
+
+
+def marker_vocabularies():
+    """The suggestion lists the form offers, derived from the catalog.
+
+    Derived, never duplicated: a marker somebody added yesterday is offered
+    today without a list being maintained anywhere. Takes no database handle,
+    like everything else that reads the compiled snapshot.
+
+    These are suggestions, not validation. A browser will happily submit a
+    value that is in no datalist, which is deliberate -- a lab that needs a
+    body part nobody has used yet must still be able to type it -- so nothing
+    downstream may treat membership here as a guarantee.
+    """
+    from flymanager.utils.phenotypes.marker_catalog import (get_body_parts,
+                                                            get_catalog)
+
+    snapshot = get_catalog()
+    definitions = snapshot["definitions"]
+
+    sources = set()
+    gene_stems = set(snapshot["construct_markers"])
+    for document in definitions.values():
+        source = str((document.get("provenance") or {}).get("source") or "").strip()
+        if source:
+            sources.add(source)
+        stem = str((document.get("payload") or {}).get("gene_stem") or "").strip()
+        if stem:
+            gene_stems.add(stem)
+
+    families = {
+        str(balancer.get("family") or "").strip()
+        for balancer in snapshot["balancers"].values()
+    }
+
+    return {
+        "body_parts": sorted(get_body_parts()),
+        "sources": sorted(sources),
+        "families": sorted(family for family in families if family),
+        "definition_keys": sorted(definitions),
+        "balancer_symbols": sorted(snapshot["balancers"]),
+        "gene_stems": sorted(gene_stems),
+    }
 
 
 def iter_fields(kind):
@@ -262,7 +324,7 @@ def _coerce(field, form):
         return True, _parse_list(raw, field.get("separator", ","))
     if not raw:
         return False, None
-    if field["type"] == "int":
+    if field["type"] == "int" or field["coerce"] == "int":
         try:
             return True, int(raw)
         except ValueError:
