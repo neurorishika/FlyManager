@@ -48,14 +48,42 @@ def get_database(client):
     return client[db_name]
 
 
+def _create_index_replacing_conflict(collection, keys, **options):
+    """Create an index, replacing one of the same name built with other options.
+
+    Mongo refuses to redefine an index in place: same name, different options
+    raises IndexOptionsConflict. A deployment that already built the earlier
+    definition of an index would therefore fail every startup after the
+    definition changed -- and index creation runs at import, so that failure
+    is the whole app, not one request.
+    """
+    from pymongo.errors import OperationFailure
+
+    try:
+        return collection.create_index(keys, **options)
+    except OperationFailure as exc:
+        # 85 IndexOptionsConflict, 86 IndexKeySpecsConflict.
+        if exc.code not in (85, 86):
+            raise
+        collection.drop_index(options["name"])
+        return collection.create_index(keys, **options)
+
+
 def ensure_mongo_indexes(db):
     """Create the indexes used by stock/cross access, tray, and auth query patterns."""
     db["stocks"].create_index([("User", 1), ("UniqueID", 1)], name="stocks_user_uid")
     db["stocks"].create_index([("AssignedTo", 1), ("UniqueID", 1)], name="stocks_assigned_uid")
-    db["stocks"].create_index(
+    # partialFilterExpression, not sparse: on a COMPOUND index sparse only
+    # skips a document missing EVERY indexed field, and every stock has a
+    # User. So a sparse unique index here indexes each stock with no
+    # SubmissionKey as (User, null) and the second one collides -- which took
+    # down index creation, and with it the whole app, on any database with
+    # more than one stock predating submission keys.
+    _create_index_replacing_conflict(
+        db["stocks"],
         [("User", 1), ("SubmissionKey", 1)],
         unique=True,
-        sparse=True,
+        partialFilterExpression={"SubmissionKey": {"$exists": True}},
         name="stocks_user_submission_key",
     )
     db["stocks"].create_index([("User", 1), ("Status", 1), ("TrayID", 1)], name="stocks_user_status_tray")
