@@ -144,6 +144,23 @@ def create_marker_definition(db, document, *, username):
     return candidate
 
 
+def get_marker_definition_overlay(db, key):
+    """The lab's own row for a key, or None if only a shipped one exists.
+
+    Unlike get_marker_definition this does NOT fall back to the shipped
+    catalog: a caller that needs to tell "this lab already defined it" from
+    "this is a built-in someone may override" cannot use a lookup that
+    collapses the two.
+    """
+    return _overlay_document(db, str(key or "").strip())
+
+
+def get_shipped_definition_keys():
+    """Every Key that ships with FlyManager."""
+    shipped, _version = _shipped_definitions()
+    return frozenset(shipped)
+
+
 def _require_editable(db, key, username):
     """Load the overlay row for `key` and confirm `username` may write to it.
 

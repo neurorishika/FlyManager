@@ -4,7 +4,7 @@
    (`payload.effect`), which is what lets the route rebuild the document from
    the form without the page knowing anything about the envelope. #}
 
-{% macro render_repeating(field, definition, field_value, kind, repeating_rows, repeating_input_name) %}
+{% macro render_repeating(field, definition, field_value, kind, repeating_rows, repeating_input_name, vocabularies={}) %}
 {# Rendered as numbered rows with two spare blanks on the end, so a rule can be
    added without any JavaScript. A row left entirely blank is dropped by the
    parser, which is also how an existing rule is removed. #}
@@ -22,7 +22,10 @@
         <div class="form-group mb-2">
             <label for="{{ id }}">{{ subfield.label }}</label>
             {% if subfield.type == "list" %}
-            <textarea class="form-control" id="{{ id }}" name="{{ name }}" rows="1">{{ value }}</textarea>
+            <textarea class="form-control" id="{{ id }}" name="{{ name }}" rows="1"
+                      {% if subfield.tags %}data-marker-tags
+                      data-whitelist='{{ vocabularies.get(subfield.vocabulary, []) | tojson }}'{% endif %}
+                      >{{ value }}</textarea>
             {% elif subfield.type == "float" %}
             <input class="form-control" id="{{ id }}" name="{{ name }}" type="number"
                    step="0.01" min="{{ subfield.minimum }}" max="{{ subfield.maximum }}" value="{{ value }}">
@@ -37,7 +40,7 @@
 </fieldset>
 {% endmacro %}
 
-{% macro render_field(field, definition, field_value, kind) %}
+{% macro render_field(field, definition, field_value, kind, vocabularies={}) %}
 {% set id = "f-" ~ kind ~ "-" ~ field.name %}
 {% set value = field_value(definition or {}, field.path,
                           "\n" if field.separator == "\n" else ", ") %}
@@ -46,8 +49,19 @@
     {% if field.type == "select" %}
     <select class="form-control" id="{{ id }}" name="{{ field.name }}">
         <option value="">—</option>
-        {% for option in field.options %}
-        <option value="{{ option }}" {% if value == option %}selected{% endif %}>{{ option|replace("_", " ")|capitalize }}</option>
+        {# A stored value the options do not cover -- set through the admin JSON
+           editor, or left over from before an option list changed -- is offered
+           back rather than silently dropped. A select posts what it shows, so
+           without this, opening and saving the marker would quietly clear it. #}
+        {% if value and value not in field.options|map(attribute=0)|list %}
+        <option value="{{ value }}" selected>{{ value }}</option>
+        {% endif %}
+        {% for option_value, option_label in field.options %}
+        {# A label that differs from its value was written to be read as-is:
+           "1 (X)" must not come back from |capitalize as "1 (x)". The tidying
+           is only for the bare-string options, which are stored identifiers
+           like "allele_token". #}
+        <option value="{{ option_value }}" {% if value == option_value %}selected{% endif %}>{{ option_label if option_label != option_value else option_label|replace("_", " ")|capitalize }}</option>
         {% endfor %}
     </select>
     {% elif field.type == "bool" %}
@@ -58,21 +72,37 @@
         <label class="form-check-label" for="{{ id }}">Yes</label>
     </div>
     {% elif field.type == "list" %}
+    {# data-whitelist is single-quoted on purpose: tojson escapes ' but emits
+       raw ", so a double-quoted attribute would be cut short by the first
+       value. #}
     <textarea class="form-control" id="{{ id }}" name="{{ field.name }}"
-              rows="2" placeholder="{{ field.placeholder }}">{{ value }}</textarea>
+              rows="2" placeholder="{{ field.placeholder }}"
+              {% if field.tags %}data-marker-tags
+              data-whitelist='{{ vocabularies.get(field.vocabulary, []) | tojson }}'{% endif %}
+              >{{ value }}</textarea>
     {% else %}
+    {# A datalist suggests without constraining: the browser still submits a
+       value that is not in the list, which is deliberate. A lab that needs a
+       body part nobody has used yet must still be able to type it. #}
     <input class="form-control" id="{{ id }}" name="{{ field.name }}"
            type="{{ 'number' if field.type in ('int', 'float') else ('url' if field.type == 'url' else 'text') }}"
            {% if field.type == 'float' %}step="0.01" min="{{ field.minimum }}" max="{{ field.maximum }}"{% endif %}
            {% if field.type == 'int' %}step="1"{% endif %}
+           {% if field.vocabulary and vocabularies.get(field.vocabulary) %}list="{{ id }}-options"{% endif %}
            value="{{ value }}" placeholder="{{ field.placeholder }}">
+    {% if field.vocabulary and vocabularies.get(field.vocabulary) %}
+    <datalist id="{{ id }}-options">
+        {% for option in vocabularies[field.vocabulary] %}<option value="{{ option }}"></option>{% endfor %}
+    </datalist>
+    {% endif %}
     {% endif %}
     {% if field.help %}<small class="form-text text-muted">{{ field.help }}</small>{% endif %}
 </div>
 {% endmacro %}
 
 {% macro render_kind_fields(kind, spec, definition, field_value, hidden=false, blurb=true,
-                            repeating_rows=none, repeating_input_name=none) %}
+                            repeating_rows=none, repeating_input_name=none,
+                            vocabularies={}) %}
 <div class="marker-kind-fields" data-marker-kind="{{ kind }}" {% if hidden %}hidden{% endif %}>
     {% if blurb %}<p class="text-muted">{{ spec.blurb }}</p>{% endif %}
     {% for title, fields in spec.groups %}
@@ -80,9 +110,9 @@
         <legend class="app-form-section-title h6">{{ title }}</legend>
         {% for field in fields %}
         {%- if field.repeating -%}
-        {{ render_repeating(field, definition, field_value, kind, repeating_rows, repeating_input_name) }}
+        {{ render_repeating(field, definition, field_value, kind, repeating_rows, repeating_input_name, vocabularies) }}
         {%- else -%}
-        {{ render_field(field, definition, field_value, kind) }}
+        {{ render_field(field, definition, field_value, kind, vocabularies) }}
         {%- endif -%}
         {% endfor %}
     </fieldset>

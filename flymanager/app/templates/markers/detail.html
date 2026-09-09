@@ -223,7 +223,8 @@
                         <input type="hidden" name="kind" value="{{ definition.kind }}">
                         {{ marker_fields.render_kind_fields(definition.kind, spec, definition, field_value, blurb=false,
                             repeating_rows=repeating_rows,
-                            repeating_input_name=repeating_input_name) }}
+                            repeating_input_name=repeating_input_name,
+                                            vocabularies=vocabularies) }}
                         <div class="app-button-row justify-content-end">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save changes</button>
                         </div>
@@ -269,7 +270,8 @@
                         <input type="hidden" name="kind" value="{{ definition.kind }}">
                         {{ marker_fields.render_kind_fields(definition.kind, spec, definition, field_value, blurb=false,
                             repeating_rows=repeating_rows,
-                            repeating_input_name=repeating_input_name) }}
+                            repeating_input_name=repeating_input_name,
+                                            vocabularies=vocabularies) }}
                         <div class="app-button-row justify-content-end">
                             <button type="submit" class="btn btn-warning"><i class="fas fa-pen"></i> Save lab version</button>
                         </div>
@@ -284,6 +286,11 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/marker_image_zoom.js') }}"></script>
+<link href="{{ url_for('static', filename='vendor/tagify/tagify.css') }}" rel="stylesheet" type="text/css" />
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.min.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.polyfills.min.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/marker_field_controls.js') }}"></script>
+
 <script nonce="{{ csp_nonce }}">
     // Delete/Promote always return a JSON body (so a bare API POST gets a
     // clean 200 instead of a redirect that only makes sense to a browser),

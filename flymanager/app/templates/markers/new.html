@@ -18,13 +18,16 @@
 </div>
 
 <div class="app-panel">
-    <form method="POST" action="{{ url_for('markers.create_marker') }}" class="app-form-shell">
+    <form method="POST" action="{{ url_for('markers.create_marker') }}" class="app-form-shell"
+          enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group mb-3">
             <label for="newMarkerKey">Name</label>
             <input type="text" class="form-control" id="newMarkerKey" name="Key" required
                    placeholder="Sb, TM3, w+ …">
             <small class="form-text text-muted">How you would write it in a genotype. This has to be unique.</small>
+            <div class="form-text mt-1" id="newMarkerKeyStatus" role="status" aria-live="polite"
+                 data-key-check-url="{{ url_for('markers.marker_key_check') }}" hidden></div>
         </div>
         <div class="form-group mb-3">
             <label for="newMarkerKind">What kind of marker is it?</label>
@@ -39,8 +42,25 @@
         {{ marker_fields.render_kind_fields(kind, field_specs[kind], definition, field_value,
                                             hidden=(kind != selected_kind),
                                             repeating_rows=repeating_rows,
-                                            repeating_input_name=repeating_input_name) }}
+                                            repeating_input_name=repeating_input_name,
+                                            vocabularies=vocabularies) }}
         {% endfor %}
+
+        <fieldset class="mb-3">
+            <legend class="app-form-section-title h6">A photo (optional)</legend>
+            <p class="text-muted">Adding it now saves coming back for it later. Anything you
+                upload here is visible to the whole lab.</p>
+            <div class="form-group mb-3">
+                <label for="newMarkerImage">Photo</label>
+                <input type="file" class="form-control-file" id="newMarkerImage" name="image"
+                       accept="image/png,image/jpeg,image/gif,image/webp">
+                <small class="form-text text-muted">PNG, JPEG, GIF or WebP, up to 2 MB.</small>
+            </div>
+            <div class="form-group mb-3">
+                <label for="newMarkerCaption">Caption (optional)</label>
+                <input type="text" class="form-control" id="newMarkerCaption" name="caption">
+            </div>
+        </fieldset>
 
         <div class="app-button-row justify-content-end">
             <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add marker</button>
@@ -51,4 +71,9 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/marker_kind_fields.js') }}"></script>
+<link href="{{ url_for('static', filename='vendor/tagify/tagify.css') }}" rel="stylesheet" type="text/css" />
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.min.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='vendor/tagify/tagify.polyfills.min.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/marker_field_controls.js') }}"></script>
+
 {% endblock %}
