@@ -183,34 +183,40 @@ def test_build_existing_vial_timeline_uses_only_alive_vials_for_source_dates():
 
 
 def test_prune_vial_schedule_applies_early_flip_and_max_lifetime_rules():
+    base = datetime.datetime.now().replace(hour=10, minute=0, second=0, microsecond=0)
     currently_alive_vials, next_flip_dates, next_eclosion_dates = prune_vial_schedule(
         currently_alive_vials=["V1", "V2"],
         source_dates=[
-            datetime.datetime(2026, 5, 1, 10, 0),
-            datetime.datetime(2026, 5, 8, 10, 0),
+            base,
+            base + datetime.timedelta(days=7),
         ],
         all_flip_dates=[
-            datetime.datetime(2026, 5, 1, 10, 0),
-            datetime.datetime(2026, 5, 8, 10, 0),
+            base,
+            base + datetime.timedelta(days=7),
         ],
         next_flip_dates=[
-            datetime.datetime(2026, 5, 8, 10, 0),
-            datetime.datetime(2026, 5, 15, 10, 0),
+            base + datetime.timedelta(days=7),
+            base + datetime.timedelta(days=14),
         ],
         next_eclosion_dates=[
-            datetime.datetime(2026, 5, 11, 10, 0),
-            datetime.datetime(2026, 5, 18, 10, 0),
+            base + datetime.timedelta(days=10),
+            base + datetime.timedelta(days=17),
         ],
         vial_lifetime=30,
-        last_flip_timestamp="2026-05-01 10:00",
+        last_flip_timestamp=base.strftime("%Y-%m-%d %H:%M"),
         flip_frequency=7,
-        first_flip_date=datetime.datetime(2026, 5, 1, 10, 0),
+        first_flip_date=base,
         max_lifetime_days=12,
     )
 
     assert currently_alive_vials == ["V1", "V2"]
-    assert [date.isoformat() for date in next_flip_dates] == ["2026-05-08T00:00:00"]
-    assert [date.isoformat() for date in next_eclosion_dates] == ["2026-05-11T00:00:00", "2026-05-18T00:00:00"]
+    assert [date.isoformat() for date in next_flip_dates] == [
+        (base + datetime.timedelta(days=7)).replace(hour=0).isoformat()
+    ]
+    assert [date.isoformat() for date in next_eclosion_dates] == [
+        (base + datetime.timedelta(days=10)).replace(hour=0).isoformat(),
+        (base + datetime.timedelta(days=17)).replace(hour=0).isoformat(),
+    ]
 
 
 def test_build_vial_update_properties_marks_empty_vials_as_unmaintained():

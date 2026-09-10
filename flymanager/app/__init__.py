@@ -242,7 +242,12 @@ def create_app():
         cors.init_app(app, resources={r"/*": {"origins": cors_allowed_origins}})
 
     mail.init_app(app)
-    scheduler.init_app(app)
+    # Flask-APScheduler owns one process-global scheduler. Reconfiguring it
+    # after another app factory instance has started it raises
+    # SchedulerAlreadyRunningError; the existing scheduler remains the owner
+    # in that case (normal production has one app factory invocation).
+    if not scheduler.running:
+        scheduler.init_app(app)
     app.after_request(add_security_headers)
 
     @app.url_defaults

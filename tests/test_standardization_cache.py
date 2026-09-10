@@ -183,15 +183,28 @@ def test_reviewer_stock_summary_prefers_cache_without_recompute():
     stock = {"Genotype": DIRTY_GENOTYPE, "StandardizationCache": cache}
 
     with patch.object(
-        main_routes, "summarize_genotype_standardization",
-        side_effect=AssertionError("live recompute should not happen when cache is valid"),
-    ):
+        main_routes, "get_cached_stock_standardization",
+        return_value=cache,
+    ) as get_cached:
         summary = main_routes._stock_standardization_summary(stock)
 
+    get_cached.assert_called_once_with(stock, strict=False)
     assert summary == cache["summary"]
 
 
-def test_reviewer_stock_summary_falls_back_when_cache_missing():
+def test_reviewer_stock_summary_returns_empty_summary_when_cache_missing():
     stock = {"Genotype": DIRTY_GENOTYPE}  # no StandardizationCache
-    summary = main_routes._stock_standardization_summary(stock)
-    assert summary["hasIssues"] is True
+
+    with patch.object(
+        main_routes, "get_cached_stock_standardization",
+        return_value=None,
+    ):
+        summary = main_routes._stock_standardization_summary(stock)
+
+    assert summary == {
+        "issueCount": 0,
+        "unresolvedCount": 0,
+        "unmodeledCount": 0,
+        "topTokens": [],
+        "recommendedReplacements": [],
+    }

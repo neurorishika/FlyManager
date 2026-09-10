@@ -71,6 +71,7 @@ def add_to_stock(user, properties, db, submission_key=None):
     if submission_key:
         existing = db["stocks"].find_one({
             "User": user,
+            "SubmissionKey": submission_key,
         })
         if existing:
             generation = existing.get("CacheGeneration") or {}

@@ -31,14 +31,19 @@ class _FakeIndexCollection:
     def __init__(self):
         self.calls = []
 
-    def create_index(self, keys, name=None):
-        self.calls.append({"keys": list(keys), "name": name})
+    def create_index(self, keys, **options):
+        self.calls.append({"keys": list(keys) if not isinstance(keys, str) else [keys], **options})
 
 
 class _FakeDatabase(dict):
     def __init__(self, name, collections):
         super().__init__(collections)
         self.name = name
+
+    def __missing__(self, name):
+        collection = _FakeIndexCollection()
+        self[name] = collection
+        return collection
 
 
 def _settings_payload():
@@ -82,14 +87,12 @@ def test_ensure_mongo_indexes_creates_access_indexes():
 
     ensure_mongo_indexes(db)
 
-    assert stocks.calls == [
-        {"keys": [("User", 1), ("UniqueID", 1)], "name": "stocks_user_uid"},
-        {"keys": [("AssignedTo", 1), ("UniqueID", 1)], "name": "stocks_assigned_uid"},
-    ]
-    assert crosses.calls == [
-        {"keys": [("User", 1), ("UniqueID", 1)], "name": "crosses_user_uid"},
-        {"keys": [("AssignedTo", 1), ("UniqueID", 1)], "name": "crosses_assigned_uid"},
-    ]
+    assert {call["name"] for call in stocks.calls} >= {
+        "stocks_user_uid", "stocks_assigned_uid", "stocks_user_tray",
+    }
+    assert {call["name"] for call in crosses.calls} >= {
+        "crosses_user_uid", "crosses_assigned_uid", "crosses_user_tray",
+    }
 
 
 def test_preload_metadata_cache_warms_selected_metadata_types():

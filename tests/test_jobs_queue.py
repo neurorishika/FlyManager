@@ -120,3 +120,21 @@ def test_enqueue_job_raises_conflict_when_already_active(jobs, ol):
     # Only the first enqueue should have actually reached the queue.
     queue = Queue(jobs.DEFAULT_QUEUE_NAME, connection=jobs.get_redis_connection())
     assert queue.count == 1
+
+
+def test_worker_connection_allows_rq_to_block_for_jobs(jobs, monkeypatch):
+    created = []
+    sentinel = object()
+
+    def fake_from_url(url, **kwargs):
+        created.append((url, kwargs))
+        return sentinel
+
+    monkeypatch.setattr(jobs.redis, "from_url", fake_from_url)
+    jobs.reset_job_queue_state_for_tests()
+
+    assert jobs.get_worker_redis_connection() is sentinel
+    assert jobs.get_worker_redis_connection() is sentinel
+    assert created == [
+        ("redis://localhost:6379/0", {"socket_connect_timeout": 1.0})
+    ]

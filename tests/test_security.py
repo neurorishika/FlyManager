@@ -121,6 +121,39 @@ def test_login_post_accepts_valid_csrf(monkeypatch):
     assert b"Invalid username or password." in response.data
 
 
+def test_login_reads_only_fields_needed_for_refresh_and_cache_warnings(monkeypatch):
+    app = _make_app(monkeypatch)
+
+    with app.test_client() as client:
+        csrf_token = _extract_csrf_token(client.get("/auth/login").get_data(as_text=True))
+        with patch(
+            "flymanager.app.routes.auth.verify_user_password",
+            return_value=(True, False),
+        ), patch(
+            "flymanager.app.routes.auth.get_user_stocks", return_value=[]
+        ) as get_stocks, patch(
+            "flymanager.app.routes.auth.get_user_crosses", return_value=[]
+        ) as get_crosses, patch(
+            "flymanager.app.routes.auth.refresh_vial_timelines_bulk"
+        ), patch("flymanager.app.routes.auth.write_activity"), patch(
+            "flymanager.app.routes.auth._flash_phenotype_cache_staleness_warnings"
+        ):
+            response = client.post(
+                "/auth/login",
+                data={
+                    "username": "user",
+                    "password": "good-password",
+                    "csrf_token": csrf_token,
+                },
+            )
+
+    assert response.status_code == 302
+    assert get_stocks.call_args.kwargs["projection"]["UniqueID"] == 1
+    assert get_crosses.call_args.kwargs["projection"]["PhenotypeCache.predictedOffspring"] == {
+        "$slice": 1
+    }
+
+
 def test_update_theme_requires_csrf(monkeypatch):
     app = _make_app(monkeypatch)
 

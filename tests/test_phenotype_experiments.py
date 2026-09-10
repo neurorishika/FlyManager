@@ -22,7 +22,7 @@ from flymanager.utils.phenotypes.data.examiner import (
     generate_visible_marker_inventory, render_stock_standardization_markdown,
     render_visible_marker_inventory_markdown, summarize_tsv_file)
 from flymanager.utils.phenotypes.flybase_pipeline import \
-    clear_flybase_phenotype_cache
+    build_flybase_phenotype_cache, clear_flybase_phenotype_cache
 from flymanager.utils.phenotypes.parser import (parse_gene_package,
                                                 tokenize_gene_package)
 from flymanager.utils.phenotypes.predictor import (
@@ -100,6 +100,12 @@ def _write_runtime_flybase_fixture(tmp_path):
     (tmp_path / "dmel_classical_and_insertion_allele_descriptions_fb_fixture.tsv").write_text(
         "Allele symbol\tAllele ID\tDescription\nfoo[1]\tFBal0000001\tFixture allele\n",
         encoding="utf-8",
+    )
+    # Ordinary phenotype resolution intentionally never parses raw FlyBase
+    # files. Build the explicit evidence cache this fixture exercises.
+    build_flybase_phenotype_cache(
+        data_dir=tmp_path,
+        cache_path=tmp_path / "cache.json",
     )
 
 
@@ -604,6 +610,7 @@ def test_resolve_package_markers_keeps_ambiguous_flybase_alias_unresolved(monkey
     monkeypatch.setenv("FLYMANAGER_FLYBASE_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("FLYMANAGER_FLYBASE_CACHE_PATH", str(tmp_path / "cache.json"))
     clear_flybase_phenotype_cache()
+    build_flybase_phenotype_cache(data_dir=tmp_path, cache_path=tmp_path / "cache.json")
 
     resolved = resolve_package_markers("Zip")
 
@@ -697,6 +704,7 @@ def test_audit_bloomington_csv_splits_ambiguous_and_unknown_unresolved_tokens(mo
     monkeypatch.setenv("FLYMANAGER_FLYBASE_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("FLYMANAGER_FLYBASE_CACHE_PATH", str(tmp_path / "cache.json"))
     clear_flybase_phenotype_cache()
+    build_flybase_phenotype_cache(data_dir=tmp_path, cache_path=tmp_path / "cache.json")
 
     csv_path = tmp_path / "bloomington.csv"
     csv_path.write_text(

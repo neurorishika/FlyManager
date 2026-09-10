@@ -134,7 +134,7 @@ def test_standardization_caches_carry_and_check_the_signature():
     assert get_cached_stock_standardization(stock_record, strict=False) is not None
 
 
-def test_the_worker_envelope_refreshes_the_catalog_before_running(monkeypatch):
+def test_the_worker_envelope_refreshes_the_catalog_before_running_work(monkeypatch):
     """A worker that skipped this would recompute every cache against the
     shipped-only marker set and stamp a signature the web process rejects."""
     from flymanager.app.jobs import tasks
@@ -146,6 +146,8 @@ def test_the_worker_envelope_refreshes_the_catalog_before_running(monkeypatch):
     monkeypatch.setattr(tasks, "mark_job_running", lambda *a, **k: calls.append("running"))
     monkeypatch.setattr(tasks, "mark_job_succeeded", lambda *a, **k: None)
 
-    tasks._run("job-key", lambda app, db: {"ok": True})
+    tasks._run("job-key", lambda app, db: calls.append("work") or {"ok": True})
 
-    assert calls[0] == "refreshed", "the refresh must happen before the job body"
+    assert calls.index("refreshed") < calls.index("work"), (
+        "the refresh must happen before the job body"
+    )

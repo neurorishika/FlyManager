@@ -21,3 +21,9 @@ def test_scheduler():
         )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# This module is a manually registered Flask route fixture, not a pytest test.
+# Keep its endpoint name for any temporary blueprint registration while avoiding
+# pytest calling it outside an application/request context.
+test_scheduler.__test__ = False

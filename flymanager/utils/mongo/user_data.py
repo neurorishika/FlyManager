@@ -1,4 +1,4 @@
-def get_user_stocks(user, db):
+def get_user_stocks(user, db, projection=None):
     """
     Connect to the MongoDB collection for the given user's stocks.
     Parameters:
@@ -11,7 +11,11 @@ def get_user_stocks(user, db):
         A list of dictionaries representing the user's stocks.
     """
     stock_collection = db["stocks"]
-    filtered_stocks = stock_collection.find({"User": user})
+    filtered_stocks = (
+        stock_collection.find({"User": user}, projection)
+        if projection is not None
+        else stock_collection.find({"User": user})
+    )
     return list(filtered_stocks)
 
 
@@ -79,7 +83,7 @@ def get_user_email(user, db):
         return None
 
 
-def get_user_crosses(user, db):
+def get_user_crosses(user, db, projection=None):
     """
     Connect to the MongoDB collection for the given user's crosses.
     Parameters:
@@ -92,7 +96,11 @@ def get_user_crosses(user, db):
         The collection representing the user's crosses.
     """
     crosses_collection = db["crosses"]
-    filtered_crosses = crosses_collection.find({"User": user})
+    filtered_crosses = (
+        crosses_collection.find({"User": user}, projection)
+        if projection is not None
+        else crosses_collection.find({"User": user})
+    )
     return list(filtered_crosses)
 
 

@@ -42,3 +42,31 @@ def test_get_accessible_trays_issues_one_batched_backfill_query():
     assert len(find_one_calls) == 0, (
         "backfill must use one batched find(), not a find_one() per accessible record"
     )
+
+
+def test_get_accessible_trays_projects_only_owner_tray_fields_from_records():
+    db = _db_with_shared_tray()
+    collection_class = db["stocks"].__class__
+    original_find = collection_class.find
+    item_queries = []
+
+    def spy_find(self, *args, **kwargs):
+        if self.name in {"stocks", "crosses"}:
+            item_queries.append(args)
+        return original_find(self, *args, **kwargs)
+
+    collection_class.find = spy_find
+    try:
+        get_accessible_trays("alice", db)
+    finally:
+        collection_class.find = original_find
+
+    assert item_queries
+    for args in item_queries:
+        assert args[1] == {
+            "_id": 0,
+            "UniqueID": 1,
+            "User": 1,
+            "AssignedTo": 1,
+            "TrayID": 1,
+        }

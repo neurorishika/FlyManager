@@ -6,6 +6,8 @@ from flask import (Blueprint, current_app, flash, redirect, render_template,
                    request, session, url_for)
 
 from flymanager.app import db
+from flymanager.app.settings import (REQUIRED_CROSS_PROPERTIES,
+                                     REQUIRED_STOCK_PROPERTIES)
 from flymanager.app.security import limiter, log_security_event
 from flymanager.app.services.email import (mail_is_configured,
                                            send_password_reset_email)
@@ -26,6 +28,42 @@ MIN_PASSWORD_LENGTH = 12
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
 INITIALS_PATTERN = re.compile(r"^[A-Za-z0-9]{1,6}$")
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+# Login refreshes vial timelines and reports stale phenotype caches, but it
+# never renders the records themselves.  Keep the read narrow: cross
+# phenotype simulations can be hundreds of kilobytes per record.
+_LOGIN_STOCK_PROJECTION = {
+    "_id": 0,
+    "UniqueID": 1,
+    "Genotype": 1,
+    "FlipLog": 1,
+    "CurrentlyAliveVials": 1,
+    "LastFlipDate": 1,
+    "PhenotypeCache.version": 1,
+    "PhenotypeCache.pipelineSignature": 1,
+    "PhenotypeCache.markerCatalogSignature": 1,
+    "PhenotypeCache.genotype": 1,
+    "PhenotypeCache.prediction": 1,
+    **{field: 1 for field in REQUIRED_STOCK_PROPERTIES},
+}
+_LOGIN_CROSS_PROJECTION = {
+    "_id": 0,
+    "UniqueID": 1,
+    "MaleGenotype": 1,
+    "FemaleGenotype": 1,
+    "FlipLog": 1,
+    "CurrentlyAliveVials": 1,
+    "LastFlipDate": 1,
+    "PhenotypeCache.version": 1,
+    "PhenotypeCache.pipelineSignature": 1,
+    "PhenotypeCache.markerCatalogSignature": 1,
+    "PhenotypeCache.maleGenotype": 1,
+    "PhenotypeCache.femaleGenotype": 1,
+    "PhenotypeCache.parentPhenotypes": 1,
+    # The strict cache check only requires a list, not every simulated child.
+    "PhenotypeCache.predictedOffspring": {"$slice": 1},
+    **{field: 1 for field in REQUIRED_CROSS_PROPERTIES},
+}
 
 
 def rotate_session_identifier():
@@ -132,8 +170,12 @@ def login():
                 rotate_session_identifier()
                 stocks, crosses = [], []
                 try:
-                    stocks = get_user_stocks(username, db)
-                    crosses = get_user_crosses(username, db)
+                    stocks = get_user_stocks(
+                        username, db, projection=_LOGIN_STOCK_PROJECTION,
+                    )
+                    crosses = get_user_crosses(
+                        username, db, projection=_LOGIN_CROSS_PROJECTION,
+                    )
                     refresh_vial_timelines_bulk(username, stocks, crosses, db)
                     write_activity(username, "Logged in", db)
                     if migrated:

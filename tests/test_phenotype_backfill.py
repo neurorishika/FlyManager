@@ -1,3 +1,4 @@
+from flask import redirect
 from unittest.mock import ANY, patch
 
 from flymanager.app import create_app
@@ -162,20 +163,17 @@ def test_logged_in_user_can_backfill_owned_phenotype_caches(monkeypatch):
             sess["username"] = "tech"
 
         with patch(
-            "flymanager.app.routes.settings.backfill_stock_phenotype_cache",
-            return_value={"scanned": 3, "updated": 2, "skipped_valid": 1},
-        ) as stock_backfill, patch(
-            "flymanager.app.routes.settings.backfill_cross_phenotype_cache",
-            return_value={"scanned": 2, "updated": 1, "skipped_valid": 1},
-        ) as cross_backfill, patch(
-            "flymanager.app.routes.settings.write_activity"
-        ) as write_activity:
+            "flymanager.app.routes.settings._enqueue_or_flash_conflict",
+            return_value=redirect("/home"),
+        ) as enqueue:
             response = client.post("/settings/backfill-my-phenotype-cache")
 
     assert response.status_code == 302
-    stock_backfill.assert_called_once_with(ANY, users=["tech"], dry_run=False, force=False)
-    cross_backfill.assert_called_once_with(ANY, users=["tech"], dry_run=False, force=False)
-    write_activity.assert_called_once_with("tech", "Backfilled phenotype cache for maintained records", ANY)
+    assert enqueue.call_args.kwargs["key"] == "maintenance:phenotype-backfill:user:tech"
+    assert enqueue.call_args.kwargs["actor"] == "tech"
+    assert enqueue.call_args.kwargs["task_kwargs"] == {
+        "username": "tech", "users": ["tech"], "scope_label": "your maintained records",
+    }
 
 
 def test_logged_in_user_sees_warning_when_owned_backfill_already_running(monkeypatch):
@@ -186,17 +184,12 @@ def test_logged_in_user_sees_warning_when_owned_backfill_already_running(monkeyp
             sess["username"] = "tech"
 
         with patch(
-            "flymanager.app.routes.settings.hold_operation_lock",
+            "flymanager.app.routes.settings.enqueue_job",
             side_effect=OperationLockConflict("Your phenotype cache backfill is already running."),
-        ), patch(
-            "flymanager.app.routes.settings.backfill_stock_phenotype_cache"
-        ) as stock_backfill, patch(
-            "flymanager.app.routes.settings.backfill_cross_phenotype_cache"
-        ) as cross_backfill:
+        ) as enqueue:
             response = client.post("/settings/backfill-my-phenotype-cache", follow_redirects=True)
 
     body = response.get_data(as_text=True)
     assert response.status_code == 200
     assert "Your phenotype cache backfill is already running." in body
-    stock_backfill.assert_not_called()
-    cross_backfill.assert_not_called()
+    enqueue.assert_called_once()

@@ -4,7 +4,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from flymanager.app import create_app
-from flymanager.utils.mongo.operation_locks import OperationLockConflict
 from flymanager.utils.phenotypes.image_library import \
     select_phenotype_reference_images
 from flymanager.utils.phenotypes.predictor import PHENOTYPE_CACHE_VERSION
@@ -760,6 +759,24 @@ def test_standardization_reviewer_route_summarizes_stocks_and_cross_parents(monk
         with client.session_transaction() as sess:
             sess["username"] = "admin"
 
+        clean_summary = {
+            "issueCount": 0, "unresolvedCount": 0, "unmodeledCount": 0,
+            "topTokens": [], "recommendedReplacements": [],
+        }
+        flagged_stock_summary = {
+            "issueCount": 2, "unresolvedCount": 2, "unmodeledCount": 0,
+            "topTokens": ["OrCo-LexA", "Sp"],
+            "recommendedReplacements": [{
+                "from": "OrCo-LexA", "to": "P{Orco-LexA-VP16}unspecified",
+            }],
+        }
+        flagged_parent_summary = {
+            "issueCount": 2, "unresolvedCount": 1, "unmodeledCount": 1,
+            "topTokens": ["FRT40A", "OrCo-LexA"],
+            "recommendedReplacements": [{
+                "from": "OrCo-LexA", "to": "P{Orco-LexA-VP16}unspecified",
+            }],
+        }
         with patch(
             "flymanager.app.routes.main.get_accessible_stocks",
             return_value=[clean_stock, flagged_stock],
@@ -767,39 +784,11 @@ def test_standardization_reviewer_route_summarizes_stocks_and_cross_parents(monk
             "flymanager.app.routes.main.get_accessible_crosses",
             return_value=[cross_record],
         ), patch(
-            "flymanager.app.services.stock_standardization.review_stock_standardization",
-            side_effect=[
-                {"issue_count": 0, "summary": {}, "issues": []},
-                {
-                    "issue_count": 2,
-                    "summary": {"unresolved_token": 2},
-                    "issues": [
-                        {
-                            "token": "OrCo-LexA",
-                            "recommended_replacement": "P{Orco-LexA-VP16}unspecified",
-                        },
-                        {
-                            "token": "Sp",
-                            "recommended_replacement": "",
-                        },
-                    ],
-                },
-                {"issue_count": 0, "summary": {}, "issues": []},
-                {
-                    "issue_count": 2,
-                    "summary": {"unresolved_token": 1, "standard_format_unmodeled": 1},
-                    "issues": [
-                        {
-                            "token": "FRT40A",
-                            "recommended_replacement": "",
-                        },
-                        {
-                            "token": "OrCo-LexA",
-                            "recommended_replacement": "P{Orco-LexA-VP16}unspecified",
-                        },
-                    ],
-                },
-            ],
+            "flymanager.app.routes.main._stock_standardization_summary",
+            side_effect=[clean_summary, flagged_stock_summary],
+        ), patch(
+            "flymanager.app.routes.main._cross_standardization_summaries",
+            return_value=(clean_summary, flagged_parent_summary),
         ):
             response = client.get("/reviewer")
 
@@ -1114,7 +1103,7 @@ def test_cross_view_route_renders_parent_and_offspring_phenotypes(monkeypatch, t
     assert body.index("vendor/tagify/tagify.css") < body.index("css/bootstrap-density.css")
 
 
-def test_stock_refresh_route_skips_duplicate_refresh(monkeypatch):
+def test_stock_refresh_route_queues_cache_generation(monkeypatch):
     app = _make_app(monkeypatch)
     app.config["WTF_CSRF_ENABLED"] = False
     stock_record = {"UniqueID": "UID1", "User": "admin", "Genotype": "w[1118]; CyO/+; +; +"}
@@ -1127,18 +1116,23 @@ def test_stock_refresh_route_skips_duplicate_refresh(monkeypatch):
             "flymanager.app.routes.stock.get_accessible_stock",
             return_value=stock_record,
         ), patch(
-            "flymanager.app.routes.stock.hold_operation_lock",
-            side_effect=OperationLockConflict("A phenotype refresh for stock UID1 is already running."),
+            "flymanager.app.routes.stock.db",
+        ) as database, patch(
+            "flymanager.app.routes.stock.schedule_record_cache_generation",
+        ) as schedule, patch(
+            "flymanager.app.routes.stock.write_activity",
         ), patch(
-            "flymanager.app.routes.stock.build_stock_phenotype_cache"
-        ) as build_cache:
+            "flymanager.app.routes.stock.pending_cache_generation",
+            return_value={"state": "pending"},
+        ):
             response = client.post(
                 "/stock/view/UID1/refresh_phenotype",
                 follow_redirects=False,
             )
 
     assert response.status_code == 302
-    build_cache.assert_not_called()
+    database["stocks"].update_one.assert_called_once()
+    schedule.assert_called_once()
 
 
 def test_stock_standardization_reviewer_route_returns_review_payload(monkeypatch):
@@ -1186,6 +1180,9 @@ def test_stock_standardization_reviewer_route_returns_review_payload(monkeypatch
             "flymanager.app.routes.stock.get_accessible_stock",
             return_value={"UniqueID": "UID1", "Genotype": "w; CyO/Sp; OrCo-LexA/TM3;", "ViewerCanEdit": True},
         ), patch(
+            "flymanager.app.routes.stock.get_cached_stock_standardization",
+            return_value={"genotype": "w; CyO/Sp; OrCo-LexA/TM3;", "summary": {}},
+        ), patch(
             "flymanager.app.routes.stock.review_stock_standardization",
             return_value=review_payload,
         ):
@@ -1198,7 +1195,7 @@ def test_stock_standardization_reviewer_route_returns_review_payload(monkeypatch
     assert data["issues"][0]["recommended_replacement"] == "P{Orco-LexA-VP16}unspecified"
 
 
-def test_cross_refresh_route_skips_duplicate_refresh(monkeypatch):
+def test_cross_refresh_route_queues_cache_generation(monkeypatch):
     app = _make_app(monkeypatch)
     app.config["WTF_CSRF_ENABLED"] = False
     cross_record = {
@@ -1216,18 +1213,23 @@ def test_cross_refresh_route_skips_duplicate_refresh(monkeypatch):
             "flymanager.app.routes.cross.get_accessible_cross",
             return_value=cross_record,
         ), patch(
-            "flymanager.app.routes.cross.hold_operation_lock",
-            side_effect=OperationLockConflict("A phenotype refresh for cross CROSS1 is already running."),
+            "flymanager.app.routes.cross.db",
+        ) as database, patch(
+            "flymanager.app.routes.cross.schedule_record_cache_generation",
+        ) as schedule, patch(
+            "flymanager.app.routes.cross.pending_cache_generation",
+            return_value={"state": "pending"},
         ), patch(
-            "flymanager.app.routes.cross.build_cross_phenotype_cache"
-        ) as build_cache:
+            "flymanager.app.routes.cross.write_activity",
+        ):
             response = client.post(
                 "/cross/view_cross/CROSS1/refresh_phenotype",
                 follow_redirects=False,
             )
 
     assert response.status_code == 302
-    build_cache.assert_not_called()
+    database["crosses"].update_one.assert_called_once()
+    schedule.assert_called_once()
 
 
 def test_standalone_phenotype_preview_route_renders_prediction(monkeypatch, tmp_path):
@@ -1446,7 +1448,7 @@ def test_cross_explorer_selection_returns_all_filtered_items(monkeypatch):
     ]
 
 
-def test_stock_refresh_phenotype_route_updates_cached_payload(monkeypatch):
+def test_stock_refresh_phenotype_route_invalidates_and_queues_cache(monkeypatch):
     app = _make_app(monkeypatch)
     app.config["WTF_CSRF_ENABLED"] = False
     stock_record = {
@@ -1462,7 +1464,12 @@ def test_stock_refresh_phenotype_route_updates_cached_payload(monkeypatch):
 
         with patch("flymanager.app.routes.stock.get_accessible_stock", return_value=stock_record), patch(
             "flymanager.app.routes.stock.db", {"stocks": fake_collection}
-        ), patch("flymanager.app.routes.stock.write_activity"):
+        ), patch("flymanager.app.routes.stock.write_activity"), patch(
+            "flymanager.app.routes.stock.schedule_record_cache_generation"
+        ) as schedule, patch(
+            "flymanager.app.routes.stock.pending_cache_generation",
+            return_value={"state": "pending"},
+        ):
             response = client.post(
                 "/stock/view/UID1/refresh_phenotype",
             )
@@ -1471,10 +1478,12 @@ def test_stock_refresh_phenotype_route_updates_cached_payload(monkeypatch):
     assert fake_collection.calls
     selector, update = fake_collection.calls[0]
     assert selector == {"UniqueID": "UID1", "User": "admin"}
-    assert update["$set"]["PhenotypeCache"]["genotype"] == "w[1118]; CyO/+; +; +"
+    assert update["$set"]["PhenotypeCache"] is None
+    assert update["$set"]["CacheGeneration"] == {"state": "pending"}
+    schedule.assert_called_once()
 
 
-def test_cross_refresh_phenotype_route_updates_cached_payload(monkeypatch):
+def test_cross_refresh_phenotype_route_invalidates_and_queues_cache(monkeypatch):
     app = _make_app(monkeypatch)
     app.config["WTF_CSRF_ENABLED"] = False
     cross_record = {
@@ -1491,7 +1500,12 @@ def test_cross_refresh_phenotype_route_updates_cached_payload(monkeypatch):
 
         with patch("flymanager.app.routes.cross.get_accessible_cross", return_value=cross_record), patch(
             "flymanager.app.routes.cross.db", {"crosses": fake_collection}
-        ), patch("flymanager.app.routes.cross.write_activity"):
+        ), patch("flymanager.app.routes.cross.write_activity"), patch(
+            "flymanager.app.routes.cross.schedule_record_cache_generation"
+        ) as schedule, patch(
+            "flymanager.app.routes.cross.pending_cache_generation",
+            return_value={"state": "pending"},
+        ):
             response = client.post(
                 "/cross/view_cross/CROSS1/refresh_phenotype",
             )
@@ -1500,5 +1514,6 @@ def test_cross_refresh_phenotype_route_updates_cached_payload(monkeypatch):
     assert fake_collection.calls
     selector, update = fake_collection.calls[0]
     assert selector == {"UniqueID": "CROSS1", "User": "admin"}
-    assert update["$set"]["PhenotypeCache"]["maleGenotype"] == "w[1118]; CyO/+; +; +"
-    assert update["$set"]["PhenotypeCache"]["femaleGenotype"] == "+; +; Sb[1]/+; +"
+    assert update["$set"]["PhenotypeCache"] is None
+    assert update["$set"]["CacheGeneration"] == {"state": "pending"}
+    schedule.assert_called_once()

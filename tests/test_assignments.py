@@ -14,12 +14,19 @@ class FakeCollection:
         self.database = database
         self.name = name
 
-    def find(self, query=None):
+    def find(self, query=None, projection=None):
         query = query or {}
         records = []
         for record in self.database.data.get(self.name, []):
             if all(record.get(key) == value for key, value in query.items()):
-                records.append(dict(record))
+                document = dict(record)
+                if projection:
+                    document = {
+                        key: value
+                        for key, value in document.items()
+                        if projection.get(key) or key == "_id"
+                    }
+                records.append(document)
         return records
 
     def find_one(self, query):
@@ -237,11 +244,24 @@ def test_stock_view_renders_assigned_record_read_only(monkeypatch):
                 "female_split_system_labels": [],
                 "male_split_system_labels": [],
                 "shared_summary": "No marker phenotype predicted",
-                "female_only_labels": [],
-                "male_only_labels": [],
-                "warnings": [],
-                "confidence_label": "low",
-            },
+                    "female_only_labels": [],
+                    "male_only_labels": [],
+                    "reference_images": [],
+                    "provenance_summary": {
+                        "primary_basis": "inference_only",
+                        "counts": {},
+                    },
+                    "viability_status": "unknown",
+                    "lethal_alleles": [],
+                    "fertility_status": "unknown",
+                    "sterile_alleles": [],
+                    "stage_specific_effects": [],
+                    "is_cached": True,
+                    "cached_at": "2026-01-02 10:00",
+                    "cache_state": "ready",
+                    "warnings": [],
+                    "confidence_label": "low",
+                },
         ):
             response = client.get("/stock/view/UID1")
 

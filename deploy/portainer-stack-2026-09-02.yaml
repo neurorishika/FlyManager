@@ -142,6 +142,8 @@ services:
       MONGO_URI: mongodb://mongodb:27017,mongodb2:27017/?replicaSet=rs0
       MONGO_DB_NAME: flymanager
       REDIS_URL: redis://redis:6379/0
+      SESSION_TYPE: redis
+      SESSION_REDIS_URL: redis://redis:6379/1
       APP_HOST: 0.0.0.0
       APP_PORT: "5234"
       FLASK_DEBUG: "0"

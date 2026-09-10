@@ -126,6 +126,15 @@ def get_user_trays(user, db):
     return list(trays)
 
 
+_ACCESSIBLE_TRAY_ITEM_PROJECTION = {
+    "_id": 0,
+    "UniqueID": 1,
+    "User": 1,
+    "AssignedTo": 1,
+    "TrayID": 1,
+}
+
+
 def get_accessible_trays(user, db):
     from flymanager.utils.mongo.access import (get_accessible_crosses,
                                                get_accessible_stocks)
@@ -133,8 +142,15 @@ def get_accessible_trays(user, db):
     trays_collection = db["trays"]
     trays = list(trays_collection.find({"User": user}))
 
-    accessible_items = list(get_accessible_stocks(user, db)) + list(
-        get_accessible_crosses(user, db)
+    # These records are used only to find their owner's tray.  Avoid reading
+    # large cache payloads (especially phenotype predictions) just to derive
+    # the owner/tray pairs for the one batched tray lookup below.
+    accessible_items = list(get_accessible_stocks(
+        user, db, projection=_ACCESSIBLE_TRAY_ITEM_PROJECTION,
+    )) + list(
+        get_accessible_crosses(
+            user, db, projection=_ACCESSIBLE_TRAY_ITEM_PROJECTION,
+        )
     )
     backfill_pairs = {
         (_normalize_text(item.get("User")), _normalize_text(item.get("TrayID")))

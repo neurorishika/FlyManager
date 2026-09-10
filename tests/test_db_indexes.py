@@ -27,8 +27,10 @@ def test_ensure_mongo_indexes_covers_filtered_fields():
     index_specs = {(collection, tuple(keys)) for collection, keys, _ in db.calls}
 
     assert ("stocks", (("User", 1), ("Status", 1), ("TrayID", 1))) in index_specs
+    assert ("stocks", (("User", 1), ("TrayID", 1))) in index_specs
     assert ("stocks", (("AssignedTo", 1), ("Status", 1), ("TrayID", 1))) in index_specs
     assert ("crosses", (("User", 1), ("Status", 1), ("TrayID", 1))) in index_specs
+    assert ("crosses", (("User", 1), ("TrayID", 1))) in index_specs
     assert ("crosses", (("AssignedTo", 1), ("Status", 1), ("TrayID", 1))) in index_specs
     assert ("users", (("Username", 1),)) in index_specs
     assert ("users", (("ReportsTo", 1),)) in index_specs

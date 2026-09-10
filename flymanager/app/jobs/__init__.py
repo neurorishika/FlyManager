@@ -17,6 +17,7 @@ DEFAULT_QUEUE_NAME = "default"
 DEFAULT_JOB_TIMEOUT_SECONDS = 60 * 60 * 2  # 2 hours; individual jobs can override
 
 _redis_connection = None
+_worker_redis_connection = None
 _queue = None
 _worker_app = None
 
@@ -38,6 +39,28 @@ def get_redis_connection():
     return _redis_connection
 
 
+def get_worker_redis_connection():
+    """Return the worker's Redis connection without a read timeout.
+
+    Web requests use a one-second socket timeout so an unavailable queue
+    cannot add several seconds to a committed form mutation.  An RQ worker,
+    however, deliberately blocks in Redis while waiting for jobs; sharing
+    that request-oriented connection makes every idle worker time out and
+    restart.  Keep the short connection timeout while leaving blocking reads
+    unbounded for the worker.
+    """
+    global _worker_redis_connection
+    if _worker_redis_connection is None:
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        _worker_redis_connection = redis.from_url(
+            redis_url,
+            socket_connect_timeout=float(
+                os.getenv("RQ_REDIS_CONNECT_TIMEOUT_SECONDS", "1")
+            ),
+        )
+    return _worker_redis_connection
+
+
 def get_queue():
     global _queue
     if _queue is None:
@@ -46,9 +69,10 @@ def get_queue():
 
 
 def reset_job_queue_state_for_tests():
-    """Test-only hook: force get_redis_connection/get_queue to rebuild next call."""
-    global _redis_connection, _queue
+    """Test-only hook: force Redis connections/queue to rebuild next call."""
+    global _redis_connection, _worker_redis_connection, _queue
     _redis_connection = None
+    _worker_redis_connection = None
     _queue = None
 
 

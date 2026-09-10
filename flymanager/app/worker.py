@@ -7,7 +7,11 @@ import os
 
 from rq import Worker
 
-from flymanager.app.jobs import DEFAULT_QUEUE_NAME, get_redis_connection, get_worker_app
+from flymanager.app.jobs import (
+    DEFAULT_QUEUE_NAME,
+    get_worker_app,
+    get_worker_redis_connection,
+)
 
 # The web process already runs the cron scheduler; the worker process must
 # not start a second copy of it.
@@ -17,7 +21,7 @@ os.environ.setdefault("ENABLE_SCHEDULER", "0")
 def main():
     app = get_worker_app()
     with app.app_context():
-        worker = Worker([DEFAULT_QUEUE_NAME], connection=get_redis_connection())
+        worker = Worker([DEFAULT_QUEUE_NAME], connection=get_worker_redis_connection())
         worker.work(with_scheduler=False)
 
 

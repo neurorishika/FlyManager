@@ -19,7 +19,7 @@ def _properties():
         "Species": "D. melanogaster", "SeriesID": "series-1",
         "ReplicateID": "1", "Type": "WT", "Status": "Healthy",
         "FoodType": "Molasses", "VialLifetime": "14", "FlipFrequency": "7",
-        "DevelopmentalTime": "10", "Provenance": "test", "Genotype": "w[*]",
+        "DevelopmentalTime": "10", "Provenance": "test", "Genotype": "w[*]; ; ; ",
         "Name": "cold-cache regression stock",
     }
 
@@ -54,6 +54,24 @@ def test_stock_retry_with_same_submission_key_returns_existing_record():
     assert first_uid == second_uid
     assert db["stocks"].count_documents({}) == 1
     assert schedule.call_count == 2  # retried dispatch, never retried insert
+
+
+def test_stock_submission_key_does_not_reuse_another_form_submission():
+    """A fresh form must not be treated as a retry of any stock by the user."""
+    db = FakeDatabase()
+    with patch("flymanager.utils.mongo.stocks.qc_genotype", return_value=(True, "w[*]")), patch(
+        "flymanager.utils.mongo.stocks.schedule_record_cache_generation"
+    ):
+        first_success, first_uid = add_to_stock(
+            "alice", _properties(), db, submission_key="form-1"
+        )
+        second_success, second_uid = add_to_stock(
+            "alice", _properties(), db, submission_key="form-2"
+        )
+
+    assert first_success and second_success
+    assert first_uid != second_uid
+    assert db["stocks"].count_documents({}) == 2
 
 
 def test_genotype_edit_marks_cache_pending_and_schedules_worker_work():

@@ -1,3 +1,4 @@
+from flask import redirect
 from unittest.mock import ANY, patch
 
 from flymanager.app import create_app
@@ -269,20 +270,17 @@ def test_admin_can_backfill_phenotype_cache_for_all_users(monkeypatch):
             sess["username"] = "admin"
 
         with patch(
-            "flymanager.app.routes.settings.backfill_stock_phenotype_cache",
-            return_value={"scanned": 5, "updated": 2, "skipped_valid": 3},
-        ) as stock_backfill, patch(
-            "flymanager.app.routes.settings.backfill_cross_phenotype_cache",
-            return_value={"scanned": 4, "updated": 1, "skipped_valid": 3},
-        ) as cross_backfill, patch(
-            "flymanager.app.routes.settings.write_activity"
-        ) as write_activity:
+            "flymanager.app.routes.settings._enqueue_or_flash_conflict",
+            return_value=redirect("/settings"),
+        ) as enqueue:
             response = client.post("/settings/backfill-all-phenotype-cache")
 
     assert response.status_code == 302
-    stock_backfill.assert_called_once_with(ANY, users=None, dry_run=False, force=False)
-    cross_backfill.assert_called_once_with(ANY, users=None, dry_run=False, force=False)
-    write_activity.assert_called_once_with("admin", "Backfilled phenotype cache for all users", ANY)
+    assert enqueue.call_args.kwargs["key"] == "maintenance:phenotype-backfill:all-users"
+    assert enqueue.call_args.kwargs["actor"] == "admin"
+    assert enqueue.call_args.kwargs["task_kwargs"] == {
+        "username": "admin", "users": None, "scope_label": "all users",
+    }
 
 
 def test_admin_refresh_flybase_reference_data_skips_when_lock_exists(monkeypatch):
@@ -294,17 +292,15 @@ def test_admin_refresh_flybase_reference_data_skips_when_lock_exists(monkeypatch
             sess["username"] = "admin"
 
         with patch(
-            "flymanager.app.routes.settings.hold_operation_lock",
+            "flymanager.app.routes.settings.enqueue_job",
             side_effect=OperationLockConflict("A FlyBase reference refresh is already running."),
-        ), patch(
-            "flymanager.app.routes.settings.flybase_service.manual_refresh_flybase_reference_data"
-        ) as refresh_action:
+        ) as enqueue:
             response = client.post("/refresh-flybase-reference-data", follow_redirects=True)
 
     body = response.get_data(as_text=True)
     assert response.status_code == 200
     assert "A FlyBase reference refresh is already running." in body
-    refresh_action.assert_not_called()
+    enqueue.assert_called_once()
 
 
 def test_create_app_registers_monthly_flybase_refresh_job(monkeypatch):

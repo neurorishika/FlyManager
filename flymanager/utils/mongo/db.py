@@ -87,11 +87,16 @@ def ensure_mongo_indexes(db):
         name="stocks_user_submission_key",
     )
     db["stocks"].create_index([("User", 1), ("Status", 1), ("TrayID", 1)], name="stocks_user_status_tray")
+    # Tray occupancy filters by owner and tray without constraining Status.
+    # Keep a matching prefix index so one tray does not scan all statuses for
+    # an owner as that owner's collection grows.
+    db["stocks"].create_index([("User", 1), ("TrayID", 1)], name="stocks_user_tray")
     db["stocks"].create_index([("AssignedTo", 1), ("Status", 1), ("TrayID", 1)], name="stocks_assigned_status_tray")
 
     db["crosses"].create_index([("User", 1), ("UniqueID", 1)], name="crosses_user_uid")
     db["crosses"].create_index([("AssignedTo", 1), ("UniqueID", 1)], name="crosses_assigned_uid")
     db["crosses"].create_index([("User", 1), ("Status", 1), ("TrayID", 1)], name="crosses_user_status_tray")
+    db["crosses"].create_index([("User", 1), ("TrayID", 1)], name="crosses_user_tray")
     db["crosses"].create_index([("AssignedTo", 1), ("Status", 1), ("TrayID", 1)], name="crosses_assigned_status_tray")
     db["crosses"].create_index([("User", 1), ("MaleUniqueID", 1)], name="crosses_user_male_uid")
     db["crosses"].create_index([("User", 1), ("FemaleUniqueID", 1)], name="crosses_user_female_uid")
